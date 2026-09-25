@@ -54,11 +54,14 @@ test("text colours keep WCAG AA contrast on the surfaces they are painted on, in
       const ratio = contrast(fgValue, bgValue);
       assert.ok(ratio >= 4.5, `${selector}: ${fg} on ${bg} is ${ratio.toFixed(2)}:1`);
     }
-    // Captions and placeholders: large-text / UI-component floor.
+    // BB also uses --subtle-foreground for normal-size text such as code comments, so it gets the full 4.5:1.
     const subtle = t["--subtle-foreground"];
-    const canvas = t["--canvas"];
-    assert.ok(subtle !== undefined && canvas !== undefined);
-    assert.ok(contrast(subtle, canvas) >= 3, `${selector}: --subtle-foreground is ${contrast(subtle, canvas).toFixed(2)}:1`);
+    assert.ok(subtle !== undefined);
+    for (const surface of ["--canvas", "--sidebar"]) {
+      const bg = t[surface];
+      assert.ok(bg !== undefined, `${selector}: ${surface} is set`);
+      assert.ok(contrast(subtle, bg) >= 4.5, `${selector}: --subtle-foreground on ${surface} is ${contrast(subtle, bg).toFixed(2)}:1`);
+    }
   }
 });
 
