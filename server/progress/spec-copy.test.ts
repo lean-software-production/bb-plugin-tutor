@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, readFile, readdir, rename, rm, symlink, writeFile } from "node:fs/promises";
+import { join, relative } from "node:path";
 import { test } from "node:test";
 import { makeSandbox } from "../../test/helpers/disk.ts";
 import { copyLessonSpec, seedFileName } from "./spec-copy.ts";
@@ -123,6 +123,101 @@ test("refuses a lesson whose README.md went missing after the course loaded, kee
     assert.deepEqual((await readdir(spec)).sort(), before, "nothing added to or left behind in spec/");
     assert.equal(await readFile(join(spec, "README.md"), "utf8"), first.readme);
     assert.deepEqual(await readdir(join(spec, "features")), ["planning.feature"]);
+  } finally {
+    await sandbox.cleanup();
+  }
+});
+
+/** Every file under `dir` (symbolic links not followed), relative to it. */
+async function filesUnder(dir: string): Promise<string[]> {
+  const entries = await readdir(dir, { recursive: true, withFileTypes: true });
+  return entries.filter((entry) => entry.isFile()).map((entry) => relative(dir, join(entry.parentPath, entry.name)));
+}
+
+test("a swap whose rollback can't put the old files back keeps them and says where they are", async () => {
+  const sandbox = await makeSandbox();
+  try {
+    const first = sandbox.course.lessons[1];
+    const second = sandbox.course.lessons[2];
+    assert.ok(first !== undefined && second !== undefined);
+    await copyLessonSpec(sandbox.factoryRoot, first);
+    const spec = join(sandbox.factoryRoot, "spec");
+
+    // Something makes a folder at spec/README.md once the old README moved aside: neither README can go there.
+    const error = await copyLessonSpec(sandbox.factoryRoot, second, {
+      afterMovedAside: () => mkdir(join(spec, "README.md", "in-the-way"), { recursive: true }).then(() => undefined),
+    }).then(
+      () => assert.fail("the adoption succeeded"),
+      (cause: Error) => cause,
+    );
+    const survivors = [];
+    for (const path of await filesUnder(spec)) {
+      if ((await readFile(join(spec, path), "utf8")) === first.readme) survivors.push(path);
+    }
+    assert.deepEqual(survivors, [".tutor-previous/README.md"], "the previous README survives, set aside");
+    assert.match(error.message, /spec\/\.tutor-previous\/README\.md/);
+    // What could be put back was.
+    assert.deepEqual(await readdir(join(spec, "features")), ["planning.feature"]);
+    assert.ok(!(await readdir(spec)).includes(".tutor-adopting"), "the staged lesson is cleared");
+  } finally {
+    await sandbox.cleanup();
+  }
+});
+
+test("an adoption first recovers what a crashed one left in spec/, restoring missing files and clearing the rest", async () => {
+  const sandbox = await makeSandbox();
+  try {
+    const first = sandbox.course.lessons[1];
+    const second = sandbox.course.lessons[2];
+    assert.ok(first !== undefined && second !== undefined);
+    await copyLessonSpec(sandbox.factoryRoot, first);
+    const spec = join(sandbox.factoryRoot, "spec");
+    // A crash mid-swap: the old README and features moved aside, the new README moved in, the rest staged.
+    await mkdir(join(spec, ".tutor-previous"));
+    await rename(join(spec, "README.md"), join(spec, ".tutor-previous/README.md"));
+    await rename(join(spec, "features"), join(spec, ".tutor-previous/features"));
+    await writeFile(join(spec, "README.md"), "half-adopted README\n");
+    await mkdir(join(spec, ".tutor-adopting/features"), { recursive: true });
+    await writeFile(join(spec, ".tutor-adopting/features/half.feature"), "Feature: half\n");
+    // ...and a staging folder from before these had fixed names.
+    await mkdir(join(spec, ".tutor-staging-Ab12Cd"));
+    await writeFile(join(spec, ".tutor-staging-Ab12Cd/NOTES.md"), "old notes\n");
+
+    // This adoption fails before the swap, so what recovery restored is what stays.
+    await rm(join(second.dir, "README.md"));
+    await assert.rejects(copyLessonSpec(sandbox.factoryRoot, second), /no README\.md/);
+    assert.deepEqual((await readdir(spec)).sort(), ["FACTORY.md", "NOTES.md", "README.md", "features"], "leftovers cleared");
+    assert.equal(await readFile(join(spec, "README.md"), "utf8"), "half-adopted README\n", "a file present is never overwritten");
+    assert.deepEqual(await readdir(join(spec, "features")), ["planning.feature"], "missing files restored");
+
+    // The next adoption that works leaves exactly the lesson.
+    await writeFile(join(second.dir, "README.md"), second.readme);
+    await mkdir(join(spec, ".tutor-previous"));
+    await copyLessonSpec(sandbox.factoryRoot, second);
+    assert.deepEqual((await readdir(spec)).sort(), ["FACTORY.md", "README.md", "features"]);
+    assert.deepEqual((await readdir(join(spec, "features"))).sort(), ["planning.feature", "validation.feature"]);
+  } finally {
+    await sandbox.cleanup();
+  }
+});
+
+test("recovery never follows a leftover that is a symbolic link", async () => {
+  const sandbox = await makeSandbox();
+  try {
+    const lesson = sandbox.course.lessons[2];
+    assert.ok(lesson !== undefined);
+    const outside = join(sandbox.root, "outside");
+    await mkdir(join(outside, "features"), { recursive: true });
+    await writeFile(join(outside, "README.md"), "not the student's spec\n");
+    await writeFile(join(outside, "features/x.feature"), "Feature: x\n");
+    const spec = join(sandbox.factoryRoot, "spec");
+    await mkdir(spec);
+    for (const name of [".tutor-previous", ".tutor-adopting", ".tutor-staging-zz"]) await symlink(outside, join(spec, name));
+
+    await rm(join(lesson.dir, "README.md"));
+    await assert.rejects(copyLessonSpec(sandbox.factoryRoot, lesson), /no README\.md/);
+    assert.deepEqual(await readdir(spec), [], "the links are removed and nothing is restored through them");
+    assert.deepEqual((await filesUnder(outside)).sort(), ["README.md", "features/x.feature"]);
   } finally {
     await sandbox.cleanup();
   }
