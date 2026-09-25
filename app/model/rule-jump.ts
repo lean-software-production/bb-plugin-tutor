@@ -2,9 +2,11 @@
 // history lazily: an early message is not in the DOM until the timeline has
 // been scrolled up far enough for BB to load older pages. So the search polls
 // for the Rule card's anchor and, while it is missing, scrolls the timeline to
-// its top to make BB load more, until the anchor turns up, the history stops
-// growing, or time runs out. The DOM work is injected (app/rule-jump.ts), so
-// the loop itself is testable.
+// its top to make BB load more, until the anchor turns up, time runs out or
+// it has asked for a bounded number of loads. An unchanged history height does
+// not end it: BB can show its loading row for seconds before an older page
+// arrives. The DOM work is injected (app/rule-jump.ts), so the loop itself is
+// testable.
 
 export interface JumpHooks<Anchor, Scroller> {
   /** The Rule card's anchor in the coach thread's timeline, or null while it is not rendered. */
@@ -13,8 +15,6 @@ export interface JumpHooks<Anchor, Scroller> {
   findScroller(): Scroller | null;
   /** Scrolls the timeline to its top, which makes BB load older history. */
   scrollToTop(scroller: Scroller): void;
-  /** How much history is rendered (the scroller's height), to tell when nothing more loads. */
-  historySize(scroller: Scroller): number;
   /** Scrolls the anchor to the top of the view and highlights it. */
   reveal(anchor: Anchor): void;
   /** False once the student has left the coach thread or scrolled it themselves. */
@@ -32,8 +32,8 @@ export interface JumpOptions {
   loadWaitMs: number;
   /** Looks before the first scroll to the top, so an anchor already loaded is found without one. */
   settlePolls: number;
-  /** Loads in a row that add no history before the search stops. */
-  stalledLoads: number;
+  /** Scrolls to the top before the search stops, in case the clock never reaches the deadline. */
+  maxLoads: number;
 }
 
 export const DEFAULT_JUMP_OPTIONS: JumpOptions = {
@@ -41,7 +41,8 @@ export const DEFAULT_JUMP_OPTIONS: JumpOptions = {
   pollMs: 150,
   loadWaitMs: 700,
   settlePolls: 4,
-  stalledLoads: 3,
+  // More than fit in timeoutMs, so the deadline is what normally ends a search.
+  maxLoads: 40,
 };
 
 export type JumpResult = "found" | "cancelled" | "not-found";
@@ -52,8 +53,7 @@ export async function findRuleSection<Anchor, Scroller>(
 ): Promise<JumpResult> {
   const deadline = hooks.now() + options.timeoutMs;
   let settled = 0;
-  let stalled = 0;
-  let lastSize: number | null = null;
+  let loads = 0;
   for (;;) {
     if (!hooks.stillWanted()) return "cancelled";
     const anchor = hooks.findAnchor();
@@ -68,10 +68,8 @@ export async function findRuleSection<Anchor, Scroller>(
       await hooks.wait(options.pollMs);
       continue;
     }
-    const size = hooks.historySize(scroller);
-    stalled = lastSize !== null && size <= lastSize ? stalled + 1 : 0;
-    if (stalled >= options.stalledLoads) return "not-found";
-    lastSize = size;
+    if (loads >= options.maxLoads) return "not-found";
+    loads += 1;
     hooks.scrollToTop(scroller);
     await hooks.wait(options.loadWaitMs);
   }

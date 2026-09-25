@@ -77,7 +77,6 @@ export function jumpToRuleSection(target: RuleTarget, open: (threadId: string) =
     scrollToTop: (scroller) => {
       scroller.scrollTop = 0;
     },
-    historySize: (scroller) => scroller.scrollHeight,
     reveal: (element) => {
       element.scrollIntoView({ block: "start" });
       // BB may still be laying out the page it just loaded above; settle once more.
