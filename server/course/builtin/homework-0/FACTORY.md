@@ -1,4 +1,4 @@
-# The factory, as of this homework
+# The factory, as of this lesson
 
-*There is no factory yet.* Homework 0 is about the tutor, not the factory;
-you start building in homework 1.
+*There is no factory yet.* Lesson 0 is about the tutor, not the factory;
+you start building in lesson 1.

@@ -168,7 +168,7 @@ test("Homework 0 ships with the plugin and teaches the interface", async () => {
   assert.equal(zero.suggestedRuleOrder.length, rules.length);
   const examples = homeworkExamples(zero);
   assert.ok(examples.every((example) => example.novelty === "new"));
-  assert.ok(examples.some((example) => /side thread/.test(example.name)));
+  assert.ok(examples.some((example) => /side chat/.test(example.name)));
 });
 
 test("a missing course, or a folder that is not a course, is a readable error", async () => {

@@ -10,7 +10,7 @@
   },
   "bb": {
     "name": "Tutor",
-    "description": "A coached, Gherkin-driven course: a course rail, lesson pages and a coach that works one Rule at a time.",
+    "description": "A coached, Gherkin-driven course: a course outline in the sidebar and a coach thread per lesson that works one Rule at a time.",
     "branding": {
       "icon": "FileText"
     },

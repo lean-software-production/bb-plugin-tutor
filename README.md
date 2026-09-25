@@ -36,7 +36,7 @@ in [`scripts/tutor-dev/`](../../../scripts/tutor-dev/README.md):
 ## Codespace polish
 
 - **Theme.** `bb.themes` contributes `paper` (`plugin:tutor:paper`): the workbook's paper, ink and
-  blue on BB's tokens, the rail colour for the sidebar, Archivo for the UI (inlined, since a theme
+  blue on BB's tokens, the outline colour for the sidebar, Archivo for the UI (inlined, since a theme
   is one CSS file) and BB's own mono for code, plus a light code theme (`themes/paper-code.json`).
   Edit `app/theme/paper.palette.css`, then `npm run fonts` regenerates `themes/paper.css`; a test
   checks it is current and that every text colour keeps 4.5:1. Dark mode gets a dark paper variant;
@@ -70,7 +70,7 @@ Coach threads are spawned by Tutor directly in the factory folder, and only they
 | `shared/` | Model, keys, RPC contract, tool schemas, directive attributes, routes, fixtures |
 | `server/course/` | Course loading: course.yaml or ledger, Gherkin, slugs, hashes, novelty, lexicon, Homework 0 |
 | `server/progress/`, `server/coach/`, `server/rpc/` | Student state, coach tools and threads, RPC handlers |
-| `app/` | Rail, lesson page, directives, rule tab, home section, sidebar navigation, activity reporter; `paper.css`, fonts and the theme source |
+| `app/` | Course outline (`Rail.tsx`), start page, lesson and Rule cards and other directives, the jump to a Rule's section, rule tab, home section, sidebar navigation, activity reporter; `paper.css`, fonts and the theme source |
 | `themes/` | The `paper` BB theme (generated CSS) and its light code theme |
 | `skills/tutor/` | The coach's skill |
 | `components/`, `lib/`, `hooks/` | Vendored BB UI components (shadcn model) |

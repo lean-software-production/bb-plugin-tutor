@@ -1,5 +1,5 @@
 # Tutor's built-in course. Its one homework is prepended to every course as
-# Homework 0; the id "000" is reserved for it.
+# Lesson 0 (Homework 0 in code); the id "000" is reserved for it.
 id: tutor
 title: Using your tutor
 homeworks:
