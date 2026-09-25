@@ -10,9 +10,9 @@ type Thread = Awaited<ReturnType<Sdk["threads"]["get"]>>;
 export interface Caller {
   threadId: string;
   /** The lesson's coach thread itself, as opposed to one of its side chats (or older side threads). */
-  isMain: boolean;
+  isCoachThread: boolean;
   /** The coach thread a side chat or side thread belongs to; the caller itself when it is the coach thread. */
-  mainThreadId: string;
+  coachThreadId: string;
 }
 
 export const NOT_A_TUTOR_THREAD =
@@ -27,7 +27,7 @@ async function getThread(sdk: Sdk, threadId: string): Promise<Thread | null> {
 }
 
 /** A thread Tutor spawned as a lesson's coach: neither a fork nor a child. */
-export function isTutorMain(thread: Pick<Thread, "originPluginId" | "parentThreadId" | "sourceThreadId" | "originKind">, pluginId: string): boolean {
+export function isTutorCoachThread(thread: Pick<Thread, "originPluginId" | "parentThreadId" | "sourceThreadId" | "originKind">, pluginId: string): boolean {
   return thread.originPluginId === pluginId && thread.parentThreadId === null && thread.sourceThreadId === null && thread.originKind === null;
 }
 
@@ -42,15 +42,15 @@ export function isTutorMain(thread: Pick<Thread, "originPluginId" | "parentThrea
  * answers to nobody.
  */
 export async function coachThreadOf(sdk: Sdk, pluginId: string, thread: Thread): Promise<Thread | null> {
-  if (isTutorMain(thread, pluginId)) return thread;
-  const mainId =
+  if (isTutorCoachThread(thread, pluginId)) return thread;
+  const coachId =
     thread.originKind === "fork"
       ? thread.visibility === "hidden" ? thread.sourceThreadId : null
       : thread.originPluginId === pluginId ? thread.parentThreadId : null;
-  if (mainId === null) return null;
-  const main = await getThread(sdk, mainId);
-  if (main === null || !isTutorMain(main, pluginId) || main.projectId !== thread.projectId || main.archivedAt !== null) return null;
-  return main;
+  if (coachId === null) return null;
+  const coachThread = await getThread(sdk, coachId);
+  if (coachThread === null || !isTutorCoachThread(coachThread, pluginId) || coachThread.projectId !== thread.projectId || coachThread.archivedAt !== null) return null;
+  return coachThread;
 }
 
 export async function authorizeCaller(
@@ -60,13 +60,13 @@ export async function authorizeCaller(
   binding: Binding,
 ): Promise<Caller | { error: string }> {
   const thread = await getThread(sdk, threadId);
-  const main = thread === null ? null : await coachThreadOf(sdk, pluginId, thread);
-  if (thread === null || main === null) return { error: NOT_A_TUTOR_THREAD };
+  const coachThread = thread === null ? null : await coachThreadOf(sdk, pluginId, thread);
+  if (thread === null || coachThread === null) return { error: NOT_A_TUTOR_THREAD };
   if (binding.status !== "bound") {
     return { error: "No factory project is set up yet. The student confirms it on the Course page." };
   }
   if (thread.projectId !== binding.projectId) {
     return { error: "This thread is not in the student's factory project, so Tutor's tools are off here." };
   }
-  return { threadId: thread.id, isMain: main.id === thread.id, mainThreadId: main.id };
+  return { threadId: thread.id, isCoachThread: coachThread.id === thread.id, coachThreadId: coachThread.id };
 }

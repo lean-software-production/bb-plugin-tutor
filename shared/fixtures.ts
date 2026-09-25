@@ -157,8 +157,8 @@ const lesson0 = lesson({
             novelty: "new",
           },
           {
-            name: "A side thread appears under its rule",
-            steps: steps("When you spin off a side thread from a rule", "Then it appears under that rule"),
+            name: "A side chat appears under its rule",
+            steps: steps("When you open a side chat about a rule", "Then it appears under that rule"),
             novelty: "new",
           },
         ],
@@ -377,17 +377,17 @@ export const fixtureBinding: Binding = {
 };
 
 export const fixtureThreads: TutorThread[] = [
-  { id: "thr_coach002", lessonId: "002", role: "main", ruleKey: null, title: coachThreadTitle("002"), mainThreadId: "thr_coach002", sideChat: false },
+  { id: "thr_coach002", lessonId: "002", role: "coach", ruleKey: null, title: coachThreadTitle("002"), coachThreadId: "thr_coach002", fork: false },
   {
     id: "thr_side002",
     lessonId: "002",
-    role: "side",
+    role: "sideChat",
     ruleKey: fixtureStudent.progress?.focus ?? null,
     title: "Why does the validator see the diff?",
-    mainThreadId: "thr_coach002",
-    sideChat: false,
+    coachThreadId: "thr_coach002",
+    fork: false,
   },
-  { id: "thr_coach001", lessonId: "001", role: "main", ruleKey: null, title: coachThreadTitle("001"), mainThreadId: "thr_coach001", sideChat: false },
+  { id: "thr_coach001", lessonId: "001", role: "coach", ruleKey: null, title: coachThreadTitle("001"), coachThreadId: "thr_coach001", fork: false },
 ];
 
 /** The Rules the Lesson 002 coach thread has focused: its sections can be jumped to. */
@@ -504,7 +504,7 @@ export const fixtureCompletion: Completion = {
   lesson: { id: "001", title: lesson1.title, set: lesson1.set },
   counts: { total: 2, passing: 2, notYet: 0, skipped: 0, pending: 0, fresh: 2 },
   freshRules: 1,
-  sideThreads: 0,
+  sideChats: 0,
   adoptedAt: "2026-09-22T09:00:00Z",
   summary: "Your factory turns a seed into a plan and keeps a plan it already has.",
   next: {

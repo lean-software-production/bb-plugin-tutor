@@ -8,22 +8,22 @@ import type { Course, Lesson, Rule } from "../../shared/model.ts";
 import { adoptionTargets } from "../coach/actions.ts";
 import { coachThreadOf } from "../coach/auth.ts";
 import { resolveFactory } from "../coach/binding.ts";
-import { mainThreadLockKey } from "../coach/lock-keys.ts";
+import { coachThreadLockKey } from "../coach/lock-keys.ts";
 import type { FactoryLocation } from "../coach/threads.ts";
 import {
-  mainThreadPrompt,
+  coachThreadPrompt,
   redirectMessage,
   sideChatAnchor,
   sideChatSeed,
   sideChatTitle,
-  type MainThreadStart,
+  type CoachThreadStart,
 } from "../coach/prompts.ts";
 import type { TutorRuntime } from "../coach/runtime.ts";
 import { BB_REPLY_PREFIX, ensureSideChatTab, forkSideChat, listSideChats } from "../coach/side-chats.ts";
 import {
-  findMainThread,
+  findCoachThread,
   listTutorThreads,
-  spawnMainThread,
+  spawnCoachThread,
   toTutorThread,
   type TutorThreadRecord,
 } from "../coach/threads.ts";
@@ -77,20 +77,20 @@ export function registerRpc(rt: TutorRuntime): void {
    * lists its own: side chats of their lesson, about no Rule in particular.
    */
   async function bbSideChatsOf(threads: readonly TutorThreadRecord[]): Promise<TutorThreadRecord[]> {
-    const mains = threads.filter((thread) => thread.role === "main");
-    const lists = await Promise.all(mains.map((main) => listSideChats(bb.sdk, main.id).catch(() => [])));
-    return mains.flatMap((main, index) =>
+    const coachThreads = threads.filter((thread) => thread.role === "coach");
+    const lists = await Promise.all(coachThreads.map((coachThread) => listSideChats(bb.sdk, coachThread.id).catch(() => [])));
+    return coachThreads.flatMap((coachThread, index) =>
       (lists[index] ?? [])
-        .filter((row) => row.originPluginId !== bb.pluginId && row.projectId === main.projectId)
+        .filter((row) => row.originPluginId !== bb.pluginId && row.projectId === coachThread.projectId)
         .map((row) => ({
           id: row.id,
-          lessonId: main.lessonId,
-          role: "side" as const,
+          lessonId: coachThread.lessonId,
+          role: "sideChat" as const,
           ruleKey: null,
           title: row.title ?? (withoutLeadingDirectives((row.titleFallback ?? "").replace(BB_REPLY_PREFIX, "")) || null),
-          mainThreadId: main.id,
-          sideChat: true,
-          courseId: main.courseId,
+          coachThreadId: coachThread.id,
+          fork: true,
+          courseId: coachThread.courseId,
           projectId: row.projectId,
           createdAt: row.createdAt,
           reachedRules: [],
@@ -98,39 +98,39 @@ export function registerRpc(rt: TutorRuntime): void {
     );
   }
 
-  async function spawnMain(course: Course, binding: BoundFactory, lesson: Lesson, prompt: string): Promise<string> {
-    const threadId = await spawnMainThread(bb.sdk, {
+  async function spawnCoach(course: Course, binding: BoundFactory, lesson: Lesson, prompt: string): Promise<string> {
+    const threadId = await spawnCoachThread(bb.sdk, {
       projectId: binding.projectId,
       factory: binding.location,
       courseId: course.id,
       lessonId: lesson.id,
       prompt,
     });
-    rt.coaches.remember([{ id: threadId, role: "main", lessonId: lesson.id }]);
+    rt.coaches.remember([{ id: threadId, role: "coach", lessonId: lesson.id }]);
     rt.signals.publish("threads", lesson.id);
     return threadId;
   }
 
   /**
-   * The lesson's main coach thread, spawned with `prompt` when there is none.
+   * The lesson's coach thread, spawned with `prompt` when there is none.
    * One caller at a time per lesson, re-listing once it has the lock, so two
-   * clicks (or two tabs) never spawn two main coaches.
+   * clicks (or two tabs) never spawn two coach threads.
    */
-  async function findOrSpawnMain(
+  async function findOrSpawnCoach(
     course: Course,
     binding: BoundFactory,
     lesson: Lesson,
     prompt: () => string,
   ): Promise<{ threadId: string; created: boolean }> {
-    return rt.locks.run(mainThreadLockKey(binding.projectId, course.id, lesson.id), async () => {
+    return rt.locks.run(coachThreadLockKey(binding.projectId, course.id, lesson.id), async () => {
       const threads = await listTutorThreads(bb.sdk, bb.pluginId, binding.projectId);
-      const existing = findMainThread(threads, course.id, lesson.id);
+      const existing = findCoachThread(threads, course.id, lesson.id);
       if (existing !== undefined) return { threadId: existing.id, created: false };
-      return { threadId: await spawnMain(course, binding, lesson, prompt()), created: true };
+      return { threadId: await spawnCoach(course, binding, lesson, prompt()), created: true };
     });
   }
 
-  function startFor(world: World, course: Course, lesson: Lesson): MainThreadStart {
+  function startFor(world: World, course: Course, lesson: Lesson): CoachThreadStart {
     const pointer = world.pointer;
     if (pointer === null || lessonStatus(course, pointer, lesson.id) === "done") return "revisit";
     return pointer.iterationStatus === "not-started" ? "adopt" : "resume";
@@ -151,10 +151,10 @@ export function registerRpc(rt: TutorRuntime): void {
     getCompletion: async ({ lessonId }) => {
       const world = await loadWorld();
       const threads = await threadsOf(world);
-      const main = world.course === null ? undefined : findMainThread(threads, world.course.id, lessonId);
+      const coachThread = world.course === null ? undefined : findCoachThread(threads, world.course.id, lessonId);
       // Side chats BB made ("Reply in side chat") are not Tutor's threads, so count them apart.
       const bbSideChats =
-        main === undefined ? 0 : (await listSideChats(bb.sdk, main.id)).filter((row) => row.originPluginId !== bb.pluginId).length;
+        coachThread === undefined ? 0 : (await listSideChats(bb.sdk, coachThread.id)).filter((row) => row.originPluginId !== bb.pluginId).length;
       return buildCompletion(world, lessonId, threads, bbSideChats);
     },
 
@@ -167,19 +167,19 @@ export function registerRpc(rt: TutorRuntime): void {
         return { thread: record === null ? null : publicThread(record) };
       }
       // A side chat BB made of a coach thread: a side chat of its lesson, about no Rule in particular.
-      const main = await coachThreadOf(bb.sdk, bb.pluginId, thread);
-      if (main === null || main.id === thread.id) return { thread: null };
-      const coach = toTutorThread(main, await bb.sdk.threads.getPluginMetadata({ threadId: main.id }).catch(() => null));
+      const coachThread = await coachThreadOf(bb.sdk, bb.pluginId, thread);
+      if (coachThread === null || coachThread.id === thread.id) return { thread: null };
+      const coach = toTutorThread(coachThread, await bb.sdk.threads.getPluginMetadata({ threadId: coachThread.id }).catch(() => null));
       if (coach === null) return { thread: null };
       return {
         thread: {
           id: thread.id,
           lessonId: coach.lessonId,
-          role: "side" as const,
+          role: "sideChat" as const,
           ruleKey: null,
           title: thread.title,
-          mainThreadId: main.id,
-          sideChat: true,
+          coachThreadId: coachThread.id,
+          fork: true,
         },
       };
     },
@@ -219,7 +219,7 @@ export function registerRpc(rt: TutorRuntime): void {
       if (world.pointer === null || lessonStatus(course, world.pointer, lesson.id) === "ahead") {
         throw new Error(`Lesson ${lesson.id} has not started yet.`);
       }
-      return findOrSpawnMain(course, binding, lesson, () => mainThreadPrompt(course, lesson, startFor(world, course, lesson)));
+      return findOrSpawnCoach(course, binding, lesson, () => coachThreadPrompt(course, lesson, startFor(world, course, lesson)));
     },
 
     startNextLesson: async ({ lessonId }) => {
@@ -230,37 +230,37 @@ export function registerRpc(rt: TutorRuntime): void {
       if (lesson.builtin || world.pointer === null || !adoptionTargets(course, world.pointer).includes(lesson.id)) {
         throw new Error(`Lesson ${lesson.id} cannot be started yet: finish the lesson before it first.`);
       }
-      const { threadId } = await findOrSpawnMain(course, binding, lesson, () => mainThreadPrompt(course, lesson, "adopt"));
+      const { threadId } = await findOrSpawnCoach(course, binding, lesson, () => coachThreadPrompt(course, lesson, "adopt"));
       return { threadId };
     },
 
-    startSideThread: async ({ lessonId, ruleKey }) => {
+    startSideChat: async ({ lessonId, ruleKey }) => {
       const world = await loadWorld();
       const course = requireCourse(world);
       requireBound(world);
       const lesson = requireLesson(course, lessonId);
       const rule = ruleKey === null ? null : requireRule(lesson, ruleKey);
-      const main = findMainThread(await threadsOf(world), course.id, lesson.id);
-      if (main === undefined) throw new Error(`Start with your coach for lesson ${lesson.id} first.`);
+      const coachThread = findCoachThread(await threadsOf(world), course.id, lesson.id);
+      if (coachThread === undefined) throw new Error(`Start with your coach for lesson ${lesson.id} first.`);
       const sideChatId = await forkSideChat(bb.sdk, {
-        coachThreadId: main.id,
+        coachThreadId: coachThread.id,
         courseId: course.id,
         lessonId: lesson.id,
         ruleKey: rule?.key ?? null,
         title: sideChatTitle(rule),
         seed: sideChatSeed(lesson, rule),
       });
-      await ensureSideChatTab(bb.sdk, main.id, sideChatId, sideChatAnchor(lesson, rule));
+      await ensureSideChatTab(bb.sdk, coachThread.id, sideChatId, sideChatAnchor(lesson, rule));
       rt.signals.publish("threads", lesson.id);
-      return { coachThreadId: main.id, sideChatId };
+      return { coachThreadId: coachThread.id, sideChatId };
     },
 
     ensureSideChatTab: async ({ sideChatId }) => {
       const world = await loadWorld();
       const binding = requireBound(world);
       const thread = await bb.sdk.threads.get({ threadId: sideChatId }).catch(() => null);
-      const main = thread === null ? null : await coachThreadOf(bb.sdk, bb.pluginId, thread);
-      if (thread === null || main === null || main.id === thread.id || thread.originKind !== "fork" || main.projectId !== binding.projectId) {
+      const coachThread = thread === null ? null : await coachThreadOf(bb.sdk, bb.pluginId, thread);
+      if (thread === null || coachThread === null || coachThread.id === thread.id || thread.originKind !== "fork" || coachThread.projectId !== binding.projectId) {
         throw new Error("That side chat is gone, or it isn't a side chat of one of your coach threads.");
       }
       const metadata = thread.originPluginId === bb.pluginId ? await bb.sdk.threads.getPluginMetadata({ threadId: thread.id }).catch(() => null) : null;
@@ -272,8 +272,8 @@ export function registerRpc(rt: TutorRuntime): void {
         lesson !== undefined
           ? sideChatAnchor(lesson, rule)
           : (thread.titleFallback ?? thread.title ?? "A side question").replace(BB_REPLY_PREFIX, "");
-      await ensureSideChatTab(bb.sdk, main.id, thread.id, anchor);
-      return { coachThreadId: main.id };
+      await ensureSideChatTab(bb.sdk, coachThread.id, thread.id, anchor);
+      return { coachThreadId: coachThread.id };
     },
 
     redirectFocus: async ({ lessonId, ruleKey }) => {
@@ -285,16 +285,16 @@ export function registerRpc(rt: TutorRuntime): void {
         throw new Error("You can only choose the next Rule in the lesson you are on.");
       }
       const rule = requireRule(lesson, ruleKey);
-      const main = await findOrSpawnMain(course, binding, lesson, () =>
-        mainThreadPrompt(course, lesson, startFor(world, course, lesson), rule),
+      const coachThread = await findOrSpawnCoach(course, binding, lesson, () =>
+        coachThreadPrompt(course, lesson, startFor(world, course, lesson), rule),
       );
-      if (main.created) return { threadId: main.threadId };
+      if (coachThread.created) return { threadId: coachThread.threadId };
       await bb.sdk.threads.send({
-        threadId: main.threadId,
+        threadId: coachThread.threadId,
         input: [{ type: "text", text: redirectMessage(rule), mentions: [] }],
         mode: "queue-if-active",
       });
-      return { threadId: main.threadId };
+      return { threadId: coachThread.threadId };
     },
 
     heartbeat: async () => {

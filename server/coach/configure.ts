@@ -26,7 +26,7 @@ export function coachConfiguration(
       ? { kind: "side-chat", lessonId: forkOf ?? null }
       : parentThreadId !== null
         ? { kind: "side-thread" }
-        : { kind: "main" };
+        : { kind: "coach" };
   return {
     tools: [...ALL_TOOL_NAMES],
     skills: [SKILL_ID],

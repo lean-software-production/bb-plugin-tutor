@@ -3,7 +3,7 @@
 // chat") forks a Tutor coach thread; it asks this instead. It only decides
 // what is offered: every tool call re-checks the thread with BB (auth.ts).
 export interface CoachRegistry {
-  /** Records coach threads (role "main") from a listing or a spawn. */
+  /** Records coach threads (role "coach") from a listing or a spawn. */
   remember(threads: readonly { id: string; role: string; lessonId: string }[]): void;
   /** The lesson of a coach thread Tutor has seen, else undefined. */
   lessonOf(threadId: string): string | undefined;
@@ -13,7 +13,7 @@ export function createCoachRegistry(): CoachRegistry {
   const lessons = new Map<string, string>();
   return {
     remember(threads) {
-      for (const thread of threads) if (thread.role === "main") lessons.set(thread.id, thread.lessonId);
+      for (const thread of threads) if (thread.role === "coach") lessons.set(thread.id, thread.lessonId);
     },
     lessonOf: (threadId) => lessons.get(threadId),
   };

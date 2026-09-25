@@ -46,7 +46,7 @@ export function completionView(completion: Completion, now: number): CompletionV
   const stats: Stat[] = [
     { value: `${counts.passing}/${counts.total}`, label: "examples hold" },
     { value: String(completion.freshRules), label: completion.freshRules === 1 ? "new or reworded rule" : "new or reworded rules" },
-    { value: String(completion.sideThreads), label: completion.sideThreads === 1 ? "side chat" : "side chats" },
+    { value: String(completion.sideChats), label: completion.sideChats === 1 ? "side chat" : "side chats" },
   ];
   if (since !== null) stats.push({ value: since, label: since === "today" ? "adopted" : "since adopted" });
   return {

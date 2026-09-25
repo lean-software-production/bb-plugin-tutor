@@ -112,8 +112,8 @@ function suggestedNextRule(lesson: Lesson, progress: ProgressMap, except: string
   return undefined;
 }
 
-export function focusAction(state: CoachState, input: ToolParameters<"tutor_focus_rule">, isMain: boolean): Outcome {
-  if (!isMain) {
+export function focusAction(state: CoachState, input: ToolParameters<"tutor_focus_rule">, isCoachThread: boolean): Outcome {
+  if (!isCoachThread) {
     return { error: "Only the coach thread moves the focus. Suggest the Rule to the student instead." };
   }
   const progress = underWay(state);

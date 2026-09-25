@@ -84,12 +84,12 @@ test("only the coach thread moves the focus, and the Rule card leads its next me
   assert.ok(rule !== undefined);
   const side = focusAction(stateOf(), { rule: rule.key }, false);
   assert.ok("error" in side);
-  const main = focusAction(stateOf(), { rule: rule.key }, true);
-  assert.equal(cardIn(main)?.kind, "focus");
-  assert.ok("progress" in main && main.progress?.focus === rule.key);
-  assert.ok("text" in main && main.reached === rule.key);
-  assert.match(main.text, /start your next message with this line, exactly as written and on a line of its own/);
-  assert.match(main.text, /\n::tutor-progress\{kind="focus"[^\n]*\}$/);
+  const onCoach = focusAction(stateOf(), { rule: rule.key }, true);
+  assert.equal(cardIn(onCoach)?.kind, "focus");
+  assert.ok("progress" in onCoach && onCoach.progress?.focus === rule.key);
+  assert.ok("text" in onCoach && onCoach.reached === rule.key);
+  assert.match(onCoach.text, /start your next message with this line, exactly as written and on a line of its own/);
+  assert.match(onCoach.text, /\n::tutor-progress\{kind="focus"[^\n]*\}$/);
 });
 
 test("adoption: Lesson 0 or the first lesson to begin with, then the one after a Done one", () => {

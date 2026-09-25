@@ -29,20 +29,20 @@ import {
 
 /**
  * A thread Tutor spawned or forked, as the backend knows it (live status comes
- * from useSidebarThreads). `main` is the lesson's coach thread. `side` is a
- * side chat, a hidden fork of it shown in its right panel, or a side thread
- * spawned under it before side chats existed.
+ * from useSidebarThreads). `coach` is the lesson's coach thread. `sideChat` is
+ * one of its side chats: a hidden fork shown in its right panel, or an older
+ * side thread spawned under it before side chats existed.
  */
 export const tutorThreadSchema = z.object({
   id: threadIdSchema,
   lessonId: lessonIdSchema,
-  role: z.enum(["main", "side"]),
+  role: z.enum(["coach", "sideChat"]),
   ruleKey: ruleKeySchema.nullable(),
   title: z.string().nullable(),
   /** The coach thread it belongs to; itself for a coach thread. */
-  mainThreadId: threadIdSchema,
-  /** A side chat (a hidden fork, in the coach thread's right panel), not a thread of its own. */
-  sideChat: z.boolean(),
+  coachThreadId: threadIdSchema,
+  /** A hidden fork, opened in the coach thread's right panel; false for an older side thread, which is a thread of its own. */
+  fork: z.boolean(),
 });
 export type TutorThread = z.infer<typeof tutorThreadSchema>;
 
@@ -99,7 +99,7 @@ export const lessonSummarySchema = z.object({
   status: lessonStatusSchema,
   /** Recorded progress: the current lesson's, a done one's history entry, else all pending. */
   counts: exampleCountsSchema,
-  /** The lesson's main coach thread, or null before it has one. */
+  /** The lesson's coach thread, or null before it has one. */
   coachThreadId: threadIdSchema.nullable(),
   /** Its features and Rules, for the course outline. */
   outline: z.array(featureOutlineSchema),
@@ -162,7 +162,7 @@ export const completionSchema = z.object({
   /** Rules whose novelty is not unchanged. */
   freshRules: z.number().int().nonnegative(),
   /** Side chats (and older side threads) of the lesson's coach thread. */
-  sideThreads: z.number().int().nonnegative(),
+  sideChats: z.number().int().nonnegative(),
   adoptedAt: z.string().nullable(),
   summary: z.string().nullable(),
   next: z
@@ -240,13 +240,13 @@ export const rpcContract = defineRpcContract({
     input: z.object({ projectId: z.string().min(1).max(128) }),
     output: bindingSchema,
   },
-  /** Finds the lesson's main coach thread, or spawns it. Current or done lessons only. */
+  /** Finds the lesson's coach thread, or spawns it. Current or done lessons only. */
   openCoach: {
     input: lessonInput,
     output: z.object({ threadId: threadIdSchema, created: z.boolean() }),
   },
   /**
-   * Spawns the main thread for the lesson after a Done one; its first turn
+   * Spawns the coach thread for the lesson after a Done one; its first turn
    * adopts the spec (tutor_adopt_iteration). Fails for any other lesson.
    */
   startNextLesson: {
@@ -254,17 +254,17 @@ export const rpcContract = defineRpcContract({
     output: z.object({ threadId: threadIdSchema }),
   },
   /**
-   * A BB side chat of the lesson's main coach thread, optionally about one
+   * A BB side chat of the lesson's coach thread, optionally about one
    * Rule: a hidden fork, plus BB's "Side chat" tab in the coach thread's right
    * panel. A plugin cannot select that tab, so the frontend points to it.
    */
-  startSideThread: {
+  startSideChat: {
     input: z.object({ lessonId: lessonIdSchema, ruleKey: ruleKeySchema.nullable() }),
     output: z.object({ coachThreadId: threadIdSchema, sideChatId: threadIdSchema }),
   },
   /**
    * Puts a side chat's tab back in its coach thread's right panel if it was
-   * closed. The side chat must be a hidden fork of a Tutor main coach thread
+   * closed. The side chat must be a hidden fork of a Tutor coach thread
    * (Tutor's, or one BB made with "Reply in side chat").
    */
   ensureSideChatTab: {
@@ -273,7 +273,7 @@ export const rpcContract = defineRpcContract({
   },
   /**
    * The student asked for a Rule (the Rule tab's "Work on this Rule next"):
-   * send the main coach thread a message asking to move there. The coach
+   * send the coach thread a message asking to move there. The coach
    * moves the focus (tutor_focus_rule), not the UI.
    */
   redirectFocus: {

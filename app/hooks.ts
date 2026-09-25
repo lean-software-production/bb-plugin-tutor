@@ -152,7 +152,7 @@ export function useAskSideQuestion(onDone: () => void = () => undefined): Action
   const rpc = useTutorRpc();
   const navigate = useBbNavigate();
   return useAction(async (lessonId: string, ruleKey: string | null) => {
-    const { coachThreadId } = await rpc.call("startSideThread", { lessonId, ruleKey });
+    const { coachThreadId } = await rpc.call("startSideChat", { lessonId, ruleKey });
     refreshAll();
     navigate.toThread(coachThreadId);
     toast.success(SIDE_CHAT_HINT);

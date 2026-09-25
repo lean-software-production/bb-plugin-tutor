@@ -226,13 +226,13 @@ export interface StudentState {
 export const coachThreadMetadataSchema = z.object({
   course: z.string(),
   lesson: lessonIdSchema,
-  /** "side" for a side chat (a fork Tutor made), and for a side thread spawned before side chats. */
-  role: z.enum(["main", "side"]),
+  /** "sideChat" for a side chat (a fork Tutor made), and for a side thread spawned before side chats. */
+  role: z.enum(["coach", "sideChat"]),
   ruleKey: ruleKeySchema.optional(),
 });
 
 /**
- * Also under Tutor's metadata on a main coach thread: the Rules the coach has
+ * Also under Tutor's metadata on a coach thread: the Rules the coach has
  * focused there (tutor_focus_rule), in order. The coach opens each Rule's
  * section in the conversation when it focuses it, so these are the Rules the
  * course outline can jump to. Read leniently: it is untrusted like the rest.

@@ -53,7 +53,7 @@ export function forkFailure(cause: unknown): string {
  * coach's working tree, and stops with the coach thread.
  */
 export async function forkSideChat(sdk: Sdk, fork: ForkSideChat): Promise<string> {
-  const pluginMetadata: CoachThreadMetadata = { course: fork.courseId, lesson: fork.lessonId, role: "side" };
+  const pluginMetadata: CoachThreadMetadata = { course: fork.courseId, lesson: fork.lessonId, role: "sideChat" };
   if (fork.ruleKey !== null) pluginMetadata.ruleKey = fork.ruleKey;
   try {
     const thread = await sdk.threads.fork({

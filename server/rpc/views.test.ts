@@ -65,7 +65,7 @@ test("completion describes the finished lesson and what comes next", () => {
   const completion = buildCompletion(makeWorld(done), "002", records);
   assert.deepEqual(completionSchema.parse(completion), completion);
   assert.equal(completion.summary, "It checks its work.");
-  assert.equal(completion.sideThreads, 1);
+  assert.equal(completion.sideChats, 1);
   assert.equal(completion.adoptedAt, "2026-09-23T09:00:00Z");
   assert.equal(completion.next?.id, "003");
   assert.equal(completion.next?.factoryDiff?.length, fixtureCompletion.next?.factoryDiff === null ? 0 : 4);

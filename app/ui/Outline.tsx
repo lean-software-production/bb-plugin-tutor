@@ -344,7 +344,7 @@ function ThreadLink({ row, onNavigate }: { row: ThreadRow; onNavigate: () => voi
   const classes = ["tp-th", `tp-th--${row.kind}`];
   if (row.nested) classes.push("tp-th--nest");
   if (row.isActive) classes.push("tp-th--on");
-  const icon = row.kind === "coach" ? "✦" : row.kind === "side" ? "↳" : "·";
+  const icon = row.kind === "coach" ? "✦" : row.kind === "sideChat" ? "↳" : "·";
   return (
     <a
       className={classes.join(" ")}

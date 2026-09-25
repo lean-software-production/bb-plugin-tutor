@@ -42,7 +42,7 @@ export interface OutlineFeature {
   rules: OutlineRule[];
 }
 
-export type ThreadRowKind = "coach" | "side" | "plain";
+export type ThreadRowKind = "coach" | "sideChat" | "plain";
 
 export interface ThreadRow {
   id: string;
@@ -78,7 +78,7 @@ export interface LessonNode {
   count: string;
   percent: number;
   expandedByDefault: boolean;
-  /** The lesson on screen: its start page, its coach thread or one of its side threads. */
+  /** The lesson on screen: its start page, its coach thread or one of its side chats. */
   isViewed: boolean;
   coach: ThreadRow | null;
   /** No coach thread yet, and this is the lesson the student is on. */
@@ -163,33 +163,33 @@ function sideRowsOf(
   activeThreadId: string | null,
 ): SideRow[] {
   const ruleNames = new Map(lesson.outline.flatMap((feature) => feature.rules.map((rule) => [rule.key, rule.name] as const)));
-  const listed = tutorThreads.filter((thread) => thread.role === "side" && thread.mainThreadId === coachId);
+  const listed = tutorThreads.filter((thread) => thread.role === "sideChat" && thread.coachThreadId === coachId);
   const listedIds = new Set(listed.map((thread) => thread.id));
   const liveOnly = [...liveById.values()].filter(
     (thread) => !listedIds.has(thread.id) && thread.sourceThreadId === coachId && thread.isHidden && !thread.isArchived,
   );
   const rows = [
-    ...listed.map((tutor) => ({ id: tutor.id, sideChat: tutor.sideChat, tutor, live: liveById.get(tutor.id) })),
-    ...liveOnly.map((live) => ({ id: live.id, sideChat: true, tutor: undefined, live })),
+    ...listed.map((tutor) => ({ id: tutor.id, fork: tutor.fork, tutor, live: liveById.get(tutor.id) })),
+    ...liveOnly.map((live) => ({ id: live.id, fork: true, tutor: undefined, live })),
   ].filter((row) => row.live?.isArchived !== true);
   return rows
     .sort((a, b) => (a.live?.createdAt ?? 0) - (b.live?.createdAt ?? 0))
-    .map(({ id, sideChat, tutor, live }) => {
+    .map(({ id, fork, tutor, live }) => {
       const ruleKey = tutor?.ruleKey ?? null;
       const ruleName = ruleKey === null ? undefined : ruleNames.get(ruleKey);
       return {
         id,
-        kind: sideChat ? "side-chat" : "side-thread",
+        kind: fork ? "side-chat" : "side-thread",
         title: withoutLeadingDirectives(tutor?.title ?? live?.displayTitle ?? "") || "Side chat",
         caption: ruleName === undefined ? null : `from: ${ruleName}`,
-        href: sideChat ? threadHref(coachId) : (live?.href ?? threadHref(id)),
+        href: fork ? threadHref(coachId) : (live?.href ?? threadHref(id)),
         isActive: id === activeThreadId,
         indicator: live === undefined ? { tone: "none", label: null } : indicatorView(live),
       };
     });
 }
 
-/** Which lesson is on screen: the start page's, or that of the open coach thread or side thread. */
+/** Which lesson is on screen: the start page's, or that of the open coach thread or side chat. */
 export function viewedLesson(
   route: TutorRoute | null,
   activeThreadId: string | null,

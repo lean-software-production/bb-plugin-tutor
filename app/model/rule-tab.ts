@@ -29,7 +29,7 @@ export interface RuleTabTarget {
   ruleKey: string | null;
 }
 
-/** Explicit params win; otherwise the thread's own lesson and (for a side thread) its Rule. */
+/** Explicit params win; otherwise the thread's own lesson and (for a side chat) its Rule. */
 export function ruleTabTarget(params: RuleTabParams, thread: TutorThread | null): RuleTabTarget | null {
   const lessonId = params.lessonId ?? thread?.lessonId ?? null;
   if (lessonId === null) return null;
@@ -70,7 +70,7 @@ function detail(status: ExampleStatus, note: string | undefined, carried: boolea
   }
 }
 
-export function ruleTabView(lessonDetail: LessonDetail, target: RuleTabTarget, fromSideThread: boolean): RuleTabView {
+export function ruleTabView(lessonDetail: LessonDetail, target: RuleTabTarget, fromSideChat: boolean): RuleTabView {
   const startPath = formatRoute({ kind: "start", lessonId: lessonDetail.lesson.id });
   const key = target.ruleKey ?? lessonDetail.focus;
   const rule = key === null ? undefined : findRule(lessonDetail.lesson, key);
@@ -78,7 +78,7 @@ export function ruleTabView(lessonDetail: LessonDetail, target: RuleTabTarget, f
   const feature = lessonDetail.lesson.features.find((candidate) => candidate.rules.includes(rule));
   const where = feature?.name ?? lessonDetail.lesson.title;
   const counts = countExamples(rule.examples, lessonDetail.progress);
-  const eyebrow = fromSideThread
+  const eyebrow = fromSideChat
     ? `Spun off from · ${where}`
     : rule.key === lessonDetail.focus
       ? `Rule in focus · ${where}`

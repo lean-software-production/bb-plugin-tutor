@@ -70,14 +70,14 @@ const overviewWithChat: Overview = {
     {
       id: "thr_chat002",
       lessonId: "002",
-      role: "side",
+      role: "sideChat",
       ruleKey: "validation/a-task-is-finished-when-validation-is-satisfied",
       title: "Side question · validation",
-      mainThreadId: "thr_coach002",
-      sideChat: true,
+      coachThreadId: "thr_coach002",
+      fork: true,
     },
     // BB's side chat as the backend lists it; the sidebar list may not carry hidden threads at all.
-    { id: "thr_bbchat002", lessonId: "002", role: "side", ruleKey: null, title: "the outline is…", mainThreadId: "thr_coach002", sideChat: true },
+    { id: "thr_bbchat002", lessonId: "002", role: "sideChat", ruleKey: null, title: "the outline is…", coachThreadId: "thr_coach002", fork: true },
   ],
 };
 
@@ -147,7 +147,7 @@ test("other threads keep BB usable: grouped by project, newest first, children n
   );
 });
 
-test("the lesson on screen opens too: its start page, its coach thread or a side thread", () => {
+test("the lesson on screen opens too: its start page, its coach thread or a side chat", () => {
   const onPage = buildOutline(input({ route: { kind: "start", lessonId: "003" } }));
   assert.deepEqual(
     onPage.lessons.filter((lesson) => lesson.expandedByDefault).map((lesson) => lesson.id),

@@ -44,7 +44,7 @@ export function RuleTab({ threadId, params }: PluginThreadPanelProps) {
     if (detail.data === null) {
       return detail.status === "error" ? <ErrorNotice message={detail.error} /> : <Loading label="Loading the Rule…" />;
     }
-    const view = ruleTabView(detail.data, target, thread?.role === "side");
+    const view = ruleTabView(detail.data, target, thread?.role === "sideChat");
     const coachThreadId = detail.data.coachThreadId;
     if (view.kind === "no-rule") {
       return <p className="tp-yah-note">No Rule is in focus yet. Your coach picks one when you start.</p>;
@@ -79,7 +79,7 @@ export function RuleTab({ threadId, params }: PluginThreadPanelProps) {
           ))}
         </div>
         <div className="tp-acts">
-          {thread?.role === "side" && coachThreadId !== null ? (
+          {thread?.role === "sideChat" && coachThreadId !== null ? (
             <button type="button" onClick={() => navigate.toThread(coachThreadId)}>
               Back to coach
             </button>

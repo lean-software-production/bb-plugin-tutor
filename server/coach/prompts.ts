@@ -5,7 +5,7 @@ import { SKILL_ID, TOOL_NAMES } from "../../shared/constants.ts";
 import { formatLessonRef } from "../../shared/directives.ts";
 import { coachThreadMetadataSchema, type Course, type Lesson, type Rule } from "../../shared/model.ts";
 
-export type MainThreadStart = "adopt" | "resume" | "revisit";
+export type CoachThreadStart = "adopt" | "resume" | "revisit";
 
 const MAX_QUESTION = 1500;
 
@@ -20,7 +20,7 @@ function method(course: Course): string {
  * The coach thread's first message. The lesson card line sits on its own
  * line, exactly as the coach must write it, so the lesson leads the thread.
  */
-export function mainThreadPrompt(course: Course, lesson: Lesson, start: MainThreadStart, focus: Rule | null = null): string {
+export function coachThreadPrompt(course: Course, lesson: Lesson, start: CoachThreadStart, focus: Rule | null = null): string {
   const lines = [
     `You are the coach for Lesson ${lesson.id} "${lesson.title}" of the course "${course.title}".`,
     `Load the \`${SKILL_ID}\` skill and follow it. ${method(course)}`,
@@ -88,7 +88,7 @@ export interface InstructionFacts {
 
 /** Where the configured thread sits under its lesson, from BB's thread structure. */
 export type ThreadPlace =
-  | { kind: "main" }
+  | { kind: "coach" }
   /** A fork of the coach thread: Tutor's (its metadata may name a Rule) or BB's own. */
   | { kind: "side-chat"; lessonId: string | null }
   /** A child Tutor spawned before side chats. */
@@ -98,14 +98,14 @@ export type ThreadPlace =
  * configure's short dynamic instructions. Metadata is untrusted: only values
  * that pass the schema (a three-digit id, a slug key) reach the text.
  */
-export function coachInstructions(metadata: unknown, facts: InstructionFacts, place: ThreadPlace = { kind: "main" }): string {
+export function coachInstructions(metadata: unknown, facts: InstructionFacts, place: ThreadPlace = { kind: "coach" }): string {
   const parsed = coachThreadMetadataSchema.safeParse(metadata);
   const lines = [`This thread belongs to Tutor, the course coach. Load the \`${SKILL_ID}\` skill and follow it.`];
   const lessonId = parsed.success ? parsed.data.lesson : place.kind === "side-chat" ? place.lessonId : null;
   const ruleKey = parsed.success ? parsed.data.ruleKey : undefined;
   const about = ruleKey === undefined ? "" : `, about Rule ${ruleKey}`;
   if (lessonId !== null) {
-    if (place.kind === "main" && parsed.success && parsed.data.role === "main") {
+    if (place.kind === "coach" && parsed.success && parsed.data.role === "coach") {
       lines.push(`You are the coach thread for Lesson ${lessonId}: you move the focus and mark Examples.`);
     } else if (place.kind === "side-chat") {
       lines.push(

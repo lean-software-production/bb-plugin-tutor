@@ -44,7 +44,7 @@ function refusal(text: string): PluginAgentToolResult {
 
 async function applyOutcome(rt: TutorRuntime, root: string, outcome: Outcome, caller: Caller): Promise<void> {
   if ("error" in outcome) return;
-  if (outcome.reached !== undefined) await recordReachedRule(rt.bb.sdk, caller.mainThreadId, outcome.reached);
+  if (outcome.reached !== undefined) await recordReachedRule(rt.bb.sdk, caller.coachThreadId, outcome.reached);
   if (outcome.adopt !== undefined) await copyLessonSpec(root, outcome.adopt);
   if (outcome.iteration !== undefined) await rt.store.writeIteration(root, outcome.iteration);
   if (outcome.progress !== undefined) await rt.store.writeProgress(root, outcome.progress);
@@ -94,14 +94,14 @@ async function sideChat(
     return { error: `There is no Rule ${input.rule} in lesson ${state.lesson.id}. Call tutor_status for the keys.` };
   }
   const sideChatId = await forkSideChat(rt.bb.sdk, {
-    coachThreadId: caller.mainThreadId,
+    coachThreadId: caller.coachThreadId,
     courseId: state.course.id,
     lessonId: state.lesson.id,
     ruleKey: rule?.key ?? null,
     title: input.title,
     seed: sideChatSeed(state.lesson, rule, input.prompt),
   });
-  await ensureSideChatTab(rt.bb.sdk, caller.mainThreadId, sideChatId, sideChatAnchor(state.lesson, rule));
+  await ensureSideChatTab(rt.bb.sdk, caller.coachThreadId, sideChatId, sideChatAnchor(state.lesson, rule));
   rt.signals.publish("threads", state.lesson.id);
   return {
     text:
@@ -123,7 +123,7 @@ export function registerCoachTools(rt: TutorRuntime): void {
     description:
       "Move the focus to a Rule of the current lesson (coach thread only). Returns the Rule card, a ::tutor-progress line to put at the top of your next message.",
     label: { pending: "Moving to a Rule", completed: "Moved to a Rule" },
-    action: (state, input, caller) => focusAction(state, input, caller.isMain),
+    action: (state, input, caller) => focusAction(state, input, caller.isCoachThread),
   });
   register(rt, {
     name: TOOL_NAMES.markExample,
