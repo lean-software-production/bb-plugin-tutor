@@ -1,0 +1,167 @@
+/* Coach moments inside BB's chat (mockup 3A, ".pcard" and ".term"). */
+
+.tutor-paper.tp-pcard {
+  max-width: 560px;
+  margin: 6px 0;
+  overflow: hidden;
+  border: 1px solid var(--tp-line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: var(--tp-shadow);
+  line-height: 1.4;
+}
+.tutor-paper .tp-pcard-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background-color: var(--tp-grid-paper);
+  background-image:
+    linear-gradient(rgb(151 178 192 / 0.16) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(151 178 192 / 0.16) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+.tutor-paper .tp-mk {
+  display: grid;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+.tutor-paper .tp-mk--green {
+  background: var(--tp-green);
+}
+.tutor-paper .tp-mk--amber {
+  background: var(--tp-amber);
+}
+.tutor-paper .tp-mk--blue {
+  background: var(--tp-blue);
+}
+.tutor-paper.tp-pcard--homework-complete .tp-mk {
+  width: 36px;
+  height: 36px;
+  font-size: 1rem;
+}
+.tutor-paper.tp-pcard--homework-complete {
+  border-color: #bfe0d2;
+}
+.tutor-paper.tp-pcard .tp-ey {
+  color: var(--tp-muted);
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.tutor-paper.tp-pcard .tp-tt {
+  color: var(--tp-ink);
+  font: 500 1.05rem/1.25 var(--tp-font-display);
+}
+.tutor-paper .tp-ring {
+  flex: none;
+  margin-left: auto;
+  color: var(--tp-muted);
+  font-size: 0.62rem;
+  text-align: right;
+}
+.tutor-paper .tp-ring b {
+  display: block;
+  color: var(--tp-ink);
+  font: 500 1.15rem/1 var(--tp-font-display);
+}
+.tutor-paper .tp-pcard-next {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--tp-line-soft);
+  color: #3d4a55;
+  font-size: 0.74rem;
+}
+.tutor-paper .tp-pcard-next .tp-lab {
+  flex: none;
+  color: var(--tp-blue);
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.tutor-paper .tp-pcard-next b {
+  font: 500 0.95rem var(--tp-font-display);
+}
+.tutor-paper .tp-pcard-rows {
+  padding: 6px 14px 10px;
+  font-size: 0.74rem;
+}
+.tutor-paper .tp-pcard-rows > div {
+  display: flex;
+  gap: 8px;
+  padding: 3px 0;
+  color: #3d4a55;
+}
+.tutor-paper .tp-pcard-rows .tp-g,
+.tutor-paper .tp-pcard-rows .tp-a {
+  flex: none;
+  width: 12px;
+  font-weight: 800;
+}
+.tutor-paper .tp-pcard-rows .tp-g {
+  color: var(--tp-green);
+}
+.tutor-paper .tp-pcard-rows .tp-a {
+  color: var(--tp-amber);
+}
+.tutor-paper .tp-pcard-ft {
+  display: flex;
+  gap: 14px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--tp-line-soft);
+}
+.tutor-paper .tp-pcard-ft .tp-link-button {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+/* ::term — a leaf directive, so a chip on its own line with a pop-up definition. */
+.tutor-paper.tp-term-line {
+  margin: 2px 0;
+}
+.tutor-paper .tp-term {
+  display: inline-block;
+  padding: 1px 2px;
+  border: 0;
+  border-bottom: 1.5px dotted var(--tp-blue);
+  background: none;
+  color: var(--tp-blue-ink);
+  font: 500 0.95rem var(--tp-font-display);
+  cursor: help;
+}
+.tutor-paper .tp-term--loading {
+  cursor: default;
+}
+.tutor-paper.tp-termpop {
+  z-index: 60;
+  width: min(300px, calc(100vw - 24px));
+  padding: 10px 12px;
+  border: 1px solid var(--tp-line);
+  border-radius: 10px;
+  background: var(--tp-paper);
+  box-shadow: var(--tp-shadow);
+  color: #34414c;
+  font: 400 0.78rem/1.5 var(--tp-font-display);
+}
+.tutor-paper.tp-termpop b {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--tp-blue);
+  font: 800 0.58rem var(--tp-font-core);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.tutor-paper.tp-termpop code {
+  font-size: 0.72rem;
+}

@@ -1,0 +1,7 @@
+widget:
+  term: "Widget"
+  definition: |-
+    A thing the works makes. See *gadget*.
+gadget:
+  term: Gadget
+  definition: A widget with a *button*.

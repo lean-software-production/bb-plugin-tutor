@@ -1,0 +1,259 @@
+/* Plain paper pages: between homeworks (mockup 7), first run (8), course errors. */
+
+.tutor-grid.tp-page {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+}
+.tutor-paper.tp-page-col {
+  width: min(740px, calc(100% - 96px));
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 2.4rem 0 120px;
+}
+.tutor-paper.tp-page-col--roomy {
+  padding-top: 4.5rem;
+}
+.tutor-paper .tp-eyebrow--green {
+  margin: 0 0 4px;
+  color: var(--tp-green);
+}
+.tutor-paper .tp-muted {
+  color: var(--tp-muted);
+}
+.tutor-paper .tp-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.tutor-paper .tp-notice {
+  margin: 14px 0;
+  padding: 10px 14px;
+  border: 1px solid #c9daf6;
+  border-radius: 10px;
+  background: var(--tp-blue-pale);
+  color: #1b3f75;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+.tutor-paper .tp-notice--error {
+  border-color: #efc9c9;
+  background: #fbeaea;
+  color: #7a2a2a;
+}
+.tutor-paper .tp-loading {
+  margin: 1.4rem 0;
+  color: var(--tp-muted);
+  font: italic 1rem var(--tp-font-display);
+}
+.tutor-paper .tp-tip {
+  margin-top: 3rem;
+  color: var(--tp-muted);
+  font-size: 0.78rem;
+}
+
+/* ---- completion ---- */
+.tutor-paper .tp-done-panel {
+  position: relative;
+  margin-top: 0.5rem;
+  padding: 30px 30px 26px;
+  overflow: hidden;
+  border: 1px solid #bfe0d2;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: var(--tp-shadow);
+}
+.tutor-paper .tp-done-panel > :not(.tp-confetti) {
+  position: relative;
+  z-index: 1;
+}
+.tutor-paper .tp-confetti {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.tutor-paper .tp-confetti i {
+  position: absolute;
+  width: 7px;
+  height: 12px;
+  border-radius: 2px;
+  opacity: 0.55;
+}
+.tutor-paper .tp-big {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.tutor-paper .tp-big .tp-h2 {
+  margin: 0;
+}
+.tutor-paper .tp-tick {
+  display: grid;
+  flex: none;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--tp-green);
+  color: #fff;
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+.tutor-paper .tp-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 26px;
+  margin-top: 18px;
+  color: var(--tp-muted);
+  font-size: 0.74rem;
+}
+.tutor-paper .tp-stats b {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--tp-ink);
+  font: 500 1.6rem/1 var(--tp-font-display);
+}
+.tutor-paper .tp-sum {
+  margin: 18px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--tp-line-soft);
+}
+.tutor-paper .tp-next {
+  margin-top: 4rem;
+}
+.tutor-paper .tp-next .tp-h1 {
+  font-size: 3.2rem;
+}
+.tutor-paper .tp-diff {
+  margin-top: 14px;
+  overflow: hidden;
+  border: 1px solid var(--tp-line);
+  border-radius: 12px;
+  background: #fff;
+  font: 0.76rem/1.7 var(--tp-font-mono);
+}
+.tutor-paper .tp-diff .tp-fh {
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--tp-line);
+  background: #f3f1ea;
+  color: var(--tp-muted);
+  font-size: 0.72rem;
+}
+.tutor-paper .tp-diff .tp-l {
+  padding: 0 12px;
+  white-space: pre-wrap;
+}
+.tutor-paper .tp-l--add {
+  background: #e8f5ee;
+  color: #18503f;
+}
+.tutor-paper .tp-l--del {
+  background: #fbeaea;
+  color: #8a2c2c;
+  text-decoration: line-through;
+  text-decoration-color: rgb(138 44 44 / 0.4);
+}
+.tutor-paper .tp-l--ctx {
+  color: #7b858e;
+}
+.tutor-paper .tp-continue {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  margin-top: 1.6rem;
+}
+
+/* ---- first run ---- */
+.tutor-paper .tp-picker {
+  max-width: 620px;
+  margin-top: 2.4rem;
+  overflow: hidden;
+  border: 1px solid var(--tp-line);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: var(--tp-shadow);
+}
+.tutor-paper .tp-pick-label {
+  margin-top: 2rem;
+}
+.tutor-paper .tp-pick-label + .tp-picker {
+  margin-top: 0.6rem;
+}
+.tutor-paper .tp-pk {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 14px 18px;
+  border: 0;
+  border-top: 1px solid var(--tp-line-soft);
+  background: #fff;
+  color: var(--tp-ink);
+  text-align: left;
+}
+.tutor-paper .tp-pk:first-child {
+  border-top: 0;
+}
+.tutor-paper .tp-pk--sel {
+  background: #f5f8fe;
+}
+.tutor-paper .tp-pk--dis:not(.tp-pk--sel) {
+  opacity: 0.6;
+}
+.tutor-paper .tp-pk .tp-r {
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid #c9c5b8;
+  border-radius: 50%;
+}
+.tutor-paper .tp-pk--sel .tp-r {
+  border: 5px solid var(--tp-blue);
+}
+.tutor-paper .tp-pk .tp-nm {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+.tutor-paper .tp-pk .tp-pth {
+  display: block;
+  color: var(--tp-muted);
+  font: 0.72rem var(--tp-font-mono);
+}
+.tutor-paper .tp-pk .tp-v {
+  color: #8d8b82;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.tutor-paper .tp-pk .tp-v--ok {
+  color: var(--tp-green);
+}
+.tutor-paper .tp-howto {
+  max-width: 620px;
+  margin-top: 2.4rem;
+  padding: 16px 20px;
+  border: 1px dashed #cfcabb;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.6);
+}
+.tutor-paper .tp-howto .tp-section-label {
+  margin: 0;
+}
+.tutor-paper .tp-howto ol {
+  margin: 6px 0 14px;
+  padding-left: 1.2rem;
+  color: #34414c;
+  font: 1rem/1.7 var(--tp-font-display);
+  list-style: decimal;
+}
+.tutor-paper .tp-howto code {
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: #f3f2ed;
+  font-size: 0.8em;
+}

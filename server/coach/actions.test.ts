@@ -1,0 +1,133 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { parseProgressCard } from "../../shared/directives.ts";
+import { findHomework, homeworkExamples } from "../../shared/derive.ts";
+import { fixtureCourse, fixtureFreshStudent, fixtureStudent } from "../../shared/fixtures.ts";
+import type { StudentState } from "../../shared/model.ts";
+import { makeWorld } from "../../test/helpers/world.ts";
+import {
+  adoptAction,
+  adoptionTargets,
+  coachStateOf,
+  completeAction,
+  focusAction,
+  markAction,
+  type CoachState,
+  type Outcome,
+} from "./actions.ts";
+
+const NOW = "2026-09-25T11:00:00Z";
+
+function stateOf(student: StudentState = fixtureStudent): CoachState {
+  const state = coachStateOf(makeWorld(student));
+  assert.ok(!("error" in state));
+  return state;
+}
+
+function cardIn(outcome: Outcome) {
+  assert.ok("text" in outcome, "error" in outcome ? outcome.error : "");
+  const line = outcome.text.split("\n").find((text) => text.startsWith("::tutor-progress"));
+  assert.ok(line !== undefined, "no card line");
+  const attributes = Object.fromEntries([...line.matchAll(/(\w+)="([^"]*)"/g)].map((m) => [m[1], m[2]]));
+  return parseProgressCard(attributes as Record<string, string>);
+}
+
+const homework2 = findHomework(fixtureCourse, "002");
+assert.ok(homework2 !== undefined);
+const [planFromSeed, keptPlan, rightFirstTime, wrongFirstTime, neverSatisfied] = homeworkExamples(homework2);
+assert.ok(planFromSeed && keptPlan && rightFirstTime && wrongFirstTime && neverSatisfied);
+const validationRule = homework2.features[1]?.rules[0];
+assert.ok(validationRule !== undefined);
+
+test("coachStateOf refuses without a course or a bound factory", () => {
+  assert.match((coachStateOf({ ...makeWorld(), course: null, courseError: "no ledger" }) as { error: string }).error, /no ledger/);
+  assert.match((coachStateOf(makeWorld(fixtureStudent, { status: "unbound" })) as { error: string }).error, /No factory/);
+});
+
+test("marking the last Example of a Rule passing gives a rule-passing card naming the next Rule", () => {
+  const outcome = markAction(stateOf(), { example: wrongFirstTime.key, status: "passing", evidence: "$ ./factory\nok" }, NOW);
+  const card = cardIn(outcome);
+  assert.equal(card?.kind, "rule-passing");
+  assert.equal(card?.title, validationRule.name);
+  assert.equal(card?.passed, 3);
+  assert.equal(card?.total, 5);
+  assert.ok(card?.next !== null);
+  assert.ok("progress" in outcome && outcome.progress !== undefined);
+  assert.deepEqual(outcome.progress.examples[wrongFirstTime.key], {
+    status: "passing",
+    hash: wrongFirstTime.hash,
+    evidence: "$ ./factory\nok",
+    at: NOW,
+  });
+  assert.match(outcome.text, /tutor_focus_rule/);
+});
+
+test("not-yet and single passes give their own cards", () => {
+  const notYet = cardIn(markAction(stateOf(), { example: keptPlan.key, status: "not-yet", note: "Plan was rewritten." }, NOW));
+  assert.equal(notYet?.kind, "not-yet");
+  assert.equal(notYet?.note, "Plan was rewritten.");
+  assert.equal(notYet?.exampleKey, keptPlan.key);
+  // Its sibling is still not yet, so the Rule does not hold.
+  const passing = cardIn(markAction(stateOf(), { example: rightFirstTime.key, status: "passing", evidence: "ok" }, NOW));
+  assert.equal(passing?.kind, "example-passing");
+});
+
+test("marking refuses unknown keys and homeworks not under way", () => {
+  const unknown = markAction(stateOf(), { example: "nope/nope/nope", status: "skipped" }, NOW);
+  assert.ok("error" in unknown && /tutor_status/.test(unknown.error));
+  const fresh = markAction(stateOf(fixtureFreshStudent), { example: keptPlan.key, status: "skipped" }, NOW);
+  assert.ok("error" in fresh && /tutor_adopt_iteration/.test(fresh.error));
+});
+
+test("only the main thread moves the cursor", () => {
+  const rule = homework2.features[0]?.rules[0];
+  assert.ok(rule !== undefined);
+  const side = focusAction(stateOf(), { rule: rule.key }, false);
+  assert.ok("error" in side);
+  const main = focusAction(stateOf(), { rule: rule.key }, true);
+  assert.equal(cardIn(main)?.kind, "focus");
+  assert.ok("progress" in main && main.progress?.focus === rule.key);
+});
+
+test("adoption: Homework 0 or the first homework to begin with, then the one after a Done one", () => {
+  assert.deepEqual(adoptionTargets(fixtureCourse, { homeworkId: "000", iterationStatus: "not-started" }), ["000", "001"]);
+  assert.deepEqual(adoptionTargets(fixtureCourse, { homeworkId: "000", iterationStatus: "WIP" }), ["001"]);
+  assert.deepEqual(adoptionTargets(fixtureCourse, { homeworkId: "002", iterationStatus: "WIP" }), []);
+  assert.deepEqual(adoptionTargets(fixtureCourse, { homeworkId: "002", iterationStatus: "Done" }), ["003"]);
+  assert.deepEqual(adoptionTargets(fixtureCourse, { homeworkId: "003", iterationStatus: "Done" }), []);
+});
+
+test("adopting a real homework copies the spec and writes WIP; Homework 0 writes progress only", () => {
+  const done: StudentState = { ...fixtureStudent, iteration: { iteration: "002", status: "Done" } };
+  const outcome = adoptAction(stateOf(done), { iteration: "003" }, NOW);
+  assert.ok("adopt" in outcome);
+  assert.equal(outcome.adopt?.id, "003");
+  assert.deepEqual(outcome.iteration, { iteration: "003", status: "WIP" });
+  assert.equal(outcome.progress?.adopted, NOW);
+  assert.match(outcome.text, /Adopt spec for iteration 003/);
+
+  const builtin = adoptAction(stateOf(fixtureFreshStudent), { iteration: "000" }, NOW);
+  assert.ok("progress" in builtin);
+  assert.equal(builtin.iteration, undefined);
+  assert.equal(builtin.adopt, undefined);
+  assert.equal(builtin.progress?.iteration, "000");
+
+  const refused = adoptAction(stateOf(), { iteration: "003" }, NOW);
+  assert.ok("error" in refused && /002 \(WIP\)/.test(refused.error));
+});
+
+test("completing writes Done and the summary; Homework 0 needs every Example to hold", () => {
+  const outcome = completeAction(stateOf(), { iteration: "002", summary: "It checks its work." });
+  assert.ok("text" in outcome);
+  assert.deepEqual(outcome.iteration, { iteration: "002", status: "Done" });
+  assert.equal(outcome.progress?.summary, "It checks its work.");
+  assert.match(outcome.text, /3 examples are not marked/);
+  assert.equal(cardIn(outcome)?.kind, "homework-complete");
+
+  const wrong = completeAction(stateOf(), { iteration: "003", summary: "x" });
+  assert.ok("error" in wrong);
+
+  const onZero: StudentState = { iteration: null, progress: { iteration: "000", examples: {} }, problems: [] };
+  const zero = completeAction(stateOf(onZero), { iteration: "000", summary: "x" });
+  assert.ok("error" in zero && /Homework 0/.test(zero.error));
+});

@@ -1,0 +1,73 @@
+// The one navPanel ("Course"), routed by sub-path (shared/routes.ts). It also
+// publishes the route so the rail can tell which lesson is on screen, because
+// BB passes the rail activeThreadId: null on plugin pages.
+import { useEffect } from "react";
+import type { PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
+import { formatRoute, parseRoute } from "../../shared/routes.ts";
+import { useCourseNavigate, useLiveRefresh, useOverview } from "../hooks.ts";
+import { homeDecision } from "../model/home.ts";
+import { routeStore } from "../state/app-state.ts";
+import { Loading, Notice, PaperPage } from "./common.tsx";
+import { CompletionPage } from "./CompletionPage.tsx";
+import { LessonPage } from "./LessonPage.tsx";
+import { WelcomePage } from "./WelcomePage.tsx";
+
+export function CoursePage({ subPath }: PluginNavPanelProps) {
+  useLiveRefresh();
+  const route = parseRoute(subPath);
+  useEffect(() => {
+    routeStore.set(route);
+    return () => routeStore.set(null);
+    // The route is a fresh object each render; its sub-path is its identity.
+  }, [subPath]);
+
+  switch (route.kind) {
+    case "home":
+      return <CourseHome />;
+    case "welcome":
+      return <WelcomePage />;
+    case "lesson":
+      return <LessonPage key={route.homeworkId} homeworkId={route.homeworkId} />;
+    case "complete":
+      return <CompletionPage key={route.homeworkId} homeworkId={route.homeworkId} />;
+  }
+}
+
+function CourseHome() {
+  const overview = useOverview();
+  const goCourse = useCourseNavigate();
+  const decision = overview.data === null ? null : homeDecision(overview.data);
+  const target = decision?.kind === "redirect" ? decision.route : null;
+  const targetPath = target === null ? null : formatRoute(target);
+  useEffect(() => {
+    if (target !== null) goCourse(target, { replace: true });
+    // Redirect once per destination, not once per render.
+  }, [targetPath, goCourse]);
+
+  if (overview.status === "error" && overview.data === null) {
+    return (
+      <PaperPage>
+        <Notice tone="error">{overview.error}</Notice>
+      </PaperPage>
+    );
+  }
+  if (decision?.kind === "error") {
+    return (
+      <PaperPage>
+        <p className="tp-eyebrow">Tutor</p>
+        <h1 className="tp-h1">The course could not be loaded</h1>
+        <Notice tone="error">{decision.message}</Notice>
+        <p className="tp-prose">
+          Tutor reads the course from the <code>coursePath</code> setting, then <code>TUTOR_COURSE_PATH</code>, then the
+          tutor feature's config, then <code>/workspaces/tutorial</code>. Check that the course is checked out there, or set
+          the path under Settings → Plugins → Tutor.
+        </p>
+      </PaperPage>
+    );
+  }
+  return (
+    <PaperPage>
+      <Loading label="Opening your course…" />
+    </PaperPage>
+  );
+}

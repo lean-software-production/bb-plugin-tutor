@@ -1,0 +1,6 @@
+# Tutor's built-in course. Its one homework is prepended to every course as
+# Homework 0; the id "000" is reserved for it.
+id: tutor
+title: Using your tutor
+homeworks:
+  - { id: "000", title: Using your tutor, set: Start here, dir: homework-0 }

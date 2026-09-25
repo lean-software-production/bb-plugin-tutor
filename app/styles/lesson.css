@@ -1,0 +1,456 @@
+/*
+ * Lesson page (mockup 2A, ".lt") and the paper lesson with annotated Gherkin
+ * (mockup 6B). The page is a .tutor-grid scroller around BB's ThreadChat, so
+ * only the plugin-owned parts (.tutor-paper) get paper typography.
+ */
+
+.tutor-grid.tp-lt {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+}
+.tutor-paper.tp-lthd {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+  height: 46px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--tp-line);
+  background: rgb(250 250 243 / 0.92);
+  color: var(--tp-muted);
+  font-size: 0.74rem;
+  white-space: nowrap;
+}
+.tutor-paper.tp-lthd b {
+  overflow: hidden;
+  color: var(--tp-ink);
+  font: 500 1.02rem var(--tp-font-display);
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+}
+.tutor-paper.tp-lthd .tp-crumb {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+.tutor-paper.tp-lthd .tp-sp {
+  flex: 1;
+}
+.tutor-paper.tp-lthd .tp-bar {
+  flex: none;
+  width: 110px;
+}
+@media (max-width: 760px) {
+  .tutor-paper.tp-lthd .tp-crumb,
+  .tutor-paper.tp-lthd .tp-bar {
+    display: none;
+  }
+}
+
+.tutor-grid .tp-lt-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.tutor-grid .tp-lt-inner {
+  min-height: 100%;
+  padding-bottom: 8px;
+}
+.tutor-paper.tp-lead {
+  width: min(740px, calc(100% - 96px));
+  margin: 0 auto;
+  padding: 1.8rem 0 0;
+}
+.tutor-paper.tp-lt-message {
+  width: min(740px, calc(100% - 96px));
+  margin: 0 auto;
+  padding: 3rem 0;
+}
+.tutor-paper .tp-convo-div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 3.2rem 0 1.2rem;
+  color: var(--tp-muted);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.tutor-paper .tp-convo-div::before,
+.tutor-paper .tp-convo-div::after {
+  flex: 1;
+  border-top: 1px solid #cfcabb;
+  content: "";
+}
+.tutor-paper.tp-chipdown {
+  position: sticky;
+  bottom: 98px;
+  left: calc(100% - 58px);
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid var(--tp-line);
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: var(--tp-shadow);
+  color: var(--tp-blue);
+  font-weight: 800;
+}
+
+/* ---- lesson header ---- */
+.tutor-paper .tp-lesson .tp-h1 {
+  font-size: 3rem;
+}
+.tutor-paper .tp-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 18px;
+}
+.tutor-paper .tp-banner {
+  display: block;
+  margin-bottom: 1.4rem;
+  padding: 10px 14px;
+  border: 1px solid #bfe0d2;
+  border-radius: 10px;
+  background: var(--tp-green-pale);
+  color: #18503f;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+.tutor-paper .tp-compass {
+  max-width: 700px;
+  margin: 1.6rem 0 0;
+  padding: 18px 22px;
+  border-left: 4px solid var(--tp-blue);
+  border-radius: 0 10px 10px 0;
+  background: #f1f5fc;
+}
+.tutor-paper .tp-compass .tp-section-label {
+  color: var(--tp-blue);
+}
+.tutor-paper .tp-compass ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 1.1rem;
+  color: #2f3c47;
+  font: 1.02rem/1.55 var(--tp-font-display);
+  list-style: disc;
+}
+.tutor-paper .tp-compass code {
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: #fff;
+  font-size: 0.82em;
+}
+
+/* ---- other features, folded ---- */
+.tutor-paper .tp-folds {
+  margin-top: 2.6rem;
+}
+.tutor-paper .tp-fold {
+  border-bottom: 1px dashed #d8d4c7;
+}
+.tutor-paper .tp-fold-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 0;
+  border: 0;
+  background: none;
+  color: #3d4a55;
+  font: 1.08rem/1.35 var(--tp-font-display);
+  text-align: left;
+}
+.tutor-paper .tp-fold-file {
+  color: #8d8b82;
+  font-size: 0.7rem;
+}
+.tutor-paper .tp-fold .tp-x,
+.tutor-paper .tp-collapsed-rule .tp-x {
+  margin-left: auto;
+  color: #8d8b82;
+  font: 600 0.7rem var(--tp-font-mono);
+  white-space: nowrap;
+}
+.tutor-paper .tp-fold-body {
+  padding: 0 0 12px 18px;
+}
+
+/* ---- feature and Rule ---- */
+.tutor-paper .tp-featurehead {
+  margin-top: 2.6rem;
+  padding-top: 1.4rem;
+  border-top: 2px solid var(--tp-ink);
+}
+.tutor-paper .tp-featurehead .tp-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.tutor-paper .tp-featurehead .tp-h2 {
+  margin: 0;
+}
+.tutor-paper .tp-featurehead .tp-cnt {
+  margin-left: auto;
+  color: var(--tp-muted);
+  font: 600 0.78rem var(--tp-font-mono);
+  white-space: nowrap;
+}
+.tutor-paper .tp-feature-desc {
+  margin-top: 12px;
+  color: #56616a;
+  font-size: 1rem;
+}
+.tutor-paper .tp-section-label .tp-newdot {
+  margin-left: 6px;
+}
+.tutor-paper .tp-background {
+  margin-top: 10px;
+  color: var(--tp-muted);
+  font-size: 0.74rem;
+}
+.tutor-paper .tp-background summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+.tutor-paper .tp-gherkin {
+  margin: 8px 0 0;
+  padding: 12px 16px 14px;
+  border: 1px solid var(--tp-line);
+  border-radius: 10px;
+  background: #fdfcf8;
+  color: #33404b;
+  font: 0.8rem/1.75 var(--tp-font-mono);
+}
+
+.tutor-paper .tp-collapsed-rule {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 1px dashed #d8d4c7;
+  background: none;
+  color: #3d4a55;
+  font: 1.02rem/1.35 var(--tp-font-display);
+  text-align: left;
+}
+.tutor-paper .tp-collapsed-rule:hover .tp-rule-name {
+  color: var(--tp-blue-ink);
+}
+.tutor-paper .tp-g {
+  font-family: var(--tp-font-core);
+  font-weight: 800;
+}
+.tutor-paper .tp-g--passing {
+  color: var(--tp-green);
+}
+.tutor-paper .tp-g--not-yet {
+  color: var(--tp-amber);
+}
+.tutor-paper .tp-g--pending {
+  color: var(--tp-todo);
+}
+
+.tutor-paper .tp-rule {
+  margin-top: 2.4rem;
+  scroll-margin-top: 24px;
+}
+.tutor-paper .tp-collapsed-rule {
+  scroll-margin-top: 24px;
+}
+.tutor-paper .tp-rule--focus {
+  position: relative;
+}
+.tutor-paper .tp-rule--focus::before {
+  position: absolute;
+  top: 4px;
+  bottom: 0;
+  left: -30px;
+  width: 4px;
+  border-radius: 4px;
+  background: var(--tp-blue);
+  content: "";
+}
+.tutor-paper .tp-link-button {
+  margin-left: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--tp-blue);
+  font: 650 0.68rem var(--tp-font-core);
+  letter-spacing: 0;
+  text-transform: none;
+}
+.tutor-paper .tp-rule-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 14px;
+}
+.tutor-paper .tp-inline-error {
+  color: var(--tp-red);
+  font-size: 0.74rem;
+}
+
+/* ---- annotated Gherkin: status gutter | steps | coach's margin ---- */
+.tutor-paper .tp-gutterwrap {
+  margin-top: 14px;
+  overflow: hidden;
+  border: 1px solid var(--tp-line);
+  border-radius: 12px;
+  background: #fdfcf8;
+  box-shadow: var(--tp-shadow);
+}
+/* Columns are painted on the example itself, so the gutter and margin reach its full height. */
+.tutor-paper .tp-anno {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 230px;
+  align-content: start;
+  padding: 12px 0;
+  background: linear-gradient(
+    90deg,
+    #f3f1ea 0 43px,
+    #e6e2d6 43px 44px,
+    transparent 44px calc(100% - 231px),
+    #e0dccf calc(100% - 231px) calc(100% - 230px),
+    #fffef9 calc(100% - 230px)
+  );
+}
+.tutor-paper .tp-anno + .tp-anno {
+  border-top: 1px dashed #e0dccf;
+}
+.tutor-paper .tp-gut {
+  grid-column: 1;
+  color: #b0ada3;
+  font: 800 0.8rem/1.75 var(--tp-font-mono);
+  text-align: center;
+}
+.tutor-paper .tp-gut--passing {
+  color: var(--tp-green);
+}
+.tutor-paper .tp-gut--not-yet {
+  color: var(--tp-amber);
+}
+.tutor-paper .tp-gut--pending,
+.tutor-paper .tp-gut--skipped {
+  color: #b7b4a9;
+}
+.tutor-paper .tp-anno-code {
+  grid-column: 2;
+  padding: 0 16px;
+  color: #33404b;
+  font: 0.8rem/1.75 var(--tp-font-mono);
+}
+.tutor-paper .tp-anno--skipped .tp-anno-code {
+  color: #8d8b82;
+}
+.tutor-paper .tp-gl {
+  padding-left: calc(var(--tp-indent, 0) * 2ch + 2ch);
+  text-indent: -2ch;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.tutor-paper .tp-gl--verbatim {
+  padding-left: calc(var(--tp-indent, 0) * 2ch);
+  text-indent: 0;
+  white-space: pre;
+  overflow-x: auto;
+}
+.tutor-paper .tp-gk--keyword {
+  color: var(--tp-blue);
+  font-weight: 700;
+}
+.tutor-paper .tp-gk--string {
+  color: #8b4a1f;
+}
+.tutor-paper .tp-gk--tag {
+  color: #6d3fa8;
+}
+.tutor-paper .tp-anno-margin {
+  grid-column: 3;
+  padding: 0 14px;
+  color: #5b6570;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+.tutor-paper .tp-mn {
+  padding-left: 8px;
+  border-left: 3px solid var(--tp-line);
+}
+.tutor-paper .tp-mn b {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--tp-muted);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.tutor-paper .tp-mn--green {
+  border-color: var(--tp-green);
+}
+.tutor-paper .tp-mn--amber {
+  border-color: var(--tp-amber);
+}
+.tutor-paper .tp-mn--blue {
+  border-color: #b6cce9;
+}
+.tutor-paper .tp-mn--purple {
+  border-color: #c9b3ea;
+}
+.tutor-paper .tp-mn code {
+  padding: 0 3px;
+  border-radius: 3px;
+  background: #f3f2ed;
+  font-size: 0.68rem;
+}
+.tutor-paper .tp-mn .tp-link-button {
+  margin: 4px 0 0;
+}
+.tutor-paper .tp-evidence {
+  margin: 6px 0 0;
+  padding: 6px 8px;
+  overflow-x: auto;
+  border-radius: 6px;
+  background: #f6f5ef;
+  color: #3d4a55;
+  font: 0.66rem/1.55 var(--tp-font-mono);
+  white-space: pre;
+}
+@media (max-width: 760px) {
+  .tutor-paper .tp-anno {
+    grid-template-columns: 32px minmax(0, 1fr);
+    background: linear-gradient(90deg, #f3f1ea 0 31px, #e6e2d6 31px 32px, transparent 32px);
+  }
+  .tutor-paper .tp-anno-margin {
+    grid-row: auto !important;
+    grid-column: 1 / -1;
+    order: 1;
+    padding: 8px 14px 0 44px;
+  }
+}
+
+/* ---- no coach thread yet ---- */
+.tutor-paper .tp-start {
+  margin: 2.4rem 0 4rem;
+  padding: 20px 22px;
+  border: 1px dashed #cfcabb;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.6);
+}
+.tutor-paper .tp-start .tp-prose {
+  margin-bottom: 14px;
+}

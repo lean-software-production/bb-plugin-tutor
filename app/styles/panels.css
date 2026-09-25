@@ -1,0 +1,201 @@
+/* The Rule tab (mockup 4, ".yah"), BB home's Continue section (5, ".hs") and
+   the Course nav row accessory. */
+
+.tutor-paper.tp-yah {
+  height: 100%;
+  overflow: auto;
+  padding: 18px;
+  background-size: 20px 20px;
+}
+.tutor-paper.tp-yah .tp-eyebrow {
+  margin: 0 0 6px;
+  font-size: 0.64rem;
+}
+.tutor-paper.tp-yah .tp-h3 {
+  font-size: 1.3rem;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+}
+.tutor-paper.tp-yah .tp-bar {
+  height: 6px;
+  margin: 12px 0 4px;
+}
+.tutor-paper.tp-yah .tp-lbl {
+  display: flex;
+  justify-content: space-between;
+  color: var(--tp-muted);
+  font-size: 0.68rem;
+}
+.tutor-paper .tp-now {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--tp-line);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: var(--tp-shadow);
+}
+.tutor-paper .tp-now .tp-section-label {
+  margin: 0 0 5px;
+  color: var(--tp-blue);
+  font-size: 0.6rem;
+}
+.tutor-paper .tp-now-ex + .tp-now-ex {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--tp-line-soft);
+}
+.tutor-paper .tp-now .tp-t {
+  font: 500 1.02rem/1.3 var(--tp-font-display);
+}
+.tutor-paper .tp-now .tp-ex {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  color: #5b6570;
+  font-size: 0.72rem;
+}
+.tutor-paper .tp-ex .tp-g {
+  flex: none;
+}
+.tutor-paper .tp-ex--passing .tp-g {
+  color: var(--tp-green);
+}
+.tutor-paper .tp-ex--not-yet .tp-g {
+  color: var(--tp-amber);
+}
+.tutor-paper .tp-ex--pending .tp-g,
+.tutor-paper .tp-ex--skipped .tp-g {
+  color: var(--tp-todo);
+}
+.tutor-paper .tp-acts {
+  display: flex;
+  gap: 6px;
+  margin-top: 16px;
+}
+.tutor-paper .tp-acts button {
+  flex: 1;
+  padding: 7px 0;
+  border: 1px solid var(--tp-line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--tp-ink);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.tutor-paper .tp-acts .tp-pri {
+  border-color: var(--tp-blue);
+  background: var(--tp-blue);
+  color: #fff;
+}
+.tutor-paper .tp-yah-note {
+  color: #5b6570;
+  font: 1rem/1.55 var(--tp-font-display);
+}
+
+/* ---- BB home ---- */
+.tutor-paper.tp-hs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 250px;
+  overflow: hidden;
+  border: 1px solid var(--tp-line);
+  border-radius: 16px;
+  box-shadow: var(--tp-shadow);
+}
+.tutor-paper.tp-hs--setup {
+  grid-template-columns: minmax(0, 1fr);
+}
+.tutor-paper .tp-hs-l {
+  padding: 24px 26px;
+}
+.tutor-paper.tp-hs .tp-ey {
+  color: var(--tp-blue);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.tutor-paper.tp-hs h2 {
+  margin: 6px 0 10px;
+  color: var(--tp-ink);
+  font: 500 2.2rem/1 var(--tp-font-display);
+  letter-spacing: -0.05em;
+}
+.tutor-paper.tp-hs p {
+  margin: 0 0 14px;
+  color: #4c5964;
+  font: 1rem/1.55 var(--tp-font-display);
+}
+.tutor-paper .tp-hs-btn {
+  display: inline-flex;
+  margin: 0 6px 6px 0;
+  padding: 10px 16px;
+  border: 1px solid #1d4c91;
+  border-radius: 10px;
+  background: var(--tp-blue);
+  color: #fff;
+  font: 700 0.84rem var(--tp-font-core);
+}
+.tutor-paper .tp-hs-btn--ghost {
+  border-color: var(--tp-line);
+  background: #fff;
+  color: var(--tp-ink);
+}
+.tutor-paper .tp-hs-btn:disabled {
+  opacity: 0.6;
+}
+.tutor-paper .tp-hs-r {
+  padding: 20px 18px;
+  border-left: 1px solid var(--tp-line);
+  background: rgb(255 255 255 / 0.55);
+  color: #5b6570;
+  font-size: 0.72rem;
+}
+.tutor-paper .tp-hs-big {
+  color: var(--tp-ink);
+  font: 500 2rem/1 var(--tp-font-display);
+}
+.tutor-paper .tp-hs-big span {
+  color: var(--tp-muted);
+  font-size: 1rem;
+}
+.tutor-paper .tp-hs-r .tp-bar {
+  height: 6px;
+  margin: 10px 0 12px;
+}
+.tutor-paper .tp-hs-now {
+  padding: 9px 10px;
+  border: 1px solid var(--tp-line);
+  border-radius: 8px;
+  background: #fff;
+}
+.tutor-paper .tp-hs-now b {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--tp-blue);
+  font-size: 0.56rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.tutor-paper .tp-hs-done {
+  margin-top: 10px;
+}
+@media (max-width: 640px) {
+  .tutor-paper.tp-hs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tutor-paper .tp-hs-r {
+    border-top: 1px solid var(--tp-line);
+    border-left: 0;
+  }
+}
+
+/* ---- Course nav row accessory ---- */
+.tutor-paper.tp-accessory {
+  color: #3f3f46;
+  font: 600 10.5px/1.25rem var(--tp-font-core);
+  white-space: nowrap;
+}
+.tutor-paper.tp-accessory i {
+  color: var(--tp-blue);
+  font-style: normal;
+}
