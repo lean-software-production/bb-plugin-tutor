@@ -344,7 +344,7 @@ test("a coach thread is found although threads vanish between pages of the listi
   assert.equal(host.harness.inspection.sdk.callsTo("threads.spawn").length, 1, "no second coach thread");
 });
 
-test("coach discovery lists coach threads only, never their side chats, and remembers what it found", async (t) => {
+test("coach discovery lists coach threads only, never their side chats, and records what it found", async (t) => {
   const { host } = await setup(t);
   await startupListed(host);
   const coach = unrecordedCoach(host, "000");
@@ -356,9 +356,8 @@ test("coach discovery lists coach threads only, never their side chats, and reme
   const before = listCalls(host);
   assert.deepEqual(await openCoach(host, "000"), { threadId: coach.id, created: false });
   assert.equal(listCalls(host) - before, 1, "one page: no side chat was listed");
-  // Found once, it is remembered: the next open asks BB for that thread, not for a listing.
-  assert.deepEqual(await openCoach(host, "000"), { threadId: coach.id, created: false });
-  assert.equal(listCalls(host) - before, 1);
+  // Found once, it is recorded, for a later listing that misses it.
+  assert.deepEqual(await host.bb.storage.kv.list().then((keys) => Promise.all(keys.map((key) => host.bb.storage.kv.get(key)))), [{ threadId: coach.id }]);
 });
 
 test("a listing that misses the coach thread is read once more before a coach thread is spawned", async (t) => {
@@ -402,6 +401,23 @@ test("a remembered coach thread counts only while BB still has it as the lesson'
   renamed.metadata = { ...renamed.metadata, lesson: "001" };
   const third = await openCoach(host, "000");
   assert.equal(third.created, true);
+});
+
+test("with two live coach threads for a lesson, opening the coach picks the one the outline shows", async (t) => {
+  const { host } = await setup(t);
+  const threadOf = (id: string) => host.threads.find((thread) => thread.id === id) ?? assert.fail(`no thread ${id}`);
+  const older = (await openCoach(host, "000")).threadId;
+  threadOf(older).archivedAt = 1;
+  const newer = (await openCoach(host, "000")).threadId;
+  // The student unarchives the older one and archives the newer, so the older is recorded again; then brings the newer back.
+  threadOf(older).archivedAt = null;
+  threadOf(newer).archivedAt = 1;
+  assert.equal((await openCoach(host, "000")).threadId, older);
+  threadOf(newer).archivedAt = null;
+  const detail = (await host.harness.behavior.callRpc("getLessonDetail", { lessonId: "000" })) as LessonDetail;
+  assert.equal(detail.coachThreadId, newer, "the start page and the outline show the newest coach thread");
+  assert.deepEqual(await openCoach(host, "000"), { threadId: newer, created: false });
+  assert.deepEqual(await host.bb.storage.kv.get((await host.bb.storage.kv.list())[0] ?? ""), { threadId: newer }, "and the record follows");
 });
 
 test("coach discovery fails loudly past its page bound instead of reading forever", async (t) => {

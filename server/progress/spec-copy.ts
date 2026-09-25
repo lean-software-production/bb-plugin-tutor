@@ -47,6 +47,17 @@ function isMissing(cause: unknown): boolean {
   return (cause as { code?: unknown }).code === "ENOENT";
 }
 
+/** Whether anything, a symbolic link included, is at `path`; never follows one. */
+async function occupied(path: string): Promise<boolean> {
+  return lstat(path).then(
+    () => true,
+    (cause: unknown) => {
+      if (isMissing(cause)) return false;
+      throw cause;
+    },
+  );
+}
+
 async function exists(path: string): Promise<boolean> {
   try {
     await access(path);
@@ -136,14 +147,7 @@ async function recoverLeftovers(specDir: string): Promise<void> {
     if (leftover !== ADOPTING_DIR) {
       for (const entry of await readdir(path)) {
         if (isWorkingFolder(entry)) continue;
-        const present = await lstat(join(specDir, entry)).then(
-          () => true,
-          (cause: unknown) => {
-            if (isMissing(cause)) return false;
-            throw cause;
-          },
-        );
-        if (present) continue;
+        if (await occupied(join(specDir, entry))) continue;
         try {
           await rename(join(path, entry), join(specDir, entry));
         } catch (cause) {
@@ -185,7 +189,11 @@ async function swapIn(specDir: string, staging: string, names: string[], hooks: 
     for (const name of movedIn) await rename(join(specDir, name), join(staging, name)).catch(() => undefined);
     const stranded: string[] = [];
     for (const entry of movedAside) {
-      await rename(join(previous, entry), join(specDir, entry)).catch(() => stranded.push(specPath(PREVIOUS_DIR, entry)));
+      // Whatever was written in its place meanwhile wins; the old copy stays aside.
+      const restored = await occupied(join(specDir, entry))
+        .then((taken) => (taken ? false : rename(join(previous, entry), join(specDir, entry)).then(() => true)))
+        .catch(() => false);
+      if (!restored) stranded.push(specPath(PREVIOUS_DIR, entry));
     }
     if (stranded.length > 0) {
       throw new Error(

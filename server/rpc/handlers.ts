@@ -116,10 +116,11 @@ export function registerRpc(rt: TutorRuntime): void {
   /**
    * The lesson's coach thread, spawned with `prompt` when there is none.
    * One caller at a time per lesson, so two clicks (or two tabs) never spawn
-   * two coach threads. The recorded coach thread comes first (coach-record.ts);
-   * without a valid record, the coach threads are listed, and listed once
-   * more before spawning, because a listing can miss a thread when others
-   * vanish between its pages. What is found or spawned is recorded.
+   * two coach threads. The newest listed coach thread wins, as it does in the
+   * outline and on the start page. A listing can miss a thread when others
+   * vanish between its pages, so when it finds none the recorded coach thread
+   * (coach-record.ts) is tried, then the listing once more, before spawning.
+   * What is found or spawned is recorded.
    */
   async function findOrSpawnCoach(
     course: Course,
@@ -129,17 +130,12 @@ export function registerRpc(rt: TutorRuntime): void {
   ): Promise<{ threadId: string; created: boolean }> {
     return rt.locks.run(coachThreadLockKey(factoryProject.projectId, course.id, lesson.id), async () => {
       const lessonCoach = { projectId: factoryProject.projectId, courseId: course.id, lessonId: lesson.id };
-      const recorded = await recordedCoachThread(bb, lessonCoach);
-      if (recorded !== null) {
-        rt.coaches.remember([{ id: recorded, role: "coach", lessonId: lesson.id }]);
-        return { threadId: recorded, created: false };
-      }
       const listed = async () => findCoachThread(await listCoachThreads(bb.sdk, bb.pluginId, factoryProject.projectId), course.id, lesson.id);
-      const existing = (await listed()) ?? (await listed());
-      if (existing !== undefined) rt.coaches.remember([existing]);
-      const threadId = existing?.id ?? (await spawnCoach(course, factoryProject, lesson, prompt()));
+      const found = (await listed())?.id ?? (await recordedCoachThread(bb, lessonCoach)) ?? (await listed())?.id;
+      if (found !== undefined) rt.coaches.remember([{ id: found, role: "coach", lessonId: lesson.id }]);
+      const threadId = found ?? (await spawnCoach(course, factoryProject, lesson, prompt()));
       await recordCoachThread(bb, lessonCoach, threadId);
-      return { threadId, created: existing === undefined };
+      return { threadId, created: found === undefined };
     });
   }
 

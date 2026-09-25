@@ -164,6 +164,34 @@ test("a swap whose rollback can't put the old files back keeps them and says whe
   }
 });
 
+test("a swap's rollback never overwrites a file written in spec/ during the swap", async () => {
+  const sandbox = await makeSandbox();
+  try {
+    const first = sandbox.course.lessons[1];
+    const second = sandbox.course.lessons[2];
+    assert.ok(first !== undefined && second !== undefined);
+    await copyLessonSpec(sandbox.factoryRoot, first);
+    const spec = join(sandbox.factoryRoot, "spec");
+    await writeFile(join(spec, "notes.md"), "old notes\n");
+
+    // Once the old files are aside, the student saves notes.md, and a folder in the way fails the swap.
+    const error = await copyLessonSpec(sandbox.factoryRoot, second, {
+      afterMovedAside: async () => {
+        await writeFile(join(spec, "notes.md"), "written during the swap\n");
+        await mkdir(join(spec, "features", "in-the-way"), { recursive: true });
+      },
+    }).then(
+      () => assert.fail("the adoption succeeded"),
+      (cause: Error) => cause,
+    );
+    assert.equal(await readFile(join(spec, "notes.md"), "utf8"), "written during the swap\n");
+    assert.equal(await readFile(join(spec, ".tutor-previous", "notes.md"), "utf8"), "old notes\n", "the old copy is kept aside");
+    assert.match(error.message, /spec\/\.tutor-previous\/notes\.md/);
+  } finally {
+    await sandbox.cleanup();
+  }
+});
+
 test("an adoption first recovers what a crashed one left in spec/, restoring missing files and clearing the rest", async () => {
   const sandbox = await makeSandbox();
   try {
