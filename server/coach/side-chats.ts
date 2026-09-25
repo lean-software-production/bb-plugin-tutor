@@ -6,12 +6,12 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { BB_SIDE_CHAT } from "../../shared/constants.ts";
 import type { CoachThreadMetadata } from "../../shared/model.ts";
+import { listAllThreads } from "./threads.ts";
 
 type Sdk = BbPluginApi["sdk"];
 type Tabs = Awaited<ReturnType<Sdk["threads"]["tabs"]["get"]>>["tabs"];
 type Tab = Tabs[number];
 
-const LIST_LIMIT = 200;
 /** Another client (BB's own tab strip) can write the tabs between our read and write. */
 export const TAB_WRITE_ATTEMPTS = 3;
 
@@ -175,6 +175,10 @@ export const BB_REPLY_PREFIX = /^Replying to this earlier message in the convers
 
 /** Every side chat of the coach thread: Tutor's and those BB's "Reply in side chat" made. */
 export async function listSideChats(sdk: Sdk, coachThreadId: string): Promise<SideChatRow[]> {
-  const rows = await sdk.threads.list({ sourceThreadId: coachThreadId, includeHidden: true, archived: false, limit: LIST_LIMIT });
+  const rows = await listAllThreads(
+    sdk,
+    { sourceThreadId: coachThreadId, includeHidden: true, archived: false },
+    `threads forked from coach thread ${coachThreadId}`,
+  );
   return rows.filter((row) => isSideChatOf(row, coachThreadId));
 }

@@ -281,6 +281,35 @@ test("a coach thread only changes its own lesson: an old coach can't touch the l
   await ok(host, "tutor_mark_example", { example: example1.key, status: "passing", evidence: "$ ./factory" }, coach1);
 });
 
+test("coach discovery reads every page of Tutor's threads: many newer side chats don't hide the coach", async (t) => {
+  const { host } = await setup(t);
+  const coach = (await openCoach(host, "000")).threadId;
+  // More side chats than one page of threads.list, all newer than the coach thread.
+  for (let index = 0; index < 450; index += 1) {
+    host.addThread({
+      id: `thr_side_${index}`,
+      originPluginId: "tutor",
+      originKind: "fork",
+      sourceThreadId: coach,
+      lifecycleOwnerThreadId: coach,
+      visibility: "hidden",
+      metadata: { course: "software-factory", lesson: "000", role: "sideChat" },
+    });
+  }
+  const again = await openCoach(host, "000");
+  assert.deepEqual(again, { threadId: coach, created: false }, "found the existing coach instead of spawning another");
+  const pages = host.harness.inspection.sdk.callsTo("threads.list").length;
+  assert.ok(pages >= 3, `listed ${pages} page(s)`);
+});
+
+test("coach discovery fails loudly past its page bound instead of reading forever", async (t) => {
+  const { host } = await setup(t);
+  for (let index = 0; index < 10_001; index += 1) {
+    host.addThread({ id: `thr_many_${index}`, originPluginId: "tutor" });
+  }
+  await assert.rejects(openCoach(host, "000"), /more than 10000 of Tutor's threads in the factory project/);
+});
+
 async function adoptedCoach(host: TutorHost): Promise<{ coach: string; rule: string }> {
   const coach = (await openCoach(host, "000")).threadId;
   await ok(host, "tutor_adopt_iteration", { iteration: "000" }, coach);

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { findCoachThread, reachedRulesOf, threadRole, toTutorThread, type ThreadRow } from "./threads.ts";
+import { findCoachThread, listAllThreads, reachedRulesOf, THREAD_PAGE_SIZE, threadRole, toTutorThread, type ThreadRow } from "./threads.ts";
 
 function row(overrides: Partial<ThreadRow>): ThreadRow {
   return {
@@ -66,4 +66,25 @@ test("reached Rules come from the coach thread's metadata, leniently", () => {
   assert.deepEqual(coach?.reachedRules, ["a/b"]);
   const side = toTutorThread(row({ parentThreadId: "m" }), { course: "c", lesson: "002", role: "sideChat", reachedRules: ["a/b"] });
   assert.deepEqual(side?.reachedRules, []);
+});
+
+test("listing reads every page once, even when a new thread shifts the pages meanwhile", async () => {
+  // Newest first, like bb-app: thr_449 … thr_0.
+  const all = Array.from({ length: 450 }, (_, index) => row({ id: `thr_${449 - index}`, createdAt: 449 - index }));
+  const offsets: number[] = [];
+  const sdk = {
+    threads: {
+      list: async ({ limit, offset }: { limit: number; offset: number }) => {
+        offsets.push(offset);
+        const page = all.slice(offset, offset + limit);
+        // A thread created after the first page pushes every older row down one.
+        if (offsets.length === 1) all.unshift(row({ id: "thr_new", createdAt: 1000 }));
+        return page;
+      },
+    },
+  } as unknown as Parameters<typeof listAllThreads>[0];
+  const rows = await listAllThreads(sdk, { originPluginId: "tutor" }, "test threads");
+  assert.deepEqual(offsets, [0, THREAD_PAGE_SIZE, 2 * THREAD_PAGE_SIZE]);
+  assert.equal(rows.length, 450);
+  assert.equal(new Set(rows.map((entry) => entry.id)).size, 450, "no row twice");
 });

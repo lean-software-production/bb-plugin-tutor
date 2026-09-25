@@ -16,7 +16,37 @@ import type { TutorThread } from "../../shared/rpc.ts";
 
 type Sdk = BbPluginApi["sdk"];
 
-const LIST_LIMIT = 200;
+type ThreadListArgs = NonNullable<Parameters<Sdk["threads"]["list"]>[0]>;
+type ListedThread = Awaited<ReturnType<Sdk["threads"]["list"]>>[number];
+
+/** Rows per `threads.list` call. */
+export const THREAD_PAGE_SIZE = 200;
+/** How many rows Tutor reads before it gives up loudly rather than paging forever. */
+export const MAX_LISTED_THREADS = 10_000;
+
+/**
+ * Every thread `threads.list` returns for `args`, newest first, page by page.
+ * A thread created while paging shifts the rest down a row, so rows are
+ * de-duplicated by id. Past MAX_LISTED_THREADS it throws, naming `what`.
+ */
+export async function listAllThreads(sdk: Sdk, args: Omit<ThreadListArgs, "limit" | "offset">, what: string): Promise<ListedThread[]> {
+  const seen = new Set<string>();
+  const rows: ListedThread[] = [];
+  for (let offset = 0; ; offset += THREAD_PAGE_SIZE) {
+    const atBound = offset >= MAX_LISTED_THREADS;
+    const page = await sdk.threads.list({ ...args, limit: atBound ? 1 : THREAD_PAGE_SIZE, offset });
+    if (atBound) {
+      if (page.length === 0) return rows;
+      throw new Error(`There are more than ${MAX_LISTED_THREADS} ${what}, more than Tutor reads. Archive the ones you no longer need in BB, then try again.`);
+    }
+    for (const row of page) {
+      if (seen.has(row.id)) continue;
+      seen.add(row.id);
+      rows.push(row);
+    }
+    if (page.length < THREAD_PAGE_SIZE) return rows;
+  }
+}
 
 export interface ThreadRow {
   id: string;
@@ -83,13 +113,11 @@ export function toTutorThread(row: ThreadRow, metadata: unknown): TutorThreadRec
 
 /** Live (not archived) Tutor threads in `projectId`, side chats included, newest first. */
 export async function listTutorThreads(sdk: Sdk, pluginId: string, projectId: string): Promise<TutorThreadRecord[]> {
-  const rows = await sdk.threads.list({
-    originPluginId: pluginId,
-    projectId,
-    archived: false,
-    includeHidden: true,
-    limit: LIST_LIMIT,
-  });
+  const rows = await listAllThreads(
+    sdk,
+    { originPluginId: pluginId, projectId, archived: false, includeHidden: true },
+    "of Tutor's threads in the factory project",
+  );
   const mine = rows.filter(
     (row) => row.originPluginId === pluginId && row.projectId === projectId && row.archivedAt === null,
   );

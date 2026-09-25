@@ -181,15 +181,21 @@ export async function makeTutorHost(
           thread.archivedAt = clock += 1;
           return { ok: true, archivedThreadIds: [threadId] };
         },
-        list: async (args = {}) =>
-          threads.filter(
-            (thread) =>
-              (args.originPluginId === undefined || thread.originPluginId === args.originPluginId) &&
-              (args.projectId === undefined || thread.projectId === args.projectId) &&
-              (args.sourceThreadId === undefined || thread.sourceThreadId === args.sourceThreadId) &&
-              (args.includeHidden === true || thread.visibility === "visible") &&
-              (args.archived !== false || thread.archivedAt === null),
-          ),
+        // Pages newest first by limit and offset, as bb-app's /threads does.
+        list: async (args = {}) => {
+          const offset = args.offset ?? 0;
+          return threads
+            .filter(
+              (thread) =>
+                (args.originPluginId === undefined || thread.originPluginId === args.originPluginId) &&
+                (args.projectId === undefined || thread.projectId === args.projectId) &&
+                (args.sourceThreadId === undefined || thread.sourceThreadId === args.sourceThreadId) &&
+                (args.includeHidden === true || thread.visibility === "visible") &&
+                (args.archived !== false || thread.archivedAt === null),
+            )
+            .sort((a, b) => b.createdAt - a.createdAt)
+            .slice(offset, args.limit === undefined ? undefined : offset + args.limit);
+        },
         getPluginMetadata: async ({ threadId }) => find(threadId).metadata,
         updatePluginMetadata: async ({ threadId, set = {}, remove = [] }) => {
           const thread = find(threadId);

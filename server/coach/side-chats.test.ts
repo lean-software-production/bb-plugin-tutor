@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { forkFailure, isSideChatOf, showsSideChat, sideChatTab } from "./side-chats.ts";
+import { forkFailure, isSideChatOf, listSideChats, showsSideChat, sideChatTab } from "./side-chats.ts";
 
 test("the side chat tab is the one BB writes for Reply in side chat", () => {
   const tab = sideChatTab("thr_fork", "thr_coach", "A side question about the Rule \"X\"");
@@ -42,4 +42,22 @@ test("fork failures read as advice to the student", () => {
     /Send your coach a message first/,
   );
   assert.equal(forkFailure("boom"), "Couldn't start a side chat: boom");
+});
+
+test("every side chat of a coach thread is listed, past the first page", async () => {
+  const forks = Array.from({ length: 250 }, (_, index) => ({
+    id: `thr_fork_${index}`,
+    originPluginId: null,
+    projectId: "prj_factory",
+    createdAt: 250 - index,
+    sourceThreadId: "thr_coach",
+    visibility: "hidden" as const,
+    archivedAt: null,
+    title: null,
+    titleFallback: null,
+  }));
+  const sdk = {
+    threads: { list: async ({ limit, offset = 0 }: { limit: number; offset?: number }) => forks.slice(offset, offset + limit) },
+  } as unknown as Parameters<typeof listSideChats>[0];
+  assert.equal((await listSideChats(sdk, "thr_coach")).length, 250);
 });
