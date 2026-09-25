@@ -26,10 +26,15 @@ test("columns are found by name, in any order", () => {
   assert.deepEqual(parse(markdown), [{ id: "009", title: "Nine", set: "Day 9", dir: "/course/docs/iterations/009-nine" }]);
 });
 
+test("the Set after column is optional", () => {
+  const markdown = "| Iteration | Spec |\n|---|---|\n| 004 | [Jobs and targets](004-jobs-and-targets/README.md) |\n";
+  assert.deepEqual(parse(markdown), [{ id: "004", title: "Jobs and targets", set: null, dir: "/course/docs/iterations/004-jobs-and-targets" }]);
+});
+
 test("a missing table, a bad id or a Spec without a link is a readable error naming the line", () => {
   const table = (row: string) => `Intro\n\n| Iteration | Spec | Set after |\n|---|---|---|\n${row}\n`;
   const cases: [string, RegExp][] = [
-    ["# Nothing here\n", /^ledger\.md has no lesson table with the columns Iteration, Spec and Set after\.$/],
+    ["# Nothing here\n", /^ledger\.md has no lesson table with the columns Iteration and Spec\.$/],
     [table("| 1 | [One](001/README.md) | Day 1 |"), /^ledger\.md, line 5: the iteration "1" should be three digits/],
     [table("| 001 | One | Day 1 |"), /^ledger\.md, line 5: the Spec column should be a link/],
     ["| Iteration | Spec | Set after |\n|---|---|---|\n", /^ledger\.md's lesson table has no rows\.$/],

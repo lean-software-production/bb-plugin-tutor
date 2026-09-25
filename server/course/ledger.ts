@@ -1,5 +1,6 @@
 // The fallback when a course has no course.yaml: the lessons table in
-// docs/iterations/README.md, "| Iteration | Spec | Set after |".
+// docs/iterations/README.md, "| Iteration | Spec |", with an optional
+// "Set after" column.
 import { dirname, resolve } from "node:path";
 import { CourseLoadError } from "../../shared/ports.ts";
 import { isInside } from "../paths.ts";
@@ -30,12 +31,12 @@ export function parseLedger(markdown: string, ledgerDir: string, displayPath: st
   const headerIndex = lines.findIndex((line) => {
     if (!line.trim().startsWith("|")) return false;
     const header = cells(line).map((cell) => cell.toLowerCase());
-    return Object.values(COLUMNS).every((name) => header.includes(name));
+    return header.includes(COLUMNS.id) && header.includes(COLUMNS.spec);
   });
   const headerLine = lines[headerIndex];
   if (headerLine === undefined) {
     throw new CourseLoadError(
-      `${displayPath} has no lesson table with the columns Iteration, Spec and Set after.`,
+      `${displayPath} has no lesson table with the columns Iteration and Spec.`,
     );
   }
   const header = cells(headerLine).map((cell) => cell.toLowerCase());
