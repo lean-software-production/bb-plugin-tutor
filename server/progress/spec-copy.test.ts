@@ -107,3 +107,23 @@ test("refuses a lesson with no feature files, keeping the previous spec snapshot
     await sandbox.cleanup();
   }
 });
+
+test("refuses a lesson whose README.md went missing after the course loaded, keeping the previous spec snapshot", async () => {
+  const sandbox = await makeSandbox();
+  try {
+    const first = sandbox.course.lessons[1];
+    const second = sandbox.course.lessons[2];
+    assert.ok(first !== undefined && second !== undefined);
+    await copyLessonSpec(sandbox.factoryRoot, first);
+    const spec = join(sandbox.factoryRoot, "spec");
+    const before = (await readdir(spec)).sort();
+    await rm(join(second.dir, "README.md"));
+
+    await assert.rejects(copyLessonSpec(sandbox.factoryRoot, second), /Lesson 002 has no README\.md/);
+    assert.deepEqual((await readdir(spec)).sort(), before, "nothing added to or left behind in spec/");
+    assert.equal(await readFile(join(spec, "README.md"), "utf8"), first.readme);
+    assert.deepEqual(await readdir(join(spec, "features")), ["planning.feature"]);
+  } finally {
+    await sandbox.cleanup();
+  }
+});
