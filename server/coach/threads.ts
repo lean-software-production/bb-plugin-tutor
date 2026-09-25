@@ -1,7 +1,8 @@
 // Tutor's coach threads: one coach thread per lesson in the factory project,
 // with side chats as hidden forks of it (and, from before side chats, side
-// threads as its children). Plugin metadata is used to list and find them
-// only; it is writable by the thread's own agent, so it never authorises.
+// threads as its children). Plugin metadata is used to list and find them,
+// and to know a verified coach thread's lesson (auth.ts); it is writable by
+// the thread's own agent, so it never decides whether a thread is Tutor's.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { coachThreadTitle } from "../../shared/constants.ts";
 import { RULE_KEY_PATTERN } from "../../shared/keys.ts";

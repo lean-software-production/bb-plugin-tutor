@@ -2,16 +2,18 @@
 // thread with BB, runs the pure action, then writes the files it returned.
 import type { PluginAgentToolContext, PluginAgentToolResult, PluginRowLabels } from "@get-bb/plugin-sdk";
 import { TOOL_NAMES, type ToolName } from "../../shared/constants.ts";
-import { findRule } from "../../shared/derive.ts";
+import { findLesson, findRule } from "../../shared/derive.ts";
 import { toolParameterSchemas, type ToolParameters } from "../../shared/tools.ts";
 import { copyLessonSpec } from "../progress/spec-copy.ts";
 import { isoSeconds } from "../progress/time.ts";
 import {
   adoptAction,
+  adoptionByOtherError,
   coachStateOf,
   completeAction,
   focusAction,
   markAction,
+  otherLessonError,
   type CoachState,
   type Outcome,
 } from "./actions.ts";
@@ -35,6 +37,12 @@ interface ToolSpec<Name extends ToolName> {
   name: Name;
   description: string;
   label: PluginRowLabels;
+  /**
+   * Which lesson the calling thread must coach: the current one, for tools
+   * that change the student's progress; any, for the read-only status and for
+   * side chats, which stay with the caller's lesson.
+   */
+  lesson: "current" | "any";
   action: Action<Name>;
 }
 
@@ -65,6 +73,8 @@ function register<Name extends ToolName>(rt: TutorRuntime, spec: ToolSpec<Name>)
         if ("error" in caller) return refusal(caller.error);
         const state = coachStateOf(world);
         if ("error" in state) return refusal(state.error);
+        const otherLesson = spec.lesson === "current" ? otherLessonError(state, caller) : null;
+        if (otherLesson !== null) return refusal(otherLesson);
         const outcome = await spec.action(state, input, caller, isoSeconds(rt.now()));
         if ("error" in outcome) return refusal(outcome.error);
         await applyOutcome(rt, state.root, outcome, caller);
@@ -89,20 +99,25 @@ async function sideChat(
   input: ToolParameters<"tutor_side_chat">,
   caller: Caller,
 ): Promise<Outcome> {
-  const rule = input.rule === undefined ? null : (findRule(state.lesson, input.rule) ?? null);
+  // A side chat belongs to its coach thread's lesson, which need not be the current one.
+  const lesson = caller.courseId === state.course.id ? findLesson(state.course, caller.lessonId) : undefined;
+  if (lesson === undefined) {
+    return { error: `This coach thread is for a lesson that isn't in "${state.course.title}", so it can't open side chats.` };
+  }
+  const rule = input.rule === undefined ? null : (findRule(lesson, input.rule) ?? null);
   if (input.rule !== undefined && rule === null) {
-    return { error: `There is no Rule ${input.rule} in lesson ${state.lesson.id}. Call tutor_status for the keys.` };
+    return { error: `There is no Rule ${input.rule} in lesson ${lesson.id}. Call tutor_status for the keys.` };
   }
   const sideChatId = await forkSideChat(rt.bb.sdk, {
     coachThreadId: caller.coachThreadId,
     courseId: state.course.id,
-    lessonId: state.lesson.id,
+    lessonId: lesson.id,
     ruleKey: rule?.key ?? null,
     title: input.title,
-    seed: sideChatSeed(state.lesson, rule, input.prompt),
+    seed: sideChatSeed(lesson, rule, input.prompt),
   });
-  await ensureSideChatTab(rt.bb.sdk, caller.coachThreadId, sideChatId, sideChatAnchor(state.lesson, rule));
-  rt.signals.publish("threads", state.lesson.id);
+  await ensureSideChatTab(rt.bb.sdk, caller.coachThreadId, sideChatId, sideChatAnchor(lesson, rule));
+  rt.signals.publish("threads", lesson.id);
   return {
     text:
       `Started side chat ${sideChatId} ("${input.title}"). It opens as the "Side chat" tab in the coach thread's right panel ` +
@@ -116,13 +131,15 @@ export function registerCoachTools(rt: TutorRuntime): void {
     description:
       "Where the student is: the current lesson, the Rule in focus, and every Rule's Examples with their keys and status. Call it before using the other tutor tools.",
     label: { pending: "Checking course progress", completed: "Checked course progress" },
-    action: (state) => ({ text: statusText(state) }),
+    lesson: "any",
+    action: (state, _input, caller) => ({ text: statusText(state, { lessonId: caller.lessonId, otherLesson: otherLessonError(state, caller) }) }),
   });
   register(rt, {
     name: TOOL_NAMES.focusRule,
     description:
       "Move the focus to a Rule of the current lesson (coach thread only). Returns the Rule card, a ::tutor-progress line to put at the top of your next message.",
     label: { pending: "Moving to a Rule", completed: "Moved to a Rule" },
+    lesson: "current",
     action: (state, input, caller) => focusAction(state, input, caller.isCoachThread),
   });
   register(rt, {
@@ -130,20 +147,27 @@ export function registerCoachTools(rt: TutorRuntime): void {
     description:
       "Record one Example's status. passing needs evidence (the command you ran and its output, or a test name); not-yet needs a note saying what happened instead. Returns a ::tutor-progress card to echo.",
     label: { pending: "Marking an Example", completed: "Marked an Example" },
+    lesson: "current",
     action: (state, input, _caller, now) => markAction(state, input, now),
   });
   register(rt, {
     name: TOOL_NAMES.adoptIteration,
     description:
-      "Adopt the next lesson (an iteration, in the course repo's words) as coach-me does: copy its README.md, FACTORY.md and features/ into spec/, its sample seed into seeds/, write spec/ITERATION as WIP and start spec/PROGRESS.yaml, carrying over Examples already passing. Does not commit.",
+      "Adopt this coach thread's lesson (an iteration, in the course repo's words) as coach-me does: copy its README.md, FACTORY.md and features/ into spec/, its sample seed into seeds/, write spec/ITERATION as WIP and start spec/PROGRESS.yaml, carrying over Examples already passing. Does not commit. A coach thread adopts only its own lesson.",
     label: { pending: "Adopting the lesson", completed: "Adopted the lesson" },
-    action: (state, input, _caller, now) => adoptAction(state, input, now),
+    // Adopting makes the caller's lesson the current one, so it checks the lesson itself.
+    lesson: "any",
+    action: (state, input, caller, now) => {
+      const other = adoptionByOtherError(state, input, caller);
+      return other === null ? adoptAction(state, input, now) : { error: other };
+    },
   });
   register(rt, {
     name: TOOL_NAMES.completeIteration,
     description:
       "Finish the current lesson: write spec/ITERATION as Done and store your two- or three-sentence summary for the student. Returns a ::tutor-progress card to echo.",
     label: { pending: "Completing the lesson", completed: "Completed the lesson" },
+    lesson: "current",
     action: (state, input) => completeAction(state, input),
   });
   register(rt, {
@@ -151,6 +175,7 @@ export function registerCoachTools(rt: TutorRuntime): void {
     description:
       "Move a side question into a BB side chat of this lesson's coach thread, optionally about one Rule, so the coach thread stays on its Rule. It opens as the \"Side chat\" tab in the coach thread's right panel and shares the working tree.",
     label: { pending: "Starting a side chat", completed: "Started a side chat" },
+    lesson: "any",
     action: (state, input, caller) => sideChat(rt, state, input, caller),
   });
 }

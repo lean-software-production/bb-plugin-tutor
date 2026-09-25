@@ -1,7 +1,24 @@
 // Who is calling a coach tool. BB runs a plugin tool even when configure did
-// not offer it, so every call re-checks the thread with BB itself; plugin
-// metadata is never consulted.
+// not offer it, so every call re-checks the thread with BB itself. Whether a
+// thread is Tutor's comes from its structure (origin, fork source, parent),
+// never from plugin metadata. Which lesson it coaches does come from metadata,
+// but only the verified coach thread's, never the caller's own.
+//
+// How far that metadata can be trusted (SDK 0.5.9, bb-app 0.43.4):
+// `threads.getPluginMetadata` returns the namespace Tutor seeded at spawn
+// (`{ course, lesson, role: "coach" }`, threads.ts) plus `reachedRules`. The
+// SDK documents it as writable by "any API client, another plugin, or the
+// thread's own agent" (`updatePluginMetadata` takes an explicit `pluginId`),
+// so it is not a security boundary. It doesn't need to be one here: every
+// Tutor thread works directly in the factory with a shell and could edit
+// spec/ itself. What it guards against is a coach acting on the wrong lesson
+// by mistake, such as an old coach thread still open after the student moved
+// on. For that, the lesson Tutor wrote at spawn is the right record: it is the
+// same record that makes the thread its lesson's coach in the outline and in
+// openCoach (findCoachThread). If a hard boundary were ever needed, Tutor
+// would keep the thread-to-lesson map in its own `bb.storage.kv` instead.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import { coachThreadMetadataSchema } from "../../shared/model.ts";
 import type { FactoryProject } from "../../shared/rpc.ts";
 
 type Sdk = BbPluginApi["sdk"];
@@ -13,6 +30,9 @@ export interface Caller {
   isCoachThread: boolean;
   /** The coach thread a side chat or side thread belongs to; the caller itself when it is the coach thread. */
   coachThreadId: string;
+  /** The course and lesson the coach thread coaches, from its Tutor metadata. Side chats inherit them. */
+  courseId: string;
+  lessonId: string;
 }
 
 export const NOT_A_TUTOR_THREAD =
@@ -68,5 +88,16 @@ export async function authorizeCaller(
   if (thread.projectId !== factoryProject.projectId) {
     return { error: "This thread is not in the student's factory project, so Tutor's tools are off here." };
   }
-  return { threadId: thread.id, isCoachThread: coachThread.id === thread.id, coachThreadId: coachThread.id };
+  // The coach thread's metadata, not the caller's: a fork's metadata was written by whoever forked it.
+  const metadata = coachThreadMetadataSchema.safeParse(await sdk.threads.getPluginMetadata({ pluginId, threadId: coachThread.id }).catch(() => null));
+  if (!metadata.success || metadata.data.role !== "coach") {
+    return { error: "This coach thread doesn't say which lesson it coaches, so Tutor's tools are off here. Open the coach from the course outline." };
+  }
+  return {
+    threadId: thread.id,
+    isCoachThread: coachThread.id === thread.id,
+    coachThreadId: coachThread.id,
+    courseId: metadata.data.course,
+    lessonId: metadata.data.lesson,
+  };
 }

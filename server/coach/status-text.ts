@@ -16,18 +16,31 @@ function clip(text: string, max: number): string {
   return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
 }
 
-export function statusText(state: CoachState): string {
+/** The calling thread's lesson, and why it may not change progress when that isn't the current lesson. */
+export interface StatusCaller {
+  lessonId: string;
+  otherLesson: string | null;
+}
+
+export function statusText(state: CoachState, caller: StatusCaller | null = null): string {
   const { course, lesson, pointer } = state;
   const progress = state.progress?.examples ?? {};
   const focus = state.progress?.focus ?? null;
   const counts = countExamples(lessonExamples(lesson), progress);
-  const lines = [
+  const lines: string[] = [];
+  if (caller !== null) {
+    lines.push(`This thread coaches Lesson ${caller.lessonId}.`);
+    if (caller.otherLesson !== null) {
+      lines.push(`${caller.otherLesson} Until then the tools that change progress refuse here. Below is the lesson the student is on.`);
+    }
+  }
+  lines.push(
     `Course: ${course.title}. Coaching method: ${course.coachPath ?? "(the course has no coach file)"}.`,
     `Factory: ${state.root}.`,
     `Lesson ${lesson.id} "${lesson.title}": ${pointer.iterationStatus}. ` +
       `${counts.passing}/${counts.total} passing, ${counts.notYet} not yet, ${counts.skipped} skipped, ${counts.pending} pending.`,
     `Focus: ${focus ?? "none"}.`,
-  ];
+  );
   const problems = state.student.problems;
   if (problems.length > 0) {
     const more = problems.length > MAX_PROBLEMS ? ` (and ${problems.length - MAX_PROBLEMS} more)` : "";

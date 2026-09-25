@@ -223,6 +223,64 @@ test("the coach tools round-trip progress through the factory repo and carry pas
   assert.equal(completion1.next?.status, "current");
 });
 
+test("a coach thread only changes its own lesson: an old coach can't touch the lesson the student is on", async (t) => {
+  const { sandbox, host } = await setup(t);
+  const root = sandbox.factoryRoot;
+  const lesson0 = findLesson(sandbox.course, "000") ?? assert.fail("no 000");
+  const lesson1 = findLesson(sandbox.course, "001") ?? assert.fail("no 001");
+  const coach0 = (await openCoach(host, "000")).threadId;
+  await ok(host, "tutor_adopt_iteration", { iteration: "000" }, coach0);
+  for (const example of lessonExamples(lesson0)) await ok(host, "tutor_mark_example", { example: example.key, status: "skipped" }, coach0);
+  await ok(host, "tutor_complete_iteration", { iteration: "000", summary: "Done." }, coach0);
+
+  // The Lesson 000 coach can't adopt Lesson 001: its own coach thread does that.
+  const stolen = await tool(host, "tutor_adopt_iteration", { iteration: "001" }, coach0);
+  assert.ok(isError(stolen), `adopted from the old coach: ${text(stolen)}`);
+  assert.match(text(stolen), /This coach thread is for Lesson 000/);
+  assert.equal(await readFile(join(root, "spec/ITERATION"), "utf8").catch(() => null), null, "nothing adopted");
+
+  const coach1 = ((await host.harness.behavior.callRpc("startNextLesson", { lessonId: "001" })) as { threadId: string }).threadId;
+  // Before adopting, the new coach is told to adopt its lesson rather than act on Lesson 000.
+  const early = await tool(host, "tutor_mark_example", { example: lessonExamples(lesson0)[0]?.key, status: "passing", evidence: "x" }, coach1);
+  assert.ok(isError(early) && /tutor_adopt_iteration/.test(text(early)), text(early));
+  await ok(host, "tutor_adopt_iteration", { iteration: "001" }, coach1);
+  const before = await readFile(join(root, "spec/PROGRESS.yaml"), "utf8");
+
+  const [example1] = lessonExamples(lesson1);
+  assert.ok(example1 !== undefined);
+  const rule1 = lesson1.suggestedRuleOrder[0] ?? assert.fail("no rule");
+  host.addThread({ id: "thr_old_side", originKind: "fork", originPluginId: "side-chat", sourceThreadId: coach0, visibility: "hidden" });
+  const refusals: [string, unknown, string][] = [
+    ["tutor_mark_example", { example: example1.key, status: "passing", evidence: "$ ./factory" }, coach0],
+    ["tutor_mark_example", { example: example1.key, status: "passing", evidence: "$ ./factory" }, "thr_old_side"],
+    ["tutor_focus_rule", { rule: rule1 }, coach0],
+    ["tutor_complete_iteration", { iteration: "001", summary: "Stolen." }, coach0],
+  ];
+  for (const [name, input, threadId] of refusals) {
+    const result = await tool(host, name, input, threadId);
+    assert.ok(isError(result), `${name} from ${threadId} was allowed: ${text(result)}`);
+    assert.match(text(result), /This coach thread is for Lesson 000, but the student is on Lesson 001\. Open Lesson 001's coach from the course outline\./);
+  }
+  assert.equal(await readFile(join(root, "spec/PROGRESS.yaml"), "utf8"), before, "Lesson 001's progress is untouched");
+  assert.equal(await readFile(join(root, "spec/ITERATION"), "utf8"), "001 WIP\n");
+  assert.deepEqual(host.threads.find((thread) => thread.id === coach0)?.metadata.reachedRules, undefined);
+
+  // tutor_status still answers, naming the caller's lesson and flagging that it isn't current.
+  const status = await ok(host, "tutor_status", {}, coach0);
+  assert.match(status, /This thread coaches Lesson 000/);
+  assert.match(status, /the student is on Lesson 001/);
+  assert.doesNotMatch(await ok(host, "tutor_status", {}, coach1), /the student is on/);
+
+  // A side chat the old coach opens belongs to its own lesson, not the current one.
+  await ok(host, "tutor_side_chat", { title: "Back then", prompt: "Why did Lesson 0 do that?" }, coach0);
+  const side = host.threads.find((thread) => thread.sourceThreadId === coach0 && thread.originPluginId === "tutor");
+  assert.equal(side?.metadata.lesson, "000");
+  assert.match(side?.seed ?? "", /Lesson 000 coach thread/);
+
+  // The current coach still works.
+  await ok(host, "tutor_mark_example", { example: example1.key, status: "passing", evidence: "$ ./factory" }, coach1);
+});
+
 async function adoptedCoach(host: TutorHost): Promise<{ coach: string; rule: string }> {
   const coach = (await openCoach(host, "000")).threadId;
   await ok(host, "tutor_adopt_iteration", { iteration: "000" }, coach);

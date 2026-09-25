@@ -59,7 +59,8 @@ in [`scripts/tutor-dev/`](../../../scripts/tutor-dev/README.md):
 Coach threads are spawned by Tutor directly in the factory folder, and only they are offered the
 `tutor` skill and the six `tutor_*` tools (`status`, `focus_rule`, `mark_example`,
 `adopt_iteration`, `complete_iteration`, `side_chat`). Each tool also refuses, inside
-`execute()`, any thread Tutor did not spawn in the chosen factory project.
+`execute()`, any thread Tutor did not spawn in the chosen factory project, and a coach
+thread (or side chat) changes only its own lesson's progress.
 
 ## Layout
 

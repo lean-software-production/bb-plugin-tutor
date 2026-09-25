@@ -65,6 +65,43 @@ export function coachStateOf(world: World): CoachState | { error: string } {
   };
 }
 
+/** The lesson a calling thread coaches: its coach thread's, which its side chats inherit (auth.ts). */
+export interface CallerLesson {
+  courseId: string;
+  lessonId: string;
+}
+
+/**
+ * Why a thread may not change the student's progress: it coaches another
+ * lesson than the one the student is on, as an old coach thread left open
+ * does. Null when it coaches the current lesson.
+ */
+export function otherLessonError(state: CoachState, caller: CallerLesson): string | null {
+  const current = state.lesson.id;
+  if (caller.courseId !== state.course.id) {
+    return `This coach thread is for another course, but the student is on Lesson ${current} of "${state.course.title}". Open Lesson ${current}'s coach from the course outline.`;
+  }
+  if (caller.lessonId === current) return null;
+  if (adoptionTargets(state.course, state.pointer).includes(caller.lessonId)) {
+    return `This coach thread is for Lesson ${caller.lessonId}, which hasn't been adopted yet: the student is still on Lesson ${current}. Call tutor_adopt_iteration with iteration "${caller.lessonId}" first.`;
+  }
+  return `This coach thread is for Lesson ${caller.lessonId}, but the student is on Lesson ${current}. Open Lesson ${current}'s coach from the course outline.`;
+}
+
+/**
+ * A coach thread adopts its own lesson: Tutor spawns each lesson's coach to
+ * adopt it (coachThreadPrompt "adopt"), so an older coach never adopts the
+ * next lesson in its own thread.
+ */
+export function adoptionByOtherError(state: CoachState, input: ToolParameters<"tutor_adopt_iteration">, caller: CallerLesson): string | null {
+  if (caller.courseId !== state.course.id) return otherLessonError(state, caller);
+  if (input.iteration === caller.lessonId) return null;
+  return (
+    `This coach thread is for Lesson ${caller.lessonId}, so it can only adopt Lesson ${caller.lessonId}. ` +
+    `Lesson ${input.iteration} is adopted by its own coach thread: tell the student to start it from the course outline.`
+  );
+}
+
 function card(fields: Partial<ProgressCard> & Pick<ProgressCard, "kind" | "title">): string {
   return formatProgressCard({
     passed: null,

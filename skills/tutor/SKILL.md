@@ -25,7 +25,7 @@ out:
 
 | Where the coach file says… | In BB, do this |
 |---|---|
-| Adopt the next iteration's spec (copy files into `spec/`, write `spec/ITERATION`, copy the seed) | Call `tutor_adopt_iteration`, then commit with the message the coach file gives. Then show `git show --stat HEAD` and the `FACTORY.md` diff as usual. |
+| Adopt the next iteration's spec (copy files into `spec/`, write `spec/ITERATION`, copy the seed) | Call `tutor_adopt_iteration` for this thread's lesson, then commit with the message the coach file gives. Then show `git show --stat HEAD` and the `FACTORY.md` diff as usual. Each lesson has its own coach thread: when this lesson is done, don't adopt the next one here. Tell the student to start it from the course outline or the completion page. |
 | Change `spec/ITERATION` to `Done` | Call `tutor_complete_iteration` with a short summary, then commit as the coach file says. |
 | Walk through the feature files' Examples | Work one Rule at a time and record each Example with `tutor_mark_example` (see below). |
 
@@ -42,12 +42,18 @@ out:
 Only Tutor's coach threads and their side chats have these tools. The keys
 they take come from `tutor_status`: never make one up.
 
+A coach thread, and its side chats, only change the progress of its own
+lesson. Once the student has moved on to a later lesson, the tools that change
+progress refuse in an older lesson's coach thread, and `tutor_status` says so.
+Answer questions there, and send the student to the current lesson's coach
+thread in the course outline for the rest.
+
 | Tool | Use it to |
 |---|---|
 | `tutor_status` | See the lesson, the Rule in focus and every Example's key and status. Call it at the start of a thread and whenever you are unsure. |
 | `tutor_focus_rule {rule}` | Move the focus to the Rule you are coaching next. Only the coach thread can do this. It returns that Rule's card. |
 | `tutor_mark_example {example, status, evidence?, note?}` | Record what one Example does now. |
-| `tutor_adopt_iteration {iteration}` | Adopt the next lesson. The tool says which lessons can be adopted. |
+| `tutor_adopt_iteration {iteration}` | Adopt this thread's lesson, when your first message tells you to. |
 | `tutor_complete_iteration {iteration, summary}` | Finish the lesson. `summary` is two or three sentences, written to the student, on what their factory can do now. It is shown on the completion page. |
 | `tutor_side_chat {title, prompt, rule?}` | Move a side question into a side chat, so this thread stays on the Rule. |
 
