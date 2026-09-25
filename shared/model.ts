@@ -226,7 +226,7 @@ export interface StudentState {
 export const coachThreadMetadataSchema = z.object({
   course: z.string(),
   lesson: lessonIdSchema,
-  /** "sideChat" for a side chat (a fork Tutor made), and for a side thread spawned before side chats. */
+  /** "sideChat" for a side chat (a fork Tutor made). */
   role: z.enum(["coach", "sideChat"]),
   ruleKey: ruleKeySchema.optional(),
 });
