@@ -45,12 +45,12 @@
 .tutor-paper .tp-mk--blue {
   background: var(--tp-blue);
 }
-.tutor-paper.tp-pcard--homework-complete .tp-mk {
+.tutor-paper.tp-pcard--lesson-complete .tp-mk {
   width: 36px;
   height: 36px;
   font-size: 1rem;
 }
-.tutor-paper.tp-pcard--homework-complete {
+.tutor-paper.tp-pcard--lesson-complete {
   border-color: #bfe0d2;
 }
 .tutor-paper.tp-pcard .tp-ey {

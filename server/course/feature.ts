@@ -1,5 +1,5 @@
 // Parses one .feature file into the shared model with @cucumber/gherkin.
-// Novelty is left as "new" here; novelty.ts compares homeworks afterwards.
+// Novelty is left as "new" here; novelty.ts compares lessons afterwards.
 import { AstBuilder, GherkinClassicTokenMatcher, Parser } from "@cucumber/gherkin";
 import { IdGenerator } from "@cucumber/messages";
 import type * as Gherkin from "@cucumber/messages";
@@ -18,7 +18,7 @@ import { dedent } from "./text.ts";
 export interface FeatureSource {
   /** The file's text. */
   text: string;
-  /** Relative to the homework dir, POSIX separators: "features/assembly-line.feature". */
+  /** Relative to the lesson dir, POSIX separators: "features/assembly-line.feature". */
   path: string;
   /** How to name the file in an error message, e.g. relative to the course root. */
   displayPath: string;

@@ -1,4 +1,4 @@
-// Tutor's coach threads: one main thread per homework in the factory project,
+// Tutor's coach threads: one main thread per lesson in the factory project,
 // with side chats as hidden forks of it (and, from before side chats, side
 // threads as its children). Plugin metadata is used to list and find them
 // only; it is writable by the thread's own agent, so it never authorises.
@@ -40,7 +40,7 @@ export interface TutorThreadRecord extends TutorThread {
 }
 
 /**
- * A thread's place under its homework, from its structure, which the
+ * A thread's place under its lesson, from its structure, which the
  * thread's agent cannot rewrite: a fork (a side chat) or a child (a side
  * thread from before side chats) is a side thread, whatever the metadata
  * claims. A hidden thread that is neither is not Tutor's to list.
@@ -67,7 +67,7 @@ export function toTutorThread(row: ThreadRow, metadata: unknown): TutorThreadRec
   if (!parsed.success || role === null) return null;
   return {
     id: row.id,
-    homeworkId: parsed.data.iteration,
+    lessonId: parsed.data.lesson,
     role,
     ruleKey: role === "main" ? null : (parsed.data.ruleKey ?? null),
     title: row.title,
@@ -101,14 +101,14 @@ export async function listTutorThreads(sdk: Sdk, pluginId: string, projectId: st
   return records.filter((record) => record !== null).sort((a, b) => b.createdAt - a.createdAt);
 }
 
-/** The homework's main coach thread: the newest one wins. Side chats and side threads never do. */
+/** The lesson's main coach thread: the newest one wins. Side chats and side threads never do. */
 export function findMainThread(
   threads: readonly TutorThreadRecord[],
   courseId: string,
-  homeworkId: string,
+  lessonId: string,
 ): TutorThreadRecord | undefined {
   return threads
-    .filter((thread) => thread.role === "main" && thread.courseId === courseId && thread.homeworkId === homeworkId)
+    .filter((thread) => thread.role === "main" && thread.courseId === courseId && thread.lessonId === lessonId)
     .reduce<TutorThreadRecord | undefined>((newest, thread) => (newest === undefined || thread.createdAt > newest.createdAt ? thread : newest), undefined);
 }
 
@@ -130,16 +130,16 @@ export interface SpawnMain {
   projectId: string;
   factory: FactoryLocation;
   courseId: string;
-  homeworkId: string;
+  lessonId: string;
   prompt: string;
 }
 
 export async function spawnMainThread(sdk: Sdk, spawn: SpawnMain): Promise<string> {
-  const pluginMetadata: CoachThreadMetadata = { course: spawn.courseId, iteration: spawn.homeworkId, role: "main" };
+  const pluginMetadata: CoachThreadMetadata = { course: spawn.courseId, lesson: spawn.lessonId, role: "main" };
   const thread = await sdk.threads.spawn({
     projectId: spawn.projectId,
     environment: factoryEnvironment(spawn.factory),
-    title: coachThreadTitle(spawn.homeworkId),
+    title: coachThreadTitle(spawn.lessonId),
     pluginMetadata,
     prompt: spawn.prompt,
   });

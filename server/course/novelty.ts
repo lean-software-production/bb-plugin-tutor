@@ -1,4 +1,4 @@
-// "New since the previous homework": novelty per Example, rolled up to Rules
+// "New since the previous lesson": novelty per Example, rolled up to Rules
 // and feature files, and the suggested Rule order that puts fresh Rules first.
 // The comparison rules are documented on noveltySchema in shared/model.ts.
 import type { Example, FeatureFile, Novelty, RuleKey } from "../../shared/model.ts";
@@ -42,8 +42,8 @@ function rollUp(novelties: readonly Novelty[], existedBefore: boolean): Novelty 
 }
 
 /**
- * Returns `features` with novelty filled in against the previous homework's
- * features, or everything "new" when there is no previous homework.
+ * Returns `features` with novelty filled in against the previous lesson's
+ * features, or everything "new" when there is no previous lesson.
  */
 export function withNovelty(
   features: readonly FeatureFile[],

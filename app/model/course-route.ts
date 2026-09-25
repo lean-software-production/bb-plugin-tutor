@@ -28,7 +28,7 @@ export function parseCoursePath(subPath: string): CourseLocation {
   if (match !== null) {
     const ruleKey = decoded(match[2] ?? "");
     if (ruleKey !== null && RULE_KEY_PATTERN.test(ruleKey)) {
-      return { route: { kind: "start", homeworkId: match[1] ?? "" }, ruleKey };
+      return { route: { kind: "start", lessonId: match[1] ?? "" }, ruleKey };
     }
   }
   return { route: parseRoute(trimmed), ruleKey: null };

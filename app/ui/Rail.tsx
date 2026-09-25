@@ -24,7 +24,7 @@ import {
   useStore,
   useTutorRpc,
 } from "../hooks.ts";
-import { homeworkLabel } from "../model/format.ts";
+import { lessonLabel } from "../model/format.ts";
 import { buildRail } from "../model/rail.ts";
 import type { LessonNode, OutlineRule, RailView, SideRow, ThreadRow } from "../model/rail.ts";
 import { railMountedStore, routeStore } from "../state/app-state.ts";
@@ -103,7 +103,7 @@ function RailBody({ rail, go, onNavigate }: { rail: RailView; go: Go; onNavigate
               key={lesson.id}
               className="tp-lesson-row tp-lesson-row--ahead"
               href={coursePageHref(lesson.startPath)}
-              onClick={(event) => go(event, { kind: "start", homeworkId: lesson.id })}
+              onClick={(event) => go(event, { kind: "start", lessonId: lesson.id })}
             >
               <span className="tp-gl-mark" aria-hidden>
                 ○
@@ -141,7 +141,7 @@ function LessonBranch({ lesson, go, onNavigate }: { lesson: LessonNode; go: Go; 
         className="tp-lesson-head"
         aria-expanded={open}
         aria-controls={childrenId}
-        aria-label={`${homeworkLabel(lesson.id)}, ${lesson.title}, ${lesson.status}, ${lesson.count} examples hold`}
+        aria-label={`${lessonLabel(lesson.id)}, ${lesson.title}, ${lesson.status}, ${lesson.count} examples hold`}
         onClick={() => setOpen(!open)}
       >
         <span className="tp-caret" aria-hidden>
@@ -178,7 +178,7 @@ function LessonThreads({ lesson, go, onNavigate }: { lesson: LessonNode; go: Go;
   const openSideChat = useOpenSideChat();
   const askSide = useAskSideQuestion(onNavigate);
   const startCoach = useAction(async () => {
-    const { threadId } = await rpc.call("openCoach", { homeworkId: lesson.id });
+    const { threadId } = await rpc.call("openCoach", { lessonId: lesson.id });
     refreshAll();
     navigate.toThread(threadId);
     onNavigate();
@@ -201,7 +201,7 @@ function LessonThreads({ lesson, go, onNavigate }: { lesson: LessonNode; go: Go;
           <a
             className="tp-th tp-th--page"
             href={coursePageHref(lesson.startPath)}
-            onClick={(event) => go(event, { kind: "start", homeworkId: lesson.id })}
+            onClick={(event) => go(event, { kind: "start", lessonId: lesson.id })}
           >
             <span className="tp-ic" aria-hidden>
               ¶
@@ -212,7 +212,7 @@ function LessonThreads({ lesson, go, onNavigate }: { lesson: LessonNode; go: Go;
       ) : (
         <>
           <ThreadLink row={{ ...coach, title: coachThreadTitle(lesson.id) }} onNavigate={onNavigate} />
-          <div className="tp-rules" role="group" aria-label={`Rules of ${homeworkLabel(lesson.id)}`}>
+          <div className="tp-rules" role="group" aria-label={`Rules of ${lessonLabel(lesson.id)}`}>
             {lesson.features.map((feature) => (
               <div key={feature.slug} className="tp-rule-group">
                 <div className="tp-feat">
@@ -225,7 +225,7 @@ function LessonThreads({ lesson, go, onNavigate }: { lesson: LessonNode; go: Go;
                     rule={rule}
                     href={coach.href}
                     onOpen={() => {
-                      openRule({ coachThreadId: coach.id, homeworkId: lesson.id, ruleKey: rule.key });
+                      openRule({ coachThreadId: coach.id, lessonId: lesson.id, ruleKey: rule.key });
                       onNavigate();
                     }}
                   />

@@ -1,11 +1,11 @@
 id: widget-works
 title: Build a widget works
-description: Two homeworks, one widget works.
+description: Two lessons, one widget works.
 coach: .agents/coach.md
 lexicon: lexicon.yaml
-homeworks:
-  - { id: 010, title: First widgets, set: Day 1, dir: homeworks/one }
+lessons:
+  - { id: 010, title: First widgets, set: Day 1, dir: lessons/one }
   - id: "020"
     title: More widgets
     set: Day 2
-    dir: homeworks/two
+    dir: lessons/two

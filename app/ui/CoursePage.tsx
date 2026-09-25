@@ -29,9 +29,9 @@ export function CoursePage({ subPath }: PluginNavPanelProps) {
     case "welcome":
       return <WelcomePage />;
     case "start":
-      return <StartPage key={route.homeworkId} homeworkId={route.homeworkId} ruleKey={ruleKey} />;
+      return <StartPage key={route.lessonId} lessonId={route.lessonId} ruleKey={ruleKey} />;
     case "complete":
-      return <CompletionPage key={route.homeworkId} homeworkId={route.homeworkId} />;
+      return <CompletionPage key={route.lessonId} lessonId={route.lessonId} />;
   }
 }
 

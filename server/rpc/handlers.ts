@@ -3,8 +3,8 @@
 import { withoutLeadingDirectives } from "../../shared/directives.ts";
 import { rpcContract } from "../../shared/rpc.ts";
 import type { Binding } from "../../shared/rpc.ts";
-import { findHomework, findRule, homeworkStatus } from "../../shared/derive.ts";
-import type { Course, Homework, Rule } from "../../shared/model.ts";
+import { findLesson, findRule, lessonStatus } from "../../shared/derive.ts";
+import type { Course, Lesson, Rule } from "../../shared/model.ts";
 import { adoptionTargets } from "../coach/actions.ts";
 import { coachThreadOf } from "../coach/auth.ts";
 import { resolveFactory } from "../coach/binding.ts";
@@ -30,7 +30,7 @@ import {
 import type { World } from "../coach/world.ts";
 import { overlaps, realPath } from "../paths.ts";
 import { listCandidates } from "./candidates.ts";
-import { buildCompletion, buildLessonDetail, buildOverview, publicThread, requireCourse, requireHomework } from "./views.ts";
+import { buildCompletion, buildLessonDetail, buildOverview, publicThread, requireCourse, requireLesson } from "./views.ts";
 
 type Bound = Extract<Binding, { status: "bound" }>;
 
@@ -49,9 +49,9 @@ function requireBound(world: World): BoundFactory {
   );
 }
 
-function requireRule(homework: Homework, ruleKey: string): Rule {
-  const rule = findRule(homework, ruleKey);
-  if (rule === undefined) throw new Error(`Lesson ${homework.id} has no Rule ${ruleKey}.`);
+function requireRule(lesson: Lesson, ruleKey: string): Rule {
+  const rule = findRule(lesson, ruleKey);
+  if (rule === undefined) throw new Error(`Lesson ${lesson.id} has no Rule ${ruleKey}.`);
   return rule;
 }
 
@@ -74,7 +74,7 @@ export function registerRpc(rt: TutorRuntime): void {
 
   /**
    * Side chats BB made ("Reply in side chat") of the coach threads, as Tutor
-   * lists its own: side chats of their homework, about no Rule in particular.
+   * lists its own: side chats of their lesson, about no Rule in particular.
    */
   async function bbSideChatsOf(threads: readonly TutorThreadRecord[]): Promise<TutorThreadRecord[]> {
     const mains = threads.filter((thread) => thread.role === "main");
@@ -84,7 +84,7 @@ export function registerRpc(rt: TutorRuntime): void {
         .filter((row) => row.originPluginId !== bb.pluginId && row.projectId === main.projectId)
         .map((row) => ({
           id: row.id,
-          homeworkId: main.homeworkId,
+          lessonId: main.lessonId,
           role: "side" as const,
           ruleKey: null,
           title: row.title ?? (withoutLeadingDirectives((row.titleFallback ?? "").replace(BB_REPLY_PREFIX, "")) || null),
@@ -98,41 +98,41 @@ export function registerRpc(rt: TutorRuntime): void {
     );
   }
 
-  async function spawnMain(course: Course, binding: BoundFactory, homework: Homework, prompt: string): Promise<string> {
+  async function spawnMain(course: Course, binding: BoundFactory, lesson: Lesson, prompt: string): Promise<string> {
     const threadId = await spawnMainThread(bb.sdk, {
       projectId: binding.projectId,
       factory: binding.location,
       courseId: course.id,
-      homeworkId: homework.id,
+      lessonId: lesson.id,
       prompt,
     });
-    rt.coaches.remember([{ id: threadId, role: "main", homeworkId: homework.id }]);
-    rt.signals.publish("threads", homework.id);
+    rt.coaches.remember([{ id: threadId, role: "main", lessonId: lesson.id }]);
+    rt.signals.publish("threads", lesson.id);
     return threadId;
   }
 
   /**
-   * The homework's main coach thread, spawned with `prompt` when there is none.
-   * One caller at a time per homework, re-listing once it has the lock, so two
+   * The lesson's main coach thread, spawned with `prompt` when there is none.
+   * One caller at a time per lesson, re-listing once it has the lock, so two
    * clicks (or two tabs) never spawn two main coaches.
    */
   async function findOrSpawnMain(
     course: Course,
     binding: BoundFactory,
-    homework: Homework,
+    lesson: Lesson,
     prompt: () => string,
   ): Promise<{ threadId: string; created: boolean }> {
-    return rt.locks.run(mainThreadLockKey(binding.projectId, course.id, homework.id), async () => {
+    return rt.locks.run(mainThreadLockKey(binding.projectId, course.id, lesson.id), async () => {
       const threads = await listTutorThreads(bb.sdk, bb.pluginId, binding.projectId);
-      const existing = findMainThread(threads, course.id, homework.id);
+      const existing = findMainThread(threads, course.id, lesson.id);
       if (existing !== undefined) return { threadId: existing.id, created: false };
-      return { threadId: await spawnMain(course, binding, homework, prompt()), created: true };
+      return { threadId: await spawnMain(course, binding, lesson, prompt()), created: true };
     });
   }
 
-  function startFor(world: World, course: Course, homework: Homework): MainThreadStart {
+  function startFor(world: World, course: Course, lesson: Lesson): MainThreadStart {
     const pointer = world.pointer;
-    if (pointer === null || homeworkStatus(course, pointer, homework.id) === "done") return "revisit";
+    if (pointer === null || lessonStatus(course, pointer, lesson.id) === "done") return "revisit";
     return pointer.iterationStatus === "not-started" ? "adopt" : "resume";
   }
 
@@ -143,19 +143,19 @@ export function registerRpc(rt: TutorRuntime): void {
       return buildOverview(world, [...threads, ...(await bbSideChatsOf(threads))]);
     },
 
-    getLessonDetail: async ({ homeworkId }) => {
+    getLessonDetail: async ({ lessonId }) => {
       const world = await loadWorld();
-      return buildLessonDetail(world, homeworkId, await threadsOf(world));
+      return buildLessonDetail(world, lessonId, await threadsOf(world));
     },
 
-    getCompletion: async ({ homeworkId }) => {
+    getCompletion: async ({ lessonId }) => {
       const world = await loadWorld();
       const threads = await threadsOf(world);
-      const main = world.course === null ? undefined : findMainThread(threads, world.course.id, homeworkId);
+      const main = world.course === null ? undefined : findMainThread(threads, world.course.id, lessonId);
       // Side chats BB made ("Reply in side chat") are not Tutor's threads, so count them apart.
       const bbSideChats =
         main === undefined ? 0 : (await listSideChats(bb.sdk, main.id)).filter((row) => row.originPluginId !== bb.pluginId).length;
-      return buildCompletion(world, homeworkId, threads, bbSideChats);
+      return buildCompletion(world, lessonId, threads, bbSideChats);
     },
 
     getThreadContext: async ({ threadId }) => {
@@ -166,7 +166,7 @@ export function registerRpc(rt: TutorRuntime): void {
         const record = toTutorThread(thread, metadata);
         return { thread: record === null ? null : publicThread(record) };
       }
-      // A side chat BB made of a coach thread: a side chat of its homework, about no Rule in particular.
+      // A side chat BB made of a coach thread: a side chat of its lesson, about no Rule in particular.
       const main = await coachThreadOf(bb.sdk, bb.pluginId, thread);
       if (main === null || main.id === thread.id) return { thread: null };
       const coach = toTutorThread(main, await bb.sdk.threads.getPluginMetadata({ threadId: main.id }).catch(() => null));
@@ -174,7 +174,7 @@ export function registerRpc(rt: TutorRuntime): void {
       return {
         thread: {
           id: thread.id,
-          homeworkId: coach.homeworkId,
+          lessonId: coach.lessonId,
           role: "side" as const,
           ruleKey: null,
           title: thread.title,
@@ -211,47 +211,47 @@ export function registerRpc(rt: TutorRuntime): void {
       return binding;
     },
 
-    openCoach: async ({ homeworkId }) => {
+    openCoach: async ({ lessonId }) => {
       const world = await loadWorld();
       const course = requireCourse(world);
       const binding = requireBound(world);
-      const homework = requireHomework(course, homeworkId);
-      if (world.pointer === null || homeworkStatus(course, world.pointer, homework.id) === "ahead") {
-        throw new Error(`Lesson ${homework.id} has not started yet.`);
+      const lesson = requireLesson(course, lessonId);
+      if (world.pointer === null || lessonStatus(course, world.pointer, lesson.id) === "ahead") {
+        throw new Error(`Lesson ${lesson.id} has not started yet.`);
       }
-      return findOrSpawnMain(course, binding, homework, () => mainThreadPrompt(course, homework, startFor(world, course, homework)));
+      return findOrSpawnMain(course, binding, lesson, () => mainThreadPrompt(course, lesson, startFor(world, course, lesson)));
     },
 
-    startNextHomework: async ({ homeworkId }) => {
+    startNextLesson: async ({ lessonId }) => {
       const world = await loadWorld();
       const course = requireCourse(world);
       const binding = requireBound(world);
-      const homework = requireHomework(course, homeworkId);
-      if (homework.builtin || world.pointer === null || !adoptionTargets(course, world.pointer).includes(homework.id)) {
-        throw new Error(`Lesson ${homework.id} cannot be started yet: finish the lesson before it first.`);
+      const lesson = requireLesson(course, lessonId);
+      if (lesson.builtin || world.pointer === null || !adoptionTargets(course, world.pointer).includes(lesson.id)) {
+        throw new Error(`Lesson ${lesson.id} cannot be started yet: finish the lesson before it first.`);
       }
-      const { threadId } = await findOrSpawnMain(course, binding, homework, () => mainThreadPrompt(course, homework, "adopt"));
+      const { threadId } = await findOrSpawnMain(course, binding, lesson, () => mainThreadPrompt(course, lesson, "adopt"));
       return { threadId };
     },
 
-    startSideThread: async ({ homeworkId, ruleKey }) => {
+    startSideThread: async ({ lessonId, ruleKey }) => {
       const world = await loadWorld();
       const course = requireCourse(world);
       requireBound(world);
-      const homework = requireHomework(course, homeworkId);
-      const rule = ruleKey === null ? null : requireRule(homework, ruleKey);
-      const main = findMainThread(await threadsOf(world), course.id, homework.id);
-      if (main === undefined) throw new Error(`Start with your coach for lesson ${homework.id} first.`);
+      const lesson = requireLesson(course, lessonId);
+      const rule = ruleKey === null ? null : requireRule(lesson, ruleKey);
+      const main = findMainThread(await threadsOf(world), course.id, lesson.id);
+      if (main === undefined) throw new Error(`Start with your coach for lesson ${lesson.id} first.`);
       const sideChatId = await forkSideChat(bb.sdk, {
         coachThreadId: main.id,
         courseId: course.id,
-        homeworkId: homework.id,
+        lessonId: lesson.id,
         ruleKey: rule?.key ?? null,
         title: sideChatTitle(rule),
-        seed: sideChatSeed(homework, rule),
+        seed: sideChatSeed(lesson, rule),
       });
-      await ensureSideChatTab(bb.sdk, main.id, sideChatId, sideChatAnchor(homework, rule));
-      rt.signals.publish("threads", homework.id);
+      await ensureSideChatTab(bb.sdk, main.id, sideChatId, sideChatAnchor(lesson, rule));
+      rt.signals.publish("threads", lesson.id);
       return { coachThreadId: main.id, sideChatId };
     },
 
@@ -265,28 +265,28 @@ export function registerRpc(rt: TutorRuntime): void {
       }
       const metadata = thread.originPluginId === bb.pluginId ? await bb.sdk.threads.getPluginMetadata({ threadId: thread.id }).catch(() => null) : null;
       const record = metadata === null ? null : toTutorThread(thread, metadata);
-      const homework = record === null || world.course === null ? undefined : findHomework(world.course, record.homeworkId);
+      const lesson = record === null || world.course === null ? undefined : findLesson(world.course, record.lessonId);
       const ruleKey = record?.ruleKey ?? null;
-      const rule = homework === undefined || ruleKey === null ? null : (findRule(homework, ruleKey) ?? null);
+      const rule = lesson === undefined || ruleKey === null ? null : (findRule(lesson, ruleKey) ?? null);
       const anchor =
-        homework !== undefined
-          ? sideChatAnchor(homework, rule)
+        lesson !== undefined
+          ? sideChatAnchor(lesson, rule)
           : (thread.titleFallback ?? thread.title ?? "A side question").replace(BB_REPLY_PREFIX, "");
       await ensureSideChatTab(bb.sdk, main.id, thread.id, anchor);
       return { coachThreadId: main.id };
     },
 
-    redirectFocus: async ({ homeworkId, ruleKey }) => {
+    redirectFocus: async ({ lessonId, ruleKey }) => {
       const world = await loadWorld();
       const course = requireCourse(world);
       const binding = requireBound(world);
-      const homework = requireHomework(course, homeworkId);
-      if (world.pointer === null || homeworkStatus(course, world.pointer, homework.id) !== "current") {
+      const lesson = requireLesson(course, lessonId);
+      if (world.pointer === null || lessonStatus(course, world.pointer, lesson.id) !== "current") {
         throw new Error("You can only choose the next Rule in the lesson you are on.");
       }
-      const rule = requireRule(homework, ruleKey);
-      const main = await findOrSpawnMain(course, binding, homework, () =>
-        mainThreadPrompt(course, homework, startFor(world, course, homework), rule),
+      const rule = requireRule(lesson, ruleKey);
+      const main = await findOrSpawnMain(course, binding, lesson, () =>
+        mainThreadPrompt(course, lesson, startFor(world, course, lesson), rule),
       );
       if (main.created) return { threadId: main.threadId };
       await bb.sdk.threads.send({

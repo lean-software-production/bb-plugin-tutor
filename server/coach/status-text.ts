@@ -1,6 +1,6 @@
-// tutor_status: a compact, bounded picture of the homework the coach can act
+// tutor_status: a compact, bounded picture of the lesson the coach can act
 // on. Keys are listed because every other tool takes them.
-import { countExamples, exampleStatus, findRule, homeworkExamples } from "../../shared/derive.ts";
+import { countExamples, exampleStatus, findRule, lessonExamples } from "../../shared/derive.ts";
 import type { ExampleStatus } from "../../shared/model.ts";
 import type { CoachState } from "./actions.ts";
 
@@ -17,14 +17,14 @@ function clip(text: string, max: number): string {
 }
 
 export function statusText(state: CoachState): string {
-  const { course, homework, pointer } = state;
+  const { course, lesson, pointer } = state;
   const progress = state.progress?.examples ?? {};
   const focus = state.progress?.focus ?? null;
-  const counts = countExamples(homeworkExamples(homework), progress);
+  const counts = countExamples(lessonExamples(lesson), progress);
   const lines = [
     `Course: ${course.title}. Coaching method: ${course.coachPath ?? "(the course has no coach file)"}.`,
     `Factory: ${state.root}.`,
-    `Lesson ${homework.id} "${homework.title}": ${pointer.iterationStatus}. ` +
+    `Lesson ${lesson.id} "${lesson.title}": ${pointer.iterationStatus}. ` +
       `${counts.passing}/${counts.total} passing, ${counts.notYet} not yet, ${counts.skipped} skipped, ${counts.pending} pending.`,
     `Focus: ${focus ?? "none"}.`,
   ];
@@ -34,8 +34,8 @@ export function statusText(state: CoachState): string {
     lines.push(`Problems reading the factory: ${problems.slice(0, MAX_PROBLEMS).join(" ")}${more}`);
   }
   lines.push("", "Rules in suggested order (● focus; ✓ passing, ! not yet, ○ pending, – skipped):");
-  for (const key of homework.suggestedRuleOrder) {
-    const rule = findRule(homework, key);
+  for (const key of lesson.suggestedRuleOrder) {
+    const rule = findRule(lesson, key);
     if (rule === undefined) continue;
     const ruleCounts = countExamples(rule.examples, progress);
     const marker = key === focus ? "●" : " ";

@@ -26,7 +26,7 @@ const card: ProgressCard = {
   total: 41,
   next: "The factory refuses an assembly line naming a machine it does not have",
   note: null,
-  homeworkId: "003",
+  lessonId: "003",
   ruleKey: "assembly-line/the-factory-accepts-an-assembly-line-it-can-run",
   exampleKey: null,
 };
@@ -51,7 +51,7 @@ test("untrusted progress attributes are validated", () => {
     title: "  x  ",
     passed: "50",
     total: "41",
-    homework: "3",
+    lesson: "3",
     rule: "../../etc",
     example: "a/b/c",
     note: "n".repeat(1000),
@@ -60,7 +60,7 @@ test("untrusted progress attributes are validated", () => {
   assert.equal(parsed.title, "x");
   assert.equal(parsed.passed, null);
   assert.equal(parsed.total, null);
-  assert.equal(parsed.homeworkId, null);
+  assert.equal(parsed.lessonId, null);
   assert.equal(parsed.ruleKey, null);
   assert.equal(parsed.exampleKey, "a/b/c");
   assert.equal(parsed.note?.length, 400);
@@ -75,16 +75,16 @@ test("term refs round-trip and reject bad ids", () => {
   assert.equal(parseTermRef({}), null);
 });
 
-test("a lesson card names one homework, and nothing else is accepted", () => {
-  const source = formatLessonRef({ homeworkId: "003" });
-  assert.equal(source, '::tutor-lesson{homework="003"}');
-  assert.deepEqual(parseLessonRef(attributesOf(source)), { homeworkId: "003" });
-  for (const homework of [undefined, "", "3", "0003", "003 ", "../003", "abc"]) {
-    assert.equal(parseLessonRef(homework === undefined ? {} : { homework }), null, String(homework));
+test("a lesson card names one lesson, and nothing else is accepted", () => {
+  const source = formatLessonRef({ lessonId: "003" });
+  assert.equal(source, '::tutor-lesson{lesson="003"}');
+  assert.deepEqual(parseLessonRef(attributesOf(source)), { lessonId: "003" });
+  for (const lesson of [undefined, "", "3", "0003", "003 ", "../003", "abc"]) {
+    assert.equal(parseLessonRef(lesson === undefined ? {} : { lesson }), null, String(lesson));
   }
 });
 
-test("a Rule anchor joins the thread, the homework and the Rule, and refuses anything malformed", () => {
+test("a Rule anchor joins the thread, the lesson and the Rule, and refuses anything malformed", () => {
   assert.equal(ruleAnchor("thr_abc", "003", "assembly-line/refuses"), "thr_abc|003/assembly-line/refuses");
   assert.equal(ruleAnchor("thr abc", "003", "a/b"), null);
   assert.equal(ruleAnchor("thr_abc", "3", "a/b"), null);
@@ -94,6 +94,6 @@ test("a Rule anchor joins the thread, the homework and the Rule, and refuses any
 
 test("a title drawn from a message drops the cards it opens with", () => {
   assert.equal(withoutLeadingDirectives('::tutor-progress{kind="focus" title="x"}\n\nLet us start.'), "Let us start.");
-  assert.equal(withoutLeadingDirectives('::tutor-lesson{homework="000"} ::tutor-progress{kind="foc…'), "");
+  assert.equal(withoutLeadingDirectives('::tutor-lesson{lesson="000"} ::tutor-progress{kind="foc…'), "");
   assert.equal(withoutLeadingDirectives("Plain text ::term{id=\"x\"}"), "Plain text ::term{id=\"x\"}");
 });

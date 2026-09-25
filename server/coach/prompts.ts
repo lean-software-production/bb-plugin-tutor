@@ -3,7 +3,7 @@
 // Rule" request, and configure's instructions.
 import { SKILL_ID, TOOL_NAMES } from "../../shared/constants.ts";
 import { formatLessonRef } from "../../shared/directives.ts";
-import { coachThreadMetadataSchema, type Course, type Homework, type Rule } from "../../shared/model.ts";
+import { coachThreadMetadataSchema, type Course, type Lesson, type Rule } from "../../shared/model.ts";
 
 export type MainThreadStart = "adopt" | "resume" | "revisit";
 
@@ -20,22 +20,22 @@ function method(course: Course): string {
  * The coach thread's first message. The lesson card line sits on its own
  * line, exactly as the coach must write it, so the lesson leads the thread.
  */
-export function mainThreadPrompt(course: Course, homework: Homework, start: MainThreadStart, focus: Rule | null = null): string {
+export function mainThreadPrompt(course: Course, lesson: Lesson, start: MainThreadStart, focus: Rule | null = null): string {
   const lines = [
-    `You are the coach for Lesson ${homework.id} "${homework.title}" of the course "${course.title}".`,
+    `You are the coach for Lesson ${lesson.id} "${lesson.title}" of the course "${course.title}".`,
     `Load the \`${SKILL_ID}\` skill and follow it. ${method(course)}`,
     "Start your first reply with this line, exactly as written and on a line of its own. BB draws it as the lesson card: the lesson and its Rules.",
-    formatLessonRef({ homeworkId: homework.id }),
+    formatLessonRef({ lessonId: lesson.id }),
   ];
   if (start === "adopt") {
     lines.push(
-      `Then call ${TOOL_NAMES.adoptIteration} with iteration "${homework.id}", commit as the coaching method says, and introduce the lesson.`,
+      `Then call ${TOOL_NAMES.adoptIteration} with iteration "${lesson.id}", commit as the coaching method says, and introduce the lesson.`,
     );
   } else if (start === "resume") {
     lines.push(`Then call ${TOOL_NAMES.status} and pick up where the student left off.`);
   } else {
     lines.push(
-      `This homework is already complete; the student has come back to it. Call ${TOOL_NAMES.status} if you need it, and answer their questions without changing their progress.`,
+      `This lesson is already complete; the student has come back to it. Call ${TOOL_NAMES.status} if you need it, and answer their questions without changing their progress.`,
     );
   }
   if (focus !== null) lines.push(`The student asked to work on the Rule "${focus.name}" (${focus.key}) next.`);
@@ -53,10 +53,10 @@ function clip(text: string, max: number): string {
  * one here (tutor_side_chat); from the "Ask a side question" button there is
  * none yet, and the student writes it.
  */
-export function sideChatSeed(homework: Homework, rule: Rule | null, question: string | null = null): string {
-  const about = rule === null ? `Lesson ${homework.id}` : `the Rule "${rule.name}" (${rule.key}) of Lesson ${homework.id}`;
+export function sideChatSeed(lesson: Lesson, rule: Rule | null, question: string | null = null): string {
+  const about = rule === null ? `Lesson ${lesson.id}` : `the Rule "${rule.name}" (${rule.key}) of Lesson ${lesson.id}`;
   const lines = [
-    `This is a side chat off the Lesson ${homework.id} coach thread, for a side question about ${about}.`,
+    `This is a side chat off the Lesson ${lesson.id} coach thread, for a side question about ${about}.`,
     "Answer it here, briefly, so the coach thread stays on its Rule. You can mark Examples, but only the coach thread moves the focus; suggest a different Rule to the student instead.",
   ];
   lines.push(
@@ -68,8 +68,8 @@ export function sideChatSeed(homework: Homework, rule: Rule | null, question: st
 }
 
 /** What BB's side chat panel shows as "Replying to", above the side chat. */
-export function sideChatAnchor(homework: Homework, rule: Rule | null): string {
-  return rule === null ? `A side question about Lesson ${homework.id}` : `A side question about the Rule "${rule.name}"`;
+export function sideChatAnchor(lesson: Lesson, rule: Rule | null): string {
+  return rule === null ? `A side question about Lesson ${lesson.id}` : `A side question about the Rule "${rule.name}"`;
 }
 
 /** Sent to the coach thread, as the student, when they ask for a Rule. */
@@ -86,11 +86,11 @@ export interface InstructionFacts {
   coachPath: string | null;
 }
 
-/** Where the configured thread sits under its homework, from BB's thread structure. */
+/** Where the configured thread sits under its lesson, from BB's thread structure. */
 export type ThreadPlace =
   | { kind: "main" }
   /** A fork of the coach thread: Tutor's (its metadata may name a Rule) or BB's own. */
-  | { kind: "side-chat"; homeworkId: string | null }
+  | { kind: "side-chat"; lessonId: string | null }
   /** A child Tutor spawned before side chats. */
   | { kind: "side-thread" };
 
@@ -101,20 +101,20 @@ export type ThreadPlace =
 export function coachInstructions(metadata: unknown, facts: InstructionFacts, place: ThreadPlace = { kind: "main" }): string {
   const parsed = coachThreadMetadataSchema.safeParse(metadata);
   const lines = [`This thread belongs to Tutor, the course coach. Load the \`${SKILL_ID}\` skill and follow it.`];
-  const homeworkId = parsed.success ? parsed.data.iteration : place.kind === "side-chat" ? place.homeworkId : null;
+  const lessonId = parsed.success ? parsed.data.lesson : place.kind === "side-chat" ? place.lessonId : null;
   const ruleKey = parsed.success ? parsed.data.ruleKey : undefined;
   const about = ruleKey === undefined ? "" : `, about Rule ${ruleKey}`;
-  if (homeworkId !== null) {
+  if (lessonId !== null) {
     if (place.kind === "main" && parsed.success && parsed.data.role === "main") {
-      lines.push(`You are the coach thread for Lesson ${homeworkId}: you move the focus and mark Examples.`);
+      lines.push(`You are the coach thread for Lesson ${lessonId}: you move the focus and mark Examples.`);
     } else if (place.kind === "side-chat") {
       lines.push(
-        `You are a side chat of the Lesson ${homeworkId} coach thread${about}. ` +
+        `You are a side chat of the Lesson ${lessonId} coach thread${about}. ` +
           "Answer the side question here; you can mark Examples, but only the coach thread moves the focus.",
       );
     } else if (place.kind === "side-thread") {
       lines.push(
-        `You are a side thread of the Lesson ${homeworkId} coach thread${about}. ` +
+        `You are a side thread of the Lesson ${lessonId} coach thread${about}. ` +
           "You can mark Examples, but only the coach thread moves the focus.",
       );
     }

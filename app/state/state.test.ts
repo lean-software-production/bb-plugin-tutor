@@ -140,10 +140,10 @@ test("error messages are always readable", () => {
 });
 
 test("a change signal refreshes everything but the lexicon, unless the course changed", () => {
-  const progress = staleKeys({ reason: "progress", homeworkId: "002" });
+  const progress = staleKeys({ reason: "progress", lessonId: "002" });
   assert.equal(progress(QUERY_KEYS.overview), true);
   assert.equal(progress(QUERY_KEYS.lessonDetail("002")), true);
   assert.equal(progress(QUERY_KEYS.lexicon), false);
-  assert.equal(staleKeys({ reason: "course", homeworkId: null })(QUERY_KEYS.lexicon), true);
+  assert.equal(staleKeys({ reason: "course", lessonId: null })(QUERY_KEYS.lexicon), true);
   assert.equal(staleKeys("garbage")(QUERY_KEYS.lexicon), true);
 });

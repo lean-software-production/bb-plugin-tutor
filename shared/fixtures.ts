@@ -1,20 +1,20 @@
 // Small, schema-valid fixtures so the backend and the frontend can build and
 // test before the content builder's real course loader lands. The course is a
-// cut-down "Build a software factory": Homework 0, then 001–003, with the
+// cut-down "Build a software factory": Lesson 0, then 001–003, with the
 // student in the middle of 002. shared/fixtures.test.ts checks every fixture
 // against its schema, so they cannot drift from the contract.
 //
 // Hashes here are fake (a stable digest of the Example's name and steps, not
 // sha256 of the normalised text); only equality matters to the model.
-import { BUILTIN_HOMEWORK_ID, coachThreadTitle } from "./constants.ts";
-import { countExamples, homeworkExamples, ruleStatus } from "./derive.ts";
+import { BUILTIN_LESSON_ID, coachThreadTitle } from "./constants.ts";
+import { countExamples, lessonExamples, ruleStatus } from "./derive.ts";
 import { exampleKey, featureSlugFromPath, ruleKey, uniqueSlugs } from "./keys.ts";
 import type {
   Course,
   Example,
   ExampleProgress,
   FeatureFile,
-  Homework,
+  Lesson,
   LexiconEntry,
   Novelty,
   Rule,
@@ -126,7 +126,7 @@ function suggestedOrder(features: FeatureFile[]): string[] {
   ].map((rule) => rule.key);
 }
 
-function homework(fields: Omit<Homework, "suggestedRuleOrder">): Homework {
+function lesson(fields: Omit<Lesson, "suggestedRuleOrder">): Lesson {
   return { ...fields, suggestedRuleOrder: suggestedOrder(fields.features) };
 }
 
@@ -136,13 +136,13 @@ const seedBecomesPlan: ExampleSpec = {
   novelty: "new",
 };
 
-const homework0 = homework({
-  id: BUILTIN_HOMEWORK_ID,
+const lesson0 = lesson({
+  id: BUILTIN_LESSON_ID,
   title: "Using your tutor",
   set: "Start here",
-  dir: "/usr/local/share/tutor/plugin/server/course/homework-0",
+  dir: "/usr/local/share/tutor/plugin/server/course/lesson-0",
   builtin: true,
-  readme: "# Homework 0 — Using your tutor\n\nLearn the course rail by using it.\n",
+  readme: "# Lesson 0 — Using your tutor\n\nLearn the course rail by using it.\n",
   dek: "Learn the course rail by using it.",
   factoryMd: "",
   seedSpec: null,
@@ -168,7 +168,7 @@ const homework0 = homework({
   factoryDiff: null,
 });
 
-const homework1 = homework({
+const lesson1 = lesson({
   id: "001",
   title: "Basic unvalidated loop",
   set: "Day 1",
@@ -196,7 +196,7 @@ const homework1 = homework({
   factoryDiff: null,
 });
 
-const homework2 = homework({
+const lesson2 = lesson({
   id: "002",
   title: "Checking the work",
   set: "Day 2",
@@ -262,7 +262,7 @@ const homework2 = homework({
   ],
 });
 
-const homework3 = homework({
+const lesson3 = lesson({
   id: "003",
   title: "The assembly line",
   set: "Day 3",
@@ -315,18 +315,18 @@ export const fixtureLexicon: LexiconEntry[] = [
 export const fixtureCourse: Course = {
   id: "software-factory",
   title: "Build a software factory",
-  description: "Seven homeworks, one factory.",
+  description: "Seven lessons, one factory.",
   root: FIXTURE_COURSE_ROOT,
   coachPath: `${FIXTURE_COURSE_ROOT}/.agents/coach-me.md`,
-  homeworks: [homework0, homework1, homework2, homework3],
+  lessons: [lesson0, lesson1, lesson2, lesson3],
   lexicon: fixtureLexicon,
   source: "ledger",
 };
 
-function examplesOf(homeworkId: string): Example[] {
-  const found = fixtureCourse.homeworks.find((h) => h.id === homeworkId);
-  if (found === undefined) throw new Error(`fixture homework ${homeworkId} missing`);
-  return homeworkExamples(found);
+function examplesOf(lessonId: string): Example[] {
+  const found = fixtureCourse.lessons.find((h) => h.id === lessonId);
+  if (found === undefined) throw new Error(`fixture lesson ${lessonId} missing`);
+  return lessonExamples(found);
 }
 
 function progressFor(example: Example | undefined, entry: Omit<ExampleProgress, "hash">): [string, ExampleProgress] {
@@ -335,9 +335,9 @@ function progressFor(example: Example | undefined, entry: Omit<ExampleProgress, 
 }
 
 const [planFromSeed, , rightFirstTime, wrongFirstTime] = examplesOf("002");
-const focusRule = homework2.features[1]?.rules[0]?.key ?? null;
+const focusRule = lesson2.features[1]?.rules[0]?.key ?? null;
 
-/** Mid-way through homework 002: one carried over, one passing, one not yet. */
+/** Mid-way through lesson 002: one carried over, one passing, one not yet. */
 export const fixtureStudent: StudentState = {
   iteration: { iteration: "002", status: "WIP" },
   progress: {
@@ -377,20 +377,20 @@ export const fixtureBinding: Binding = {
 };
 
 export const fixtureThreads: TutorThread[] = [
-  { id: "thr_coach002", homeworkId: "002", role: "main", ruleKey: null, title: coachThreadTitle("002"), mainThreadId: "thr_coach002", sideChat: false },
+  { id: "thr_coach002", lessonId: "002", role: "main", ruleKey: null, title: coachThreadTitle("002"), mainThreadId: "thr_coach002", sideChat: false },
   {
     id: "thr_side002",
-    homeworkId: "002",
+    lessonId: "002",
     role: "side",
     ruleKey: fixtureStudent.progress?.focus ?? null,
     title: "Why does the validator see the diff?",
     mainThreadId: "thr_coach002",
     sideChat: false,
   },
-  { id: "thr_coach001", homeworkId: "001", role: "main", ruleKey: null, title: coachThreadTitle("001"), mainThreadId: "thr_coach001", sideChat: false },
+  { id: "thr_coach001", lessonId: "001", role: "main", ruleKey: null, title: coachThreadTitle("001"), mainThreadId: "thr_coach001", sideChat: false },
 ];
 
-/** The Rules the Homework 002 coach thread has focused: its sections can be jumped to. */
+/** The Rules the Lesson 002 coach thread has focused: its sections can be jumped to. */
 export const fixtureReachedRules: string[] = [fixtureStudent.progress?.focus].filter((key): key is string => typeof key === "string");
 
 interface OutlineInput {
@@ -401,14 +401,14 @@ interface OutlineInput {
 
 const NOTHING_RECORDED: OutlineInput = { progress: {}, focus: null, reached: [] };
 
-/** Homework 002 is the one under way; the others have nothing recorded. */
-function recorded(homeworkId: string): OutlineInput {
-  if (homeworkId !== "002") return NOTHING_RECORDED;
+/** Lesson 002 is the one under way; the others have nothing recorded. */
+function recorded(lessonId: string): OutlineInput {
+  if (lessonId !== "002") return NOTHING_RECORDED;
   return { progress: fixtureStudent.progress?.examples ?? {}, focus: fixtureStudent.progress?.focus ?? null, reached: fixtureReachedRules };
 }
 
-function outline(homeworkId: string, { progress, focus, reached }: OutlineInput = recorded(homeworkId)): FeatureOutline[] {
-  const hw = fixtureCourse.homeworks.find((h) => h.id === homeworkId);
+function outline(lessonId: string, { progress, focus, reached }: OutlineInput = recorded(lessonId)): FeatureOutline[] {
+  const hw = fixtureCourse.lessons.find((h) => h.id === lessonId);
   return (hw?.features ?? []).map((f) => ({
     slug: f.slug,
     name: f.name,
@@ -436,26 +436,26 @@ function outline(homeworkId: string, { progress, focus, reached }: OutlineInput 
   }));
 }
 
-const coachByHomework: Readonly<Record<string, string>> = { "001": "thr_coach001", "002": "thr_coach002" };
+const coachByLesson: Readonly<Record<string, string>> = { "001": "thr_coach001", "002": "thr_coach002" };
 
-const statusByHomework = { "000": "done", "001": "done", "002": "current", "003": "ahead" } as const;
+const statusByLesson = { "000": "done", "001": "done", "002": "current", "003": "ahead" } as const;
 
 export const fixtureOverview: Overview = {
   course: { id: fixtureCourse.id, title: fixtureCourse.title, description: fixtureCourse.description },
   courseError: null,
   binding: fixtureBinding,
-  homeworks: fixtureCourse.homeworks.map((hw) => ({
+  lessons: fixtureCourse.lessons.map((hw) => ({
     id: hw.id,
     title: hw.title,
     set: hw.set,
     builtin: hw.builtin,
-    status: statusByHomework[hw.id as keyof typeof statusByHomework],
-    counts: countExamples(homeworkExamples(hw), hw.id === "002" ? (fixtureStudent.progress?.examples ?? {}) : {}),
-    coachThreadId: coachByHomework[hw.id] ?? null,
+    status: statusByLesson[hw.id as keyof typeof statusByLesson],
+    counts: countExamples(lessonExamples(hw), hw.id === "002" ? (fixtureStudent.progress?.examples ?? {}) : {}),
+    coachThreadId: coachByLesson[hw.id] ?? null,
     outline: outline(hw.id),
   })),
   current: {
-    homeworkId: "002",
+    lessonId: "002",
     iterationStatus: "WIP",
     focus: fixtureStudent.progress?.focus ?? null,
     focusRuleName: "A task is finished when validation is satisfied",
@@ -479,9 +479,9 @@ export const fixtureOverview: Overview = {
 export const fixtureOverviewUnbound: Overview = {
   ...fixtureOverview,
   binding: { status: "unbound" },
-  homeworks: fixtureOverview.homeworks.map((hw) => ({
+  lessons: fixtureOverview.lessons.map((hw) => ({
     ...hw,
-    status: hw.id === BUILTIN_HOMEWORK_ID ? "current" : "ahead",
+    status: hw.id === BUILTIN_LESSON_ID ? "current" : "ahead",
     counts: countExamples(examplesOf(hw.id), {}),
     coachThreadId: null,
     outline: outline(hw.id, NOTHING_RECORDED),
@@ -491,7 +491,7 @@ export const fixtureOverviewUnbound: Overview = {
 };
 
 export const fixtureLessonDetail: LessonDetail = {
-  homework: homework2,
+  lesson: lesson2,
   status: "current",
   iterationStatus: "WIP",
   focus: fixtureStudent.progress?.focus ?? null,
@@ -501,7 +501,7 @@ export const fixtureLessonDetail: LessonDetail = {
 };
 
 export const fixtureCompletion: Completion = {
-  homework: { id: "001", title: homework1.title, set: homework1.set },
+  lesson: { id: "001", title: lesson1.title, set: lesson1.set },
   counts: { total: 2, passing: 2, notYet: 0, skipped: 0, pending: 0, fresh: 2 },
   freshRules: 1,
   sideThreads: 0,
@@ -510,14 +510,14 @@ export const fixtureCompletion: Completion = {
   next: {
     id: "002",
     status: "ahead",
-    title: homework2.title,
-    set: homework2.set,
-    dek: homework2.dek,
+    title: lesson2.title,
+    set: lesson2.set,
+    dek: lesson2.dek,
     rules: 3,
     examples: 5,
     carryOver: 1,
     fresh: 4,
-    factoryDiff: homework2.factoryDiff,
+    factoryDiff: lesson2.factoryDiff,
   },
 };
 

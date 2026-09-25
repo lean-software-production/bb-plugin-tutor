@@ -1,7 +1,7 @@
 // Side chats: BB's own, as its built-in side-chat plugin makes them. A side
 // chat is a hidden fork of the coach thread, shown by BB's "Side chat" panel
 // in the coach thread's right panel. Tutor forks it with its own metadata (the
-// homework and Rule it is about) and writes the tab BB writes for "Reply in
+// lesson and Rule it is about) and writes the tab BB writes for "Reply in
 // side chat", because a plugin cannot open another plugin's panel itself.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { BB_SIDE_CHAT } from "../../shared/constants.ts";
@@ -18,7 +18,7 @@ export const TAB_WRITE_ATTEMPTS = 3;
 export interface ForkSideChat {
   coachThreadId: string;
   courseId: string;
-  homeworkId: string;
+  lessonId: string;
   ruleKey: string | null;
   title: string;
   /** Agent-only context the side chat's agent reads before the student's first message. */
@@ -53,7 +53,7 @@ export function forkFailure(cause: unknown): string {
  * coach's working tree, and stops with the coach thread.
  */
 export async function forkSideChat(sdk: Sdk, fork: ForkSideChat): Promise<string> {
-  const pluginMetadata: CoachThreadMetadata = { course: fork.courseId, iteration: fork.homeworkId, role: "side" };
+  const pluginMetadata: CoachThreadMetadata = { course: fork.courseId, lesson: fork.lessonId, role: "side" };
   if (fork.ruleKey !== null) pluginMetadata.ruleKey = fork.ruleKey;
   try {
     const thread = await sdk.threads.fork({

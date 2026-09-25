@@ -5,7 +5,7 @@ import { makeWorld } from "../../test/helpers/world.ts";
 import { coachStateOf } from "./actions.ts";
 import { statusText } from "./status-text.ts";
 
-test("lists the homework, the focus and every Example key with its status", () => {
+test("lists the lesson, the focus and every Example key with its status", () => {
   const state = coachStateOf(makeWorld());
   assert.ok(!("error" in state));
   const text = statusText(state);

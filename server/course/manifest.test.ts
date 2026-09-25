@@ -14,7 +14,7 @@ test("course.yaml becomes a manifest with absolute paths and string ids", () => 
 title: Build a software factory
 coach: .agents/coach-me.md
 lexicon: docs/lexicon.yaml
-homeworks:
+lessons:
   - { id: 001, title: Basic unvalidated loop, set: Day 1, dir: docs/iterations/001-basic }
   - { id: "010", title: Ten, dir: ten }
 `);
@@ -24,7 +24,7 @@ homeworks:
     description: null,
     coachPath: "/course/.agents/coach-me.md",
     lexiconPath: "/course/docs/lexicon.yaml",
-    homeworks: [
+    lessons: [
       { id: "001", title: "Basic unvalidated loop", set: "Day 1", dir: "/course/docs/iterations/001-basic" },
       { id: "010", title: "Ten", set: null, dir: "/course/ten" },
     ],
@@ -32,26 +32,26 @@ homeworks:
 });
 
 test("coach and lexicon are optional", () => {
-  const manifest = parse("id: x\ntitle: X\ndescription: '  About X. '\nhomeworks:\n  - { id: '001', title: One, dir: one }\n");
+  const manifest = parse("id: x\ntitle: X\ndescription: '  About X. '\nlessons:\n  - { id: '001', title: One, dir: one }\n");
   assert.equal(manifest.coachPath, null);
   assert.equal(manifest.lexiconPath, null);
   assert.equal(manifest.description, "About X.");
 });
 
 test("a field that does not fit names its line", () => {
-  throwsAt("id: x\ntitle: X\nhomeworks:\n  - { id: '1', title: One, dir: one }\n", /^Could not read course\.yaml, line 4: homeworks\.0\.id expected a three-digit homework id$/);
-  throwsAt("id: x\nhomeworks:\n  - { id: '001', title: One, dir: one }\n", /^Could not read course\.yaml, line 1: title is missing$/);
-  throwsAt("id: x\ntitle: X\nhomeworks: []\n", /line 3: homeworks should list at least one homework$/);
+  throwsAt("id: x\ntitle: X\nlessons:\n  - { id: '1', title: One, dir: one }\n", /^Could not read course\.yaml, line 4: lessons\.0\.id expected a three-digit lesson id$/);
+  throwsAt("id: x\nlessons:\n  - { id: '001', title: One, dir: one }\n", /^Could not read course\.yaml, line 1: title is missing$/);
+  throwsAt("id: x\ntitle: X\nlessons: []\n", /line 3: lessons should list at least one lesson$/);
 });
 
 test("broken YAML names its line", () => {
-  throwsAt("id: x\ntitle: X\nhomeworks:\n  - { id: '001', title: One\n", /^Could not read course\.yaml, line \d+: /);
+  throwsAt("id: x\ntitle: X\nlessons:\n  - { id: '001', title: One\n", /^Could not read course\.yaml, line \d+: /);
 });
 
 test("paths may not leave the course folder", () => {
   throwsAt(
-    "id: x\ntitle: X\nhomeworks:\n  - { id: '001', title: One, dir: one }\n  - { id: '002', title: Two, dir: ../elsewhere }\n",
+    "id: x\ntitle: X\nlessons:\n  - { id: '001', title: One, dir: one }\n  - { id: '002', title: Two, dir: ../elsewhere }\n",
     /^Could not read course\.yaml, line 5: \.\.\/elsewhere is outside the course folder\.$/,
   );
-  throwsAt("id: x\ntitle: X\ncoach: /etc/passwd\nhomeworks:\n  - { id: '001', title: One, dir: one }\n", /line 3: \/etc\/passwd is outside/);
+  throwsAt("id: x\ntitle: X\ncoach: /etc/passwd\nlessons:\n  - { id: '001', title: One, dir: one }\n", /line 3: \/etc\/passwd is outside/);
 });

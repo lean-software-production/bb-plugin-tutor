@@ -1,13 +1,13 @@
 // Small text formatters shared by every Tutor surface.
 
 /** "003" → 3. Ids are validated three-digit strings upstream. */
-export function homeworkNumber(id: string): number {
+export function lessonNumber(id: string): number {
   return Number.parseInt(id, 10);
 }
 
-/** "003" → "Lesson 3": students read "lesson" for a homework (docs/tutor/GLOSSARY.md). */
-export function homeworkLabel(id: string): string {
-  return `Lesson ${homeworkNumber(id)}`;
+/** "003" → "Lesson 3" (docs/tutor/GLOSSARY.md). */
+export function lessonLabel(id: string): string {
+  return `Lesson ${lessonNumber(id)}`;
 }
 
 /** Ledger "Day 3" reads "Set after day 3"; anything else ("Start here") is shown as written. */
@@ -18,9 +18,9 @@ export function setLabel(set: string | null): string | null {
 }
 
 /** "Lesson 3 · Set after day 3", or just "Lesson 3". */
-export function homeworkEyebrow(id: string, set: string | null): string {
+export function lessonEyebrow(id: string, set: string | null): string {
   const label = setLabel(set);
-  return label === null ? homeworkLabel(id) : `${homeworkLabel(id)} · ${label}`;
+  return label === null ? lessonLabel(id) : `${lessonLabel(id)} · ${label}`;
 }
 
 export function plural(count: number, singular: string, pluralForm = `${singular}s`): string {

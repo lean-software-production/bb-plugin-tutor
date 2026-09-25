@@ -12,9 +12,9 @@ import {
   exampleCountsSchema,
   exampleKeySchema,
   exampleProgressSchema,
-  homeworkIdSchema,
-  homeworkSchema,
-  homeworkStatusSchema,
+  lessonIdSchema,
+  lessonSchema,
+  lessonStatusSchema,
   iterationProgressSchema,
   lexiconEntrySchema,
   noveltySchema,
@@ -29,13 +29,13 @@ import {
 
 /**
  * A thread Tutor spawned or forked, as the backend knows it (live status comes
- * from useSidebarThreads). `main` is the homework's coach thread. `side` is a
+ * from useSidebarThreads). `main` is the lesson's coach thread. `side` is a
  * side chat, a hidden fork of it shown in its right panel, or a side thread
  * spawned under it before side chats existed.
  */
 export const tutorThreadSchema = z.object({
   id: threadIdSchema,
-  homeworkId: homeworkIdSchema,
+  lessonId: lessonIdSchema,
   role: z.enum(["main", "side"]),
   ruleKey: ruleKeySchema.nullable(),
   title: z.string().nullable(),
@@ -76,7 +76,7 @@ export const ruleOutlineSchema = z.object({
   counts: exampleCountsSchema,
   /** Latest `at` among its Examples' progress entries. */
   lastAt: z.string().nullable(),
-  /** The coach has focused it in the homework's coach thread, so its section there can be jumped to. */
+  /** The coach has focused it in the lesson's coach thread, so its section there can be jumped to. */
   reached: z.boolean(),
 });
 export type RuleOutline = z.infer<typeof ruleOutlineSchema>;
@@ -91,20 +91,20 @@ export const featureOutlineSchema = z.object({
 });
 export type FeatureOutline = z.infer<typeof featureOutlineSchema>;
 
-export const homeworkSummarySchema = z.object({
-  id: homeworkIdSchema,
+export const lessonSummarySchema = z.object({
+  id: lessonIdSchema,
   title: z.string(),
   set: z.string().nullable(),
   builtin: z.boolean(),
-  status: homeworkStatusSchema,
-  /** Recorded progress: the current homework's, a done one's history entry, else all pending. */
+  status: lessonStatusSchema,
+  /** Recorded progress: the current lesson's, a done one's history entry, else all pending. */
   counts: exampleCountsSchema,
-  /** The homework's main coach thread, or null before it has one. */
+  /** The lesson's main coach thread, or null before it has one. */
   coachThreadId: threadIdSchema.nullable(),
   /** Its features and Rules, for the course outline. */
   outline: z.array(featureOutlineSchema),
 });
-export type HomeworkSummary = z.infer<typeof homeworkSummarySchema>;
+export type LessonSummary = z.infer<typeof lessonSummarySchema>;
 
 export const lastNoteSchema = z.object({
   exampleKey: exampleKeySchema,
@@ -114,7 +114,7 @@ export const lastNoteSchema = z.object({
 });
 
 export const currentStateSchema = z.object({
-  homeworkId: homeworkIdSchema,
+  lessonId: lessonIdSchema,
   iterationStatus: iterationProgressSchema,
   focus: ruleKeySchema.nullable(),
   focusRuleName: z.string().nullable(),
@@ -132,7 +132,7 @@ export const overviewSchema = z.object({
   /** Why the course could not be loaded (course is then null). */
   courseError: z.string().nullable(),
   binding: bindingSchema,
-  homeworks: z.array(homeworkSummarySchema),
+  lessons: z.array(lessonSummarySchema),
   /** Null while the course is missing or the factory is not bound. */
   current: currentStateSchema.nullable(),
   threads: z.array(tutorThreadSchema),
@@ -140,14 +140,14 @@ export const overviewSchema = z.object({
 export type Overview = z.infer<typeof overviewSchema>;
 
 export const lessonDetailSchema = z.object({
-  homework: homeworkSchema,
-  status: homeworkStatusSchema,
-  /** The student's iteration status when this is the current homework, else null. */
+  lesson: lessonSchema,
+  status: lessonStatusSchema,
+  /** The student's iteration status when this is the current lesson, else null. */
   iterationStatus: iterationProgressSchema.nullable(),
   focus: ruleKeySchema.nullable(),
   /**
-   * Recorded progress: the current PROGRESS.yaml, or its `history` entry for a done homework.
-   * Empty for homeworks ahead (a preview) and for done homeworks finished before history was kept.
+   * Recorded progress: the current PROGRESS.yaml, or its `history` entry for a done lesson.
+   * Empty for lessons ahead (a preview) and for done lessons finished before history was kept.
    */
   progress: z.record(exampleKeySchema, exampleProgressSchema),
   coachThreadId: threadIdSchema.nullable(),
@@ -157,19 +157,19 @@ export const lessonDetailSchema = z.object({
 export type LessonDetail = z.infer<typeof lessonDetailSchema>;
 
 export const completionSchema = z.object({
-  homework: z.object({ id: homeworkIdSchema, title: z.string(), set: z.string().nullable() }),
+  lesson: z.object({ id: lessonIdSchema, title: z.string(), set: z.string().nullable() }),
   counts: exampleCountsSchema,
   /** Rules whose novelty is not unchanged. */
   freshRules: z.number().int().nonnegative(),
-  /** Side chats (and older side threads) of the homework's coach thread. */
+  /** Side chats (and older side threads) of the lesson's coach thread. */
   sideThreads: z.number().int().nonnegative(),
   adoptedAt: z.string().nullable(),
   summary: z.string().nullable(),
   next: z
     .object({
-      id: homeworkIdSchema,
+      id: lessonIdSchema,
       /** "ahead" until the student starts it; then the page continues it instead. */
-      status: homeworkStatusSchema,
+      status: lessonStatusSchema,
       title: z.string(),
       set: z.string().nullable(),
       dek: z.string(),
@@ -198,7 +198,7 @@ export type CandidateProject = z.infer<typeof candidateProjectSchema>;
 /** Payload of the REALTIME_CHANNELS.stateChanged signal. */
 export const stateChangedSignalSchema = z.object({
   reason: z.enum(["progress", "iteration", "binding", "threads", "course"]),
-  homeworkId: homeworkIdSchema.nullable(),
+  lessonId: lessonIdSchema.nullable(),
 });
 export type StateChangedSignal = z.infer<typeof stateChangedSignalSchema>;
 
@@ -206,7 +206,7 @@ export type StateChangedSignal = z.infer<typeof stateChangedSignalSchema>;
 // Contract
 // ---------------------------------------------------------------------------
 
-const homeworkInput = z.object({ homeworkId: homeworkIdSchema });
+const lessonInput = z.object({ lessonId: lessonIdSchema });
 
 export const rpcContract = defineRpcContract({
   getOverview: {
@@ -214,12 +214,12 @@ export const rpcContract = defineRpcContract({
     output: overviewSchema,
   },
   getLessonDetail: {
-    input: homeworkInput,
+    input: lessonInput,
     output: lessonDetailSchema,
   },
-  /** Between homeworks (screen 7). Fails unless the homework is done. */
+  /** Between lessons (screen 7). Fails unless the lesson is done. */
   getCompletion: {
-    input: homeworkInput,
+    input: lessonInput,
     output: completionSchema,
   },
   /** For the rule tab: null unless the thread is Tutor's, or a side chat BB made of a coach thread. */
@@ -240,26 +240,26 @@ export const rpcContract = defineRpcContract({
     input: z.object({ projectId: z.string().min(1).max(128) }),
     output: bindingSchema,
   },
-  /** Finds the homework's main coach thread, or spawns it. Current or done homeworks only. */
+  /** Finds the lesson's main coach thread, or spawns it. Current or done lessons only. */
   openCoach: {
-    input: homeworkInput,
+    input: lessonInput,
     output: z.object({ threadId: threadIdSchema, created: z.boolean() }),
   },
   /**
-   * Spawns the main thread for the homework after a Done one; its first turn
-   * adopts the spec (tutor_adopt_iteration). Fails for any other homework.
+   * Spawns the main thread for the lesson after a Done one; its first turn
+   * adopts the spec (tutor_adopt_iteration). Fails for any other lesson.
    */
-  startNextHomework: {
-    input: homeworkInput,
+  startNextLesson: {
+    input: lessonInput,
     output: z.object({ threadId: threadIdSchema }),
   },
   /**
-   * A BB side chat of the homework's main coach thread, optionally about one
+   * A BB side chat of the lesson's main coach thread, optionally about one
    * Rule: a hidden fork, plus BB's "Side chat" tab in the coach thread's right
    * panel. A plugin cannot select that tab, so the frontend points to it.
    */
   startSideThread: {
-    input: z.object({ homeworkId: homeworkIdSchema, ruleKey: ruleKeySchema.nullable() }),
+    input: z.object({ lessonId: lessonIdSchema, ruleKey: ruleKeySchema.nullable() }),
     output: z.object({ coachThreadId: threadIdSchema, sideChatId: threadIdSchema }),
   },
   /**
@@ -277,7 +277,7 @@ export const rpcContract = defineRpcContract({
    * moves the focus (tutor_focus_rule), not the UI.
    */
   redirectFocus: {
-    input: z.object({ homeworkId: homeworkIdSchema, ruleKey: ruleKeySchema }),
+    input: z.object({ lessonId: lessonIdSchema, ruleKey: ruleKeySchema }),
     output: z.object({ threadId: threadIdSchema }),
   },
   /**

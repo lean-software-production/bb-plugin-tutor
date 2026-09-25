@@ -13,29 +13,29 @@ export interface Sandbox {
   cleanup(): Promise<void>;
 }
 
-/** fixtureCourse with every non-builtin homework written to disk under a temp course root. */
+/** fixtureCourse with every non-builtin lesson written to disk under a temp course root. */
 export async function makeSandbox(): Promise<Sandbox> {
   const root = await mkdtemp(join(tmpdir(), "tutor-test-"));
   const courseRoot = join(root, "tutorial");
   const factoryRoot = join(root, "my-factory");
   await mkdir(factoryRoot, { recursive: true });
-  const homeworks = [];
-  for (const homework of fixtureCourse.homeworks) {
-    const dir = join(courseRoot, "docs/iterations", `${homework.id}-${homework.title.toLowerCase().replace(/\W+/g, "-")}`);
+  const lessons = [];
+  for (const lesson of fixtureCourse.lessons) {
+    const dir = join(courseRoot, "docs/iterations", `${lesson.id}-${lesson.title.toLowerCase().replace(/\W+/g, "-")}`);
     await mkdir(join(dir, "features"), { recursive: true });
-    await writeFile(join(dir, "README.md"), homework.readme);
-    if (homework.factoryMd !== "") await writeFile(join(dir, "FACTORY.md"), homework.factoryMd);
-    if (homework.seedSpec !== null) await writeFile(join(dir, "spec.md"), homework.seedSpec);
-    for (const feature of homework.features) {
+    await writeFile(join(dir, "README.md"), lesson.readme);
+    if (lesson.factoryMd !== "") await writeFile(join(dir, "FACTORY.md"), lesson.factoryMd);
+    if (lesson.seedSpec !== null) await writeFile(join(dir, "spec.md"), lesson.seedSpec);
+    for (const feature of lesson.features) {
       await writeFile(join(dir, feature.path), `Feature: ${feature.name}\n`);
     }
-    homeworks.push({ ...homework, dir });
+    lessons.push({ ...lesson, dir });
   }
   const course: Course = {
     ...fixtureCourse,
     root: courseRoot,
     coachPath: join(courseRoot, ".agents/coach-me.md"),
-    homeworks,
+    lessons,
   };
   return { root, course, factoryRoot, cleanup: () => rm(root, { recursive: true, force: true }) };
 }

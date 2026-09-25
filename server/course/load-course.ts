@@ -1,16 +1,16 @@
 // Reads a course from disk into the shared Course model: the manifest (from
-// course.yaml or the ledger), Homework 0 in front, every homework's content,
-// then novelty, suggested Rule order and FACTORY.md diffs between homeworks.
+// course.yaml or the ledger), Lesson 0 in front, every lesson's content,
+// then novelty, suggested Rule order and FACTORY.md diffs between lessons.
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
-import { BUILTIN_HOMEWORK_ID, COURSE_FILES } from "../../shared/constants.ts";
+import { BUILTIN_LESSON_ID, COURSE_FILES } from "../../shared/constants.ts";
 import { slugify } from "../../shared/keys.ts";
-import type { Course, Homework, LexiconEntry } from "../../shared/model.ts";
+import type { Course, Lesson, LexiconEntry } from "../../shared/model.ts";
 import { CourseLoadError } from "../../shared/ports.ts";
 import { BUILTIN_COURSE_ROOT } from "./builtin.ts";
 import { factoryDiff } from "./factory-diff.ts";
 import { guardWithin, isDirectory, isFile, readTextIfPresent, type PathGuard } from "./files.ts";
-import { readHomework } from "./homework.ts";
-import type { DisplayPath, HomeworkContent } from "./homework.ts";
+import { readLesson } from "./lesson.ts";
+import type { DisplayPath, LessonContent } from "./lesson.ts";
 import { parseLedger } from "./ledger.ts";
 import { parseLexicon } from "./lexicon.ts";
 import { parseCourseYaml } from "./manifest.ts";
@@ -33,12 +33,12 @@ export async function loadCourse(coursePath: string): Promise<Course> {
   const display = displayWithin(root);
   const guard = guardWithin(root, display);
   const { manifest, source, displayPath } = await readManifest(root, display, guard);
-  checkHomeworkIds(manifest, displayPath);
+  checkLessonIds(manifest, displayPath);
   await checkManifestPaths(manifest, displayPath, guard);
 
-  const builtin = await readBuiltinHomeworks();
+  const builtin = await readBuiltinLessons();
   const contents = await Promise.all(
-    manifest.homeworks.map((entry) => readHomework(entry, false, display, guard)),
+    manifest.lessons.map((entry) => readLesson(entry, false, display, guard)),
   );
   return {
     id: manifest.id,
@@ -46,7 +46,7 @@ export async function loadCourse(coursePath: string): Promise<Course> {
     description: manifest.description,
     root,
     coachPath: await requireIfNamed(manifest.coachPath, "coach", display),
-    homeworks: [...deriveInOrder(builtin), ...deriveInOrder(contents)],
+    lessons: [...deriveInOrder(builtin), ...deriveInOrder(contents)],
     lexicon: await readLexicon(manifest.lexiconPath, display),
     source,
   };
@@ -87,7 +87,7 @@ async function readManifest(root: string, display: DisplayPath, guard: PathGuard
       description: null,
       coachPath: await ifPresent(join(root, COURSE_FILES.defaultCoach)),
       lexiconPath: await ifPresent(join(root, COURSE_FILES.defaultLexicon)),
-      homeworks: parseLedger(ledger, dirname(ledgerPath), display(ledgerPath), root),
+      lessons: parseLedger(ledger, dirname(ledgerPath), display(ledgerPath), root),
     },
     source: "ledger",
     displayPath: display(ledgerPath),
@@ -96,14 +96,14 @@ async function readManifest(root: string, display: DisplayPath, guard: PathGuard
 
 /** Where the manifest's paths lead once symbolic links are followed: inside the course only. */
 async function checkManifestPaths(manifest: CourseManifest, where: string, guard: PathGuard): Promise<void> {
-  const paths = [manifest.coachPath, manifest.lexiconPath, ...manifest.homeworks.map((entry) => entry.dir)];
+  const paths = [manifest.coachPath, manifest.lexiconPath, ...manifest.lessons.map((entry) => entry.dir)];
   for (const path of paths) if (path !== null) await guard(path, where);
 }
 
-function checkHomeworkIds(manifest: CourseManifest, where: string): void {
+function checkLessonIds(manifest: CourseManifest, where: string): void {
   const seen = new Set<string>();
-  for (const { id } of manifest.homeworks) {
-    if (id === BUILTIN_HOMEWORK_ID) {
+  for (const { id } of manifest.lessons) {
+    if (id === BUILTIN_LESSON_ID) {
       throw new CourseLoadError(`${where}: lesson ${id} is reserved for the built-in Lesson 0.`);
     }
     if (seen.has(id)) throw new CourseLoadError(`${where}: lesson ${id} is listed twice.`);
@@ -111,26 +111,26 @@ function checkHomeworkIds(manifest: CourseManifest, where: string): void {
   }
 }
 
-async function readBuiltinHomeworks(): Promise<HomeworkContent[]> {
+async function readBuiltinLessons(): Promise<LessonContent[]> {
   const display = (path: string): string => `Lesson 0 (built in): ${displayWithin(BUILTIN_COURSE_ROOT)(path)}`;
   const yamlPath = join(BUILTIN_COURSE_ROOT, COURSE_FILES.manifest);
   const yaml = await readTextIfPresent(yamlPath, display(yamlPath));
   if (yaml === null) throw new CourseLoadError(`Tutor's built-in Lesson 0 is missing from ${BUILTIN_COURSE_ROOT}.`);
   const manifest = parseCourseYaml(yaml, BUILTIN_COURSE_ROOT, display(yamlPath));
   const guard = guardWithin(BUILTIN_COURSE_ROOT, display);
-  return Promise.all(manifest.homeworks.map((entry) => readHomework(entry, true, display, guard)));
+  return Promise.all(manifest.lessons.map((entry) => readLesson(entry, true, display, guard)));
 }
 
 /**
- * Each homework compared with the one before it (the first has nothing before
+ * Each lesson compared with the one before it (the first has nothing before
  * it), and its dek read without the sentences every README repeats.
  */
-function deriveInOrder(contents: readonly HomeworkContent[]): Homework[] {
+function deriveInOrder(contents: readonly LessonContent[]): Lesson[] {
   const boilerplate = sharedSentences(contents.map((content) => content.readme));
   return contents.map((content, index) => derive(content, contents[index - 1] ?? null, boilerplate));
 }
 
-function derive(content: HomeworkContent, previous: HomeworkContent | null, boilerplate: ReadonlySet<string>): Homework {
+function derive(content: LessonContent, previous: LessonContent | null, boilerplate: ReadonlySet<string>): Lesson {
   const features = withNovelty(content.features, previous?.features ?? null);
   return {
     ...content,

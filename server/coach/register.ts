@@ -41,7 +41,7 @@ export async function registerTutor(bb: BbPluginApi, deps: WorldDeps): Promise<T
   bb.agents.configure((context) =>
     coachConfiguration(context, bb.pluginId, {
       coachPath: rt.world.lastCourse()?.coachPath ?? null,
-      coachHomework: (threadId) => rt.coaches.homeworkOf(threadId),
+      coachLesson: (threadId) => rt.coaches.lessonOf(threadId),
     }),
   );
   bb.experimental_hooks.on("message.dispatch", async (context) => {
@@ -72,8 +72,8 @@ export async function registerTutor(bb: BbPluginApi, deps: WorldDeps): Promise<T
 
   // A side chat BB made of a coach thread belongs in the course outline straight away.
   bb.events.on("thread.created", ({ thread }) => {
-    const homeworkId = thread.originKind === "fork" && thread.sourceThreadId !== null ? rt.coaches.homeworkOf(thread.sourceThreadId) : undefined;
-    if (homeworkId !== undefined) rt.signals.publish("threads", homeworkId);
+    const lessonId = thread.originKind === "fork" && thread.sourceThreadId !== null ? rt.coaches.lessonOf(thread.sourceThreadId) : undefined;
+    if (lessonId !== undefined) rt.signals.publish("threads", lessonId);
   });
 
   registerRpc(rt);

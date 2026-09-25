@@ -59,7 +59,7 @@ Your first message tells you to start your first reply with a line like this,
 on its own:
 
 ```
-::tutor-lesson{homework="000"}
+::tutor-lesson{lesson="000"}
 ```
 
 BB draws it as the lesson card: the lesson's title and introduction, and all
@@ -77,7 +77,7 @@ Put that line at the top of the message in which you turn to the Rule, on a
 line of its own:
 
 ```
-::tutor-progress{kind="focus" title="The homework you are on is marked" passed="0" total="2" homework="000" rule="tutor/the-course-outline-shows-where-you-are"}
+::tutor-progress{kind="focus" title="The lesson you are on is marked" passed="0" total="2" lesson="000" rule="tutor/the-course-outline-shows-where-you-are"}
 ```
 
 BB draws it as the Rule card, with the Rule's Examples. It is where the Rule's
@@ -111,19 +111,19 @@ Copy it into your reply exactly as returned, on a line of its own with a blank
 line before and after it. BB draws it as a progress card:
 
 ```
-::tutor-progress{kind="rule-passing" title="The factory accepts an assembly line it can run" passed="30" total="41" next="The factory refuses an assembly line naming a machine it does not have" homework="003" rule="assembly-line/the-factory-accepts-an-assembly-line-it-can-run"}
+::tutor-progress{kind="rule-passing" title="The factory accepts an assembly line it can run" passed="30" total="41" next="The factory refuses an assembly line naming a machine it does not have" lesson="003" rule="assembly-line/the-factory-accepts-an-assembly-line-it-can-run"}
 ```
 
 The attributes are:
 
 - `kind`: `rule-passing`, `example-passing`, `not-yet`, `focus` (the Rule card)
-  or `homework-complete`.
+  or `lesson-complete`.
 - `title`: the Rule's or Example's name, or the lesson's title for
-  `homework-complete`.
+  `lesson-complete`.
 - `passed` and `total`: Example counts.
 - `next`: the Rule suggested next.
 - `note`: why an Example is not yet.
-- `homework`, `rule` and `example`: ids and keys.
+- `lesson`, `rule` and `example`: ids and keys.
 
 Values are always double-quoted, and they can't contain quotes, braces or line
 breaks. Don't write cards yourself: echo the ones the tools return. After a

@@ -4,7 +4,7 @@ import type { PluginAgentToolContext, PluginAgentToolResult, PluginRowLabels } f
 import { TOOL_NAMES, type ToolName } from "../../shared/constants.ts";
 import { findRule } from "../../shared/derive.ts";
 import { toolParameterSchemas, type ToolParameters } from "../../shared/tools.ts";
-import { copyHomeworkSpec } from "../progress/spec-copy.ts";
+import { copyLessonSpec } from "../progress/spec-copy.ts";
 import { isoSeconds } from "../progress/time.ts";
 import {
   adoptAction,
@@ -45,7 +45,7 @@ function refusal(text: string): PluginAgentToolResult {
 async function applyOutcome(rt: TutorRuntime, root: string, outcome: Outcome, caller: Caller): Promise<void> {
   if ("error" in outcome) return;
   if (outcome.reached !== undefined) await recordReachedRule(rt.bb.sdk, caller.mainThreadId, outcome.reached);
-  if (outcome.adopt !== undefined) await copyHomeworkSpec(root, outcome.adopt);
+  if (outcome.adopt !== undefined) await copyLessonSpec(root, outcome.adopt);
   if (outcome.iteration !== undefined) await rt.store.writeIteration(root, outcome.iteration);
   if (outcome.progress !== undefined) await rt.store.writeProgress(root, outcome.progress);
   if (outcome.iteration !== undefined || outcome.progress !== undefined) {
@@ -89,20 +89,20 @@ async function sideChat(
   input: ToolParameters<"tutor_side_chat">,
   caller: Caller,
 ): Promise<Outcome> {
-  const rule = input.rule === undefined ? null : (findRule(state.homework, input.rule) ?? null);
+  const rule = input.rule === undefined ? null : (findRule(state.lesson, input.rule) ?? null);
   if (input.rule !== undefined && rule === null) {
-    return { error: `There is no Rule ${input.rule} in lesson ${state.homework.id}. Call tutor_status for the keys.` };
+    return { error: `There is no Rule ${input.rule} in lesson ${state.lesson.id}. Call tutor_status for the keys.` };
   }
   const sideChatId = await forkSideChat(rt.bb.sdk, {
     coachThreadId: caller.mainThreadId,
     courseId: state.course.id,
-    homeworkId: state.homework.id,
+    lessonId: state.lesson.id,
     ruleKey: rule?.key ?? null,
     title: input.title,
-    seed: sideChatSeed(state.homework, rule, input.prompt),
+    seed: sideChatSeed(state.lesson, rule, input.prompt),
   });
-  await ensureSideChatTab(rt.bb.sdk, caller.mainThreadId, sideChatId, sideChatAnchor(state.homework, rule));
-  rt.signals.publish("threads", state.homework.id);
+  await ensureSideChatTab(rt.bb.sdk, caller.mainThreadId, sideChatId, sideChatAnchor(state.lesson, rule));
+  rt.signals.publish("threads", state.lesson.id);
   return {
     text:
       `Started side chat ${sideChatId} ("${input.title}"). It opens as the "Side chat" tab in the coach thread's right panel ` +
@@ -135,7 +135,7 @@ export function registerCoachTools(rt: TutorRuntime): void {
   register(rt, {
     name: TOOL_NAMES.adoptIteration,
     description:
-      "Adopt the next lesson (a homework iteration) as coach-me does: copy its README.md, FACTORY.md and features/ into spec/, its sample seed into seeds/, write spec/ITERATION as WIP and start spec/PROGRESS.yaml, carrying over Examples already passing. Does not commit.",
+      "Adopt the next lesson (an iteration, in the course repo's words) as coach-me does: copy its README.md, FACTORY.md and features/ into spec/, its sample seed into seeds/, write spec/ITERATION as WIP and start spec/PROGRESS.yaml, carrying over Examples already passing. Does not commit.",
     label: { pending: "Adopting the lesson", completed: "Adopted the lesson" },
     action: (state, input, _caller, now) => adoptAction(state, input, now),
   });

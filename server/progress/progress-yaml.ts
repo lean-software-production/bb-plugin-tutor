@@ -9,12 +9,12 @@ import YAML, { isScalar } from "yaml";
 import {
   exampleKeySchema,
   exampleProgressSchema,
-  homeworkIdSchema,
+  lessonIdSchema,
   isoTimestampSchema,
-  pastHomeworkSchema,
+  pastLessonSchema,
   ruleKeySchema,
   type ExampleProgress,
-  type PastHomework,
+  type PastLesson,
   type ProgressFile,
 } from "../../shared/model.ts";
 
@@ -36,7 +36,7 @@ function isMap(value: unknown): value is RawMap {
 }
 
 /** YAML reads an unquoted `003` as 3 (and a mapping key as "3"); put the zero padding back. */
-function homeworkIdLike(value: unknown): unknown {
+function lessonIdLike(value: unknown): unknown {
   if (typeof value === "string" && /^\d{1,2}$/.test(value)) return value.padStart(3, "0");
   return typeof value === "number" && Number.isInteger(value) && value >= 0 && value < 1000
     ? String(value).padStart(3, "0")
@@ -62,7 +62,7 @@ export function parseProgress(text: string): ParsedProgress {
   if (!isMap(loaded.raw)) return { progress: null, problems: [`${FILE} should be a YAML mapping.`] };
   const raw = loaded.raw;
 
-  const iteration = homeworkIdSchema.safeParse(homeworkIdLike(raw.iteration));
+  const iteration = lessonIdSchema.safeParse(lessonIdLike(raw.iteration));
   if (!iteration.success) {
     return { progress: null, problems: [`${FILE} has no valid iteration (expected a quoted id like "003").`] };
   }
@@ -101,7 +101,7 @@ function parseExamples(examples: RawMap, report: (problem: string) => void): Rec
       continue;
     }
     const candidate =
-      isMap(value) && value.carriedFrom !== undefined ? { ...value, carriedFrom: homeworkIdLike(value.carriedFrom) } : value;
+      isMap(value) && value.carriedFrom !== undefined ? { ...value, carriedFrom: lessonIdLike(value.carriedFrom) } : value;
     const entry = exampleProgressSchema.safeParse(candidate);
     if (entry.success) parsed[key] = entry.data;
     else report(`${FILE}: the entry for ${key} is malformed and was ignored.`);
@@ -109,15 +109,15 @@ function parseExamples(examples: RawMap, report: (problem: string) => void): Rec
   return parsed;
 }
 
-function parseHistory(history: RawMap, report: (problem: string) => void): Record<string, PastHomework> {
-  const parsed: Record<string, PastHomework> = {};
+function parseHistory(history: RawMap, report: (problem: string) => void): Record<string, PastLesson> {
+  const parsed: Record<string, PastLesson> = {};
   for (const [rawId, value] of Object.entries(history)) {
-    const id = homeworkIdSchema.safeParse(homeworkIdLike(rawId));
+    const id = lessonIdSchema.safeParse(lessonIdLike(rawId));
     if (isMap(value) && value.examples !== undefined && !isMap(value.examples)) {
       report(`${FILE}: history.${id.success ? id.data : rawId}.examples should be a mapping; none were read.`);
     }
     const past = isMap(value)
-      ? pastHomeworkSchema.safeParse({
+      ? pastLessonSchema.safeParse({
           ...(value.adopted === undefined ? {} : { adopted: value.adopted }),
           ...(value.summary === undefined ? {} : { summary: value.summary }),
           examples: isMap(value.examples) ? parseExamples(value.examples, report) : {},
@@ -134,11 +134,11 @@ interface Preserved {
   top: RawMap;
   /** Unknown fields of each current Example entry, by key. */
   entries: Record<string, RawMap>;
-  /** Unknown keys of each history entry, by homework id. */
+  /** Unknown keys of each history entry, by lesson id. */
   past: Record<string, RawMap>;
-  /** Unknown fields of each history Example entry, by homework id and key. */
+  /** Unknown fields of each history Example entry, by lesson id and key. */
   pastEntries: Record<string, Record<string, RawMap>>;
-  /** A history entry's `examples` that is not a mapping, verbatim, by homework id. */
+  /** A history entry's `examples` that is not a mapping, verbatim, by lesson id. */
   pastExamples: Record<string, unknown>;
   /** The replaced file's `iteration`: when it moves into the history, its Examples' unknown fields go with it. */
   iteration?: string;
@@ -165,12 +165,12 @@ function preserved(previousText: string | null): Preserved {
   if ("problem" in loaded || !isMap(loaded.raw)) return result;
   result.top = extraFields(loaded.raw, TOP_KEYS);
   result.entries = entryExtras(loaded.raw.examples);
-  if (loaded.raw.iteration !== undefined) result.iteration = String(homeworkIdLike(loaded.raw.iteration));
+  if (loaded.raw.iteration !== undefined) result.iteration = String(lessonIdLike(loaded.raw.iteration));
   const history = loaded.raw.history;
   if (!isMap(history)) return result;
   for (const [rawId, value] of Object.entries(history)) {
     if (!isMap(value)) continue;
-    const id = String(homeworkIdLike(rawId));
+    const id = String(lessonIdLike(rawId));
     result.past[id] = extraFields(value, PAST_KEYS);
     result.pastEntries[id] = entryExtras(value.examples);
     if (value.examples !== undefined && !isMap(value.examples)) result.pastExamples[id] = value.examples;
@@ -208,7 +208,7 @@ export function formatProgress(progress: ProgressFile, previousText: string | nu
     ordered.history = Object.fromEntries(
       Object.keys(history)
         .sort()
-        .map((id) => [id, orderedPast(history[id] as PastHomework, id, extras)]),
+        .map((id) => [id, orderedPast(history[id] as PastLesson, id, extras)]),
     );
   }
   const doc = new YAML.Document({ ...ordered, ...extras.top });
@@ -220,7 +220,7 @@ export function formatProgress(progress: ProgressFile, previousText: string | nu
   return doc.toString({ lineWidth: 0 });
 }
 
-function orderedPast(past: PastHomework, id: string, extras: Preserved): RawMap {
+function orderedPast(past: PastLesson, id: string, extras: Preserved): RawMap {
   const entryExtras = extras.pastEntries[id] ?? (id === extras.iteration ? extras.entries : undefined);
   const ordered: RawMap = {};
   for (const field of PAST_KEYS) {

@@ -1,4 +1,4 @@
-// What the course rail and start page read out of a homework's README.md.
+// What the course rail and start page read out of a lesson's README.md.
 
 const ITALIC_LINE = /^(\*[^*]+\*|_[^_]+_)$/;
 const NOT_PROSE = /^(#|```|~~~|[-*+] |\d+[.)] |>|\||<)/;

@@ -111,10 +111,10 @@ export const COURSE_FILES = {
   defaultLexicon: "docs/lexicon.yaml",
 } as const;
 
-/** Homework 0, "Using your tutor": shipped with the plugin, prepended to every course. */
-export const BUILTIN_HOMEWORK_ID = "000";
+/** Lesson 0, "Using your tutor": shipped with the plugin, prepended to every course. */
+export const BUILTIN_LESSON_ID = "000";
 
-/** Title of a homework's coach thread. Students read "lesson" for homework (docs/tutor/GLOSSARY.md). */
-export function coachThreadTitle(homeworkId: string): string {
-  return `Coach · Lesson ${homeworkId}`;
+/** Title of a lesson's coach thread. Students read "lesson" for lesson (docs/tutor/GLOSSARY.md). */
+export function coachThreadTitle(lessonId: string): string {
+  return `Coach · Lesson ${lessonId}`;
 }

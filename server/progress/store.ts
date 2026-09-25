@@ -1,7 +1,7 @@
 // The ProgressStore port over the student's factory repo on this machine.
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { BUILTIN_HOMEWORK_ID, FACTORY_FILES } from "../../shared/constants.ts";
+import { BUILTIN_LESSON_ID, FACTORY_FILES } from "../../shared/constants.ts";
 import type { IterationState, ProgressFile, StudentState } from "../../shared/model.ts";
 import type { ProgressStore } from "../../shared/ports.ts";
 import { writeFileAtomic } from "./atomic-write.ts";
@@ -57,7 +57,7 @@ export function createProgressStore(): ProgressStore {
     },
 
     async writeIteration(factoryRoot: string, state: IterationState): Promise<void> {
-      if (state.iteration === BUILTIN_HOMEWORK_ID) {
+      if (state.iteration === BUILTIN_LESSON_ID) {
         throw new Error("Lesson 0 is tracked in spec/PROGRESS.yaml only; spec/ITERATION is never written for it.");
       }
       await ownFolder(factoryRoot, FACTORY_FILES.specDir);

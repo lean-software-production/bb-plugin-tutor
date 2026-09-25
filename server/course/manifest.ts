@@ -1,13 +1,13 @@
-// What a course is made of before any homework is read: course.yaml when the
+// What a course is made of before any lesson is read: course.yaml when the
 // course has one, otherwise what ledger.ts works out from the ledger table.
 import { resolve } from "node:path";
 import { z } from "zod";
-import { homeworkIdSchema } from "../../shared/model.ts";
+import { lessonIdSchema } from "../../shared/model.ts";
 import { CourseLoadError } from "../../shared/ports.ts";
 import { isInside } from "../paths.ts";
 import { readYaml } from "./yaml-file.ts";
 
-export interface HomeworkEntry {
+export interface LessonEntry {
   id: string;
   title: string;
   set: string | null;
@@ -23,7 +23,7 @@ export interface CourseManifest {
   coachPath: string | null;
   /** Absolute; the file named by `lexicon`, or null when there is none. */
   lexiconPath: string | null;
-  homeworks: HomeworkEntry[];
+  lessons: LessonEntry[];
 }
 
 const text = z
@@ -37,9 +37,9 @@ const courseYamlSchema = z.object({
   description: z.string().optional(),
   coach: text.optional(),
   lexicon: text.optional(),
-  homeworks: z
-    .array(z.object({ id: homeworkIdSchema, title: text, set: z.string().optional(), dir: text }))
-    .min(1, "should list at least one homework"),
+  lessons: z
+    .array(z.object({ id: lessonIdSchema, title: text, set: z.string().optional(), dir: text }))
+    .min(1, "should list at least one lesson"),
 });
 
 /**
@@ -74,11 +74,11 @@ export function parseCourseYaml(source: string, root: string, displayPath: strin
     description: course.description?.trim() || null,
     coachPath: course.coach === undefined ? null : inside(course.coach, ["coach"]),
     lexiconPath: course.lexicon === undefined ? null : inside(course.lexicon, ["lexicon"]),
-    homeworks: course.homeworks.map((homework, index) => ({
-      id: homework.id,
-      title: homework.title,
-      set: homework.set?.trim() || null,
-      dir: inside(homework.dir, ["homeworks", index, "dir"]),
+    lessons: course.lessons.map((lesson, index) => ({
+      id: lesson.id,
+      title: lesson.title,
+      set: lesson.set?.trim() || null,
+      dir: inside(lesson.dir, ["lessons", index, "dir"]),
     })),
   };
 }

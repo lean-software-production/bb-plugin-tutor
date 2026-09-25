@@ -1,12 +1,12 @@
-// Adopting a homework's spec, exactly as the course's coach-me does it:
-// spec/ holds only the homework's README.md, FACTORY.md and features/ (plus
+// Adopting a lesson's spec, exactly as the course's coach-me does it:
+// spec/ holds only the lesson's README.md, FACTORY.md and features/ (plus
 // Tutor's own ITERATION and PROGRESS.yaml), and a sample seed is copied into
 // seeds/ unless it is already there.
 import { access, copyFile, cp, lstat, mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { FACTORY_FILES } from "../../shared/constants.ts";
 import { slugify } from "../../shared/keys.ts";
-import type { Homework } from "../../shared/model.ts";
+import type { Lesson } from "../../shared/model.ts";
 import { ownFolder } from "./own-folder.ts";
 
 const KEPT_IN_SPEC = new Set([basename(FACTORY_FILES.iteration), basename(FACTORY_FILES.progress)]);
@@ -30,33 +30,33 @@ async function seedPresent(path: string, display: string): Promise<boolean> {
   return stats !== null;
 }
 
-/** Refuses a homework with nothing to coach before anything in spec/ is replaced. */
-async function requireFeatureFiles(homework: Homework): Promise<void> {
-  const names = await readdir(join(homework.dir, FEATURES_DIR)).catch(() => []);
+/** Refuses a lesson with nothing to coach before anything in spec/ is replaced. */
+async function requireFeatureFiles(lesson: Lesson): Promise<void> {
+  const names = await readdir(join(lesson.dir, FEATURES_DIR)).catch(() => []);
   if (!names.some((name) => name.endsWith(".feature"))) {
-    throw new Error(`Lesson ${homework.id} has no feature files in ${homework.dir}, so it cannot be adopted.`);
+    throw new Error(`Lesson ${lesson.id} has no feature files in ${lesson.dir}, so it cannot be adopted.`);
   }
 }
 
 /** The seed's file name: its `#` title slugified ("# Tetris" → tetris.md), as coach-me names 001's. */
-export function seedFileName(seed: string, homeworkId: string): string {
+export function seedFileName(seed: string, lessonId: string): string {
   const title = /^#\s+(.+)$/m.exec(seed)?.[1]?.trim();
-  return `${title === undefined ? `homework-${homeworkId}` : slugify(title)}.md`;
+  return `${title === undefined ? `homework-${lessonId}` : slugify(title)}.md`;
 }
 
 export interface SpecCopyResult {
   /** Paths written, relative to the factory root. */
   written: string[];
-  /** The seed's path relative to the factory root, or null when the homework has none. */
+  /** The seed's path relative to the factory root, or null when the lesson has none. */
   seed: string | null;
   seedAlreadyThere: boolean;
 }
 
-export async function copyHomeworkSpec(factoryRoot: string, homework: Homework): Promise<SpecCopyResult> {
-  await requireFeatureFiles(homework);
+export async function copyLessonSpec(factoryRoot: string, lesson: Lesson): Promise<SpecCopyResult> {
+  await requireFeatureFiles(lesson);
   const specDir = await ownFolder(factoryRoot, FACTORY_FILES.specDir);
-  const seedsDir = homework.seedSpec === null ? null : await ownFolder(factoryRoot, FACTORY_FILES.seedsDir);
-  const seed = homework.seedSpec === null ? null : `${FACTORY_FILES.seedsDir}/${seedFileName(homework.seedSpec, homework.id)}`;
+  const seedsDir = lesson.seedSpec === null ? null : await ownFolder(factoryRoot, FACTORY_FILES.seedsDir);
+  const seed = lesson.seedSpec === null ? null : `${FACTORY_FILES.seedsDir}/${seedFileName(lesson.seedSpec, lesson.id)}`;
   const seedAlreadyThere = seed !== null && (await seedPresent(join(factoryRoot, seed), seed));
   await mkdir(specDir, { recursive: true });
   for (const entry of await readdir(specDir)) {
@@ -65,18 +65,18 @@ export async function copyHomeworkSpec(factoryRoot: string, homework: Homework):
 
   const written: string[] = [];
   for (const file of SPEC_FILES) {
-    const source = join(homework.dir, file);
+    const source = join(lesson.dir, file);
     if (!(await exists(source))) continue;
     await copyFile(source, join(specDir, file));
     written.push(`${FACTORY_FILES.specDir}/${file}`);
   }
-  await cp(join(homework.dir, FEATURES_DIR), join(specDir, FEATURES_DIR), { recursive: true });
+  await cp(join(lesson.dir, FEATURES_DIR), join(specDir, FEATURES_DIR), { recursive: true });
   written.push(`${FACTORY_FILES.specDir}/${FEATURES_DIR}/`);
 
-  if (homework.seedSpec === null || seedsDir === null || seed === null) return { written, seed: null, seedAlreadyThere: false };
+  if (lesson.seedSpec === null || seedsDir === null || seed === null) return { written, seed: null, seedAlreadyThere: false };
   if (seedAlreadyThere) return { written, seed, seedAlreadyThere: true };
   await mkdir(seedsDir, { recursive: true });
   // "wx" never follows a symbolic link created since the check to write elsewhere.
-  await writeFile(join(factoryRoot, seed), homework.seedSpec, { encoding: "utf8", flag: "wx" });
+  await writeFile(join(factoryRoot, seed), lesson.seedSpec, { encoding: "utf8", flag: "wx" });
   return { written: [...written, seed], seed, seedAlreadyThere: false };
 }

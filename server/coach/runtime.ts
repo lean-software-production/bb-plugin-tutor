@@ -14,7 +14,7 @@ export interface TutorRuntime {
   world: WorldSource;
   store: ProgressStore;
   signals: StateSignals;
-  /** Serialises changes to one factory's files, and find-or-spawn of one homework's coach. */
+  /** Serialises changes to one factory's files, and find-or-spawn of one lesson's coach. */
   locks: KeyedLock;
   /** Coach threads seen so far, for configure (which cannot ask BB). */
   coaches: CoachRegistry;

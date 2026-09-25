@@ -12,7 +12,7 @@ test("the lesson card lists every Rule by Feature, with live status, and links o
   assert.equal(view.title, "Checking the work");
   assert.match(view.tally, /^\d+ of \d+ examples hold$/);
   const rules = view.features.flatMap((feature) => feature.rules);
-  assert.equal(rules.length, fixtureLessonDetail.homework.features.flatMap((feature) => feature.rules).length);
+  assert.equal(rules.length, fixtureLessonDetail.lesson.features.flatMap((feature) => feature.rules).length);
   assert.deepEqual(rules.filter((rule) => rule.reached).map((rule) => rule.key), [focus]);
   assert.equal(rules.find((rule) => rule.key === focus)?.glyph, "focus");
   const unlinked = lessonCardView({ ...fixtureLessonDetail, coachThreadId: null });

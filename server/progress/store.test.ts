@@ -47,7 +47,7 @@ test("malformed files become problems, never exceptions", async () => {
   }
 });
 
-test("refuses to write spec/ITERATION for Homework 0", async () => {
+test("refuses to write spec/ITERATION for Lesson 0", async () => {
   await assert.rejects(store.writeIteration("/nonexistent", { iteration: "000", status: "WIP" }), /Lesson 0/);
 });
 

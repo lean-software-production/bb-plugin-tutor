@@ -5,7 +5,7 @@
 // coach exactly what to write. Zod-free on purpose: the frontend imports this
 // module at runtime.
 //
-//   ::tutor-lesson{homework="003"}         the lesson card opening a coach thread
+//   ::tutor-lesson{lesson="003"}         the lesson card opening a coach thread
 //   ::tutor-progress{kind="rule-passing" title="…" passed="30" total="41" next="…"}
 //   ::term{id="doer"}
 //
@@ -21,7 +21,7 @@ type Attributes = Readonly<Record<string, string>>;
 const MAX_TITLE = 160;
 const MAX_NOTE = 400;
 const MAX_COUNT = 100_000;
-const HOMEWORK_ID = /^\d{3}$/;
+const LESSON_ID = /^\d{3}$/;
 const THREAD_ID = /^[A-Za-z0-9_-]{1,128}$/;
 
 export const PROGRESS_KINDS = [
@@ -33,27 +33,27 @@ export const PROGRESS_KINDS = [
   "not-yet",
   /** ● blue: the coach moved the focus to a Rule. It is also the Rule card that opens the Rule's section. */
   "focus",
-  /** ✓ green, larger: the homework is done. */
-  "homework-complete",
+  /** ✓ green, larger: the lesson is done. */
+  "lesson-complete",
 ] as const;
 export type ProgressKind = (typeof PROGRESS_KINDS)[number];
 
 export interface ProgressCard {
   kind: ProgressKind;
-  /** Rule or Example name (homework title for homework-complete). */
+  /** Rule or Example name (lesson title for lesson-complete). */
   title: string;
   passed: number | null;
   total: number | null;
   /** Name of the Rule now in focus. */
   next: string | null;
   note: string | null;
-  homeworkId: string | null;
+  lessonId: string | null;
   ruleKey: string | null;
   exampleKey: string | null;
 }
 
 export interface LessonRef {
-  homeworkId: string;
+  lessonId: string;
 }
 
 export interface TermRef {
@@ -102,16 +102,16 @@ export function parseProgressCard(attributes: Attributes): ProgressCard | null {
     total,
     next: text(attributes.next, MAX_TITLE),
     note: text(attributes.note, MAX_NOTE),
-    homeworkId: matching(attributes.homework, HOMEWORK_ID),
+    lessonId: matching(attributes.lesson, LESSON_ID),
     ruleKey: matching(attributes.rule, RULE_KEY_PATTERN),
     exampleKey: matching(attributes.example, EXAMPLE_KEY_PATTERN),
   };
 }
 
-/** Null when the homework id is missing or malformed: render the fallback. */
+/** Null when the lesson id is missing or malformed: render the fallback. */
 export function parseLessonRef(attributes: Attributes): LessonRef | null {
-  const homeworkId = matching(attributes.homework, HOMEWORK_ID);
-  return homeworkId === null ? null : { homeworkId };
+  const lessonId = matching(attributes.lesson, LESSON_ID);
+  return lessonId === null ? null : { lessonId };
 }
 
 export function parseTermRef(attributes: Attributes): TermRef | null {
@@ -139,7 +139,7 @@ export function formatProgressCard(card: ProgressCard): string {
     attribute("total", card.total),
     attribute("next", card.next),
     attribute("note", card.note),
-    attribute("homework", card.homeworkId),
+    attribute("lesson", card.lessonId),
     attribute("rule", card.ruleKey),
     attribute("example", card.exampleKey),
   ].join("");
@@ -147,20 +147,20 @@ export function formatProgressCard(card: ProgressCard): string {
 }
 
 export function formatLessonRef(ref: LessonRef): string {
-  return `::${DIRECTIVE_NAMES.lesson}{${attribute("homework", ref.homeworkId).trim()}}`;
+  return `::${DIRECTIVE_NAMES.lesson}{${attribute("lesson", ref.lessonId).trim()}}`;
 }
 
 /** The DOM attribute a Rule section card carries, and the outline looks for. */
 export const RULE_ANCHOR_ATTRIBUTE = "data-tutor-rule-anchor";
 
 /**
- * `<threadId>|<homeworkId>/<ruleKey>`: where the coach started a Rule. Only
- * anchors in a homework's own coach thread count, so the thread is part of
+ * `<threadId>|<lessonId>/<ruleKey>`: where the coach started a Rule. Only
+ * anchors in a lesson's own coach thread count, so the thread is part of
  * it. Null for anything malformed.
  */
-export function ruleAnchor(threadId: string, homeworkId: string, ruleKey: string): string | null {
-  if (!THREAD_ID.test(threadId) || !HOMEWORK_ID.test(homeworkId) || !RULE_KEY_PATTERN.test(ruleKey)) return null;
-  return `${threadId}|${homeworkId}/${ruleKey}`;
+export function ruleAnchor(threadId: string, lessonId: string, ruleKey: string): string | null {
+  if (!THREAD_ID.test(threadId) || !LESSON_ID.test(lessonId) || !RULE_KEY_PATTERN.test(ruleKey)) return null;
+  return `${threadId}|${lessonId}/${ruleKey}`;
 }
 
 /**

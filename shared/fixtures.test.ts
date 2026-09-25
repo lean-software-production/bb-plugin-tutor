@@ -27,16 +27,16 @@ test("fixtures satisfy their schemas", () => {
   for (const candidate of fixtureCandidates) candidateProjectSchema.parse(candidate);
 });
 
-test("fixture keys are unique within each homework", () => {
-  for (const homework of fixtureCourse.homeworks) {
-    const keys = homework.features.flatMap((f) => f.rules.flatMap((r) => r.examples.map((e) => e.key)));
-    assert.equal(new Set(keys).size, keys.length, homework.id);
-    assert.equal(new Set(homework.suggestedRuleOrder).size, homework.suggestedRuleOrder.length);
+test("fixture keys are unique within each lesson", () => {
+  for (const lesson of fixtureCourse.lessons) {
+    const keys = lesson.features.flatMap((f) => f.rules.flatMap((r) => r.examples.map((e) => e.key)));
+    assert.equal(new Set(keys).size, keys.length, lesson.id);
+    assert.equal(new Set(lesson.suggestedRuleOrder).size, lesson.suggestedRuleOrder.length);
   }
 });
 
-test("an unchanged example keeps its hash across homeworks", () => {
-  const [, one, two] = fixtureCourse.homeworks;
+test("an unchanged example keeps its hash across lessons", () => {
+  const [, one, two] = fixtureCourse.lessons;
   const inOne = one?.features[0]?.rules[0]?.examples[0];
   const inTwo = two?.features[0]?.rules[0]?.examples[0];
   assert.equal(inTwo?.novelty, "unchanged");

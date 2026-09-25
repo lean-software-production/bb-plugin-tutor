@@ -29,7 +29,7 @@ const after = [
 `),
 ];
 
-test("the first homework is all new", () => {
+test("the first lesson is all new", () => {
   const [a] = withNovelty(before, null);
   assert.equal(a?.novelty, "new");
   assert.ok(a?.rules.every((rule) => rule.novelty === "new" && rule.examples.every((e) => e.novelty === "new")));

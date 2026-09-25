@@ -1,4 +1,4 @@
-// FACTORY.md compared line by line with the previous homework's.
+// FACTORY.md compared line by line with the previous lesson's.
 import { diffLines } from "diff";
 import type { DiffLine } from "../../shared/model.ts";
 

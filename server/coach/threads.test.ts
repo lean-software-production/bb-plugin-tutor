@@ -11,7 +11,7 @@ function row(overrides: Partial<ThreadRow>): ThreadRow {
     originKind: null,
     originPluginId: "tutor",
     visibility: "visible",
-    title: "Coach · Homework 002",
+    title: "Coach · Lesson 002",
     createdAt: 1,
     archivedAt: null,
     ...overrides,
@@ -21,18 +21,18 @@ function row(overrides: Partial<ThreadRow>): ThreadRow {
 test("the role comes from the thread's parent, not from what the metadata claims", () => {
   const claimsMain = toTutorThread(row({ parentThreadId: "thr_main" }), {
     course: "c",
-    iteration: "002",
+    lesson: "002",
     role: "main",
     ruleKey: "validation/a-rule",
   });
   assert.equal(claimsMain?.role, "side");
   assert.equal(claimsMain?.ruleKey, "validation/a-rule");
-  assert.equal(toTutorThread(row({}), { course: "c", iteration: "002", role: "side", ruleKey: "a/b" })?.ruleKey, null);
-  assert.equal(toTutorThread(row({}), { iteration: 2 }), null);
+  assert.equal(toTutorThread(row({}), { course: "c", lesson: "002", role: "side", ruleKey: "a/b" })?.ruleKey, null);
+  assert.equal(toTutorThread(row({}), { lesson: 2 }), null);
 });
 
-test("finds the newest main thread for the course and homework", () => {
-  const meta = (iteration: string, course = "c") => ({ course, iteration, role: "main" });
+test("finds the newest main thread for the course and lesson", () => {
+  const meta = (lesson: string, course = "c") => ({ course, lesson, role: "main" });
   const threads = [
     toTutorThread(row({ id: "old", createdAt: 1 }), meta("002")),
     toTutorThread(row({ id: "new", createdAt: 5 }), meta("002")),
@@ -47,7 +47,7 @@ test("finds the newest main thread for the course and homework", () => {
 test("a fork is a side chat of its source, never a main thread, whatever its metadata says", () => {
   const fork = toTutorThread(row({ id: "fork", sourceThreadId: "thr_main", originKind: "fork", visibility: "hidden" }), {
     course: "c",
-    iteration: "002",
+    lesson: "002",
     role: "main",
     ruleKey: "validation/a-rule",
   });
@@ -62,8 +62,8 @@ test("reached Rules come from the coach thread's metadata, leniently", () => {
   for (const junk of [null, undefined, "a/b", { reachedRules: "a/b" }, { reachedRules: null }]) {
     assert.deepEqual(reachedRulesOf(junk), [], String(junk));
   }
-  const main = toTutorThread(row({}), { course: "c", iteration: "002", role: "main", reachedRules: ["a/b"] });
+  const main = toTutorThread(row({}), { course: "c", lesson: "002", role: "main", reachedRules: ["a/b"] });
   assert.deepEqual(main?.reachedRules, ["a/b"]);
-  const side = toTutorThread(row({ parentThreadId: "m" }), { course: "c", iteration: "002", role: "side", reachedRules: ["a/b"] });
+  const side = toTutorThread(row({ parentThreadId: "m" }), { course: "c", lesson: "002", role: "side", reachedRules: ["a/b"] });
   assert.deepEqual(side?.reachedRules, []);
 });

@@ -12,9 +12,9 @@ import { EXAMPLE_KEY_PATTERN, RULE_KEY_PATTERN, SLUG_PATTERN } from "./keys.ts";
 // Scalars
 // ---------------------------------------------------------------------------
 
-/** Three digits, as in the course ledger: "001". Homework 0 is "000". */
-export const homeworkIdSchema = z.string().regex(/^\d{3}$/, "expected a three-digit homework id");
-export type HomeworkId = z.infer<typeof homeworkIdSchema>;
+/** Three digits, as in the course ledger: "001". Lesson 0 is "000". */
+export const lessonIdSchema = z.string().regex(/^\d{3}$/, "expected a three-digit lesson id");
+export type LessonId = z.infer<typeof lessonIdSchema>;
 
 export const slugSchema = z.string().regex(SLUG_PATTERN, "expected a slug");
 export const ruleKeySchema = z.string().regex(RULE_KEY_PATTERN, "expected <feature>/<rule>");
@@ -41,10 +41,10 @@ export const exampleStatusSchema = z.enum(EXAMPLE_STATUSES);
 export type ExampleStatus = z.infer<typeof exampleStatusSchema>;
 
 /**
- * Compared with the previous homework in course order:
+ * Compared with the previous lesson in course order:
  * - Example: same key and hash → unchanged; same key, new hash → reworded;
- *   key absent but hash present anywhere in the previous homework → unchanged;
- *   otherwise → new. Every Example of the first homework (and of Homework 0) is new.
+ *   key absent but hash present anywhere in the previous lesson → unchanged;
+ *   otherwise → new. Every Example of the first lesson (and of Lesson 0) is new.
  * - Rule / FeatureFile: new when all its Examples are new, unchanged when all
  *   are unchanged, reworded otherwise.
  */
@@ -96,7 +96,7 @@ export type Rule = z.infer<typeof ruleSchema>;
 
 export const featureFileSchema = z.object({
   slug: slugSchema,
-  /** Relative to the homework dir, POSIX separators: "features/assembly-line.feature". */
+  /** Relative to the lesson dir, POSIX separators: "features/assembly-line.feature". */
   path: z.string(),
   name: z.string(),
   description: z.string(),
@@ -113,12 +113,12 @@ export const diffLineSchema = z.object({
 });
 export type DiffLine = z.infer<typeof diffLineSchema>;
 
-export const homeworkSchema = z.object({
-  id: homeworkIdSchema,
+export const lessonSchema = z.object({
+  id: lessonIdSchema,
   title: z.string(),
   /** Ledger "Set after" / course.yaml `set`, e.g. "Day 3". Groups the rail's days strip. */
   set: z.string().nullable(),
-  /** Absolute path of the homework directory (for Homework 0: inside the plugin). */
+  /** Absolute path of the lesson directory (for Lesson 0: inside the plugin). */
   dir: z.string(),
   builtin: z.boolean(),
   /** README.md, verbatim markdown. */
@@ -133,10 +133,10 @@ export const homeworkSchema = z.object({
   features: z.array(featureFileSchema),
   /** Every Rule key once: new/reworded Rules first, then the rest, each group in file order. */
   suggestedRuleOrder: z.array(ruleKeySchema),
-  /** FACTORY.md compared with the previous non-builtin homework; null for the first one and Homework 0. */
+  /** FACTORY.md compared with the previous non-builtin lesson; null for the first one and Lesson 0. */
   factoryDiff: z.array(diffLineSchema).nullable(),
 });
-export type Homework = z.infer<typeof homeworkSchema>;
+export type Lesson = z.infer<typeof lessonSchema>;
 
 export const lexiconEntrySchema = z.object({
   /** The YAML key: "assembly-line". */
@@ -155,8 +155,8 @@ export const courseSchema = z.object({
   root: z.string(),
   /** Absolute path of the course's coaching guidance (coach-me.md), or null. */
   coachPath: z.string().nullable(),
-  /** Homework 0 first, then the course's homeworks in ledger order. */
-  homeworks: z.array(homeworkSchema),
+  /** Lesson 0 first, then the course's lessons in ledger order. */
+  lessons: z.array(lessonSchema),
   lexicon: z.array(lexiconEntrySchema),
   source: z.enum(["course.yaml", "ledger"]),
 });
@@ -166,9 +166,9 @@ export type Course = z.infer<typeof courseSchema>;
 // Student state (factory repo)
 // ---------------------------------------------------------------------------
 
-/** spec/ITERATION: one line, "<NNN> <WIP|Done>". Never written for Homework 0. */
+/** spec/ITERATION: one line, "<NNN> <WIP|Done>". Never written for Lesson 0. */
 export const iterationStateSchema = z.object({
-  iteration: homeworkIdSchema,
+  iteration: lessonIdSchema,
   status: z.enum(["WIP", "Done"]),
 });
 export type IterationState = z.infer<typeof iterationStateSchema>;
@@ -181,34 +181,34 @@ export const exampleProgressSchema = z.object({
   /** Required when status is passing: the command and its output, or a test name. */
   evidence: z.string().optional(),
   at: isoTimestampSchema,
-  /** Set when the status was carried over by hash from an earlier homework. */
-  carriedFrom: homeworkIdSchema.optional(),
+  /** Set when the status was carried over by hash from an earlier lesson. */
+  carriedFrom: lessonIdSchema.optional(),
 });
 export type ExampleProgress = z.infer<typeof exampleProgressSchema>;
 
 /**
- * A finished homework, kept in PROGRESS.yaml when the next one is adopted so
+ * A finished lesson, kept in PROGRESS.yaml when the next one is adopted so
  * its lesson and completion pages stay truthful. Evidence is left out to keep
  * the file small; it stays in the file's git history.
  */
-export const pastHomeworkSchema = z.object({
+export const pastLessonSchema = z.object({
   adopted: isoTimestampSchema.optional(),
   summary: z.string().optional(),
   examples: z.record(exampleKeySchema, exampleProgressSchema.omit({ evidence: true })),
 });
-export type PastHomework = z.infer<typeof pastHomeworkSchema>;
+export type PastLesson = z.infer<typeof pastLessonSchema>;
 
 /** spec/PROGRESS.yaml. Written only by the coach tools. */
 export const progressFileSchema = z.object({
-  iteration: homeworkIdSchema,
+  iteration: lessonIdSchema,
   focus: ruleKeySchema.nullable().optional(),
   /** When tutor_adopt_iteration adopted `iteration`. */
   adopted: isoTimestampSchema.optional(),
   /** The coach's summary, set by tutor_complete_iteration. */
   summary: z.string().optional(),
   examples: z.record(exampleKeySchema, exampleProgressSchema),
-  /** Earlier homeworks, by id. */
-  history: z.record(homeworkIdSchema, pastHomeworkSchema).optional(),
+  /** Earlier lessons, by id. */
+  history: z.record(lessonIdSchema, pastLessonSchema).optional(),
 });
 export type ProgressFile = z.infer<typeof progressFileSchema>;
 
@@ -225,7 +225,7 @@ export interface StudentState {
 
 export const coachThreadMetadataSchema = z.object({
   course: z.string(),
-  iteration: homeworkIdSchema,
+  lesson: lessonIdSchema,
   /** "side" for a side chat (a fork Tutor made), and for a side thread spawned before side chats. */
   role: z.enum(["main", "side"]),
   ruleKey: ruleKeySchema.optional(),
@@ -245,10 +245,10 @@ export type CoachThreadMetadata = z.infer<typeof coachThreadMetadataSchema>;
 // Derived view values
 // ---------------------------------------------------------------------------
 
-export const homeworkStatusSchema = z.enum(["done", "current", "ahead"]);
-export type HomeworkStatus = z.infer<typeof homeworkStatusSchema>;
+export const lessonStatusSchema = z.enum(["done", "current", "ahead"]);
+export type LessonStatus = z.infer<typeof lessonStatusSchema>;
 
-/** "not-started" only when nothing has been adopted yet (current is Homework 0). */
+/** "not-started" only when nothing has been adopted yet (current is Lesson 0). */
 export const iterationProgressSchema = z.enum(["not-started", "WIP", "Done"]);
 export type IterationProgress = z.infer<typeof iterationProgressSchema>;
 

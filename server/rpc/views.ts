@@ -3,15 +3,15 @@
 import {
   countExamples,
   exampleStatus,
-  findHomework,
+  findLesson,
   findRule,
-  homeworkExamples,
-  homeworkStatus,
-  nextHomework,
+  lessonExamples,
+  lessonStatus,
+  nextLesson,
   ruleStatus,
   type ProgressMap,
 } from "../../shared/derive.ts";
-import type { Course, Homework } from "../../shared/model.ts";
+import type { Course, Lesson } from "../../shared/model.ts";
 import type { Completion, CurrentState, FeatureOutline, LessonDetail, Overview, TutorThread } from "../../shared/rpc.ts";
 import { progressFor, recordedProgress } from "../progress/current.ts";
 import { findMainThread, type TutorThreadRecord } from "../coach/threads.ts";
@@ -20,7 +20,7 @@ import type { World } from "../coach/world.ts";
 export function publicThread(record: TutorThreadRecord): TutorThread {
   return {
     id: record.id,
-    homeworkId: record.homeworkId,
+    lessonId: record.lessonId,
     role: record.role,
     ruleKey: record.ruleKey,
     title: record.title,
@@ -34,15 +34,15 @@ export function requireCourse(world: World): Course {
   return world.course;
 }
 
-export function requireHomework(course: Course, homeworkId: string): Homework {
-  const homework = findHomework(course, homeworkId);
-  if (homework === undefined) throw new Error(`There is no lesson ${homeworkId} in this course.`);
-  return homework;
+export function requireLesson(course: Course, lessonId: string): Lesson {
+  const lesson = findLesson(course, lessonId);
+  if (lesson === undefined) throw new Error(`There is no lesson ${lessonId} in this course.`);
+  return lesson;
 }
 
-/** Progress entries recorded for `homework`, current or from the history, else none. */
-function progressMap(world: World, homeworkId: string): ProgressMap {
-  return recordedProgress(world.student, homeworkId)?.examples ?? {};
+/** Progress entries recorded for `lesson`, current or from the history, else none. */
+function progressMap(world: World, lessonId: string): ProgressMap {
+  return recordedProgress(world.student, lessonId)?.examples ?? {};
 }
 
 function latest(values: readonly (string | undefined)[]): string | null {
@@ -50,12 +50,12 @@ function latest(values: readonly (string | undefined)[]): string | null {
 }
 
 export function outline(
-  homework: Homework,
+  lesson: Lesson,
   progress: ProgressMap,
   focus: string | null,
   reached: ReadonlySet<string> = new Set(),
 ): FeatureOutline[] {
-  return homework.features.map((feature) => ({
+  return lesson.features.map((feature) => ({
     slug: feature.slug,
     name: feature.name,
     path: feature.path,
@@ -74,8 +74,8 @@ export function outline(
   }));
 }
 
-function lastNote(homework: Homework, progress: ProgressMap): CurrentState["lastNote"] {
-  const notes = homeworkExamples(homework).flatMap((example) => {
+function lastNote(lesson: Lesson, progress: ProgressMap): CurrentState["lastNote"] {
+  const notes = lessonExamples(lesson).flatMap((example) => {
     const entry = progress[example.key];
     if (entry?.note === undefined || exampleStatus(example, progress) !== "not-yet") return [];
     return [{ exampleKey: example.key, exampleName: example.name, note: entry.note, at: entry.at }];
@@ -83,28 +83,28 @@ function lastNote(homework: Homework, progress: ProgressMap): CurrentState["last
   return notes.sort((a, b) => a.at.localeCompare(b.at)).at(-1) ?? null;
 }
 
-/** The homework's features and Rules against what is recorded, with the Rules its coach thread has reached. */
-function homeworkOutline(world: World, homework: Homework, main: TutorThreadRecord | undefined): FeatureOutline[] {
-  const focus = progressFor(world.student, homework.id)?.focus ?? null;
-  return outline(homework, progressMap(world, homework.id), focus, new Set(main?.reachedRules ?? []));
+/** The lesson's features and Rules against what is recorded, with the Rules its coach thread has reached. */
+function lessonOutline(world: World, lesson: Lesson, main: TutorThreadRecord | undefined): FeatureOutline[] {
+  const focus = progressFor(world.student, lesson.id)?.focus ?? null;
+  return outline(lesson, progressMap(world, lesson.id), focus, new Set(main?.reachedRules ?? []));
 }
 
 function currentState(world: World, course: Course, threads: readonly TutorThreadRecord[]): CurrentState | null {
   if (world.binding.status !== "bound" || world.pointer === null) return null;
-  const homework = findHomework(course, world.pointer.homeworkId);
-  if (homework === undefined) return null;
-  const progress = progressMap(world, homework.id);
-  const focus = progressFor(world.student, homework.id)?.focus ?? null;
-  const main = findMainThread(threads, course.id, homework.id);
+  const lesson = findLesson(course, world.pointer.lessonId);
+  if (lesson === undefined) return null;
+  const progress = progressMap(world, lesson.id);
+  const focus = progressFor(world.student, lesson.id)?.focus ?? null;
+  const main = findMainThread(threads, course.id, lesson.id);
   return {
-    homeworkId: homework.id,
+    lessonId: lesson.id,
     iterationStatus: world.pointer.iterationStatus,
     focus,
-    focusRuleName: focus === null ? null : (findRule(homework, focus)?.name ?? null),
-    counts: countExamples(homeworkExamples(homework), progress),
-    outline: homeworkOutline(world, homework, main),
+    focusRuleName: focus === null ? null : (findRule(lesson, focus)?.name ?? null),
+    counts: countExamples(lessonExamples(lesson), progress),
+    outline: lessonOutline(world, lesson, main),
     coachThreadId: main?.id ?? null,
-    lastNote: lastNote(homework, progress),
+    lastNote: lastNote(lesson, progress),
   };
 }
 
@@ -112,7 +112,7 @@ export function buildOverview(world: World, threads: readonly TutorThreadRecord[
   const course = world.course;
   const pointer = world.pointer;
   if (course === null || pointer === null) {
-    return { course: null, courseError: world.courseError, binding: world.binding, homeworks: [], current: null, threads: [] };
+    return { course: null, courseError: world.courseError, binding: world.binding, lessons: [], current: null, threads: [] };
   }
   const courseThreads =
     world.binding.status === "bound" ? threads.filter((thread) => thread.courseId === course.id) : [];
@@ -120,17 +120,17 @@ export function buildOverview(world: World, threads: readonly TutorThreadRecord[
     course: { id: course.id, title: course.title, description: course.description },
     courseError: null,
     binding: world.binding,
-    homeworks: course.homeworks.map((homework) => {
-      const main = findMainThread(courseThreads, course.id, homework.id);
+    lessons: course.lessons.map((lesson) => {
+      const main = findMainThread(courseThreads, course.id, lesson.id);
       return {
-        id: homework.id,
-        title: homework.title,
-        set: homework.set,
-        builtin: homework.builtin,
-        status: homeworkStatus(course, pointer, homework.id),
-        counts: countExamples(homeworkExamples(homework), progressMap(world, homework.id)),
+        id: lesson.id,
+        title: lesson.title,
+        set: lesson.set,
+        builtin: lesson.builtin,
+        status: lessonStatus(course, pointer, lesson.id),
+        counts: countExamples(lessonExamples(lesson), progressMap(world, lesson.id)),
         coachThreadId: main?.id ?? null,
-        outline: homeworkOutline(world, homework, main),
+        outline: lessonOutline(world, lesson, main),
       };
     }),
     current: currentState(world, course, courseThreads),
@@ -138,52 +138,52 @@ export function buildOverview(world: World, threads: readonly TutorThreadRecord[
   };
 }
 
-export function buildLessonDetail(world: World, homeworkId: string, threads: readonly TutorThreadRecord[]): LessonDetail {
+export function buildLessonDetail(world: World, lessonId: string, threads: readonly TutorThreadRecord[]): LessonDetail {
   const course = requireCourse(world);
-  const homework = requireHomework(course, homeworkId);
+  const lesson = requireLesson(course, lessonId);
   const pointer = world.pointer;
-  const isCurrent = pointer?.homeworkId === homework.id;
-  const status = pointer === null ? "ahead" : homeworkStatus(course, pointer, homework.id);
-  const current = progressFor(world.student, homework.id);
-  const main = findMainThread(threads, course.id, homework.id);
+  const isCurrent = pointer?.lessonId === lesson.id;
+  const status = pointer === null ? "ahead" : lessonStatus(course, pointer, lesson.id);
+  const current = progressFor(world.student, lesson.id);
+  const main = findMainThread(threads, course.id, lesson.id);
   return {
-    homework,
+    lesson,
     status,
     iterationStatus: isCurrent && pointer !== null ? pointer.iterationStatus : null,
     focus: current?.focus ?? null,
-    progress: status === "ahead" ? {} : progressMap(world, homework.id),
+    progress: status === "ahead" ? {} : progressMap(world, lesson.id),
     coachThreadId: main?.id ?? null,
     reachedRules: main?.reachedRules ?? [],
   };
 }
 
-/** `bbSideChats`: side chats of the homework's coach thread that BB made, which are not Tutor's threads. */
+/** `bbSideChats`: side chats of the lesson's coach thread that BB made, which are not Tutor's threads. */
 export function buildCompletion(
   world: World,
-  homeworkId: string,
+  lessonId: string,
   threads: readonly TutorThreadRecord[],
   bbSideChats = 0,
 ): Completion {
   const course = requireCourse(world);
-  const homework = requireHomework(course, homeworkId);
-  if (world.pointer === null || homeworkStatus(course, world.pointer, homework.id) !== "done") {
-    throw new Error(`Lesson ${homework.id} is not complete yet.`);
+  const lesson = requireLesson(course, lessonId);
+  if (world.pointer === null || lessonStatus(course, world.pointer, lesson.id) !== "done") {
+    throw new Error(`Lesson ${lesson.id} is not complete yet.`);
   }
-  const progress = recordedProgress(world.student, homework.id);
-  // Carry-over into the next homework comes from what passed in this one (its history entry once it is past).
+  const progress = recordedProgress(world.student, lesson.id);
+  // Carry-over into the next lesson comes from what passed in this one (its history entry once it is past).
   const passingHashes = new Set(
     Object.values(progress?.examples ?? {})
       .filter((entry) => entry.status === "passing")
       .map((entry) => entry.hash),
   );
-  const next = nextHomework(course, homework.id);
-  const nextExamples = next === undefined ? [] : homeworkExamples(next);
+  const next = nextLesson(course, lesson.id);
+  const nextExamples = next === undefined ? [] : lessonExamples(next);
   return {
-    homework: { id: homework.id, title: homework.title, set: homework.set },
-    counts: countExamples(homeworkExamples(homework), progress?.examples ?? {}),
-    freshRules: homework.features.flatMap((feature) => feature.rules).filter((rule) => rule.novelty !== "unchanged").length,
+    lesson: { id: lesson.id, title: lesson.title, set: lesson.set },
+    counts: countExamples(lessonExamples(lesson), progress?.examples ?? {}),
+    freshRules: lesson.features.flatMap((feature) => feature.rules).filter((rule) => rule.novelty !== "unchanged").length,
     sideThreads:
-      threads.filter((thread) => thread.courseId === course.id && thread.homeworkId === homework.id && thread.role === "side").length +
+      threads.filter((thread) => thread.courseId === course.id && thread.lessonId === lesson.id && thread.role === "side").length +
       bbSideChats,
     adoptedAt: progress?.adopted ?? null,
     summary: progress?.summary ?? null,
@@ -192,7 +192,7 @@ export function buildCompletion(
         ? null
         : {
             id: next.id,
-            status: homeworkStatus(course, world.pointer, next.id),
+            status: lessonStatus(course, world.pointer, next.id),
             title: next.title,
             set: next.set,
             dek: next.dek,

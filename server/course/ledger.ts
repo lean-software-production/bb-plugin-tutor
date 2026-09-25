@@ -1,9 +1,9 @@
-// The fallback when a course has no course.yaml: the homeworks table in
+// The fallback when a course has no course.yaml: the lessons table in
 // docs/iterations/README.md, "| Iteration | Spec | Set after |".
 import { dirname, resolve } from "node:path";
 import { CourseLoadError } from "../../shared/ports.ts";
 import { isInside } from "../paths.ts";
-import type { HomeworkEntry } from "./manifest.ts";
+import type { LessonEntry } from "./manifest.ts";
 
 const COLUMNS = { id: "iteration", spec: "spec", set: "set after" } as const;
 const LINK = /^\[([^\]]+)\]\(([^)\s]+)\)$/;
@@ -21,11 +21,11 @@ function isSeparator(line: string): boolean {
 }
 
 /**
- * Reads the ledger table. A Spec link's target is a homework's README.md, or
- * its folder; either way the folder is the homework's `dir`, resolved against
+ * Reads the ledger table. A Spec link's target is a lesson's README.md, or
+ * its folder; either way the folder is the lesson's `dir`, resolved against
  * `ledgerDir`, and it may not leave `courseRoot` as written.
  */
-export function parseLedger(markdown: string, ledgerDir: string, displayPath: string, courseRoot: string): HomeworkEntry[] {
+export function parseLedger(markdown: string, ledgerDir: string, displayPath: string, courseRoot: string): LessonEntry[] {
   const lines = markdown.replace(/\r\n/g, "\n").split("\n");
   const headerIndex = lines.findIndex((line) => {
     if (!line.trim().startsWith("|")) return false;
@@ -35,13 +35,13 @@ export function parseLedger(markdown: string, ledgerDir: string, displayPath: st
   const headerLine = lines[headerIndex];
   if (headerLine === undefined) {
     throw new CourseLoadError(
-      `${displayPath} has no homework table with the columns Iteration, Spec and Set after.`,
+      `${displayPath} has no lesson table with the columns Iteration, Spec and Set after.`,
     );
   }
   const header = cells(headerLine).map((cell) => cell.toLowerCase());
   const column = (name: string): number => header.indexOf(name);
 
-  const homeworks: HomeworkEntry[] = [];
+  const lessons: LessonEntry[] = [];
   for (let index = headerIndex + 1; index < lines.length; index += 1) {
     const line = lines[index] ?? "";
     if (!line.trim().startsWith("|")) break;
@@ -61,15 +61,15 @@ export function parseLedger(markdown: string, ledgerDir: string, displayPath: st
     if (!isInside(courseRoot, targetPath)) {
       throw new CourseLoadError(`${where}: ${target} is outside the course folder.`);
     }
-    homeworks.push({
+    lessons.push({
       id,
       title: title.trim(),
       set: row[column(COLUMNS.set)] || null,
       dir: /\.md$/i.test(target) ? dirname(targetPath) : targetPath,
     });
   }
-  if (homeworks.length === 0) {
-    throw new CourseLoadError(`${displayPath}'s homework table has no rows.`);
+  if (lessons.length === 0) {
+    throw new CourseLoadError(`${displayPath}'s lesson table has no rows.`);
   }
-  return homeworks;
+  return lessons;
 }

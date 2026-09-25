@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fixtureOverview, fixtureOverviewUnbound } from "../../shared/fixtures.ts";
 import type { Overview } from "../../shared/rpc.ts";
-import { buildRail, viewedHomework } from "./rail.ts";
+import { buildRail, viewedLesson } from "./rail.ts";
 import type { RailInput } from "./rail.ts";
 import { indicatorTone, indicatorView } from "./threads.ts";
 import type { SidebarThreadLike } from "./threads.ts";
@@ -27,7 +27,7 @@ function thread(id: string, fields: Partial<SidebarThreadLike> = {}): SidebarThr
 }
 
 const liveThreads: SidebarThreadLike[] = [
-  thread("thr_coach002", { displayTitle: "Coach · Homework 002", indicator: "runtime", indicatorLabel: "Working", createdAt: 10 }),
+  thread("thr_coach002", { displayTitle: "Coach · Lesson 002", indicator: "runtime", indicatorLabel: "Working", createdAt: 10 }),
   // Tutor's side chat (in the overview's threads) and one BB's "Reply in side chat" made: hidden forks.
   thread("thr_chat002", {
     displayTitle: "Side question · validation",
@@ -50,7 +50,7 @@ const liveThreads: SidebarThreadLike[] = [
     indicatorLabel: "Unread",
     createdAt: 20,
   }),
-  thread("thr_coach001", { displayTitle: "Coach · Homework 001", createdAt: 5 }),
+  thread("thr_coach001", { displayTitle: "Coach · Lesson 001", createdAt: 5 }),
   thread("thr_readme", { displayTitle: "Add a README for the factory", updatedAt: 50 }),
   thread("thr_child", { displayTitle: "Child of README", parentThreadId: "thr_readme", updatedAt: 60 }),
   thread("thr_pi", { displayTitle: "Set up pi auth", projectId: "prj_personal", updatedAt: 90 }),
@@ -69,7 +69,7 @@ const overviewWithChat: Overview = {
     ...fixtureOverview.threads,
     {
       id: "thr_chat002",
-      homeworkId: "002",
+      lessonId: "002",
       role: "side",
       ruleKey: "validation/a-task-is-finished-when-validation-is-satisfied",
       title: "Side question · validation",
@@ -77,7 +77,7 @@ const overviewWithChat: Overview = {
       sideChat: true,
     },
     // BB's side chat as the backend lists it; the sidebar list may not carry hidden threads at all.
-    { id: "thr_bbchat002", homeworkId: "002", role: "side", ruleKey: null, title: "the outline is…", mainThreadId: "thr_coach002", sideChat: true },
+    { id: "thr_bbchat002", lessonId: "002", role: "side", ruleKey: null, title: "the outline is…", mainThreadId: "thr_coach002", sideChat: true },
   ],
 };
 
@@ -148,7 +148,7 @@ test("other threads keep BB usable: grouped by project, newest first, children n
 });
 
 test("the lesson on screen opens too: its start page, its coach thread or a side thread", () => {
-  const onPage = buildRail(input({ route: { kind: "start", homeworkId: "003" } }));
+  const onPage = buildRail(input({ route: { kind: "start", lessonId: "003" } }));
   assert.deepEqual(
     onPage.lessons.filter((lesson) => lesson.expandedByDefault).map((lesson) => lesson.id),
     ["002", "003"],
@@ -161,19 +161,19 @@ test("the lesson on screen opens too: its start page, its coach thread or a side
   assert.equal(onSide.lessons.find((lesson) => lesson.id === "002")?.sideRows[0]?.isActive, true);
 });
 
-test("viewedHomework prefers the route, then the coach thread of the open thread", () => {
-  const lessons = fixtureOverview.homeworks;
-  assert.equal(viewedHomework({ kind: "complete", homeworkId: "001" }, "thr_coach002", lessons, liveThreads), "001");
-  assert.equal(viewedHomework({ kind: "home" }, "thr_coach001", lessons, liveThreads), "001");
-  assert.equal(viewedHomework(null, "thr_chat002", lessons, liveThreads), "002");
-  assert.equal(viewedHomework(null, "thr_readme", lessons, liveThreads), null);
-  assert.equal(viewedHomework(null, null, lessons, liveThreads), null);
+test("viewedLesson prefers the route, then the coach thread of the open thread", () => {
+  const lessons = fixtureOverview.lessons;
+  assert.equal(viewedLesson({ kind: "complete", lessonId: "001" }, "thr_coach002", lessons, liveThreads), "001");
+  assert.equal(viewedLesson({ kind: "home" }, "thr_coach001", lessons, liveThreads), "001");
+  assert.equal(viewedLesson(null, "thr_chat002", lessons, liveThreads), "002");
+  assert.equal(viewedLesson(null, "thr_readme", lessons, liveThreads), null);
+  assert.equal(viewedLesson(null, null, lessons, liveThreads), null);
 });
 
 test("no coach thread yet: the current lesson offers to start one, others link to their start page", () => {
   const overview: Overview = {
     ...fixtureOverview,
-    homeworks: fixtureOverview.homeworks.map((lesson) => ({ ...lesson, coachThreadId: null })),
+    lessons: fixtureOverview.lessons.map((lesson) => ({ ...lesson, coachThreadId: null })),
     threads: [],
   };
   const rail = buildRail(input({ overview }));

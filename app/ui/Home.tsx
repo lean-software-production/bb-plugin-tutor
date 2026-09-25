@@ -16,15 +16,15 @@ export function ContinueSection(_props: PluginHomepageSectionProps) {
   const goCourse = useCourseNavigate();
   const overview = useOverview();
   const view = overview.data === null ? null : continueView(overview.data);
-  const homeworkId = view?.kind === "continue" ? view.homeworkId : null;
+  const lessonId = view?.kind === "continue" ? view.lessonId : null;
   const coachThreadId = view?.kind === "continue" ? view.coachThreadId : null;
   const toCoach = useAction(async () => {
     if (coachThreadId !== null) {
       navigate.toThread(coachThreadId);
       return;
     }
-    if (homeworkId === null) return;
-    const { threadId } = await rpc.call("openCoach", { homeworkId });
+    if (lessonId === null) return;
+    const { threadId } = await rpc.call("openCoach", { lessonId });
     refreshAll();
     navigate.toThread(threadId);
   });
@@ -85,7 +85,7 @@ export function ContinueSection(_props: PluginHomepageSectionProps) {
           )}
         </p>
         {view.complete ? (
-          <button type="button" className="tp-hs-btn" onClick={() => goCourse({ kind: "complete", homeworkId: view.homeworkId })}>
+          <button type="button" className="tp-hs-btn" onClick={() => goCourse({ kind: "complete", lessonId: view.lessonId })}>
             See what's next →
           </button>
         ) : (
@@ -94,7 +94,7 @@ export function ContinueSection(_props: PluginHomepageSectionProps) {
           </button>
         )}
         {view.coachThreadId === null ? (
-          <button type="button" className="tp-hs-btn tp-hs-btn--ghost" onClick={() => goCourse({ kind: "start", homeworkId: view.homeworkId })}>
+          <button type="button" className="tp-hs-btn tp-hs-btn--ghost" onClick={() => goCourse({ kind: "start", lessonId: view.lessonId })}>
             Open the start page
           </button>
         ) : null}
@@ -127,7 +127,7 @@ export function CourseAccessory() {
   if (current === null) return null;
   return (
     <span className="tutor-paper tp-accessory">
-      <i>{current.homeworkId}</i> · {current.counts.passing}/{current.counts.total}
+      <i>{current.lessonId}</i> · {current.counts.passing}/{current.counts.total}
     </span>
   );
 }

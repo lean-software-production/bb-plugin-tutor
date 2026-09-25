@@ -1,16 +1,16 @@
 // Pure derivations over the model that both the backend (overview, tools) and
 // the frontend (start page, cards, outline) need, so the two can never disagree about what a
 // glyph or a count means.
-import { BUILTIN_HOMEWORK_ID } from "./constants.ts";
+import { BUILTIN_LESSON_ID } from "./constants.ts";
 import type {
   Course,
   Example,
   ExampleCounts,
   ExampleProgress,
   ExampleStatus,
-  Homework,
-  HomeworkId,
-  HomeworkStatus,
+  Lesson,
+  LessonId,
+  LessonStatus,
   IterationProgress,
   Rule,
   RuleStatus,
@@ -58,61 +58,61 @@ export function ruleStatus(rule: Rule, progress: ProgressMap): RuleStatus {
   return "pending";
 }
 
-export function homeworkExamples(homework: Homework): Example[] {
-  return homework.features.flatMap((feature) => feature.rules.flatMap((rule) => rule.examples));
+export function lessonExamples(lesson: Lesson): Example[] {
+  return lesson.features.flatMap((feature) => feature.rules.flatMap((rule) => rule.examples));
 }
 
-export function findHomework(course: Course, id: string): Homework | undefined {
-  return course.homeworks.find((homework) => homework.id === id);
+export function findLesson(course: Course, id: string): Lesson | undefined {
+  return course.lessons.find((lesson) => lesson.id === id);
 }
 
-/** The homework after `id` in course order, or undefined for the last one. */
-export function nextHomework(course: Course, id: string): Homework | undefined {
-  const index = course.homeworks.findIndex((homework) => homework.id === id);
-  return index < 0 ? undefined : course.homeworks[index + 1];
+/** The lesson after `id` in course order, or undefined for the last one. */
+export function nextLesson(course: Course, id: string): Lesson | undefined {
+  const index = course.lessons.findIndex((lesson) => lesson.id === id);
+  return index < 0 ? undefined : course.lessons[index + 1];
 }
 
-export function findRule(homework: Homework, key: string): Rule | undefined {
-  for (const feature of homework.features) {
+export function findRule(lesson: Lesson, key: string): Rule | undefined {
+  for (const feature of lesson.features) {
     const rule = feature.rules.find((candidate) => candidate.key === key);
     if (rule !== undefined) return rule;
   }
   return undefined;
 }
 
-export function findExample(homework: Homework, key: string): Example | undefined {
-  return homeworkExamples(homework).find((example) => example.key === key);
+export function findExample(lesson: Lesson, key: string): Example | undefined {
+  return lessonExamples(lesson).find((example) => example.key === key);
 }
 
 export interface CurrentPointer {
-  homeworkId: HomeworkId;
+  lessonId: LessonId;
   iterationStatus: IterationProgress;
 }
 
 /**
  * Where the student is. spec/ITERATION is canonical (decision 1) whenever it
- * names a homework of this course. Otherwise PROGRESS.yaml on Homework 0 means
- * Homework 0 is under way, and Done once every one of its Examples is passing
+ * names a lesson of this course. Otherwise PROGRESS.yaml on Lesson 0 means
+ * Lesson 0 is under way, and Done once every one of its Examples is passing
  * or skipped. Anything else means nothing has been adopted yet.
  */
 export function resolveCurrent(course: Course, student: StudentState): CurrentPointer {
   const fromIteration = student.iteration;
-  if (fromIteration !== null && findHomework(course, fromIteration.iteration) !== undefined) {
-    return { homeworkId: fromIteration.iteration, iterationStatus: fromIteration.status };
+  if (fromIteration !== null && findLesson(course, fromIteration.iteration) !== undefined) {
+    return { lessonId: fromIteration.iteration, iterationStatus: fromIteration.status };
   }
-  const builtin = findHomework(course, BUILTIN_HOMEWORK_ID);
-  if (student.progress?.iteration === BUILTIN_HOMEWORK_ID && builtin !== undefined) {
-    const counts = countExamples(homeworkExamples(builtin), student.progress.examples);
+  const builtin = findLesson(course, BUILTIN_LESSON_ID);
+  if (student.progress?.iteration === BUILTIN_LESSON_ID && builtin !== undefined) {
+    const counts = countExamples(lessonExamples(builtin), student.progress.examples);
     const done = counts.total > 0 && counts.passing + counts.skipped === counts.total;
-    return { homeworkId: BUILTIN_HOMEWORK_ID, iterationStatus: done ? "Done" : "WIP" };
+    return { lessonId: BUILTIN_LESSON_ID, iterationStatus: done ? "Done" : "WIP" };
   }
-  return { homeworkId: BUILTIN_HOMEWORK_ID, iterationStatus: "not-started" };
+  return { lessonId: BUILTIN_LESSON_ID, iterationStatus: "not-started" };
 }
 
-/** Homeworks before the current one are done; the current one is done once its status is Done. */
-export function homeworkStatus(course: Course, pointer: CurrentPointer, id: string): HomeworkStatus {
-  const ids = course.homeworks.map((homework) => homework.id);
-  const current = ids.indexOf(pointer.homeworkId);
+/** Lessons before the current one are done; the current one is done once its status is Done. */
+export function lessonStatus(course: Course, pointer: CurrentPointer, id: string): LessonStatus {
+  const ids = course.lessons.map((lesson) => lesson.id);
+  const current = ids.indexOf(pointer.lessonId);
   const index = ids.indexOf(id);
   if (index < 0) return "ahead";
   if (index < current) return "done";

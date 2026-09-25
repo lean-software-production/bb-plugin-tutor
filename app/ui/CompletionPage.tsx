@@ -4,23 +4,23 @@
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { refreshAll, useAction, useCourseNavigate, useQuery, useTutorRpc } from "../hooks.ts";
 import { completionView, confettiPieces } from "../model/completion.ts";
-import type { NextHomeworkView } from "../model/completion.ts";
+import type { NextLessonView } from "../model/completion.ts";
 import { QUERY_KEYS } from "../state/app-state.ts";
 import { Chips, ErrorNotice, InlineText, Loading, PaperPage } from "./common.tsx";
 
 const CONFETTI = confettiPieces();
 
-export function CompletionPage({ homeworkId }: { homeworkId: string }) {
+export function CompletionPage({ lessonId }: { lessonId: string }) {
   const rpc = useTutorRpc();
   const goCourse = useCourseNavigate();
-  const completion = useQuery(QUERY_KEYS.completion(homeworkId), () => rpc.call("getCompletion", { homeworkId }));
+  const completion = useQuery(QUERY_KEYS.completion(lessonId), () => rpc.call("getCompletion", { lessonId }));
   if (completion.data === null) {
     return (
       <PaperPage>
         {completion.status === "error" ? (
           <>
             <ErrorNotice message={completion.error} />
-            <button type="button" className="tp-btn tp-btn--ghost" onClick={() => goCourse({ kind: "start", homeworkId })}>
+            <button type="button" className="tp-btn tp-btn--ghost" onClick={() => goCourse({ kind: "start", lessonId })}>
               Back to the lesson
             </button>
           </>
@@ -72,20 +72,20 @@ export function CompletionPage({ homeworkId }: { homeworkId: string }) {
           <p className="tp-dek">Your factory, its spec and every conversation with your coach stay in your repo.</p>
         </div>
       ) : (
-        <NextHomework next={view.next} />
+        <NextLesson next={view.next} />
       )}
     </PaperPage>
   );
 }
 
-function NextHomework({ next }: { next: NextHomeworkView }) {
+function NextLesson({ next }: { next: NextLessonView }) {
   const rpc = useTutorRpc();
   const navigate = useBbNavigate();
   const goCourse = useCourseNavigate();
   const start = useAction(async () => {
     const { threadId } = next.started
-      ? await rpc.call("openCoach", { homeworkId: next.id })
-      : await rpc.call("startNextHomework", { homeworkId: next.id });
+      ? await rpc.call("openCoach", { lessonId: next.id })
+      : await rpc.call("startNextLesson", { lessonId: next.id });
     refreshAll();
     navigate.toThread(threadId);
   });
@@ -114,7 +114,7 @@ function NextHomework({ next }: { next: NextHomeworkView }) {
         <button type="button" className="tp-btn tp-btn--big" disabled={start.pending} onClick={() => void start.run()}>
           {start.pending ? "Starting…" : next.startLabel}
         </button>
-        <button type="button" className="tp-btn tp-btn--ghost" onClick={() => goCourse({ kind: "start", homeworkId: next.id })}>
+        <button type="button" className="tp-btn tp-btn--ghost" onClick={() => goCourse({ kind: "start", lessonId: next.id })}>
           Read the features first
         </button>
       </div>

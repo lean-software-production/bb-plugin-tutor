@@ -3,23 +3,23 @@
 // feature holding the Rule in focus, ending at that Rule. The Rules after it
 // fold away ahead of it ("Later in this feature"), so the conversation always
 // follows the Rule in focus.
-import { countExamples, exampleStatus, findRule, homeworkExamples, ruleStatus } from "../../shared/derive.ts";
+import { countExamples, exampleStatus, findRule, lessonExamples, ruleStatus } from "../../shared/derive.ts";
 import type { ProgressMap } from "../../shared/derive.ts";
 import type {
   Example,
   ExampleCounts,
   ExampleStatus,
   FeatureFile,
-  Homework,
-  HomeworkStatus,
+  Lesson,
+  LessonStatus,
   Novelty,
   Rule,
   RuleStatus,
 } from "../../shared/model.ts";
-import type { Binding, HomeworkSummary, LessonDetail } from "../../shared/rpc.ts";
+import type { Binding, LessonSummary, LessonDetail } from "../../shared/rpc.ts";
 import { backgroundLines, exampleLines } from "./gherkin.ts";
 import type { GherkinLine } from "./gherkin.ts";
-import { firstSentence, homeworkEyebrow, homeworkLabel, percent, plural, relativeTime } from "./format.ts";
+import { firstSentence, lessonEyebrow, lessonLabel, percent, plural, relativeTime } from "./format.ts";
 
 export type NoteTone = "green" | "amber" | "blue" | "purple" | "muted";
 
@@ -75,13 +75,13 @@ export interface CompassItem {
 }
 
 export interface LessonView {
-  homeworkId: string;
+  lessonId: string;
   title: string;
   eyebrow: string;
   /** "Lesson 3 · The assembly line", for the page's top bar. */
   barTitle: string;
   dek: string;
-  status: HomeworkStatus;
+  status: LessonStatus;
   counts: ExampleCounts;
   percent: number;
   chips: Chip[];
@@ -96,7 +96,7 @@ export interface LessonView {
   /** Every other feature, collapsed when there is a focus feature. */
   otherFeatures: FeatureView[];
   coachThreadId: string | null;
-  /** The student's current homework and done with it: the completion page is next. */
+  /** The student's current lesson and done with it: the completion page is next. */
   readyToComplete: boolean;
 }
 
@@ -110,7 +110,7 @@ export type CoachStart = "read-ahead" | "loading" | "set-up" | "start" | "revisi
  * start that must fail. `binding` is null until the overview loads, and
  * nothing is offered until then.
  */
-export function coachStart(status: HomeworkStatus, binding: Binding["status"] | null): CoachStart {
+export function coachStart(status: LessonStatus, binding: Binding["status"] | null): CoachStart {
   if (status === "ahead") return "read-ahead";
   if (binding === null) return "loading";
   if (binding === "unbound" || binding === "missing") return "set-up";
@@ -153,7 +153,7 @@ export function marginNote(example: Example, progress: ProgressMap, now: number)
         return {
           tone: "green",
           label: "Carried over",
-          text: `Passing since ${homeworkLabel(entry.carriedFrom).toLowerCase()}.`,
+          text: `Passing since ${lessonLabel(entry.carriedFrom).toLowerCase()}.`,
           evidence: entry.evidence ?? null,
         };
       }
@@ -210,11 +210,11 @@ function ruleSummary(rule: Rule, status: RuleStatus, isUpNext: boolean, progress
 /** The Rule the lesson ends at: the coach's focus, else the first open Rule in suggested order. */
 function resolveFocus(detail: LessonDetail, progress: ProgressMap): LessonView["focus"] {
   if (detail.status !== "current") return null;
-  if (detail.focus !== null && findRule(detail.homework, detail.focus) !== undefined) {
+  if (detail.focus !== null && findRule(detail.lesson, detail.focus) !== undefined) {
     return { ruleKey: detail.focus, label: "in focus" };
   }
-  const open = detail.homework.suggestedRuleOrder.find((key) => {
-    const rule = findRule(detail.homework, key);
+  const open = detail.lesson.suggestedRuleOrder.find((key) => {
+    const rule = findRule(detail.lesson, key);
     return rule !== undefined && ruleStatus(rule, progress) !== "passing";
   });
   return open === undefined ? null : { ruleKey: open, label: "up next" };
@@ -223,19 +223,19 @@ function resolveFocus(detail: LessonDetail, progress: ProgressMap): LessonView["
 function upNextKey(detail: LessonDetail, progress: ProgressMap, focusKey: string | null): string | null {
   if (detail.status !== "current") return null;
   return (
-    detail.homework.suggestedRuleOrder.find((key) => {
+    detail.lesson.suggestedRuleOrder.find((key) => {
       if (key === focusKey) return false;
-      const rule = findRule(detail.homework, key);
+      const rule = findRule(detail.lesson, key);
       return rule !== undefined && ruleStatus(rule, progress) !== "passing";
     }) ?? null
   );
 }
 
-function compass(homework: Homework, previous: HomeworkSummary | null): LessonView["compass"] {
-  const examples = homeworkExamples(homework);
-  if (homework.builtin || examples.every((example) => example.novelty === "new")) return null;
+function compass(lesson: Lesson, previous: LessonSummary | null): LessonView["compass"] {
+  const examples = lessonExamples(lesson);
+  if (lesson.builtin || examples.every((example) => example.novelty === "new")) return null;
   const items: CompassItem[] = [];
-  for (const feature of homework.features) {
+  for (const feature of lesson.features) {
     if (feature.novelty === "unchanged") continue;
     const file = fileName(feature.path);
     if (feature.novelty === "new") {
@@ -253,14 +253,14 @@ function compass(homework: Homework, previous: HomeworkSummary | null): LessonVi
   }
   if (items.length === 0) return null;
   return {
-    title: previous === null ? "New in this lesson" : `New since ${homeworkLabel(previous.id).toLowerCase()}`,
+    title: previous === null ? "New in this lesson" : `New since ${lessonLabel(previous.id).toLowerCase()}`,
     items: items.slice(0, MAX_COMPASS_ITEMS),
   };
 }
 
-function chips(status: HomeworkStatus, counts: ExampleCounts, homework: Homework): Chip[] {
+function chips(status: LessonStatus, counts: ExampleCounts, lesson: Lesson): Chip[] {
   if (status === "ahead") {
-    const rules = homework.features.reduce((sum, feature) => sum + feature.rules.length, 0);
+    const rules = lesson.features.reduce((sum, feature) => sum + feature.rules.length, 0);
     return [
       { text: `${plural(rules, "rule")} · ${plural(counts.total, "example")}`, tone: "plain" },
       { text: "Preview", tone: "plain" },
@@ -310,32 +310,32 @@ export function featureView(
   };
 }
 
-/** `homeworks` is the course order from getOverview, used to name the previous homework. */
-export function buildLesson(detail: LessonDetail, homeworks: readonly HomeworkSummary[], now: number): LessonView {
-  const { homework, progress } = detail;
-  const counts = countExamples(homeworkExamples(homework), progress);
+/** `lessons` is the course order from getOverview, used to name the previous lesson. */
+export function buildLesson(detail: LessonDetail, lessons: readonly LessonSummary[], now: number): LessonView {
+  const { lesson, progress } = detail;
+  const counts = countExamples(lessonExamples(lesson), progress);
   const focus = resolveFocus(detail, progress);
   const upNext = upNextKey(detail, progress, focus?.ruleKey ?? null);
-  const features = homework.features.map((feature) =>
+  const features = lesson.features.map((feature) =>
     featureView(feature, progress, focus?.ruleKey ?? null, upNext, now),
   );
   const holder = features.find((feature) => feature.rules.some((rule) => rule.key === focus?.ruleKey)) ?? null;
   const focusIndex = holder?.rules.findIndex((rule) => rule.isFocus) ?? -1;
   const focusFeature = holder === null ? null : { ...holder, rules: holder.rules.slice(0, focusIndex + 1) };
   const focusRule = holder?.rules[focusIndex];
-  const index = homeworks.findIndex((summary) => summary.id === homework.id);
-  const previous = homeworks.slice(0, Math.max(0, index)).filter((summary) => !summary.builtin).at(-1) ?? null;
+  const index = lessons.findIndex((summary) => summary.id === lesson.id);
+  const previous = lessons.slice(0, Math.max(0, index)).filter((summary) => !summary.builtin).at(-1) ?? null;
   return {
-    homeworkId: homework.id,
-    title: homework.title,
-    eyebrow: homeworkEyebrow(homework.id, homework.set),
-    barTitle: `${homeworkLabel(homework.id)} · ${homework.title}`,
-    dek: homework.dek,
+    lessonId: lesson.id,
+    title: lesson.title,
+    eyebrow: lessonEyebrow(lesson.id, lesson.set),
+    barTitle: `${lessonLabel(lesson.id)} · ${lesson.title}`,
+    dek: lesson.dek,
     status: detail.status,
     counts,
     percent: percent(counts.passing, counts.total),
-    chips: chips(detail.status, counts, homework),
-    compass: compass(homework, previous),
+    chips: chips(detail.status, counts, lesson),
+    compass: compass(lesson, previous),
     crumb: focusFeature === null || focusRule === undefined ? null : `${focusFeature.name} › ${focusRule.name}`,
     focus,
     focusFeature,

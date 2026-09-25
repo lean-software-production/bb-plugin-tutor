@@ -4,8 +4,8 @@ import {
   clipLines,
   daysSince,
   firstSentence,
-  homeworkEyebrow,
-  homeworkLabel,
+  lessonEyebrow,
+  lessonLabel,
   percent,
   plural,
   relativeTime,
@@ -14,10 +14,10 @@ import {
 
 const NOW = Date.parse("2026-09-25T10:12:00Z");
 
-test("homework labels drop the leading zeros", () => {
-  assert.equal(homeworkLabel("003"), "Lesson 3");
-  assert.equal(homeworkLabel("000"), "Lesson 0");
-  assert.equal(homeworkLabel("012"), "Lesson 12");
+test("lesson labels drop the leading zeros", () => {
+  assert.equal(lessonLabel("003"), "Lesson 3");
+  assert.equal(lessonLabel("000"), "Lesson 0");
+  assert.equal(lessonLabel("012"), "Lesson 12");
 });
 
 test("a ledger day reads as 'Set after day N'; other sets are shown as written", () => {
@@ -25,8 +25,8 @@ test("a ledger day reads as 'Set after day N'; other sets are shown as written",
   assert.equal(setLabel("Start here"), "Start here");
   assert.equal(setLabel(null), null);
   assert.equal(setLabel("  "), null);
-  assert.equal(homeworkEyebrow("003", "Day 3"), "Lesson 3 · Set after day 3");
-  assert.equal(homeworkEyebrow("004", null), "Lesson 4");
+  assert.equal(lessonEyebrow("003", "Day 3"), "Lesson 3 · Set after day 3");
+  assert.equal(lessonEyebrow("004", null), "Lesson 4");
 });
 
 test("plural and percent", () => {

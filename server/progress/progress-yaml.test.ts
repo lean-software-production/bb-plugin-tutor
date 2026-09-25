@@ -71,7 +71,7 @@ const withHistory: ProgressFile = {
   },
 };
 
-test("writes the history after the Examples, sorted by homework, with quoted ids", () => {
+test("writes the history after the Examples, sorted by lesson, with quoted ids", () => {
   const text = formatProgress(withHistory, null);
   assert.match(text, /\nhistory:\n {2}"000":\n {4}examples: \{\}\n {2}"002":\n {4}adopted: .*\n {4}summary: It checks the work\.\n {4}examples:\n/);
   assert.match(text, /history:[\s\S]*carriedFrom: "001"/);
@@ -168,7 +168,7 @@ test("keeps unknown fields in history entries and their Examples", () => {
   assert.deepEqual(parseProgress(written).progress, parsed.progress);
 });
 
-test("an Example's unknown fields follow it into the history when the next homework is adopted", () => {
+test("an Example's unknown fields follow it into the history when the next lesson is adopted", () => {
   const previous = [
     'iteration: "001"',
     "examples:",

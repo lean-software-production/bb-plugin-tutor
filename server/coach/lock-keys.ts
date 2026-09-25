@@ -5,7 +5,7 @@ export function factoryLockKey(root: string): string {
   return `factory:${root}`;
 }
 
-/** Finding or spawning one homework's main coach thread in one project. */
-export function mainThreadLockKey(projectId: string, courseId: string, homeworkId: string): string {
-  return `main:${projectId}:${courseId}:${homeworkId}`;
+/** Finding or spawning one lesson's main coach thread in one project. */
+export function mainThreadLockKey(projectId: string, courseId: string, lessonId: string): string {
+  return `main:${projectId}:${courseId}:${lessonId}`;
 }

@@ -148,11 +148,11 @@ export function useOpenRule(): (target: RuleTarget) => void {
  * coach thread with a pointer to its "Side chat" tab (a plugin cannot select
  * that tab itself).
  */
-export function useAskSideQuestion(onDone: () => void = () => undefined): Action<[homeworkId: string, ruleKey: string | null]> {
+export function useAskSideQuestion(onDone: () => void = () => undefined): Action<[lessonId: string, ruleKey: string | null]> {
   const rpc = useTutorRpc();
   const navigate = useBbNavigate();
-  return useAction(async (homeworkId: string, ruleKey: string | null) => {
-    const { coachThreadId } = await rpc.call("startSideThread", { homeworkId, ruleKey });
+  return useAction(async (lessonId: string, ruleKey: string | null) => {
+    const { coachThreadId } = await rpc.call("startSideThread", { lessonId, ruleKey });
     refreshAll();
     navigate.toThread(coachThreadId);
     toast.success(SIDE_CHAT_HINT);

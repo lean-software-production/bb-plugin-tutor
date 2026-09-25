@@ -15,7 +15,7 @@ import {
 import type { Overview } from "../../shared/rpc.ts";
 import { progressCardView, termView } from "./cards.ts";
 import { completionView, confettiPieces } from "./completion.ts";
-import { continueView, doneHomeworksLabel, homeDecision } from "./home.ts";
+import { continueView, doneLessonsLabel, homeDecision } from "./home.ts";
 import { parseRuleTabParams, ruleTabTarget, ruleTabView } from "./rule-tab.ts";
 import { welcomeView } from "./welcome.ts";
 
@@ -34,7 +34,7 @@ test("a passing Rule card shows the tally, the next Rule and a way into the Rule
     passed: "30",
     total: "41",
     next: "The factory refuses an assembly line naming a machine it does not have",
-    homework: "003",
+    lesson: "003",
     rule: "assembly-line/the-factory-accepts-an-assembly-line-it-can-run",
   });
   assert.ok(card !== null);
@@ -47,8 +47,8 @@ test("a passing Rule card shows the tally, the next Rule and a way into the Rule
     ring: "30/41",
     next: "The factory refuses an assembly line naming a machine it does not have",
     note: null,
-    rule: { homeworkId: "003", ruleKey: "assembly-line/the-factory-accepts-an-assembly-line-it-can-run" },
-    completedHomeworkId: null,
+    rule: { lessonId: "003", ruleKey: "assembly-line/the-factory-accepts-an-assembly-line-it-can-run" },
+    completedLessonId: null,
   });
 });
 
@@ -60,7 +60,7 @@ test("a not-yet card finds its Rule from the Example key and drops what did not 
     passed: "31",
     total: "30",
     next: "ignored for not-yet",
-    homework: "3",
+    lesson: "3",
     example: "assembly-line/refuses-unknown/a-misspelt-validator",
   });
   assert.ok(card !== null);
@@ -69,17 +69,17 @@ test("a not-yet card finds its Rule from the Example key and drops what did not 
   assert.equal(view.ring, null, "passed > total is not shown");
   assert.equal(view.next, null);
   assert.equal(view.note, "Crashed in the doer loop.");
-  assert.equal(view.rule, null, "a malformed homework id leaves no Rule link");
+  assert.equal(view.rule, null, "a malformed lesson id leaves no Rule link");
 
-  const linked = parseProgressCard({ kind: "not-yet", title: "x", homework: "003", example: "a/b/c" });
-  assert.deepEqual(linked === null ? null : progressCardView(linked).rule, { homeworkId: "003", ruleKey: "a/b" });
+  const linked = parseProgressCard({ kind: "not-yet", title: "x", lesson: "003", example: "a/b/c" });
+  assert.deepEqual(linked === null ? null : progressCardView(linked).rule, { lessonId: "003", ruleKey: "a/b" });
 });
 
-test("a homework-complete card links to the completion page, focus cards are blue", () => {
-  const done = parseProgressCard({ kind: "homework-complete", title: "The assembly line", homework: "003", rule: "a/b" });
+test("a lesson-complete card links to the completion page, focus cards are blue", () => {
+  const done = parseProgressCard({ kind: "lesson-complete", title: "The assembly line", lesson: "003", rule: "a/b" });
   assert.ok(done !== null);
   const view = progressCardView(done);
-  assert.deepEqual([view.eyebrow, view.completedHomeworkId, view.rule], ["Lesson 3 complete", "003", null]);
+  assert.deepEqual([view.eyebrow, view.completedLessonId, view.rule], ["Lesson 3 complete", "003", null]);
   const focus = parseProgressCard({ kind: "focus", title: "Refuses an unknown machine" });
   assert.deepEqual(focus === null ? null : [progressCardView(focus).tone, progressCardView(focus).mark], ["blue", "●"]);
 });
@@ -105,20 +105,20 @@ test("terms resolve against the lexicon; unknown ids fall back", () => {
 // ---------------------------------------------------------------------------
 
 test("the course root sends the student where they are", () => {
-  assert.deepEqual(homeDecision(fixtureOverview), { kind: "redirect", route: { kind: "start", homeworkId: "002" } });
+  assert.deepEqual(homeDecision(fixtureOverview), { kind: "redirect", route: { kind: "start", lessonId: "002" } });
   assert.deepEqual(homeDecision(fixtureOverviewUnbound), { kind: "redirect", route: { kind: "welcome" } });
   const done: Overview = {
     ...fixtureOverview,
     current: fixtureOverview.current === null ? null : { ...fixtureOverview.current, iterationStatus: "Done" },
   };
-  assert.deepEqual(homeDecision(done), { kind: "redirect", route: { kind: "complete", homeworkId: "002" } });
+  assert.deepEqual(homeDecision(done), { kind: "redirect", route: { kind: "complete", lessonId: "002" } });
   assert.deepEqual(homeDecision({ ...fixtureOverview, course: null, courseError: "No course.yaml or ledger." }), {
     kind: "error",
     message: "No course.yaml or ledger.",
   });
   assert.deepEqual(homeDecision({ ...fixtureOverview, current: null }), {
     kind: "redirect",
-    route: { kind: "start", homeworkId: "000" },
+    route: { kind: "start", lessonId: "000" },
   });
 });
 
@@ -144,17 +144,17 @@ test("the Continue section reads from the overview alone", () => {
   assert.equal(continueView({ ...fixtureOverview, course: null, courseError: null }).kind, "error");
 });
 
-test("done homeworks read as a range", () => {
-  assert.equal(doneHomeworksLabel([]), null);
-  assert.equal(doneHomeworksLabel(["002", "001"]), "Lessons 1–2 done ✓");
-  assert.equal(doneHomeworksLabel(["001", "003"]), "Lessons 1, 3 done ✓");
+test("done lessons read as a range", () => {
+  assert.equal(doneLessonsLabel([]), null);
+  assert.equal(doneLessonsLabel(["002", "001"]), "Lessons 1–2 done ✓");
+  assert.equal(doneLessonsLabel(["001", "003"]), "Lessons 1, 3 done ✓");
 });
 
 // ---------------------------------------------------------------------------
-// Between homeworks (7) and first run (8).
+// Between lessons (7) and first run (8).
 // ---------------------------------------------------------------------------
 
-test("the completion page recaps the homework and introduces the next", () => {
+test("the completion page recaps the lesson and introduces the next", () => {
   const view = completionView(fixtureCompletion, NOW);
   assert.equal(view.eyebrow, "Lesson 1 complete");
   assert.deepEqual(view.stats, [
@@ -178,7 +178,7 @@ test("the completion page recaps the homework and introduces the next", () => {
   const sameDay = completionView(
     {
       ...fixtureCompletion,
-      homework: { ...fixtureCompletion.homework, set: "Day 3" },
+      lesson: { ...fixtureCompletion.lesson, set: "Day 3" },
       adoptedAt: null,
       next: fixtureCompletion.next === null ? null : { ...fixtureCompletion.next, set: "Day 3", factoryDiff: null },
     },
@@ -190,7 +190,7 @@ test("the completion page recaps the homework and introduces the next", () => {
   assert.equal(completionView({ ...fixtureCompletion, next: null }, NOW).next, null);
 });
 
-test("once the next homework has started, the completion page continues it", () => {
+test("once the next lesson has started, the completion page continues it", () => {
   const next = fixtureCompletion.next;
   assert.ok(next !== null);
   const view = completionView({ ...fixtureCompletion, next: { ...next, status: "current" } }, NOW);
@@ -224,23 +224,23 @@ test("first run confirms a detected factory, or explains how to set one up", () 
 // ---------------------------------------------------------------------------
 
 test("rule tab params are validated field by field", () => {
-  assert.deepEqual(parseRuleTabParams({ homeworkId: "002", ruleKey: FOCUS }), { homeworkId: "002", ruleKey: FOCUS });
-  assert.deepEqual(parseRuleTabParams({ homeworkId: "2", ruleKey: "../etc" }), { homeworkId: null, ruleKey: null });
-  assert.deepEqual(parseRuleTabParams(["002"]), { homeworkId: null, ruleKey: null });
-  assert.deepEqual(parseRuleTabParams(null), { homeworkId: null, ruleKey: null });
+  assert.deepEqual(parseRuleTabParams({ lessonId: "002", ruleKey: FOCUS }), { lessonId: "002", ruleKey: FOCUS });
+  assert.deepEqual(parseRuleTabParams({ lessonId: "2", ruleKey: "../etc" }), { lessonId: null, ruleKey: null });
+  assert.deepEqual(parseRuleTabParams(["002"]), { lessonId: null, ruleKey: null });
+  assert.deepEqual(parseRuleTabParams(null), { lessonId: null, ruleKey: null });
 });
 
-test("the rule tab targets explicit params, else the thread's own homework and Rule", () => {
+test("the rule tab targets explicit params, else the thread's own lesson and Rule", () => {
   const side = fixtureThreads[1] ?? null;
   const coach = fixtureThreads[0] ?? null;
-  assert.deepEqual(ruleTabTarget({ homeworkId: null, ruleKey: null }, side), { homeworkId: "002", ruleKey: FOCUS });
-  assert.deepEqual(ruleTabTarget({ homeworkId: null, ruleKey: null }, coach), { homeworkId: "002", ruleKey: null });
-  assert.deepEqual(ruleTabTarget({ homeworkId: "001", ruleKey: null }, side), { homeworkId: "001", ruleKey: null });
-  assert.equal(ruleTabTarget({ homeworkId: null, ruleKey: null }, null), null);
+  assert.deepEqual(ruleTabTarget({ lessonId: null, ruleKey: null }, side), { lessonId: "002", ruleKey: FOCUS });
+  assert.deepEqual(ruleTabTarget({ lessonId: null, ruleKey: null }, coach), { lessonId: "002", ruleKey: null });
+  assert.deepEqual(ruleTabTarget({ lessonId: "001", ruleKey: null }, side), { lessonId: "001", ruleKey: null });
+  assert.equal(ruleTabTarget({ lessonId: null, ruleKey: null }, null), null);
 });
 
 test("the rule tab shows the Rule and its Examples", () => {
-  const view = ruleTabView(fixtureLessonDetail, { homeworkId: "002", ruleKey: null }, false);
+  const view = ruleTabView(fixtureLessonDetail, { lessonId: "002", ruleKey: null }, false);
   assert.equal(view.kind, "rule");
   if (view.kind !== "rule") return;
   assert.equal(view.eyebrow, "Rule in focus · Validation");
@@ -252,10 +252,10 @@ test("the rule tab shows the Rule and its Examples", () => {
   );
   assert.equal(view.startPath, "start/002");
 
-  const spun = ruleTabView(fixtureLessonDetail, { homeworkId: "002", ruleKey: "planning/the-planner-writes-a-plan" }, true);
+  const spun = ruleTabView(fixtureLessonDetail, { lessonId: "002", ruleKey: "planning/the-planner-writes-a-plan" }, true);
   assert.equal(spun.kind === "rule" ? spun.eyebrow : null, "Spun off from · Planning");
   assert.equal(spun.kind === "rule" ? spun.examples[0]?.detail : null, "Passing · carried over");
-  assert.deepEqual(ruleTabView({ ...fixtureLessonDetail, focus: null }, { homeworkId: "002", ruleKey: null }, false), {
+  assert.deepEqual(ruleTabView({ ...fixtureLessonDetail, focus: null }, { lessonId: "002", ruleKey: null }, false), {
     kind: "no-rule",
     startPath: "start/002",
   });

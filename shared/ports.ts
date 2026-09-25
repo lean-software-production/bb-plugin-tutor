@@ -13,7 +13,7 @@ export interface CourseSource {
   /**
    * Reads the course at `coursePath` from disk: course.yaml when present,
    * otherwise the ledger table in docs/iterations/README.md. Returns a fully
-   * derived Course (Homework 0 prepended; slugs, hashes, novelty,
+   * derived Course (Lesson 0 prepended; slugs, hashes, novelty,
    * suggestedRuleOrder, factoryDiff and lexicon filled in). Never caches:
    * callers decide when to re-read. Rejects with CourseLoadError when the path
    * is missing or holds neither a course.yaml nor a ledger; a malformed single
@@ -27,6 +27,6 @@ export interface ProgressStore {
   read(factoryRoot: string): Promise<StudentState>;
   /** Writes spec/PROGRESS.yaml atomically (temp file + rename). */
   writeProgress(factoryRoot: string, progress: ProgressFile): Promise<void>;
-  /** Writes spec/ITERATION as "<NNN> <WIP|Done>\n". Refuses Homework 0. */
+  /** Writes spec/ITERATION as "<NNN> <WIP|Done>\n". Refuses Lesson 0. */
   writeIteration(factoryRoot: string, state: IterationState): Promise<void>;
 }

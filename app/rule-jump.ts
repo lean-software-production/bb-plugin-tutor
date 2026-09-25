@@ -15,7 +15,7 @@ const ARRIVAL_GRACE_MS = 4000;
 
 export interface RuleTarget {
   coachThreadId: string;
-  homeworkId: string;
+  lessonId: string;
   ruleKey: string;
 }
 
@@ -47,7 +47,7 @@ function onCoachThread(coachThreadId: string): boolean {
  * throws: a section that can't be found is a toast.
  */
 export function jumpToRuleSection(target: RuleTarget, open: (threadId: string) => void): void {
-  const anchor = ruleAnchor(target.coachThreadId, target.homeworkId, target.ruleKey);
+  const anchor = ruleAnchor(target.coachThreadId, target.lessonId, target.ruleKey);
   if (anchor === null) return;
   current?.cancel();
   let cancelled = false;

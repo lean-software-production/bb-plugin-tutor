@@ -8,7 +8,7 @@
 // return `{ content: [...], isError: true }` otherwise.
 import { z } from "zod";
 import { TOOL_NAMES, type ToolName } from "./constants.ts";
-import { exampleKeySchema, exampleStatusSchema, homeworkIdSchema, ruleKeySchema } from "./model.ts";
+import { exampleKeySchema, exampleStatusSchema, lessonIdSchema, ruleKeySchema } from "./model.ts";
 
 export const MAX_EVIDENCE_LENGTH = 8000;
 export const MAX_NOTE_LENGTH = 1000;
@@ -47,10 +47,10 @@ export const toolParameterSchemas = {
       }
     }),
   [TOOL_NAMES.adoptIteration]: z.object({
-    iteration: homeworkIdSchema.describe("The lesson to adopt: the one after the student's Done iteration."),
+    iteration: lessonIdSchema.describe("The lesson to adopt: the one after the student's Done iteration."),
   }),
   [TOOL_NAMES.completeIteration]: z.object({
-    iteration: homeworkIdSchema,
+    iteration: lessonIdSchema,
     summary: z
       .string()
       .trim()

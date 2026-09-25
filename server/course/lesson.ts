@@ -1,28 +1,28 @@
-// Reads one homework folder: README.md, FACTORY.md, spec.md and features/*.feature.
+// Reads one lesson folder: README.md, FACTORY.md, spec.md and features/*.feature.
 // README.md and at least one feature file are required: without them there is
-// nothing to coach, and adopting the homework would empty the student's spec/.
-// FACTORY.md and spec.md are optional; a homework without FACTORY.md has "".
+// nothing to coach, and adopting the lesson would empty the student's spec/.
+// FACTORY.md and spec.md are optional; a lesson without FACTORY.md has "".
 import { join } from "node:path";
-import type { FeatureFile, Homework } from "../../shared/model.ts";
+import type { FeatureFile, Lesson } from "../../shared/model.ts";
 import { CourseLoadError } from "../../shared/ports.ts";
 import { parseFeatureFile } from "./feature.ts";
 import { listFilesIfPresent, readTextIfPresent, type PathGuard } from "./files.ts";
-import type { HomeworkEntry } from "./manifest.ts";
+import type { LessonEntry } from "./manifest.ts";
 
-/** A homework before it is compared with the others in its course. */
-export type HomeworkContent = Omit<Homework, "suggestedRuleOrder" | "factoryDiff" | "dek">;
+/** A lesson before it is compared with the others in its course. */
+export type LessonContent = Omit<Lesson, "suggestedRuleOrder" | "factoryDiff" | "dek">;
 
 /** Names a path inside the course for error messages. */
 export type DisplayPath = (absolutePath: string) => string;
 
 const FEATURES_DIR = "features";
 
-export async function readHomework(
-  entry: HomeworkEntry,
+export async function readLesson(
+  entry: LessonEntry,
   builtin: boolean,
   display: DisplayPath,
   guard: PathGuard,
-): Promise<HomeworkContent> {
+): Promise<LessonContent> {
   const readmePath = join(entry.dir, "README.md");
   const factoryPath = join(entry.dir, "FACTORY.md");
   const seedPath = join(entry.dir, "spec.md");
@@ -44,7 +44,7 @@ export async function readHomework(
   };
 }
 
-async function readFeatures(entry: HomeworkEntry, display: DisplayPath): Promise<FeatureFile[]> {
+async function readFeatures(entry: LessonEntry, display: DisplayPath): Promise<FeatureFile[]> {
   const featuresDir = join(entry.dir, FEATURES_DIR);
   const names = (await listFilesIfPresent(featuresDir, display(featuresDir))) ?? [];
   const paths = names

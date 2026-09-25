@@ -3,8 +3,8 @@ import { ALL_TOOL_NAMES, SKILL_ID } from "../../shared/constants.ts";
 import { coachInstructions, type InstructionFacts, type ThreadPlace } from "./prompts.ts";
 
 export interface ConfigureFacts extends InstructionFacts {
-  /** The homework of a known coach thread, else undefined (coach-registry.ts). */
-  coachHomework(threadId: string): string | undefined;
+  /** The lesson of a known coach thread, else undefined (coach-registry.ts). */
+  coachLesson(threadId: string): string | undefined;
 }
 
 /**
@@ -18,12 +18,12 @@ export function coachConfiguration(
   facts: ConfigureFacts,
 ): PluginAgentConfiguration {
   const { sourceThreadId, parentThreadId } = context.thread;
-  const forkOf = context.origin.kind === "fork" && sourceThreadId !== null ? facts.coachHomework(sourceThreadId) : undefined;
+  const forkOf = context.origin.kind === "fork" && sourceThreadId !== null ? facts.coachLesson(sourceThreadId) : undefined;
   const own = context.origin.pluginId === pluginId;
   if (!own && forkOf === undefined) return { tools: [], skills: [] };
   const place: ThreadPlace =
     context.origin.kind === "fork"
-      ? { kind: "side-chat", homeworkId: forkOf ?? null }
+      ? { kind: "side-chat", lessonId: forkOf ?? null }
       : parentThreadId !== null
         ? { kind: "side-thread" }
         : { kind: "main" };

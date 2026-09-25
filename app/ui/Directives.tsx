@@ -27,18 +27,18 @@ function SourceFallback({ source }: { source: string }) {
   return <p>{source}</p>;
 }
 
-function useLessonDetail(homeworkId: string | null) {
+function useLessonDetail(lessonId: string | null) {
   const rpc = useTutorRpc();
-  // The fetcher only runs for a non-null key, so homeworkId is set whenever it is called.
-  return useQuery(homeworkId === null ? null : QUERY_KEYS.lessonDetail(homeworkId), () =>
-    rpc.call("getLessonDetail", { homeworkId: homeworkId ?? "" }),
+  // The fetcher only runs for a non-null key, so lessonId is set whenever it is called.
+  return useQuery(lessonId === null ? null : QUERY_KEYS.lessonDetail(lessonId), () =>
+    rpc.call("getLessonDetail", { lessonId: lessonId ?? "" }),
   );
 }
 
-/** `::tutor-lesson{homework="003"}`: the lesson that opens a coach thread. */
+/** `::tutor-lesson{lesson="003"}`: the lesson that opens a coach thread. */
 export function LessonCardDirective({ attributes, source }: PluginMessageDirectiveProps) {
   const ref = parseLessonRef(attributes);
-  const detail = useLessonDetail(ref?.homeworkId ?? null);
+  const detail = useLessonDetail(ref?.lessonId ?? null);
   if (ref === null) return <SourceFallback source={source} />;
   if (detail.data === null) {
     return detail.status === "error" ? (
@@ -56,7 +56,7 @@ function LessonCard({ view }: { view: LessonCardView }) {
   const openRule = useOpenRule();
   const coachThreadId = view.coachThreadId;
   return (
-    <article className="tutor-paper tp-lcard" aria-label={`${view.eyebrow}: ${view.title}`} data-tutor-lesson={view.homeworkId}>
+    <article className="tutor-paper tp-lcard" aria-label={`${view.eyebrow}: ${view.title}`} data-tutor-lesson={view.lessonId}>
       <div className="tp-lcard-top">
         <p className="tp-eyebrow">{view.eyebrow}</p>
         <h2 className="tp-h2">{view.title}</h2>
@@ -100,7 +100,7 @@ function LessonCard({ view }: { view: LessonCardView }) {
                         type="button"
                         className="tp-lcard-rule"
                         title="Show where your coach started this Rule"
-                        onClick={() => openRule({ coachThreadId, homeworkId: view.homeworkId, ruleKey: rule.key })}
+                        onClick={() => openRule({ coachThreadId, lessonId: view.lessonId, ruleKey: rule.key })}
                       >
                         {body}
                       </button>
@@ -142,11 +142,11 @@ function RuleCardDirective({
   threadId,
 }: {
   card: ProgressCardView;
-  rule: { homeworkId: string; ruleKey: string };
+  rule: { lessonId: string; ruleKey: string };
   threadId: string;
 }) {
-  const detail = useLessonDetail(rule.homeworkId);
-  const anchor = ruleAnchor(threadId, rule.homeworkId, rule.ruleKey);
+  const detail = useLessonDetail(rule.lessonId);
+  const anchor = ruleAnchor(threadId, rule.lessonId, rule.ruleKey);
   const anchorProps: Record<string, string> = anchor === null ? {} : { [RULE_ANCHOR_ATTRIBUTE]: anchor };
   const view = detail.data === null ? null : ruleCardView(detail.data, rule.ruleKey, Date.now());
   if (view === null) return <ProgressCard view={card} anchorProps={anchorProps} />;
@@ -194,7 +194,7 @@ function RuleCard({ view, anchorProps }: { view: RuleCardView; anchorProps: Reco
       ) : null}
       {view.current && view.coachThreadId !== null ? (
         <div className="tp-pcard-ft">
-          <button type="button" className="tp-link-button" disabled={askSide.pending} onClick={() => void askSide.run(view.homeworkId, rule.key)}>
+          <button type="button" className="tp-link-button" disabled={askSide.pending} onClick={() => void askSide.run(view.lessonId, rule.key)}>
             {askSide.pending ? "Opening a side chat…" : "Ask a side question ↗"}
           </button>
           {askSide.error === null ? null : (
@@ -215,7 +215,7 @@ function ProgressCard({ view, anchorProps = {} }: { view: ProgressCardView; anch
   const openRuleSection = useOpenRule();
   const overview = useOverview();
   const rule = view.rule;
-  const lesson = rule === null ? undefined : overview.data?.homeworks.find((candidate) => candidate.id === rule.homeworkId);
+  const lesson = rule === null ? undefined : overview.data?.lessons.find((candidate) => candidate.id === rule.lessonId);
   const reached =
     rule !== null && lesson?.outline.some((feature) => feature.rules.some((candidate) => candidate.key === rule.ruleKey && candidate.reached));
   const coachThreadId = lesson?.coachThreadId ?? null;
@@ -223,13 +223,13 @@ function ProgressCard({ view, anchorProps = {} }: { view: ProgressCardView; anch
     if (rule === null) return;
     // To the Rule's section when it has one; otherwise the Rule tab beside the thread.
     if (reached === true && coachThreadId !== null) {
-      openRuleSection({ coachThreadId, homeworkId: rule.homeworkId, ruleKey: rule.ruleKey });
+      openRuleSection({ coachThreadId, lessonId: rule.lessonId, ruleKey: rule.ruleKey });
       return;
     }
     const opened = navigate.openThreadPanel({ actionId: SLOT_IDS.ruleTab, title: "Rule", params: rule });
-    if (!opened) goCourse({ kind: "start", homeworkId: rule.homeworkId }, { ruleKey: rule.ruleKey });
+    if (!opened) goCourse({ kind: "start", lessonId: rule.lessonId }, { ruleKey: rule.ruleKey });
   };
-  const completed = view.completedHomeworkId;
+  const completed = view.completedLessonId;
   return (
     <div className={`tutor-paper tp-pcard tp-pcard--${view.kind}`} role="group" aria-label={`${view.eyebrow}: ${view.title}`} {...anchorProps}>
       <div className="tp-pcard-top">
@@ -270,7 +270,7 @@ function ProgressCard({ view, anchorProps = {} }: { view: ProgressCardView; anch
             </button>
           )}
           {completed === null ? null : (
-            <button type="button" className="tp-link-button" onClick={() => goCourse({ kind: "complete", homeworkId: completed })}>
+            <button type="button" className="tp-link-button" onClick={() => goCourse({ kind: "complete", lessonId: completed })}>
               What's next →
             </button>
           )}

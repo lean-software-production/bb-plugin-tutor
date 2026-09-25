@@ -6,7 +6,7 @@ import type { StateChangedSignal } from "../../shared/rpc.ts";
 import type { World } from "./world.ts";
 
 export interface StateSignals {
-  publish(reason: StateChangedSignal["reason"], homeworkId: string | null): void;
+  publish(reason: StateChangedSignal["reason"], lessonId: string | null): void;
   /**
    * Remembers what the factory looked like and publishes when it differs from
    * last time. With `publishIfUnseen`, a first look publishes too.
@@ -20,8 +20,8 @@ function fingerprint(world: World): { iteration: string; progress: string } {
 
 export function createStateSignals(bb: BbPluginApi): StateSignals {
   const seen = new Map<string, { iteration: string; progress: string }>();
-  const publish = (reason: StateChangedSignal["reason"], homeworkId: string | null) => {
-    const payload: StateChangedSignal = { reason, homeworkId };
+  const publish = (reason: StateChangedSignal["reason"], lessonId: string | null) => {
+    const payload: StateChangedSignal = { reason, lessonId };
     bb.realtime.publish(REALTIME_CHANNELS.stateChanged, payload);
   };
   return {
@@ -31,13 +31,13 @@ export function createStateSignals(bb: BbPluginApi): StateSignals {
       const next = fingerprint(world);
       const previous = seen.get(world.binding.root);
       seen.set(world.binding.root, next);
-      const homeworkId = world.pointer?.homeworkId ?? null;
+      const lessonId = world.pointer?.lessonId ?? null;
       if (previous === undefined) {
-        if (options.publishIfUnseen === true) publish("progress", homeworkId);
+        if (options.publishIfUnseen === true) publish("progress", lessonId);
       } else if (previous.iteration !== next.iteration) {
-        publish("iteration", homeworkId);
+        publish("iteration", lessonId);
       } else if (previous.progress !== next.progress) {
-        publish("progress", homeworkId);
+        publish("progress", lessonId);
       }
     },
   };

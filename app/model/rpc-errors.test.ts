@@ -62,7 +62,7 @@ test("the wrapped client rethrows lost connections as ConnectionLostError and pa
       throw bodylessFailure("openCoach", 401);
     },
     async () => {
-      throw new Error("Homework 004 has not started yet.");
+      throw new Error("Lesson 004 has not started yet.");
     },
   ];
   const client = withConnectionLossDetection({
@@ -72,8 +72,8 @@ test("the wrapped client rethrows lost connections as ConnectionLostError and pa
     },
   });
 
-  assert.deepEqual(await client.call("openCoach", { homeworkId: "003" }), { threadId: "thr_1" });
-  await assert.rejects(client.call("openCoach", { homeworkId: "003" }), ConnectionLostError);
-  await assert.rejects(client.call("openCoach", { homeworkId: "004" }), /has not started yet/);
-  assert.deepEqual(calls[0], ["openCoach", { homeworkId: "003" }]);
+  assert.deepEqual(await client.call("openCoach", { lessonId: "003" }), { threadId: "thr_1" });
+  await assert.rejects(client.call("openCoach", { lessonId: "003" }), ConnectionLostError);
+  await assert.rejects(client.call("openCoach", { lessonId: "004" }), /has not started yet/);
+  assert.deepEqual(calls[0], ["openCoach", { lessonId: "003" }]);
 });

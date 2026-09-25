@@ -9,7 +9,7 @@ type Thread = Awaited<ReturnType<Sdk["threads"]["get"]>>;
 
 export interface Caller {
   threadId: string;
-  /** The homework's coach thread itself, as opposed to one of its side chats (or older side threads). */
+  /** The lesson's coach thread itself, as opposed to one of its side chats (or older side threads). */
   isMain: boolean;
   /** The coach thread a side chat or side thread belongs to; the caller itself when it is the coach thread. */
   mainThreadId: string;
@@ -26,7 +26,7 @@ async function getThread(sdk: Sdk, threadId: string): Promise<Thread | null> {
   }
 }
 
-/** A thread Tutor spawned as a homework's coach: neither a fork nor a child. */
+/** A thread Tutor spawned as a lesson's coach: neither a fork nor a child. */
 export function isTutorMain(thread: Pick<Thread, "originPluginId" | "parentThreadId" | "sourceThreadId" | "originKind">, pluginId: string): boolean {
   return thread.originPluginId === pluginId && thread.parentThreadId === null && thread.sourceThreadId === null && thread.originKind === null;
 }
@@ -36,7 +36,7 @@ export function isTutorMain(thread: Pick<Thread, "originPluginId" | "parentThrea
  * thread. Tutor's coach threads answer to themselves. Their side chats are
  * forks of them: Tutor's own (Tutor metadata) and those BB's "Reply in side
  * chat" made (the side-chat plugin's), which count as side chats of that
- * homework without a Rule. A side chat is hidden: a visible fork ("Fork into
+ * lesson without a Rule. A side chat is hidden: a visible fork ("Fork into
  * new thread") is a thread of its own. Side threads from before side chats
  * are children Tutor spawned. Anything else, a fork of a fork included,
  * answers to nobody.

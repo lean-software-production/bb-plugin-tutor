@@ -4,23 +4,23 @@ import { cp, mkdir, mkdtemp, rename, rm, symlink, writeFile } from "node:fs/prom
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { findHomework, homeworkExamples } from "../../shared/derive.ts";
+import { findLesson, lessonExamples } from "../../shared/derive.ts";
 import { courseSchema } from "../../shared/model.ts";
-import type { Course, Homework } from "../../shared/model.ts";
+import type { Course, Lesson } from "../../shared/model.ts";
 import { CourseLoadError } from "../../shared/ports.ts";
 import { createCourseSource } from "./index.ts";
 
 const fixture = (name: string): string => fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url));
 const load = (path: string): Promise<Course> => createCourseSource().loadCourse(path);
 
-function homework(course: Course, id: string): Homework {
-  const found = findHomework(course, id);
-  assert.ok(found, `homework ${id}`);
+function lesson(course: Course, id: string): Lesson {
+  const found = findLesson(course, id);
+  assert.ok(found, `lesson ${id}`);
   return found;
 }
 
-function noveltyByKey(hw: Homework): Record<string, string> {
-  return Object.fromEntries(homeworkExamples(hw).map((example) => [example.key, example.novelty]));
+function noveltyByKey(hw: Lesson): Record<string, string> {
+  return Object.fromEntries(lessonExamples(hw).map((example) => [example.key, example.novelty]));
 }
 
 /** A writable copy of a fixture course, removed after `body`. */
@@ -42,17 +42,17 @@ async function rejectsWith(promise: Promise<unknown>, pattern: RegExp): Promise<
   });
 }
 
-test("a course.yaml course loads with Homework 0 in front", async () => {
+test("a course.yaml course loads with Lesson 0 in front", async () => {
   const course = await load(fixture("synthetic"));
   courseSchema.parse(course);
   assert.equal(course.source, "course.yaml");
   assert.equal(course.id, "widget-works");
   assert.equal(course.title, "Build a widget works");
-  assert.equal(course.description, "Two homeworks, one widget works.");
+  assert.equal(course.description, "Two lessons, one widget works.");
   assert.equal(course.root, fixture("synthetic"));
   assert.equal(course.coachPath, join(fixture("synthetic"), ".agents/coach.md"));
   assert.deepEqual(
-    course.homeworks.map((hw) => [hw.id, hw.title, hw.set, hw.builtin]),
+    course.lessons.map((hw) => [hw.id, hw.title, hw.set, hw.builtin]),
     [
       ["000", "Using your tutor", "Start here", true],
       ["010", "First widgets", "Day 1", false],
@@ -65,21 +65,21 @@ test("a course.yaml course loads with Homework 0 in front", async () => {
   ]);
 });
 
-test("a homework's files are read verbatim, and its dek skips what every README repeats", async () => {
+test("a lesson's files are read verbatim, and its dek skips what every README repeats", async () => {
   const course = await load(fixture("synthetic"));
-  const one = homework(course, "010");
-  assert.equal(one.dir, join(fixture("synthetic"), "homeworks/one"));
+  const one = lesson(course, "010");
+  assert.equal(one.dir, join(fixture("synthetic"), "lessons/one"));
   assert.match(one.readme, /^# Homework 1 — First widgets\n/);
   assert.equal(one.dek, "Make the works turn out a **widget**.");
   assert.equal(one.factoryMd, "# The works\n\nIt makes widgets.\n");
   assert.equal(one.seedSpec, "# A widget\n\nRound.\n");
-  const two = homework(course, "020");
+  const two = lesson(course, "020");
   assert.equal(two.dek, "Now the works makes gadgets too.");
   assert.equal(two.seedSpec, null);
 });
 
 test("features are sorted by path and Examples keep file order under their Rules", async () => {
-  const two = homework(await load(fixture("synthetic")), "020");
+  const two = lesson(await load(fixture("synthetic")), "020");
   assert.deepEqual(
     two.features.map((feature) => feature.path),
     ["features/gadgets.feature", "features/widgets.feature"],
@@ -93,10 +93,10 @@ test("features are sorted by path and Examples keep file order under their Rules
   ]);
 });
 
-test("novelty compares each homework with the one before it", async () => {
+test("novelty compares each lesson with the one before it", async () => {
   const course = await load(fixture("synthetic"));
-  assert.ok(homeworkExamples(homework(course, "010")).every((example) => example.novelty === "new"));
-  const two = homework(course, "020");
+  assert.ok(lessonExamples(lesson(course, "010")).every((example) => example.novelty === "new"));
+  const two = lesson(course, "020");
   assert.deepEqual(noveltyByKey(two), {
     "gadgets/a-gadget-has-a-button/pressing-the-button": "new",
     "widgets/general/a-loose-example": "unchanged",
@@ -121,11 +121,11 @@ test("novelty compares each homework with the one before it", async () => {
   ]);
 });
 
-test("the FACTORY.md diff is against the previous homework, and null for the first", async () => {
+test("the FACTORY.md diff is against the previous lesson, and null for the first", async () => {
   const course = await load(fixture("synthetic"));
-  assert.equal(homework(course, "000").factoryDiff, null);
-  assert.equal(homework(course, "010").factoryDiff, null);
-  assert.deepEqual(homework(course, "020").factoryDiff, [
+  assert.equal(lesson(course, "000").factoryDiff, null);
+  assert.equal(lesson(course, "010").factoryDiff, null);
+  assert.deepEqual(lesson(course, "020").factoryDiff, [
     { kind: "ctx", text: "# The works" },
     { kind: "ctx", text: "" },
     { kind: "ctx", text: "It makes widgets." },
@@ -144,36 +144,36 @@ test("without a course.yaml the ledger table is the course", async () => {
   assert.equal(course.coachPath, null);
   assert.deepEqual(course.lexicon, []);
   assert.deepEqual(
-    course.homeworks.map((hw) => [hw.id, hw.title, hw.set, hw.dir]),
+    course.lessons.map((hw) => [hw.id, hw.title, hw.set, hw.dir]),
     [
-      ["000", "Using your tutor", "Start here", homework(course, "000").dir],
+      ["000", "Using your tutor", "Start here", lesson(course, "000").dir],
       ["001", "First steps", "Day 1", join(root, "docs/iterations/001-first-steps")],
       ["002", "Second steps", null, join(root, "docs/iterations/002-second-steps")],
     ],
   );
-  assert.deepEqual(noveltyByKey(homework(course, "002")), {
+  assert.deepEqual(noveltyByKey(lesson(course, "002")), {
     "steps/a-step-moves-you/one-step": "unchanged",
     "steps/a-step-moves-you/two-steps": "new",
   });
 });
 
-test("Homework 0 ships with the plugin and teaches the interface", async () => {
-  const zero = homework(await load(fixture("ledger")), "000");
+test("Lesson 0 ships with the plugin and teaches the interface", async () => {
+  const zero = lesson(await load(fixture("ledger")), "000");
   assert.equal(zero.builtin, true);
-  assert.match(zero.dir, /server\/course\/builtin\/homework-0$/);
+  assert.match(zero.dir, /server\/course\/builtin\/lesson-0$/);
   assert.equal(zero.factoryDiff, null);
   assert.match(zero.dek, /^Before you build anything/);
   const rules = zero.features.flatMap((feature) => feature.rules);
   assert.ok(rules.length >= 3 && rules.length <= 5, `${rules.length} rules`);
   assert.equal(zero.suggestedRuleOrder.length, rules.length);
-  const examples = homeworkExamples(zero);
+  const examples = lessonExamples(zero);
   assert.ok(examples.every((example) => example.novelty === "new"));
   assert.ok(examples.some((example) => /side chat/.test(example.name)));
 });
 
 test("a missing course, or a folder that is not a course, is a readable error", async () => {
   await rejectsWith(load(join(fixture("synthetic"), "nowhere")), /There is no course folder at .*nowhere/);
-  await rejectsWith(load(fixture("synthetic/homeworks")), /is not a course: it has neither a course\.yaml nor a ledger/);
+  await rejectsWith(load(fixture("synthetic/lessons")), /is not a course: it has neither a course\.yaml nor a ledger/);
 });
 
 test("a malformed feature file names the file and line", async () => {
@@ -189,19 +189,19 @@ test("a malformed feature file names the file and line", async () => {
   });
 });
 
-test("a homework without a README.md is a readable error", async () => {
+test("a lesson without a README.md is a readable error", async () => {
   await withCopy("ledger", async (root) => {
     await rm(join(root, "docs/iterations/001-first-steps/README.md"));
     await rejectsWith(load(root), /^Lesson 001 has no README\.md in docs\/iterations\/001-first-steps\.$/);
   });
 });
 
-test("course.yaml may not reuse Homework 0's id or list an id twice", async () => {
+test("course.yaml may not reuse Lesson 0's id or list an id twice", async () => {
   await withCopy("synthetic", async (root) => {
-    const entry = (id: string): string => `  - { id: "${id}", title: T, dir: homeworks/one }\n`;
-    await writeFile(join(root, "course.yaml"), `id: x\ntitle: X\nhomeworks:\n${entry("000")}`);
+    const entry = (id: string): string => `  - { id: "${id}", title: T, dir: lessons/one }\n`;
+    await writeFile(join(root, "course.yaml"), `id: x\ntitle: X\nlessons:\n${entry("000")}`);
     await rejectsWith(load(root), /^course\.yaml: lesson 000 is reserved for the built-in Lesson 0\.$/);
-    await writeFile(join(root, "course.yaml"), `id: x\ntitle: X\nhomeworks:\n${entry("001")}${entry("001")}`);
+    await writeFile(join(root, "course.yaml"), `id: x\ntitle: X\nlessons:\n${entry("001")}${entry("001")}`);
     await rejectsWith(load(root), /^course\.yaml: lesson 001 is listed twice\.$/);
   });
 });
@@ -215,13 +215,13 @@ test("a coach or lexicon that course.yaml names must exist", async () => {
   });
 });
 
-test("a symbolic link may not lead a homework, the coach or the lexicon out of the course folder", async () => {
+test("a symbolic link may not lead a lesson, the coach or the lexicon out of the course folder", async () => {
   const outside = await mkdtemp(join(tmpdir(), "tutor-outside-"));
   try {
     await withCopy("synthetic", async (root) => {
-      await rename(join(root, "homeworks/one"), join(outside, "one"));
-      await symlink(join(outside, "one"), join(root, "homeworks/one"));
-      await rejectsWith(load(root), /^course\.yaml: homeworks\/one leads outside the course folder\.$/);
+      await rename(join(root, "lessons/one"), join(outside, "one"));
+      await symlink(join(outside, "one"), join(root, "lessons/one"));
+      await rejectsWith(load(root), /^course\.yaml: lessons\/one leads outside the course folder\.$/);
     });
     await withCopy("synthetic", async (root) => {
       await writeFile(join(outside, "coach.md"), "secret\n");
@@ -242,9 +242,9 @@ test("a symbolic link may not lead a homework, the coach or the lexicon out of t
     });
     await withCopy("synthetic", async (root) => {
       await writeFile(join(outside, "README.md"), "# Not the course\n");
-      await rm(join(root, "homeworks/two/README.md"));
-      await symlink(join(outside, "README.md"), join(root, "homeworks/two/README.md"));
-      await rejectsWith(load(root), /^homeworks\/two\/README\.md leads outside the course folder\.$/);
+      await rm(join(root, "lessons/two/README.md"));
+      await symlink(join(outside, "README.md"), join(root, "lessons/two/README.md"));
+      await rejectsWith(load(root), /^lessons\/two\/README\.md leads outside the course folder\.$/);
     });
     await withCopy("ledger", async (root) => {
       const dir = join(root, "docs/iterations/002-second-steps");
@@ -266,14 +266,14 @@ test("a symbolic link may not lead a homework, the coach or the lexicon out of t
 
 test("a symbolic link that stays inside the course folder is fine", async () => {
   await withCopy("synthetic", async (root) => {
-    await rename(join(root, "homeworks/one"), join(root, "homeworks/one-real"));
-    await symlink("one-real", join(root, "homeworks/one"));
+    await rename(join(root, "lessons/one"), join(root, "lessons/one-real"));
+    await symlink("one-real", join(root, "lessons/one"));
     const course = await load(root);
-    assert.equal(homework(course, "010").title, "First widgets");
+    assert.equal(lesson(course, "010").title, "First widgets");
   });
 });
 
-test("a homework without feature files is a readable error; FACTORY.md is optional", async () => {
+test("a lesson without feature files is a readable error; FACTORY.md is optional", async () => {
   await withCopy("ledger", async (root) => {
     const features = join(root, "docs/iterations/002-second-steps/features");
     await rm(join(features, "steps.feature"));
@@ -283,5 +283,5 @@ test("a homework without feature files is a readable error; FACTORY.md is option
     await rejectsWith(load(root), /^Lesson 002 has no feature files in docs\/iterations\/002-second-steps\/features\.$/);
   });
   const course = await load(fixture("ledger"));
-  assert.equal(homework(course, "001").factoryMd, "");
+  assert.equal(lesson(course, "001").factoryMd, "");
 });
