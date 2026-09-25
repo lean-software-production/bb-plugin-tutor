@@ -57,6 +57,11 @@ export interface TutorHost extends FakePluginHost {
   forkRefusal: { message: string | null };
   /** When set, archiving a thread fails with this message. */
   archiveRefusal: { message: string | null };
+  /**
+   * Runs before each `threads.list` call is answered, so a test can change
+   * the threads between pages (as another client archiving one would).
+   */
+  beforeList: { hook: ((args: { offset?: number; limit?: number }) => void) | null };
   /** Adds a thread Tutor did not spawn (or one in another project). */
   addThread(thread: Partial<FakeThread> & { id: string }): FakeThread;
 }
@@ -99,6 +104,7 @@ export async function makeTutorHost(
   const tabWriteError: { message: string | null; landed: boolean } = { message: null, landed: false };
   const forkRefusal: { message: string | null } = { message: null };
   const archiveRefusal: { message: string | null } = { message: null };
+  const beforeList: TutorHost["beforeList"] = { hook: null };
   let clock = 1000;
   const addThread = (thread: Partial<FakeThread> & { id: string }): FakeThread => {
     const row: FakeThread = {
@@ -191,8 +197,10 @@ export async function makeTutorHost(
           thread.archivedAt = clock += 1;
           return { ok: true, archivedThreadIds: [threadId] };
         },
-        // Pages newest first by limit and offset, as bb-app's /threads does.
+        // Pages newest first by limit and offset, as bb-app's /threads does:
+        // hidden threads only with includeHidden, and hasParent filters on having a parent.
         list: async (args = {}) => {
+          beforeList.hook?.(args);
           const offset = args.offset ?? 0;
           return threads
             .filter(
@@ -200,6 +208,7 @@ export async function makeTutorHost(
                 (args.originPluginId === undefined || thread.originPluginId === args.originPluginId) &&
                 (args.projectId === undefined || thread.projectId === args.projectId) &&
                 (args.sourceThreadId === undefined || thread.sourceThreadId === args.sourceThreadId) &&
+                (args.hasParent === undefined || (thread.parentThreadId !== null) === args.hasParent) &&
                 (args.includeHidden === true || thread.visibility === "visible") &&
                 (args.archived !== false || thread.archivedAt === null),
             )
@@ -252,5 +261,5 @@ export async function makeTutorHost(
     featureConfigFile: options.featureConfigFile ?? "/nonexistent/tutor/config.json",
     now: () => NOW,
   });
-  return { ...host, rt, threads, running, sent, tabs, tabConflicts, tabWriteError, forkRefusal, archiveRefusal, addThread };
+  return { ...host, rt, threads, running, sent, tabs, tabConflicts, tabWriteError, forkRefusal, archiveRefusal, beforeList, addThread };
 }

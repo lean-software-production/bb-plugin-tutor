@@ -7,6 +7,7 @@ import { findLesson, findRule, lessonStatus } from "../../shared/derive.ts";
 import type { Course, Lesson, Rule } from "../../shared/model.ts";
 import { adoptionTargets } from "../coach/actions.ts";
 import { coachThreadOf } from "../coach/auth.ts";
+import { recordCoachThread, recordedCoachThread } from "../coach/coach-record.ts";
 import { resolveFactory } from "../coach/factory-project.ts";
 import { coachThreadLockKey } from "../coach/lock-keys.ts";
 import type { FactoryLocation } from "../coach/threads.ts";
@@ -22,6 +23,7 @@ import type { TutorRuntime } from "../coach/runtime.ts";
 import { BB_REPLY_PREFIX, ensureSideChatTab, listSideChats, openSideChat } from "../coach/side-chats.ts";
 import {
   findCoachThread,
+  listCoachThreads,
   listTutorThreads,
   spawnCoachThread,
   toTutorThread,
@@ -113,8 +115,11 @@ export function registerRpc(rt: TutorRuntime): void {
 
   /**
    * The lesson's coach thread, spawned with `prompt` when there is none.
-   * One caller at a time per lesson, re-listing once it has the lock, so two
-   * clicks (or two tabs) never spawn two coach threads.
+   * One caller at a time per lesson, so two clicks (or two tabs) never spawn
+   * two coach threads. The recorded coach thread comes first (coach-record.ts);
+   * without a valid record, the coach threads are listed, and listed once
+   * more before spawning, because a listing can miss a thread when others
+   * vanish between its pages. What is found or spawned is recorded.
    */
   async function findOrSpawnCoach(
     course: Course,
@@ -123,10 +128,18 @@ export function registerRpc(rt: TutorRuntime): void {
     prompt: () => string,
   ): Promise<{ threadId: string; created: boolean }> {
     return rt.locks.run(coachThreadLockKey(factoryProject.projectId, course.id, lesson.id), async () => {
-      const threads = await listTutorThreads(bb.sdk, bb.pluginId, factoryProject.projectId);
-      const existing = findCoachThread(threads, course.id, lesson.id);
-      if (existing !== undefined) return { threadId: existing.id, created: false };
-      return { threadId: await spawnCoach(course, factoryProject, lesson, prompt()), created: true };
+      const lessonCoach = { projectId: factoryProject.projectId, courseId: course.id, lessonId: lesson.id };
+      const recorded = await recordedCoachThread(bb, lessonCoach);
+      if (recorded !== null) {
+        rt.coaches.remember([{ id: recorded, role: "coach", lessonId: lesson.id }]);
+        return { threadId: recorded, created: false };
+      }
+      const listed = async () => findCoachThread(await listCoachThreads(bb.sdk, bb.pluginId, factoryProject.projectId), course.id, lesson.id);
+      const existing = (await listed()) ?? (await listed());
+      if (existing !== undefined) rt.coaches.remember([existing]);
+      const threadId = existing?.id ?? (await spawnCoach(course, factoryProject, lesson, prompt()));
+      await recordCoachThread(bb, lessonCoach, threadId);
+      return { threadId, created: existing === undefined };
     });
   }
 

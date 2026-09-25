@@ -15,8 +15,9 @@
 // by mistake, such as an old coach thread still open after the student moved
 // on. For that, the lesson Tutor wrote at spawn is the right record: it is the
 // same record that makes the thread its lesson's coach in the outline and in
-// openCoach (findCoachThread). If a hard boundary were ever needed, Tutor
-// would keep the thread-to-lesson map in its own `bb.storage.kv` instead.
+// openCoach (findCoachThread; its lesson-to-coach record in `bb.storage.kv`,
+// coach-record.ts, is checked against it too). If a hard boundary were ever
+// needed, Tutor would keep the thread-to-lesson map in `bb.storage.kv` instead.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { coachThreadMetadataSchema } from "../../shared/model.ts";
 import type { FactoryProject } from "../../shared/rpc.ts";

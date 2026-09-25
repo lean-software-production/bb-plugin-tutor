@@ -17,6 +17,7 @@ import type { Completion, LessonDetail, Overview } from "../shared/rpc.ts";
 import { NOT_A_TUTOR_THREAD } from "../server/coach/auth.ts";
 import { makeSandbox, type Sandbox } from "./helpers/disk.ts";
 import { makeTutorHost, PROJECT_ID, type TutorHost } from "./helpers/fake-bb.ts";
+import { THREAD_PAGE_SIZE } from "../server/coach/threads.ts";
 
 async function setup(t: TestContext, settings?: Record<string, string>): Promise<{ sandbox: Sandbox; host: TutorHost }> {
   const sandbox = await makeSandbox();
@@ -298,8 +299,109 @@ test("coach discovery reads every page of Tutor's threads: many newer side chats
   }
   const again = await openCoach(host, "000");
   assert.deepEqual(again, { threadId: coach, created: false }, "found the existing coach instead of spawning another");
-  const pages = host.harness.inspection.sdk.callsTo("threads.list").length;
+  const before = listCalls(host);
+  const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.equal(overview.threads.filter((thread) => thread.role === "coach")[0]?.id, coach, "the outline finds it too");
+  const pages = listCalls(host) - before;
   assert.ok(pages >= 3, `listed ${pages} page(s)`);
+});
+
+/** Waits out the coach registry's start-up listing, so the listings a test counts or hooks are its own. */
+async function startupListed(host: TutorHost): Promise<void> {
+  for (let tries = 0; host.harness.inspection.sdk.callsTo("threads.list").length === 0; tries += 1) {
+    if (tries > 200) assert.fail("the start-up listing never ran");
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  await new Promise((resolve) => setImmediate(resolve));
+}
+
+const listCalls = (host: TutorHost) => host.harness.inspection.sdk.callsTo("threads.list").length;
+
+/** A coach thread as a Tutor build without the lesson-to-coach record left it: in BB, but not in Tutor's storage. */
+function unrecordedCoach(host: TutorHost, lessonId: string, course = "software-factory") {
+  return host.addThread({
+    id: `thr_coach_${course}_${lessonId}`,
+    originPluginId: "tutor",
+    title: `Coach · Lesson ${lessonId}`,
+    metadata: { course, lesson: lessonId, role: "coach" },
+  });
+}
+
+test("a coach thread is found although threads vanish between pages of the listing", async (t) => {
+  const { host } = await setup(t);
+  await startupListed(host);
+  const coach = (await openCoach(host, "000")).threadId;
+  // 201 of Tutor's threads: the coach thread and 200 newer side chats of it.
+  for (let index = 0; index < THREAD_PAGE_SIZE; index += 1) {
+    host.addThread({ id: `thr_side_${index}`, originPluginId: "tutor", originKind: "fork", sourceThreadId: coach, visibility: "hidden", metadata: { course: "software-factory", lesson: "000", role: "sideChat" } });
+  }
+  // One is archived just before the second page is read, so the coach thread slides onto the first.
+  host.beforeList.hook = ({ offset = 0 }) => {
+    const newest = host.threads.filter((thread) => thread.id.startsWith("thr_side_") && thread.archivedAt === null).at(-1);
+    if (offset === THREAD_PAGE_SIZE && newest !== undefined) newest.archivedAt = 1;
+  };
+  assert.deepEqual(await openCoach(host, "000"), { threadId: coach, created: false });
+  assert.equal(host.harness.inspection.sdk.callsTo("threads.spawn").length, 1, "no second coach thread");
+});
+
+test("coach discovery lists coach threads only, never their side chats, and remembers what it found", async (t) => {
+  const { host } = await setup(t);
+  await startupListed(host);
+  const coach = unrecordedCoach(host, "000");
+  // Side chats and side threads from before side chats, far more than a page, never enter the listing.
+  for (let index = 0; index < 450; index += 1) {
+    host.addThread({ id: `thr_side_${index}`, originPluginId: "tutor", originKind: "fork", sourceThreadId: coach.id, visibility: "hidden", metadata: { course: "software-factory", lesson: "000", role: "sideChat" } });
+  }
+  host.addThread({ id: "thr_child", originPluginId: "tutor", parentThreadId: coach.id, metadata: { course: "software-factory", lesson: "000", role: "sideChat" } });
+  const before = listCalls(host);
+  assert.deepEqual(await openCoach(host, "000"), { threadId: coach.id, created: false });
+  assert.equal(listCalls(host) - before, 1, "one page: no side chat was listed");
+  // Found once, it is remembered: the next open asks BB for that thread, not for a listing.
+  assert.deepEqual(await openCoach(host, "000"), { threadId: coach.id, created: false });
+  assert.equal(listCalls(host) - before, 1);
+});
+
+test("a listing that misses the coach thread is read once more before a coach thread is spawned", async (t) => {
+  const { host } = await setup(t);
+  await startupListed(host);
+  const coach = unrecordedCoach(host, "000");
+  // 200 newer coach threads of another course, one archived just before the second page is read.
+  for (let index = 0; index < THREAD_PAGE_SIZE; index += 1) unrecordedCoach(host, `${index}`, "another-course");
+  let archived = false;
+  host.beforeList.hook = ({ offset = 0 }) => {
+    if (offset !== THREAD_PAGE_SIZE || archived) return;
+    archived = true;
+    const other = host.threads.find((thread) => thread.id === "thr_coach_another-course_199");
+    if (other !== undefined) other.archivedAt = 1;
+  };
+  assert.deepEqual(await openCoach(host, "000"), { threadId: coach.id, created: false });
+  assert.equal(host.harness.inspection.sdk.callsTo("threads.spawn").length, 0);
+});
+
+test("a remembered coach thread counts only while BB still has it as the lesson's coach", async (t) => {
+  const { host } = await setup(t);
+  const first = (await openCoach(host, "000")).threadId;
+  const [key, ...others] = await host.bb.storage.kv.list();
+  assert.ok(key !== undefined && others.length === 0, "one lesson, one record");
+  // A record naming a side chat (or anything but the lesson's coach thread) is ignored.
+  host.addThread({ id: "thr_side", originPluginId: "tutor", originKind: "fork", sourceThreadId: first, visibility: "hidden", metadata: { course: "software-factory", lesson: "000", role: "coach" } });
+  await host.bb.storage.kv.set(key, { threadId: "thr_side" });
+  assert.deepEqual(await openCoach(host, "000"), { threadId: first, created: false });
+  assert.deepEqual(await host.bb.storage.kv.get(key), { threadId: first }, "the record is corrected from the listing");
+  // Once the coach thread is archived, the record no longer holds and a new coach thread is spawned.
+  const archived = host.threads.find((thread) => thread.id === first);
+  assert.ok(archived !== undefined);
+  archived.archivedAt = 1;
+  const second = await openCoach(host, "000");
+  assert.equal(second.created, true);
+  assert.notEqual(second.threadId, first);
+  assert.deepEqual(await host.bb.storage.kv.get(key), { threadId: second.threadId });
+  // Another lesson's coach thread, or one whose metadata names another lesson, never answers for this one.
+  const renamed = host.threads.find((thread) => thread.id === second.threadId);
+  assert.ok(renamed !== undefined);
+  renamed.metadata = { ...renamed.metadata, lesson: "001" };
+  const third = await openCoach(host, "000");
+  assert.equal(third.created, true);
 });
 
 test("coach discovery fails loudly past its page bound instead of reading forever", async (t) => {

@@ -113,9 +113,31 @@ export function toTutorThread(row: ThreadRow, metadata: unknown): TutorThreadRec
 
 /** Live (not archived) Tutor threads in `projectId`, side chats included, newest first. */
 export async function listTutorThreads(sdk: Sdk, pluginId: string, projectId: string): Promise<TutorThreadRecord[]> {
+  return tutorThreadsOf(sdk, pluginId, projectId, { includeHidden: true });
+}
+
+/**
+ * Live Tutor threads in `projectId` that can be a coach thread, newest first.
+ * `threads.list` (SDK 0.5.9) pages by offset only, with no cursor, so a
+ * listing can skip a row when others vanish between its pages. Asking BB for
+ * visible threads without a parent keeps the side chats (hidden forks) and
+ * the side threads from before them (children) out of the listing, so it
+ * holds one coach thread per lesson and rarely needs a second page.
+ */
+export async function listCoachThreads(sdk: Sdk, pluginId: string, projectId: string): Promise<TutorThreadRecord[]> {
+  const threads = await tutorThreadsOf(sdk, pluginId, projectId, { includeHidden: false, hasParent: false });
+  return threads.filter((thread) => thread.role === "coach");
+}
+
+async function tutorThreadsOf(
+  sdk: Sdk,
+  pluginId: string,
+  projectId: string,
+  filter: Pick<ThreadListArgs, "includeHidden" | "hasParent">,
+): Promise<TutorThreadRecord[]> {
   const rows = await listAllThreads(
     sdk,
-    { originPluginId: pluginId, projectId, archived: false, includeHidden: true },
+    { originPluginId: pluginId, projectId, archived: false, ...filter },
     "of Tutor's threads in the factory project",
   );
   const mine = rows.filter(
