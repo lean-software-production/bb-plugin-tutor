@@ -16,7 +16,7 @@ import type {
   Rule,
   RuleStatus,
 } from "../../shared/model.ts";
-import type { Binding, LessonSummary, LessonDetail } from "../../shared/rpc.ts";
+import type { FactoryProject, LessonSummary, LessonDetail } from "../../shared/rpc.ts";
 import { backgroundLines, exampleLines } from "./gherkin.ts";
 import type { GherkinLine } from "./gherkin.ts";
 import { firstSentence, lessonEyebrow, lessonLabel, percent, plural, relativeTime } from "./format.ts";
@@ -105,15 +105,15 @@ const MAX_COMPASS_ITEMS = 6;
 export type CoachStart = "read-ahead" | "loading" | "set-up" | "start" | "revisit";
 
 /**
- * What a lesson offers before its coach thread exists. A coach needs a bound
- * factory, so an unbound student is sent to set one up rather than shown a
- * start that must fail. `binding` is null until the overview loads, and
+ * What a lesson offers before its coach thread exists. A coach needs a factory
+ * project, so a student without one is sent to set one up rather than shown a
+ * start that must fail. `factoryProject` is null until the overview loads, and
  * nothing is offered until then.
  */
-export function coachStart(status: LessonStatus, binding: Binding["status"] | null): CoachStart {
+export function coachStart(status: LessonStatus, factoryProject: FactoryProject["status"] | null): CoachStart {
   if (status === "ahead") return "read-ahead";
-  if (binding === null) return "loading";
-  if (binding === "unbound" || binding === "missing") return "set-up";
+  if (factoryProject === null) return "loading";
+  if (factoryProject === "unset" || factoryProject === "missing") return "set-up";
   return status === "current" ? "start" : "revisit";
 }
 

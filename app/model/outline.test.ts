@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fixtureOverview, fixtureOverviewUnbound } from "../../shared/fixtures.ts";
+import { fixtureOverview, fixtureOverviewNoFactory } from "../../shared/fixtures.ts";
 import type { Overview } from "../../shared/rpc.ts";
 import { buildOutline, viewedLesson } from "./outline.ts";
 import type { OutlineInput } from "./outline.ts";
@@ -189,15 +189,15 @@ test("a coach thread the sidebar has not listed yet still gets a row", () => {
   assert.deepEqual([coach?.href, coach?.indicator.tone], ["/threads/thr_coach002", "none"]);
 });
 
-test("unbound, loading and failed states still list other threads", () => {
-  const unbound = buildOutline(input({ overview: fixtureOverviewUnbound }));
-  assert.deepEqual(unbound.status, { kind: "unbound", missing: false });
-  assert.equal(unbound.lessons.length, 4);
-  assert.ok(unbound.lessons.every((lesson) => lesson.coach === null && !lesson.canStartCoach && !lesson.expandedByDefault));
-  assert.ok(unbound.others.length > 0);
+test("no factory project, loading and failed states still list other threads", () => {
+  const noFactory = buildOutline(input({ overview: fixtureOverviewNoFactory }));
+  assert.deepEqual(noFactory.status, { kind: "unset", missing: false });
+  assert.equal(noFactory.lessons.length, 4);
+  assert.ok(noFactory.lessons.every((lesson) => lesson.coach === null && !lesson.canStartCoach && !lesson.expandedByDefault));
+  assert.ok(noFactory.others.length > 0);
 
-  const missing = buildOutline(input({ overview: { ...fixtureOverviewUnbound, binding: { status: "missing", projectId: "prj_gone" } } }));
-  assert.deepEqual(missing.status, { kind: "unbound", missing: true });
+  const missing = buildOutline(input({ overview: { ...fixtureOverviewNoFactory, factoryProject: { status: "missing", projectId: "prj_gone" } } }));
+  assert.deepEqual(missing.status, { kind: "unset", missing: true });
 
   const loading = buildOutline(input({ overview: null }));
   assert.deepEqual(loading.status, { kind: "loading" });
@@ -208,7 +208,7 @@ test("unbound, loading and failed states still list other threads", () => {
   assert.deepEqual(failed.status, { kind: "error", message: "Tutor's backend is not running." });
 
   const noCourse = buildOutline(
-    input({ overview: { ...fixtureOverviewUnbound, course: null, courseError: "No course at /workspaces/tutorial." } }),
+    input({ overview: { ...fixtureOverviewNoFactory, course: null, courseError: "No course at /workspaces/tutorial." } }),
   );
   assert.deepEqual(noCourse.status, { kind: "error", message: "No course at /workspaces/tutorial." });
   assert.deepEqual(noCourse.lessons, []);

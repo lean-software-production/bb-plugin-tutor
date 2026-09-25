@@ -90,7 +90,7 @@ function lessonOutline(world: World, lesson: Lesson, coachThread: TutorThreadRec
 }
 
 function currentState(world: World, course: Course, threads: readonly TutorThreadRecord[]): CurrentState | null {
-  if (world.binding.status !== "bound" || world.pointer === null) return null;
+  if (world.factoryProject.status !== "found" || world.pointer === null) return null;
   const lesson = findLesson(course, world.pointer.lessonId);
   if (lesson === undefined) return null;
   const progress = progressMap(world, lesson.id);
@@ -112,14 +112,14 @@ export function buildOverview(world: World, threads: readonly TutorThreadRecord[
   const course = world.course;
   const pointer = world.pointer;
   if (course === null || pointer === null) {
-    return { course: null, courseError: world.courseError, binding: world.binding, lessons: [], current: null, threads: [] };
+    return { course: null, courseError: world.courseError, factoryProject: world.factoryProject, lessons: [], current: null, threads: [] };
   }
   const courseThreads =
-    world.binding.status === "bound" ? threads.filter((thread) => thread.courseId === course.id) : [];
+    world.factoryProject.status === "found" ? threads.filter((thread) => thread.courseId === course.id) : [];
   return {
     course: { id: course.id, title: course.title, description: course.description },
     courseError: null,
-    binding: world.binding,
+    factoryProject: world.factoryProject,
     lessons: course.lessons.map((lesson) => {
       const coachThread = findCoachThread(courseThreads, course.id, lesson.id);
       return {

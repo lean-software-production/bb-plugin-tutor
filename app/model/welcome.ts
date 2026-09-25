@@ -1,6 +1,6 @@
 // First run (mockup 8): confirm the detected factory project (8A), or explain
 // how to set one up when nothing qualifies (8B). The plugin never creates it.
-import type { Binding, CandidateProject } from "../../shared/rpc.ts";
+import type { FactoryProject, CandidateProject } from "../../shared/rpc.ts";
 
 export interface WelcomeView {
   /** "confirm" when some project looks like a factory repo; "setup" otherwise. */
@@ -14,7 +14,7 @@ export interface WelcomeView {
   missingProjectId: string | null;
 }
 
-export function welcomeView(candidates: readonly CandidateProject[], binding: Binding): WelcomeView {
+export function welcomeView(candidates: readonly CandidateProject[], factoryProject: FactoryProject): WelcomeView {
   const detected = candidates.filter((candidate) => candidate.qualifies);
   const others = candidates.filter((candidate) => !candidate.qualifies);
   return {
@@ -22,6 +22,6 @@ export function welcomeView(candidates: readonly CandidateProject[], binding: Bi
     detected,
     others,
     preselected: detected[0]?.projectId ?? null,
-    missingProjectId: binding.status === "missing" ? binding.projectId : null,
+    missingProjectId: factoryProject.status === "missing" ? factoryProject.projectId : null,
   };
 }

@@ -1,8 +1,8 @@
-// The factory binding: always a BB project id (the factoryProject setting),
+// The factory project: always a BB project id (the factoryProject setting),
 // whose default local source is the factory repo on this machine.
 import { access } from "node:fs/promises";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import type { Binding } from "../../shared/rpc.ts";
+import type { FactoryProject } from "../../shared/rpc.ts";
 
 type Sdk = BbPluginApi["sdk"];
 export type ProjectWithSources = Awaited<ReturnType<Sdk["projects"]["get"]>>;
@@ -25,14 +25,14 @@ export function defaultSourcePath(project: ProjectWithSources): string | null {
 }
 
 export interface Factory {
-  binding: Binding;
-  /** The machine holding the factory folder; null unless bound. Coach threads run there. */
+  factoryProject: FactoryProject;
+  /** The machine holding the factory folder; null without a factory project. Coach threads run there. */
   hostId: string | null;
 }
 
 export async function resolveFactory(sdk: Sdk, projectId: string | undefined): Promise<Factory> {
-  if (projectId === undefined || projectId === "") return { binding: { status: "unbound" }, hostId: null };
-  const missing: Factory = { binding: { status: "missing", projectId }, hostId: null };
+  if (projectId === undefined || projectId === "") return { factoryProject: { status: "unset" }, hostId: null };
+  const missing: Factory = { factoryProject: { status: "missing", projectId }, hostId: null };
   let project: ProjectWithSources;
   try {
     project = await sdk.projects.get({ projectId });
@@ -42,7 +42,7 @@ export async function resolveFactory(sdk: Sdk, projectId: string | undefined): P
   const source = defaultSource(project);
   if (source === undefined || !(await pathExists(source.path))) return missing;
   return {
-    binding: { status: "bound", projectId, projectName: project.name, root: source.path },
+    factoryProject: { status: "found", projectId, projectName: project.name, root: source.path },
     hostId: source.hostId,
   };
 }

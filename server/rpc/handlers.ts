@@ -2,12 +2,12 @@
 // handler fails by throwing an Error written for the student.
 import { withoutLeadingDirectives } from "../../shared/directives.ts";
 import { rpcContract } from "../../shared/rpc.ts";
-import type { Binding } from "../../shared/rpc.ts";
+import type { FactoryProject } from "../../shared/rpc.ts";
 import { findLesson, findRule, lessonStatus } from "../../shared/derive.ts";
 import type { Course, Lesson, Rule } from "../../shared/model.ts";
 import { adoptionTargets } from "../coach/actions.ts";
 import { coachThreadOf } from "../coach/auth.ts";
-import { resolveFactory } from "../coach/binding.ts";
+import { resolveFactory } from "../coach/factory-project.ts";
 import { coachThreadLockKey } from "../coach/lock-keys.ts";
 import type { FactoryLocation } from "../coach/threads.ts";
 import {
@@ -32,18 +32,18 @@ import { overlaps, realPath } from "../paths.ts";
 import { listCandidates } from "./candidates.ts";
 import { buildCompletion, buildLessonDetail, buildOverview, publicThread, requireCourse, requireLesson } from "./views.ts";
 
-type Bound = Extract<Binding, { status: "bound" }>;
+type Found = Extract<FactoryProject, { status: "found" }>;
 
-interface BoundFactory extends Bound {
+interface FoundFactory extends Found {
   location: FactoryLocation;
 }
 
-function requireBound(world: World): BoundFactory {
-  if (world.binding.status === "bound" && world.factoryHostId !== null) {
-    return { ...world.binding, location: { root: world.binding.root, hostId: world.factoryHostId } };
+function requireFactory(world: World): FoundFactory {
+  if (world.factoryProject.status === "found" && world.factoryHostId !== null) {
+    return { ...world.factoryProject, location: { root: world.factoryProject.root, hostId: world.factoryHostId } };
   }
   throw new Error(
-    world.binding.status === "missing"
+    world.factoryProject.status === "missing"
       ? "The factory project Tutor was set up with has gone. Pick it again on the Course page."
       : "No factory project is set up yet. Confirm it on the Course page.",
   );
@@ -66,8 +66,8 @@ export function registerRpc(rt: TutorRuntime): void {
   }
 
   async function threadsOf(world: World): Promise<TutorThreadRecord[]> {
-    if (world.binding.status !== "bound") return [];
-    const threads = await listTutorThreads(bb.sdk, bb.pluginId, world.binding.projectId);
+    if (world.factoryProject.status !== "found") return [];
+    const threads = await listTutorThreads(bb.sdk, bb.pluginId, world.factoryProject.projectId);
     rt.coaches.remember(threads);
     return threads;
   }
@@ -98,10 +98,10 @@ export function registerRpc(rt: TutorRuntime): void {
     );
   }
 
-  async function spawnCoach(course: Course, binding: BoundFactory, lesson: Lesson, prompt: string): Promise<string> {
+  async function spawnCoach(course: Course, factoryProject: FoundFactory, lesson: Lesson, prompt: string): Promise<string> {
     const threadId = await spawnCoachThread(bb.sdk, {
-      projectId: binding.projectId,
-      factory: binding.location,
+      projectId: factoryProject.projectId,
+      factory: factoryProject.location,
       courseId: course.id,
       lessonId: lesson.id,
       prompt,
@@ -118,15 +118,15 @@ export function registerRpc(rt: TutorRuntime): void {
    */
   async function findOrSpawnCoach(
     course: Course,
-    binding: BoundFactory,
+    factoryProject: FoundFactory,
     lesson: Lesson,
     prompt: () => string,
   ): Promise<{ threadId: string; created: boolean }> {
-    return rt.locks.run(coachThreadLockKey(binding.projectId, course.id, lesson.id), async () => {
-      const threads = await listTutorThreads(bb.sdk, bb.pluginId, binding.projectId);
+    return rt.locks.run(coachThreadLockKey(factoryProject.projectId, course.id, lesson.id), async () => {
+      const threads = await listTutorThreads(bb.sdk, bb.pluginId, factoryProject.projectId);
       const existing = findCoachThread(threads, course.id, lesson.id);
       if (existing !== undefined) return { threadId: existing.id, created: false };
-      return { threadId: await spawnCoach(course, binding, lesson, prompt()), created: true };
+      return { threadId: await spawnCoach(course, factoryProject, lesson, prompt()), created: true };
     });
   }
 
@@ -197,47 +197,47 @@ export function registerRpc(rt: TutorRuntime): void {
     },
 
     confirmFactory: async ({ projectId }) => {
-      const { binding } = await resolveFactory(bb.sdk, projectId);
-      if (binding.status !== "bound") {
+      const { factoryProject } = await resolveFactory(bb.sdk, projectId);
+      if (factoryProject.status !== "found") {
         throw new Error("That project has no folder on this machine, so Tutor cannot coach in it.");
       }
       // The coach writes spec/ and seeds/ into the factory, so it must never be the course checkout.
       const { coursePath } = await rt.world.load();
-      if (overlaps(await realPath(binding.root), await realPath(coursePath))) {
+      if (overlaps(await realPath(factoryProject.root), await realPath(coursePath))) {
         throw new Error("That project's folder is, or shares a folder with, the course. Pick the repo you build your factory in.");
       }
-      // settings.onChange publishes the binding signal.
+      // settings.onChange publishes the factoryProject signal.
       await rt.settings.experimental_set({ factoryProject: projectId });
-      return binding;
+      return factoryProject;
     },
 
     openCoach: async ({ lessonId }) => {
       const world = await loadWorld();
       const course = requireCourse(world);
-      const binding = requireBound(world);
+      const factoryProject = requireFactory(world);
       const lesson = requireLesson(course, lessonId);
       if (world.pointer === null || lessonStatus(course, world.pointer, lesson.id) === "ahead") {
         throw new Error(`Lesson ${lesson.id} has not started yet.`);
       }
-      return findOrSpawnCoach(course, binding, lesson, () => coachThreadPrompt(course, lesson, startFor(world, course, lesson)));
+      return findOrSpawnCoach(course, factoryProject, lesson, () => coachThreadPrompt(course, lesson, startFor(world, course, lesson)));
     },
 
     startNextLesson: async ({ lessonId }) => {
       const world = await loadWorld();
       const course = requireCourse(world);
-      const binding = requireBound(world);
+      const factoryProject = requireFactory(world);
       const lesson = requireLesson(course, lessonId);
       if (lesson.builtin || world.pointer === null || !adoptionTargets(course, world.pointer).includes(lesson.id)) {
         throw new Error(`Lesson ${lesson.id} cannot be started yet: finish the lesson before it first.`);
       }
-      const { threadId } = await findOrSpawnCoach(course, binding, lesson, () => coachThreadPrompt(course, lesson, "adopt"));
+      const { threadId } = await findOrSpawnCoach(course, factoryProject, lesson, () => coachThreadPrompt(course, lesson, "adopt"));
       return { threadId };
     },
 
     startSideChat: async ({ lessonId, ruleKey }) => {
       const world = await loadWorld();
       const course = requireCourse(world);
-      requireBound(world);
+      requireFactory(world);
       const lesson = requireLesson(course, lessonId);
       const rule = ruleKey === null ? null : requireRule(lesson, ruleKey);
       const coachThread = findCoachThread(await threadsOf(world), course.id, lesson.id);
@@ -257,10 +257,10 @@ export function registerRpc(rt: TutorRuntime): void {
 
     ensureSideChatTab: async ({ sideChatId }) => {
       const world = await loadWorld();
-      const binding = requireBound(world);
+      const factoryProject = requireFactory(world);
       const thread = await bb.sdk.threads.get({ threadId: sideChatId }).catch(() => null);
       const coachThread = thread === null ? null : await coachThreadOf(bb.sdk, bb.pluginId, thread);
-      if (thread === null || coachThread === null || coachThread.id === thread.id || thread.originKind !== "fork" || coachThread.projectId !== binding.projectId) {
+      if (thread === null || coachThread === null || coachThread.id === thread.id || thread.originKind !== "fork" || coachThread.projectId !== factoryProject.projectId) {
         throw new Error("That side chat is gone, or it isn't a side chat of one of your coach threads.");
       }
       const metadata = thread.originPluginId === bb.pluginId ? await bb.sdk.threads.getPluginMetadata({ threadId: thread.id }).catch(() => null) : null;
@@ -279,13 +279,13 @@ export function registerRpc(rt: TutorRuntime): void {
     redirectFocus: async ({ lessonId, ruleKey }) => {
       const world = await loadWorld();
       const course = requireCourse(world);
-      const binding = requireBound(world);
+      const factoryProject = requireFactory(world);
       const lesson = requireLesson(course, lessonId);
       if (world.pointer === null || lessonStatus(course, world.pointer, lesson.id) !== "current") {
         throw new Error("You can only choose the next Rule in the lesson you are on.");
       }
       const rule = requireRule(lesson, ruleKey);
-      const coachThread = await findOrSpawnCoach(course, binding, lesson, () =>
+      const coachThread = await findOrSpawnCoach(course, factoryProject, lesson, () =>
         coachThreadPrompt(course, lesson, startFor(world, course, lesson), rule),
       );
       if (coachThread.created) return { threadId: coachThread.threadId };

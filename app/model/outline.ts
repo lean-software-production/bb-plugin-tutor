@@ -99,7 +99,7 @@ export interface OtherThreadGroup {
 export type OutlineStatus =
   | { kind: "loading" }
   | { kind: "error"; message: string }
-  | { kind: "unbound"; missing: boolean }
+  | { kind: "unset"; missing: boolean }
   | { kind: "ready" };
 
 export interface OutlineView {
@@ -122,8 +122,8 @@ function statusOf(input: OutlineInput): OutlineStatus {
   if (overview.course === null) {
     return { kind: "error", message: overview.courseError ?? "The course could not be loaded." };
   }
-  if (overview.binding.status !== "bound") {
-    return { kind: "unbound", missing: overview.binding.status === "missing" };
+  if (overview.factoryProject.status !== "found") {
+    return { kind: "unset", missing: overview.factoryProject.status === "missing" };
   }
   return { kind: "ready" };
 }

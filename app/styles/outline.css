@@ -365,7 +365,7 @@
   font-weight: 650;
 }
 
-/* ---- unbound / loading / error ---- */
+/* ---- no factory project / loading / error ---- */
 .tutor-paper .tp-lesson-row {
   display: flex;
   align-items: center;

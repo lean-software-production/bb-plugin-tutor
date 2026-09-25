@@ -7,7 +7,7 @@ import { COURSE_FILES, FACTORY_FILES } from "../../shared/constants.ts";
 import type { CandidateProject } from "../../shared/rpc.ts";
 import { overlaps } from "../paths.ts";
 import { parseIteration } from "../progress/iteration.ts";
-import { defaultSourcePath, pathExists, type ProjectWithSources } from "../coach/binding.ts";
+import { defaultSourcePath, pathExists, type ProjectWithSources } from "../coach/factory-project.ts";
 
 type Sdk = BbPluginApi["sdk"];
 

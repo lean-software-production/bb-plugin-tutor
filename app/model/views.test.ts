@@ -3,13 +3,13 @@ import assert from "node:assert/strict";
 import { parseProgressCard, parseTermRef } from "../../shared/directives.ts";
 import {
   FIXTURE_NOW,
-  fixtureBinding,
+  fixtureFactoryProject,
   fixtureCandidates,
   fixtureCompletion,
   fixtureLessonDetail,
   fixtureLexicon,
   fixtureOverview,
-  fixtureOverviewUnbound,
+  fixtureOverviewNoFactory,
   fixtureThreads,
 } from "../../shared/fixtures.ts";
 import type { Overview } from "../../shared/rpc.ts";
@@ -106,7 +106,7 @@ test("terms resolve against the lexicon; unknown ids fall back", () => {
 
 test("the course root sends the student where they are", () => {
   assert.deepEqual(homeDecision(fixtureOverview), { kind: "redirect", route: { kind: "start", lessonId: "002" } });
-  assert.deepEqual(homeDecision(fixtureOverviewUnbound), { kind: "redirect", route: { kind: "welcome" } });
+  assert.deepEqual(homeDecision(fixtureOverviewNoFactory), { kind: "redirect", route: { kind: "welcome" } });
   const done: Overview = {
     ...fixtureOverview,
     current: fixtureOverview.current === null ? null : { ...fixtureOverview.current, iterationStatus: "Done" },
@@ -136,7 +136,7 @@ test("the Continue section reads from the overview alone", () => {
   assert.equal(view.coachThreadId, "thr_coach002");
   assert.equal(view.complete, false);
 
-  assert.deepEqual(continueView(fixtureOverviewUnbound), {
+  assert.deepEqual(continueView(fixtureOverviewNoFactory), {
     kind: "setup",
     courseTitle: "Build a software factory",
     missing: false,
@@ -206,7 +206,7 @@ test("confetti is deterministic and stays in the top right", () => {
 });
 
 test("first run confirms a detected factory, or explains how to set one up", () => {
-  const view = welcomeView(fixtureCandidates, { status: "unbound" });
+  const view = welcomeView(fixtureCandidates, { status: "unset" });
   assert.equal(view.mode, "confirm");
   assert.equal(view.preselected, "prj_factory");
   assert.deepEqual(view.others.map((project) => project.name), ["tutorial"]);
@@ -216,7 +216,7 @@ test("first run confirms a detected factory, or explains how to set one up", () 
   assert.equal(none.mode, "setup");
   assert.equal(none.preselected, null);
   assert.equal(none.missingProjectId, "prj_gone");
-  assert.equal(welcomeView([], fixtureBinding).mode, "setup");
+  assert.equal(welcomeView([], fixtureFactoryProject).mode, "setup");
 });
 
 // ---------------------------------------------------------------------------

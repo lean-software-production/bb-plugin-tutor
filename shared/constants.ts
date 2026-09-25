@@ -76,7 +76,7 @@ export const SETTING_KEYS = {
  * Course path precedence: `coursePath` setting > `TUTOR_COURSE_PATH` env >
  * `FEATURE_CONFIG_FILE.course` > `DEFAULT_COURSE_PATH`.
  * The factory path is only a hint for detecting the factory project; the
- * binding itself is always a BB project id (`factoryProject` setting).
+ * factory project itself is always a BB project id (`factoryProject` setting).
  */
 export const ENV_VARS = {
   coursePath: "TUTOR_COURSE_PATH",

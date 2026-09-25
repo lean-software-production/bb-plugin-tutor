@@ -61,7 +61,7 @@ export function CourseOutline({ activeThreadId, activeProjectId, onNavigate }: P
     goCourse(target);
     onNavigate();
   };
-  const factoryProjectId = overview.data?.binding.status === "bound" ? overview.data.binding.projectId : null;
+  const factoryProjectId = overview.data?.factoryProject.status === "found" ? overview.data.factoryProject.projectId : null;
 
   return (
     <nav className="tutor-paper tp-outline" aria-label="Course outline">
@@ -95,7 +95,7 @@ function OutlineBody({ outline, go, onNavigate }: { outline: OutlineView; go: Go
           <ReloadButton message={outline.status.message} />
         </div>
       );
-    case "unbound":
+    case "unset":
       return (
         <>
           {outline.lessons.map((lesson) => (

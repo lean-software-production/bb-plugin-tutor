@@ -2,7 +2,7 @@
 // not offer it, so every call re-checks the thread with BB itself; plugin
 // metadata is never consulted.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import type { Binding } from "../../shared/rpc.ts";
+import type { FactoryProject } from "../../shared/rpc.ts";
 
 type Sdk = BbPluginApi["sdk"];
 type Thread = Awaited<ReturnType<Sdk["threads"]["get"]>>;
@@ -57,15 +57,15 @@ export async function authorizeCaller(
   sdk: Sdk,
   pluginId: string,
   threadId: string,
-  binding: Binding,
+  factoryProject: FactoryProject,
 ): Promise<Caller | { error: string }> {
   const thread = await getThread(sdk, threadId);
   const coachThread = thread === null ? null : await coachThreadOf(sdk, pluginId, thread);
   if (thread === null || coachThread === null) return { error: NOT_A_TUTOR_THREAD };
-  if (binding.status !== "bound") {
+  if (factoryProject.status !== "found") {
     return { error: "No factory project is set up yet. The student confirms it on the Course page." };
   }
-  if (thread.projectId !== binding.projectId) {
+  if (thread.projectId !== factoryProject.projectId) {
     return { error: "This thread is not in the student's factory project, so Tutor's tools are off here." };
   }
   return { threadId: thread.id, isCoachThread: coachThread.id === thread.id, coachThreadId: coachThread.id };

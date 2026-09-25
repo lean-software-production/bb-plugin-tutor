@@ -22,7 +22,7 @@ import type {
   StudentState,
 } from "./model.ts";
 import type {
-  Binding,
+  FactoryProject,
   CandidateProject,
   Completion,
   FeatureOutline,
@@ -369,8 +369,8 @@ export const fixtureStudent: StudentState = {
 /** A factory repo nobody has coached yet. */
 export const fixtureFreshStudent: StudentState = { iteration: null, progress: null, problems: [] };
 
-export const fixtureBinding: Binding = {
-  status: "bound",
+export const fixtureFactoryProject: FactoryProject = {
+  status: "found",
   projectId: "prj_factory",
   projectName: "my-factory",
   root: FIXTURE_FACTORY_ROOT,
@@ -443,7 +443,7 @@ const statusByLesson = { "000": "done", "001": "done", "002": "current", "003": 
 export const fixtureOverview: Overview = {
   course: { id: fixtureCourse.id, title: fixtureCourse.title, description: fixtureCourse.description },
   courseError: null,
-  binding: fixtureBinding,
+  factoryProject: fixtureFactoryProject,
   lessons: fixtureCourse.lessons.map((hw) => ({
     id: hw.id,
     title: hw.title,
@@ -475,10 +475,10 @@ export const fixtureOverview: Overview = {
   threads: fixtureThreads,
 };
 
-/** First run: course loaded, nothing bound. */
-export const fixtureOverviewUnbound: Overview = {
+/** First run: course loaded, no factory project yet. */
+export const fixtureOverviewNoFactory: Overview = {
   ...fixtureOverview,
-  binding: { status: "unbound" },
+  factoryProject: { status: "unset" },
   lessons: fixtureOverview.lessons.map((hw) => ({
     ...hw,
     status: hw.id === BUILTIN_LESSON_ID ? "current" : "ahead",

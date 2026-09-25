@@ -52,7 +52,7 @@ export function StartPage({ lessonId, ruleKey }: { lessonId: string; ruleKey: st
     return <ToCoach lessonId={lessonId} coachThreadId={detail.data.coachThreadId} ruleKey={ruleKey} reached={detail.data.reachedRules} />;
   }
   const view = buildLesson(detail.data, overview.data?.lessons ?? [], Date.now());
-  const start = coachStart(view.status, overview.data?.binding.status ?? null);
+  const start = coachStart(view.status, overview.data?.factoryProject.status ?? null);
   return (
     <StartPageBody key={lessonId} view={view} start={start} urlRuleKey={ruleKey} staleError={detail.status === "error" ? detail.error : null} />
   );

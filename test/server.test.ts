@@ -118,7 +118,7 @@ test("every tool refuses threads Tutor did not spawn, whatever their metadata sa
   assert.equal(host.harness.inspection.sdk.callsTo("threads.fork").length, 0);
 });
 
-test("tools refuse while no factory project is bound", async (t) => {
+test("tools refuse while there is no factory project", async (t) => {
   const { host } = await setup(t, {});
   host.addThread({ id: "thr_tutor", originPluginId: "tutor" });
   const result = await tool(host, "tutor_status", {}, "thr_tutor");
@@ -533,19 +533,19 @@ test("a Tutor thread going idle re-reads the factory and signals changes made ou
 
 test("first run: candidates, confirmation and a course that will not load", async (t) => {
   const { sandbox, host } = await setup(t, {});
-  const unbound = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
-  assert.deepEqual(unbound.binding, { status: "unbound" });
-  assert.equal(unbound.current, null);
+  const before = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.deepEqual(before.factoryProject, { status: "unset" });
+  assert.equal(before.current, null);
   const { projects } = (await host.harness.behavior.callRpc("listCandidateProjects", null)) as {
     projects: { projectId: string; qualifies: boolean }[];
   };
   assert.deepEqual(projects.map((project) => project.projectId), [PROJECT_ID]);
   await assert.rejects(host.harness.behavior.callRpc("confirmFactory", { projectId: "prj_gone" }), /no folder/);
-  const binding = await host.harness.behavior.callRpc("confirmFactory", { projectId: PROJECT_ID });
-  assert.deepEqual(binding, { status: "bound", projectId: PROJECT_ID, projectName: "my-factory", root: sandbox.factoryRoot });
-  assert.ok(host.harness.inspection.realtimeSignals.some((signal) => (signal.payload as { reason: string }).reason === "binding"));
-  const bound = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
-  assert.equal(bound.current?.iterationStatus, "not-started");
+  const factoryProject = await host.harness.behavior.callRpc("confirmFactory", { projectId: PROJECT_ID });
+  assert.deepEqual(factoryProject, { status: "found", projectId: PROJECT_ID, projectName: "my-factory", root: sandbox.factoryRoot });
+  assert.ok(host.harness.inspection.realtimeSignals.some((signal) => (signal.payload as { reason: string }).reason === "factoryProject"));
+  const after = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.equal(after.current?.iterationStatus, "not-started");
 });
 
 test("concurrent tool calls never lose each other's progress", async (t) => {
@@ -597,10 +597,10 @@ test("confirmFactory refuses the course checkout, a folder inside it, or one hol
   await mkdir(factory);
   const host = await makeTutorHost(sandbox.course, factory, { coursePath: sandbox.course.root });
   t.after(() => host.harness.lifecycle.dispose());
-  assert.equal(((await host.harness.behavior.callRpc("confirmFactory", { projectId: PROJECT_ID })) as { status: string }).status, "bound");
+  assert.equal(((await host.harness.behavior.callRpc("confirmFactory", { projectId: PROJECT_ID })) as { status: string }).status, "found");
 });
 
-test("a stored binding that now leads into the course is treated as missing: no coach, no writes", async (t) => {
+test("a stored factoryProject that now leads into the course is treated as missing: no coach, no writes", async (t) => {
   const sandbox = await makeSandbox();
   t.after(() => sandbox.cleanup());
   const link = join(sandbox.root, "factory-link");
@@ -608,7 +608,7 @@ test("a stored binding that now leads into the course is treated as missing: no 
   const host = await makeTutorHost(sandbox.course, link, { factoryProject: PROJECT_ID, coursePath: sandbox.course.root });
   t.after(() => host.harness.lifecycle.dispose());
   const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
-  assert.equal(overview.binding.status, "missing");
+  assert.equal(overview.factoryProject.status, "missing");
   await assert.rejects(host.harness.behavior.callRpc("openCoach", { lessonId: "000" }));
   assert.equal(host.harness.inspection.sdk.callsTo("threads.spawn").length, 0);
   assert.equal(await readdir(join(sandbox.course.root, "spec")).catch(() => null), null, "nothing written into the course");

@@ -1,7 +1,7 @@
 // First run (mockup 8): confirm the detected factory project (8A) or explain
 // how to create one (8B). The plugin never creates the project itself.
 import { useEffect, useState } from "react";
-import type { Binding, CandidateProject } from "../../shared/rpc.ts";
+import type { FactoryProject, CandidateProject } from "../../shared/rpc.ts";
 import { refreshAll, useAction, useCourseNavigate, useOverview, useQuery, useStore, useTutorRpc } from "../hooks.ts";
 import { homeDecision } from "../model/home.ts";
 import { welcomeView } from "../model/welcome.ts";
@@ -31,7 +31,7 @@ export function WelcomePage() {
       ) : (
         <Picker
           candidates={candidates.data.projects}
-          binding={overview.data.binding}
+          factoryProject={overview.data.factoryProject}
           description={course?.description ?? null}
         />
       )}
@@ -46,23 +46,23 @@ export function WelcomePage() {
 
 function Picker({
   candidates,
-  binding,
+  factoryProject,
   description,
 }: {
   candidates: readonly CandidateProject[];
-  binding: Binding;
+  factoryProject: FactoryProject;
   description: string | null;
 }) {
   const rpc = useTutorRpc();
   const goCourse = useCourseNavigate();
-  const view = welcomeView(candidates, binding);
+  const view = welcomeView(candidates, factoryProject);
   const [selected, setSelected] = useState<string | null>(view.preselected);
   const [showAll, setShowAll] = useState(false);
   useEffect(() => setSelected((current) => current ?? view.preselected), [view.preselected]);
   const confirm = useAction(async () => {
     if (selected === null) return;
     await rpc.call("confirmFactory", { projectId: selected });
-    // Decide from a fresh overview: the cached one still says "unbound".
+    // Decide from a fresh overview: the cached one still says "unset".
     const decision = homeDecision(await rpc.call("getOverview", null));
     refreshAll();
     goCourse(decision.kind === "redirect" ? decision.route : { kind: "home" }, { replace: true });

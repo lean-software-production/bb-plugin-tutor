@@ -187,13 +187,13 @@ test("previews and finished lessons have no focus and open every feature", () =>
   assert.deepEqual(finished.chips.map((chip) => chip.tone), ["green", "green"]);
 });
 
-test("before a coach thread exists, an unbound student is sent to set up the factory instead of a start that must fail", () => {
-  assert.equal(coachStart("current", "unbound"), "set-up");
+test("before a coach thread exists, a student without a factory project is sent to set up the factory instead of a start that must fail", () => {
+  assert.equal(coachStart("current", "unset"), "set-up");
   assert.equal(coachStart("current", "missing"), "set-up");
-  assert.equal(coachStart("done", "unbound"), "set-up");
-  assert.equal(coachStart("ahead", "unbound"), "read-ahead");
-  assert.equal(coachStart("current", "bound"), "start");
-  assert.equal(coachStart("done", "bound"), "revisit");
-  assert.equal(coachStart("current", null), "loading", "no coach action until the binding is known");
+  assert.equal(coachStart("done", "unset"), "set-up");
+  assert.equal(coachStart("ahead", "unset"), "read-ahead");
+  assert.equal(coachStart("current", "found"), "start");
+  assert.equal(coachStart("done", "found"), "revisit");
+  assert.equal(coachStart("current", null), "loading", "no coach action until the factoryProject is known");
   assert.equal(coachStart("ahead", null), "read-ahead");
 });

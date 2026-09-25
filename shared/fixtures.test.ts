@@ -13,7 +13,7 @@ import {
   fixtureCourse,
   fixtureLessonDetail,
   fixtureOverview,
-  fixtureOverviewUnbound,
+  fixtureOverviewNoFactory,
   fixtureStudent,
 } from "./fixtures.ts";
 
@@ -21,7 +21,7 @@ test("fixtures satisfy their schemas", () => {
   courseSchema.parse(fixtureCourse);
   progressFileSchema.parse(fixtureStudent.progress);
   overviewSchema.parse(fixtureOverview);
-  overviewSchema.parse(fixtureOverviewUnbound);
+  overviewSchema.parse(fixtureOverviewNoFactory);
   lessonDetailSchema.parse(fixtureLessonDetail);
   completionSchema.parse(fixtureCompletion);
   for (const candidate of fixtureCandidates) candidateProjectSchema.parse(candidate);

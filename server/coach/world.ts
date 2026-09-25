@@ -1,13 +1,13 @@
 // Everything a handler needs, re-derived from disk and BB on each call: the
-// course, the factory binding, and the student's state. Nothing here comes
+// course, the factory project, and the student's state. Nothing here comes
 // from thread metadata.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { resolveCurrent, type CurrentPointer } from "../../shared/derive.ts";
 import type { Course, StudentState } from "../../shared/model.ts";
 import type { CourseSource, ProgressStore } from "../../shared/ports.ts";
-import type { Binding } from "../../shared/rpc.ts";
+import type { FactoryProject } from "../../shared/rpc.ts";
 import { overlaps, realPath } from "../paths.ts";
-import { resolveFactory } from "./binding.ts";
+import { resolveFactory } from "./factory-project.ts";
 import { readFeatureConfig, resolveCoursePath, resolveFactoryHint, type Env } from "./course-path.ts";
 import type { TutorSettings } from "./settings.ts";
 
@@ -18,10 +18,10 @@ export interface World {
   coursePath: string;
   course: Course | null;
   courseError: string | null;
-  binding: Binding;
-  /** The machine holding the factory folder; null unless bound. */
+  factoryProject: FactoryProject;
+  /** The machine holding the factory folder; null without a factory project. */
   factoryHostId: string | null;
-  /** Empty state while the factory is not bound. */
+  /** Empty state while there is no factory project. */
   student: StudentState;
   /** Null while the course is missing. */
   pointer: CurrentPointer | null;
@@ -72,17 +72,17 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
       ]);
       // Re-checked on every load, not just at confirmFactory: a factory whose folder now
       // leads into the course would have the coach write spec/ and seeds/ into the course.
-      const { binding, hostId } =
-        factory.binding.status === "bound" && overlaps(await realPath(factory.binding.root), await realPath(coursePath))
-          ? { binding: { status: "missing" as const, projectId: factory.binding.projectId }, hostId: null }
+      const { factoryProject, hostId } =
+        factory.factoryProject.status === "found" && overlaps(await realPath(factory.factoryProject.root), await realPath(coursePath))
+          ? { factoryProject: { status: "missing" as const, projectId: factory.factoryProject.projectId }, hostId: null }
           : factory;
-      const student = binding.status === "bound" ? await deps.store.read(binding.root) : EMPTY_STUDENT;
+      const student = factoryProject.status === "found" ? await deps.store.read(factoryProject.root) : EMPTY_STUDENT;
       if (courseResult.course !== null) last = courseResult.course;
       return {
         coursePath,
         course: courseResult.course,
         courseError: courseResult.error,
-        binding,
+        factoryProject,
         factoryHostId: hostId,
         student,
         pointer: courseResult.course === null ? null : resolveCurrent(courseResult.course, student),

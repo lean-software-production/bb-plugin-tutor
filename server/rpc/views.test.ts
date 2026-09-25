@@ -7,7 +7,7 @@ import {
   fixtureFreshStudent,
   fixtureLessonDetail,
   fixtureOverview,
-  fixtureOverviewUnbound,
+  fixtureOverviewNoFactory,
   fixtureReachedRules,
   fixtureStudent,
   fixtureThreads,
@@ -32,8 +32,8 @@ test("the overview matches the fixture the frontend was built against", () => {
   assert.deepEqual(overview, fixtureOverview);
 });
 
-test("unbound: lessons are listed from a fresh start, with no current state or threads", () => {
-  assert.deepEqual(buildOverview(makeWorld(fixtureStudent, { status: "unbound" }), records), fixtureOverviewUnbound);
+test("no factory project: lessons are listed from a fresh start, with no current state or threads", () => {
+  assert.deepEqual(buildOverview(makeWorld(fixtureStudent, { status: "unset" }), records), fixtureOverviewNoFactory);
 });
 
 test("a missing course still gives an overview", () => {

@@ -10,7 +10,7 @@ export function homeDecision(overview: Overview): HomeDecision {
   if (overview.course === null) {
     return { kind: "error", message: overview.courseError ?? "The course could not be loaded." };
   }
-  if (overview.binding.status !== "bound") return { kind: "redirect", route: { kind: "welcome" } };
+  if (overview.factoryProject.status !== "found") return { kind: "redirect", route: { kind: "welcome" } };
   const current = overview.current;
   if (current === null) {
     const first = overview.lessons[0];
@@ -64,8 +64,8 @@ export function continueView(overview: Overview): ContinueView {
     return { kind: "error", message: overview.courseError ?? "The course could not be loaded." };
   }
   const current = overview.current;
-  if (overview.binding.status !== "bound" || current === null) {
-    return { kind: "setup", courseTitle: overview.course.title, missing: overview.binding.status === "missing" };
+  if (overview.factoryProject.status !== "found" || current === null) {
+    return { kind: "setup", courseTitle: overview.course.title, missing: overview.factoryProject.status === "missing" };
   }
   const summary = overview.lessons.find((lesson) => lesson.id === current.lessonId);
   const set = summary?.set ?? null;

@@ -46,10 +46,10 @@ export const tutorThreadSchema = z.object({
 });
 export type TutorThread = z.infer<typeof tutorThreadSchema>;
 
-export const bindingSchema = z.discriminatedUnion("status", [
-  z.object({ status: z.literal("unbound") }),
+export const factoryProjectSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("unset") }),
   z.object({
-    status: z.literal("bound"),
+    status: z.literal("found"),
     projectId: z.string(),
     projectName: z.string(),
     /** Absolute path of the project's default local source. */
@@ -58,7 +58,7 @@ export const bindingSchema = z.discriminatedUnion("status", [
   /** The factoryProject setting names a project that is gone or has no local source. */
   z.object({ status: z.literal("missing"), projectId: z.string() }),
 ]);
-export type Binding = z.infer<typeof bindingSchema>;
+export type FactoryProject = z.infer<typeof factoryProjectSchema>;
 
 export const courseInfoSchema = z.object({
   id: z.string(),
@@ -131,9 +131,9 @@ export const overviewSchema = z.object({
   course: courseInfoSchema.nullable(),
   /** Why the course could not be loaded (course is then null). */
   courseError: z.string().nullable(),
-  binding: bindingSchema,
+  factoryProject: factoryProjectSchema,
   lessons: z.array(lessonSummarySchema),
-  /** Null while the course is missing or the factory is not bound. */
+  /** Null while the course is missing or there is no factory project. */
   current: currentStateSchema.nullable(),
   threads: z.array(tutorThreadSchema),
 });
@@ -197,7 +197,7 @@ export type CandidateProject = z.infer<typeof candidateProjectSchema>;
 
 /** Payload of the REALTIME_CHANNELS.stateChanged signal. */
 export const stateChangedSignalSchema = z.object({
-  reason: z.enum(["progress", "iteration", "binding", "threads", "course"]),
+  reason: z.enum(["progress", "iteration", "factoryProject", "threads", "course"]),
   lessonId: lessonIdSchema.nullable(),
 });
 export type StateChangedSignal = z.infer<typeof stateChangedSignalSchema>;
@@ -238,7 +238,7 @@ export const rpcContract = defineRpcContract({
   /** Stores the factoryProject setting. Never creates a project. */
   confirmFactory: {
     input: z.object({ projectId: z.string().min(1).max(128) }),
-    output: bindingSchema,
+    output: factoryProjectSchema,
   },
   /** Finds the lesson's coach thread, or spawns it. Current or done lessons only. */
   openCoach: {

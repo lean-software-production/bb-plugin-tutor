@@ -48,15 +48,15 @@ export function coachStateOf(world: World): CoachState | { error: string } {
   if (world.course === null || world.pointer === null) {
     return { error: `The course could not be loaded: ${world.courseError ?? "unknown error"}` };
   }
-  if (world.binding.status !== "bound" || world.factoryHostId === null) {
+  if (world.factoryProject.status !== "found" || world.factoryHostId === null) {
     return { error: "No factory project is set up yet. The student confirms it on the Course page." };
   }
   const lesson = findLesson(world.course, world.pointer.lessonId);
   if (lesson === undefined) return { error: `Lesson ${world.pointer.lessonId} is not in this course.` };
   return {
     course: world.course,
-    projectId: world.binding.projectId,
-    root: world.binding.root,
+    projectId: world.factoryProject.projectId,
+    root: world.factoryProject.root,
     hostId: world.factoryHostId,
     lesson,
     pointer: world.pointer,
