@@ -1,6 +1,6 @@
-// The paper lesson that leads the coach thread (mockup 2A) with Examples as
+// The paper lesson on a lesson's start page (mockup 2A) with Examples as
 // annotated Gherkin (mockup 6B). Pure presentation over LessonView; the page
-// owns data, open/closed state and actions.
+// owns data and open/closed state.
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { clipLines, plural } from "../model/format.ts";
@@ -19,16 +19,14 @@ export interface LessonProps {
   openFeatures: ReadonlySet<string>;
   onToggleRule: (ruleKey: string) => void;
   onToggleFeature: (foldId: string) => void;
-  /** Extra controls under a Rule drawn open (redirect, side thread). */
-  ruleActions: (rule: RuleView) => ReactNode;
   /** Shown above the lesson, e.g. "you finished this lesson". */
   banner?: ReactNode;
 }
 
-export function Lesson({ view, openRules, openFeatures, onToggleRule, onToggleFeature, ruleActions, banner }: LessonProps) {
+export function Lesson({ view, openRules, openFeatures, onToggleRule, onToggleFeature, banner }: LessonProps) {
   const focusFeature = view.focusFeature;
   const ruleList = (rules: readonly RuleView[], focusLabel: string | null = null) => (
-    <RuleList rules={rules} openRules={openRules} onToggleRule={onToggleRule} ruleActions={ruleActions} focusLabel={focusLabel} />
+    <RuleList rules={rules} openRules={openRules} onToggleRule={onToggleRule} focusLabel={focusLabel} />
   );
   return (
     <article className="tp-lesson" aria-label={view.barTitle}>
@@ -167,13 +165,11 @@ function RuleList({
   rules,
   openRules,
   onToggleRule,
-  ruleActions,
   focusLabel,
 }: {
   rules: readonly RuleView[];
   openRules: ReadonlySet<string>;
   onToggleRule: (ruleKey: string) => void;
-  ruleActions: (rule: RuleView) => ReactNode;
   focusLabel: string | null;
 }) {
   return (
@@ -185,7 +181,6 @@ function RuleList({
             rule={rule}
             label={rule.isFocus && focusLabel !== null ? `Rule · ${focusLabel}` : rule.isUpNext ? "Rule · up next" : "Rule"}
             onCollapse={rule.isFocus ? null : () => onToggleRule(rule.key)}
-            actions={ruleActions(rule)}
           />
         ) : (
           <button
@@ -215,12 +210,10 @@ function RuleOpen({
   rule,
   label,
   onCollapse,
-  actions,
 }: {
   rule: RuleView;
   label: string;
   onCollapse: (() => void) | null;
-  actions: ReactNode;
 }) {
   return (
     <section className={rule.isFocus ? "tp-rule tp-rule--focus" : "tp-rule"} data-rule-key={rule.key} aria-label={`Rule ${rule.name}`}>
@@ -244,7 +237,6 @@ function RuleOpen({
           <AnnotatedExample key={example.key} example={example} />
         ))}
       </div>
-      {actions}
     </section>
   );
 }

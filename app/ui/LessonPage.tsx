@@ -150,7 +150,6 @@ function StartPage({
             openFeatures={openFeatures}
             onToggleRule={(key) => setOpenRules((set) => toggled(set, key))}
             onToggleFeature={(slug) => setOpenFeatures((set) => toggled(set, slug))}
-            ruleActions={() => null}
             banner={
               <>
                 {staleError === null ? null : <ErrorNotice message={staleError} />}
