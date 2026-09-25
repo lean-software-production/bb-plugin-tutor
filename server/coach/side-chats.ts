@@ -137,12 +137,28 @@ export async function ensureSideChatTab(
  * coach's tool start a side chat. A fork whose tab never got written would sit
  * in the coach thread unseen, so when the tab write fails the fork is archived
  * before the error surfaces; if archiving fails too, the error names both.
+ *
+ * A failed write is not proof there is no tab: BB can store it and still
+ * answer with an error, and another client can write the same tab during the
+ * last conflict. So the tabs are read again first; if one shows the fork, the
+ * side chat opened after all. Only a fork confirmed tab-less is archived; when
+ * the tabs can't be read, it is left alone and the error says so.
  */
 export async function openSideChat(sdk: Sdk, fork: ForkSideChat, sourceMessageText: string): Promise<string> {
   const sideChatId = await forkSideChat(sdk, fork);
   try {
     await ensureSideChatTab(sdk, fork.coachThreadId, sideChatId, sourceMessageText);
   } catch (cause) {
+    let tabs: Tabs;
+    try {
+      tabs = (await sdk.threads.tabs.get({ threadId: fork.coachThreadId })).tabs;
+    } catch (reread) {
+      throw new Error(
+        `${errorText(cause)} (and couldn't check whether side chat ${sideChatId} has its tab, so it was left as it is: ${errorText(reread)})`,
+        { cause },
+      );
+    }
+    if (tabs.some((tab) => showsSideChat(tab, sideChatId))) return sideChatId;
     try {
       await sdk.threads.archive({ threadId: sideChatId });
     } catch (cleanup) {

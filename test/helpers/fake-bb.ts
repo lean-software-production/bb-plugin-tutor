@@ -42,8 +42,17 @@ export interface TutorHost extends FakePluginHost {
   sent: { threadId: string; text: string }[];
   /** Each thread's right-panel tabs, as BB stores them. */
   tabs: Map<string, FakeTabs>;
-  /** Tab writes to fail with BB's revision conflict before one succeeds. */
-  tabConflicts: { remaining: number };
+  /**
+   * Tab writes to fail with BB's revision conflict before one succeeds. With
+   * `withOurTab`, the other client's write behind the last of those conflicts
+   * already carries the tab being written (as when two clients add the same tab).
+   */
+  tabConflicts: { remaining: number; withOurTab: boolean };
+  /**
+   * When set, every tab write fails with this message; with `landed`, the
+   * write is stored first (as when BB applies it but the reply is lost).
+   */
+  tabWriteError: { message: string | null; landed: boolean };
   /** When set, forks fail the way BB fails them for a provider that cannot fork. */
   forkRefusal: { message: string | null };
   /** When set, archiving a thread fails with this message. */
@@ -86,7 +95,8 @@ export async function makeTutorHost(
   const running = new Set<string>();
   const sent: { threadId: string; text: string }[] = [];
   const tabs = new Map<string, FakeTabs>();
-  const tabConflicts = { remaining: 0 };
+  const tabConflicts = { remaining: 0, withOurTab: false };
+  const tabWriteError: { message: string | null; landed: boolean } = { message: null, landed: false };
   const forkRefusal: { message: string | null } = { message: null };
   const archiveRefusal: { message: string | null } = { message: null };
   let clock = 1000;
@@ -213,12 +223,16 @@ export async function makeTutorHost(
             if (tabConflicts.remaining > 0) {
               // Another client wrote first: BB's tab strip adds a tab of its own.
               tabConflicts.remaining -= 1;
-              tabs.set(threadId, { revision: current.revision + 1, tabs: [...current.tabs, { id: `other-${current.revision}`, kind: "new-tab" }] });
+              const theirs = tabConflicts.withOurTab && tabConflicts.remaining === 0
+                ? (structuredClone(next) as FakeTabs["tabs"]).filter((tab) => !current.tabs.some((existing) => existing.id === tab.id))
+                : [{ id: `other-${current.revision}`, kind: "new-tab" }];
+              tabs.set(threadId, { revision: current.revision + 1, tabs: [...current.tabs, ...theirs] });
               throw httpError(409, "thread_tabs_conflict", "Thread tabs changed on another client");
             }
             if (expectedRevision !== current.revision) throw httpError(409, "thread_tabs_conflict", "Thread tabs changed on another client");
             const stored = { revision: current.revision + 1, tabs: structuredClone(next) as FakeTabs["tabs"] };
-            tabs.set(threadId, stored);
+            if (tabWriteError.message === null || tabWriteError.landed) tabs.set(threadId, stored);
+            if (tabWriteError.message !== null) throw httpError(502, "bad_gateway", tabWriteError.message);
             return stored;
           },
         },
@@ -238,5 +252,5 @@ export async function makeTutorHost(
     featureConfigFile: options.featureConfigFile ?? "/nonexistent/tutor/config.json",
     now: () => NOW,
   });
-  return { ...host, rt, threads, running, sent, tabs, tabConflicts, forkRefusal, archiveRefusal, addThread };
+  return { ...host, rt, threads, running, sent, tabs, tabConflicts, tabWriteError, forkRefusal, archiveRefusal, addThread };
 }

@@ -525,6 +525,40 @@ test("a tab write that keeps conflicting fails after a few tries instead of loop
   );
 });
 
+test("a tab write that errors but lands keeps its side chat; one that really failed archives it", async (t) => {
+  const { host } = await setup(t);
+  const { coach, rule } = await adoptedCoach(host);
+  const live = (id: string) => host.threads.find((thread) => thread.id === id)?.archivedAt === null;
+  const shown = () => sideChatTabsOf(host, coach).map((tab) => (JSON.parse(tab.paramsJson ?? "{}") as { threadId: string }).threadId);
+
+  // BB stored the tab but the reply was an error: the tab points at the fork, so the fork stays.
+  host.tabWriteError.message = "upstream timed out";
+  host.tabWriteError.landed = true;
+  const landed = (await host.harness.behavior.callRpc("startSideChat", { lessonId: "000", ruleKey: rule })) as { sideChatId: string };
+  assert.ok(live(landed.sideChatId), "the side chat its tab shows is not archived");
+  assert.deepEqual(shown(), [landed.sideChatId]);
+
+  // Another client wrote our very tab during the last conflict: the tab is there, so the fork stays.
+  host.tabWriteError.message = null;
+  host.tabConflicts.remaining = 3;
+  host.tabConflicts.withOurTab = true;
+  const raced = await tool(host, "tutor_side_chat", { title: "t", prompt: "p", rule }, coach);
+  assert.ok(!isError(raced), text(raced));
+  const racedId = /Started side chat (thr_\d+)/.exec(text(raced))?.[1] ?? assert.fail(text(raced));
+  assert.ok(live(racedId), "the side chat another client's tab shows is not archived");
+  assert.deepEqual(shown(), [landed.sideChatId, racedId]);
+
+  // The write really failed: no tab shows the fork, so it is archived and the error surfaces.
+  host.tabConflicts.withOurTab = false;
+  host.tabWriteError.message = "upstream timed out";
+  host.tabWriteError.landed = false;
+  const before = host.threads.length;
+  await assert.rejects(host.harness.behavior.callRpc("startSideChat", { lessonId: "000", ruleKey: rule }), /upstream timed out/);
+  const failed = host.threads[before]?.id ?? assert.fail("no fork");
+  assert.ok(!live(failed), "the tab-less fork is archived");
+  assert.deepEqual(shown(), [landed.sideChatId, racedId]);
+});
+
 test("a provider that cannot fork gets a clear error, and no side thread is spawned instead", async (t) => {
   const { host } = await setup(t);
   const { coach, rule } = await adoptedCoach(host);
