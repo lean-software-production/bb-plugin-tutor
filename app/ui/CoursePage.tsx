@@ -1,10 +1,12 @@
-// The one navPanel ("Course"), routed by sub-path (shared/routes.ts). It also
-// publishes the route so the rail can tell which lesson is on screen, because
-// BB passes the rail activeThreadId: null on plugin pages.
+// The one navPanel ("Course"), routed by sub-path (shared/routes.ts, plus a
+// lesson's Rule: model/course-route.ts). It also publishes the route so the
+// rail can tell which lesson is on screen, because BB passes the rail
+// activeThreadId: null on plugin pages.
 import { useEffect } from "react";
 import type { PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
-import { formatRoute, parseRoute } from "../../shared/routes.ts";
+import { formatRoute } from "../../shared/routes.ts";
 import { useCourseNavigate, useLiveRefresh, useOverview } from "../hooks.ts";
+import { parseCoursePath } from "../model/course-route.ts";
 import { homeDecision } from "../model/home.ts";
 import { routeStore } from "../state/app-state.ts";
 import { Loading, Notice, PaperPage } from "./common.tsx";
@@ -14,7 +16,7 @@ import { WelcomePage } from "./WelcomePage.tsx";
 
 export function CoursePage({ subPath }: PluginNavPanelProps) {
   useLiveRefresh();
-  const route = parseRoute(subPath);
+  const { route, ruleKey } = parseCoursePath(subPath);
   useEffect(() => {
     routeStore.set(route);
     return () => routeStore.set(null);
@@ -27,7 +29,7 @@ export function CoursePage({ subPath }: PluginNavPanelProps) {
     case "welcome":
       return <WelcomePage />;
     case "lesson":
-      return <LessonPage key={route.homeworkId} homeworkId={route.homeworkId} />;
+      return <LessonPage key={route.homeworkId} homeworkId={route.homeworkId} ruleKey={ruleKey} />;
     case "complete":
       return <CompletionPage key={route.homeworkId} homeworkId={route.homeworkId} />;
   }

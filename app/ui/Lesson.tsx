@@ -3,7 +3,8 @@
 // owns data, open/closed state and actions.
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { clipLines } from "../model/format.ts";
+import { clipLines, plural } from "../model/format.ts";
+import { laterFoldId } from "../model/lesson.ts";
 import type { ExampleView, FeatureView, LessonView, MarginNote, RuleView } from "../model/lesson.ts";
 import { Chips, GherkinLines, GherkinRow, InlineText, NewDot } from "./common.tsx";
 
@@ -14,9 +15,10 @@ const EVIDENCE_LINES = 4;
 export interface LessonProps {
   view: LessonView;
   openRules: ReadonlySet<string>;
+  /** Open folds: feature slugs, and laterFoldId for the Rules after the focus. */
   openFeatures: ReadonlySet<string>;
   onToggleRule: (ruleKey: string) => void;
-  onToggleFeature: (slug: string) => void;
+  onToggleFeature: (foldId: string) => void;
   /** Extra controls under a Rule drawn open (redirect, side thread). */
   ruleActions: (rule: RuleView) => ReactNode;
   /** Shown above the lesson, e.g. "you finished this homework". */
@@ -24,7 +26,10 @@ export interface LessonProps {
 }
 
 export function Lesson({ view, openRules, openFeatures, onToggleRule, onToggleFeature, ruleActions, banner }: LessonProps) {
-  const folded = view.focusFeature !== null;
+  const focusFeature = view.focusFeature;
+  const ruleList = (rules: readonly RuleView[], focusLabel: string | null = null) => (
+    <RuleList rules={rules} openRules={openRules} onToggleRule={onToggleRule} ruleActions={ruleActions} focusLabel={focusLabel} />
+  );
   return (
     <article className="tp-lesson" aria-label={view.barTitle}>
       {banner}
@@ -48,35 +53,49 @@ export function Lesson({ view, openRules, openFeatures, onToggleRule, onToggleFe
           </ul>
         </div>
       )}
-      {folded && view.otherFeatures.length > 0 ? (
+      {focusFeature !== null && view.otherFeatures.length > 0 ? (
         <div className="tp-folds">
           <p className="tp-section-label">Other features</p>
           {view.otherFeatures.map((feature) => (
-            <FeatureFold
+            <Fold
               key={feature.slug}
-              feature={feature}
+              name={
+                <>
+                  {feature.name}
+                  <NewDot novelty={feature.novelty} mixedLabel="changed" />
+                </>
+              }
+              file={feature.file}
+              count={feature.count}
               open={openFeatures.has(feature.slug)}
               onToggle={() => onToggleFeature(feature.slug)}
             >
-              <RuleList feature={feature} openRules={openRules} onToggleRule={onToggleRule} ruleActions={ruleActions} />
-            </FeatureFold>
+              {ruleList(feature.rules)}
+            </Fold>
           ))}
         </div>
       ) : null}
-      {folded && view.focusFeature !== null ? (
-        <FeatureSection feature={view.focusFeature} focusLabel={view.focus?.label ?? null}>
-          <RuleList
-            feature={view.focusFeature}
-            openRules={openRules}
-            onToggleRule={onToggleRule}
-            ruleActions={ruleActions}
-            focusLabel={view.focus?.label ?? null}
-          />
+      {focusFeature !== null ? (
+        <FeatureSection feature={focusFeature} focusLabel={view.focus?.label ?? null}>
+          {/* The focus feature's rules end at the focus; the ones after it fold away above it. */}
+          {ruleList(focusFeature.rules.slice(0, -1))}
+          {view.laterRules.length === 0 ? null : (
+            <Fold
+              name="Later in this feature"
+              file={null}
+              count={plural(view.laterRules.length, "rule")}
+              open={openFeatures.has(laterFoldId(focusFeature.slug))}
+              onToggle={() => onToggleFeature(laterFoldId(focusFeature.slug))}
+            >
+              {ruleList(view.laterRules)}
+            </Fold>
+          )}
+          {ruleList(focusFeature.rules.slice(-1), view.focus?.label ?? null)}
         </FeatureSection>
       ) : (
         view.otherFeatures.map((feature) => (
           <FeatureSection key={feature.slug} feature={feature} focusLabel={null}>
-            <RuleList feature={feature} openRules={openRules} onToggleRule={onToggleRule} ruleActions={ruleActions} />
+            {ruleList(feature.rules)}
           </FeatureSection>
         ))
       )}
@@ -115,17 +134,28 @@ function FeatureSection({ feature, focusLabel, children }: { feature: FeatureVie
   );
 }
 
-function FeatureFold({ feature, open, onToggle, children }: { feature: FeatureView; open: boolean; onToggle: () => void; children: ReactNode }) {
+function Fold({
+  name,
+  file,
+  count,
+  open,
+  onToggle,
+  children,
+}: {
+  name: ReactNode;
+  file: string | null;
+  count: string;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
   return (
     <div className="tp-fold">
       <button type="button" className="tp-fold-head" aria-expanded={open} onClick={onToggle}>
-        <span className="tp-fold-name">
-          {feature.name}
-          <NewDot novelty={feature.novelty} mixedLabel="changed" />
-        </span>
-        <code className="tp-fold-file">{feature.file}</code>
+        <span className="tp-fold-name">{name}</span>
+        {file === null ? null : <code className="tp-fold-file">{file}</code>}
         <span className="tp-x">
-          {feature.count} {open ? "▾" : "›"}
+          {count} {open ? "▾" : "›"}
         </span>
       </button>
       {open ? <div className="tp-fold-body">{children}</div> : null}
@@ -134,21 +164,21 @@ function FeatureFold({ feature, open, onToggle, children }: { feature: FeatureVi
 }
 
 function RuleList({
-  feature,
+  rules,
   openRules,
   onToggleRule,
   ruleActions,
-  focusLabel = null,
+  focusLabel,
 }: {
-  feature: FeatureView;
+  rules: readonly RuleView[];
   openRules: ReadonlySet<string>;
   onToggleRule: (ruleKey: string) => void;
   ruleActions: (rule: RuleView) => ReactNode;
-  focusLabel?: string | null;
+  focusLabel: string | null;
 }) {
   return (
     <>
-      {feature.rules.map((rule) =>
+      {rules.map((rule) =>
         rule.isFocus || openRules.has(rule.key) ? (
           <RuleOpen
             key={rule.key}

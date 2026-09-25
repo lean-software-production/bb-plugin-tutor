@@ -12,3 +12,7 @@ licensed; the typefaces themselves are under the SIL Open Font License 1.1:
 
 `../paper.css` registers them under `Tutor …` family names so they can never shadow a font BB or
 another plugin loads.
+
+The Archivo face leaves out U+0020 and U+00A0 (`unicode-range`), so word spaces come from the
+fallback sans-serif: Archivo's own 0.2em space runs words together at the rail's small sizes. The
+file itself matches Google Fonts' Archivo Latin subset (same space advance, `HVAR` and widths).

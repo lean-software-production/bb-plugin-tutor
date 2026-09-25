@@ -5,6 +5,7 @@
   font-weight: 300 800;
   font-style: normal;
   font-display: swap;
+  unicode-range: U+0-1F, U+21-9F, U+A1-10FFFF;
 }
 @font-face {
   font-family: "Tutor JetBrains Mono";

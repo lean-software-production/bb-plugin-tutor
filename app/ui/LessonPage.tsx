@@ -8,9 +8,9 @@ import { toast } from "sonner";
 import { formatRoute } from "../../shared/routes.ts";
 import { refreshAll, useAction, useCourseNavigate, useOverview, useQuery, useStore, useTutorRpc } from "../hooks.ts";
 import { homeworkLabel } from "../model/format.ts";
-import { buildLesson } from "../model/lesson.ts";
-import type { LessonView, RuleView } from "../model/lesson.ts";
-import { QUERY_KEYS, ruleRequestStore } from "../state/app-state.ts";
+import { buildLesson, coachStart, foldsHiding } from "../model/lesson.ts";
+import type { CoachStart, LessonView, RuleView } from "../model/lesson.ts";
+import { QUERY_KEYS, ruleRequestStore, takeRuleRequest } from "../state/app-state.ts";
 import { Bar, Loading, Notice, coursePageHref, isPlainClick } from "./common.tsx";
 import { Lesson } from "./Lesson.tsx";
 
@@ -26,7 +26,8 @@ function toggled(set: ReadonlySet<string>, key: string, open?: boolean): Set<str
   return next;
 }
 
-export function LessonPage({ homeworkId }: { homeworkId: string }) {
+/** `ruleKey` is the Rule named in the URL, opened on arrival. */
+export function LessonPage({ homeworkId, ruleKey }: { homeworkId: string; ruleKey: string | null }) {
   const rpc = useTutorRpc();
   const overview = useOverview();
   const lesson = useQuery(QUERY_KEYS.lesson(homeworkId), () => rpc.call("getLesson", { homeworkId }));
@@ -40,10 +41,29 @@ export function LessonPage({ homeworkId }: { homeworkId: string }) {
     );
   }
   const view = buildLesson(lesson.data, overview.data?.homeworks ?? [], Date.now());
-  return <LessonLayout key={homeworkId} view={view} staleError={lesson.status === "error" ? lesson.error : null} />;
+  const start = coachStart(view.status, overview.data?.binding.status ?? null);
+  return (
+    <LessonLayout
+      key={homeworkId}
+      view={view}
+      start={start}
+      urlRuleKey={ruleKey}
+      staleError={lesson.status === "error" ? lesson.error : null}
+    />
+  );
 }
 
-function LessonLayout({ view, staleError }: { view: LessonView; staleError: string | null }) {
+function LessonLayout({
+  view,
+  start,
+  urlRuleKey,
+  staleError,
+}: {
+  view: LessonView;
+  start: CoachStart;
+  urlRuleKey: string | null;
+  staleError: string | null;
+}) {
   const rpc = useTutorRpc();
   const navigate = useBbNavigate();
   const goCourse = useCourseNavigate();
@@ -55,9 +75,13 @@ function LessonLayout({ view, staleError }: { view: LessonView; staleError: stri
   const scroller = useRef<HTMLDivElement>(null);
   const [farFromLatest, setFarFromLatest] = useState(false);
 
+  // The latest scroll wins: a Rule asked for on arrival overrides the focus.
+  const scrollSeq = useRef(0);
   const scrollToRule = useCallback((ruleKey: string) => {
+    const seq = ++scrollSeq.current;
     let frames = 0;
     const attempt = () => {
+      if (seq !== scrollSeq.current) return;
       const target = scroller.current?.querySelector(`[data-rule-key="${CSS.escape(ruleKey)}"]`);
       if (target !== null && target !== undefined) target.scrollIntoView({ block: "start", behavior: "smooth" });
       else if (++frames < SCROLL_WAIT_FRAMES) requestAnimationFrame(attempt);
@@ -71,17 +95,26 @@ function LessonLayout({ view, staleError }: { view: LessonView; staleError: stri
     if (focusKey !== null) scrollToRule(focusKey);
   }, [focusKey, scrollToRule]);
 
-  // A Rule clicked in the rail or on a chat card: open it, and its feature, then scroll there.
-  const request = useStore(ruleRequestStore);
-  const handled = useRef<number | null>(null);
+  // A Rule named in the URL or clicked in the rail: open it and whatever folds hide it, then scroll there.
+  const latestView = useRef(view);
+  latestView.current = view;
+  const revealRule = useCallback(
+    (ruleKey: string) => {
+      for (const fold of foldsHiding(latestView.current, ruleKey)) setOpenFeatures((set) => toggled(set, fold, true));
+      setOpenRules((set) => toggled(set, ruleKey, true));
+      scrollToRule(ruleKey);
+    },
+    [scrollToRule],
+  );
   useEffect(() => {
-    if (request === null || request.homeworkId !== homeworkId || handled.current === request.seq) return;
-    handled.current = request.seq;
-    const feature = view.otherFeatures.find((candidate) => candidate.rules.some((rule) => rule.key === request.ruleKey));
-    if (feature !== undefined) setOpenFeatures((set) => toggled(set, feature.slug, true));
-    setOpenRules((set) => toggled(set, request.ruleKey, true));
-    scrollToRule(request.ruleKey);
-  }, [request, homeworkId, view.otherFeatures, scrollToRule]);
+    if (urlRuleKey !== null) revealRule(urlRuleKey);
+  }, [urlRuleKey, revealRule]);
+  // The rail also asks through the store, so clicking the Rule already in the URL scrolls back to it.
+  const request = useStore(ruleRequestStore);
+  useEffect(() => {
+    const taken = takeRuleRequest(homeworkId);
+    if (taken !== null) revealRule(taken.ruleKey);
+  }, [request, homeworkId, revealRule]);
 
   const onScroll = () => {
     const element = scroller.current;
@@ -184,7 +217,13 @@ function LessonLayout({ view, staleError }: { view: LessonView; staleError: stri
             <>
               {lead}
               <div className="tutor-paper tp-lead">
-                <StartCoach view={view} pending={openCoach.pending} error={openCoach.error} onStart={() => void openCoach.run()} />
+                <StartCoach
+                  start={start}
+                  pending={openCoach.pending}
+                  error={openCoach.error}
+                  onStart={() => void openCoach.run()}
+                  onSetUp={() => goCourse({ kind: "welcome" })}
+                />
               </div>
             </>
           ) : (
@@ -206,28 +245,54 @@ function LessonLayout({ view, staleError }: { view: LessonView; staleError: stri
   );
 }
 
-function StartCoach({ view, pending, error, onStart }: { view: LessonView; pending: boolean; error: string | null; onStart: () => void }) {
-  if (view.status === "ahead") {
-    return (
-      <div className="tp-start">
-        <p className="tp-prose">
-          This homework comes after the one you're on. Read ahead as much as you like; your coach picks it up when you get
-          here.
-        </p>
-      </div>
-    );
+function StartCoach({
+  start,
+  pending,
+  error,
+  onStart,
+  onSetUp,
+}: {
+  start: CoachStart;
+  pending: boolean;
+  error: string | null;
+  onStart: () => void;
+  onSetUp: () => void;
+}) {
+  switch (start) {
+    case "read-ahead":
+      return (
+        <div className="tp-start">
+          <p className="tp-prose">
+            This homework comes after the one you're on. Read ahead as much as you like; your coach picks it up when you
+            get here.
+          </p>
+        </div>
+      );
+    case "set-up":
+      return (
+        <div className="tp-start">
+          <p className="tp-prose">
+            Your coach works in your factory project. Pick that project first, then come back to start with your coach.
+          </p>
+          <button type="button" className="tp-btn tp-btn--big" onClick={onSetUp}>
+            Set up your factory project →
+          </button>
+        </div>
+      );
+    case "start":
+    case "revisit":
+      return (
+        <div className="tp-start">
+          <p className="tp-prose">
+            {start === "start"
+              ? "Your coach works through this homework with you, one Rule at a time, in your factory repo."
+              : "You finished this homework. Open its coach thread to look back at how it went."}
+          </p>
+          <button type="button" className="tp-btn tp-btn--big" disabled={pending} onClick={onStart}>
+            {pending ? "Starting…" : start === "start" ? "Start with your coach →" : "Open the coach thread →"}
+          </button>
+          {error === null ? null : <Notice tone="error">{error}</Notice>}
+        </div>
+      );
   }
-  return (
-    <div className="tp-start">
-      <p className="tp-prose">
-        {view.status === "current"
-          ? "Your coach works through this homework with you, one Rule at a time, in your factory repo."
-          : "You finished this homework. Open its coach thread to look back at how it went."}
-      </p>
-      <button type="button" className="tp-btn tp-btn--big" disabled={pending} onClick={onStart}>
-        {pending ? "Starting…" : view.status === "current" ? "Start with your coach →" : "Open the coach thread →"}
-      </button>
-      {error === null ? null : <Notice tone="error">{error}</Notice>}
-    </div>
-  );
 }

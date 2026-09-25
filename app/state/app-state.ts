@@ -9,7 +9,7 @@ export const queryCache = createQueryCache();
 /** The Tutor route on screen, published by the course page; null elsewhere in BB. */
 export const routeStore = createStore<TutorRoute | null>(null);
 
-/** A Rule someone asked the lesson to open and scroll to (a rail click, a card link). */
+/** A Rule the rail asked the lesson to open and scroll to; the lesson takes it once. */
 export interface RuleRequest {
   homeworkId: string;
   ruleKey: string;
@@ -22,6 +22,14 @@ let requestSeq = 0;
 export function requestRule(homeworkId: string, ruleKey: string): void {
   requestSeq += 1;
   ruleRequestStore.set({ homeworkId, ruleKey, seq: requestSeq });
+}
+
+/** The pending request for this homework's lesson, cleared so a remount never replays it. */
+export function takeRuleRequest(homeworkId: string): RuleRequest | null {
+  const request = ruleRequestStore.get();
+  if (request === null || request.homeworkId !== homeworkId) return null;
+  ruleRequestStore.set(null);
+  return request;
 }
 
 /** Whether the course rail is the selected sidebar list (it only mounts when it is). */

@@ -40,10 +40,10 @@ export function CourseRail({ activeThreadId, activeProjectId, onNavigate }: Plug
   });
 
   const goCourse = useCourseNavigate();
-  const go = (event: MouseEvent, target: TutorRoute) => {
+  const go = (event: MouseEvent, target: TutorRoute, ruleKey: string | null = null) => {
     if (!isPlainClick(event)) return;
     event.preventDefault();
-    goCourse(target);
+    goCourse(target, { ruleKey });
     onNavigate();
   };
   const factoryProjectId = overview.data?.binding.status === "bound" ? overview.data.binding.projectId : null;
@@ -67,7 +67,7 @@ export function CourseRail({ activeThreadId, activeProjectId, onNavigate }: Plug
   );
 }
 
-type Go = (event: MouseEvent, target: TutorRoute) => void;
+type Go = (event: MouseEvent, target: TutorRoute, ruleKey?: string | null) => void;
 
 function RailBody({ rail, go, onNavigate }: { rail: RailView; go: Go; onNavigate: () => void }) {
   switch (rail.status.kind) {
@@ -190,11 +190,12 @@ function RailFeatureGroup({ feature, homeworkId, go }: { feature: RailFeature; h
             <a
               key={rule.key}
               className={`tp-rrow tp-rrow--${rule.glyph}${rule.isFocus ? " tp-rrow--focus" : ""}`}
-              href={coursePageHref(formatRoute({ kind: "lesson", homeworkId }))}
+              href={coursePageHref(rule.subPath)}
               aria-current={rule.isFocus ? "step" : undefined}
               onClick={(event) => {
+                // The store request also scrolls back to a Rule whose URL is already open.
                 if (isPlainClick(event)) requestRule(homeworkId, rule.key);
-                go(event, { kind: "lesson", homeworkId });
+                go(event, { kind: "lesson", homeworkId }, rule.key);
               }}
             >
               <span className="tp-g" aria-hidden>
@@ -214,6 +215,7 @@ function RailFeatureGroup({ feature, homeworkId, go }: { feature: RailFeature; h
 function Conversations({ rail, onNavigate }: { rail: RailView; onNavigate: () => void }) {
   const rpc = useTutorRpc();
   const navigate = useBbNavigate();
+  const goCourse = useCourseNavigate();
   const homeworkId = rail.currentHomeworkId;
   const focus = rail.features.flatMap((feature) => feature.rules).find((rule) => rule.isFocus)?.key ?? null;
   const startSide = useAction(async () => {
@@ -223,10 +225,13 @@ function Conversations({ rail, onNavigate }: { rail: RailView; onNavigate: () =>
     navigate.toThread(threadId);
     onNavigate();
   });
+  // The lesson page hosts the coach thread, so a new coach opens there.
   const startCoach = useAction(async () => {
     if (homeworkId === null) return;
     await rpc.call("openCoach", { homeworkId });
     refreshAll();
+    goCourse({ kind: "lesson", homeworkId });
+    onNavigate();
   });
   if (homeworkId === null) return null;
   return (

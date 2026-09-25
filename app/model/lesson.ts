@@ -1,6 +1,8 @@
 // View model of the paper lesson that leads the coach thread (mockups 2A and
 // 6B): header, "New since" compass, the other features collapsed, then the
-// feature holding the Rule in focus, ending at that Rule.
+// feature holding the Rule in focus, ending at that Rule. The Rules after it
+// fold away ahead of it ("Later in this feature"), so the conversation always
+// follows the Rule in focus.
 import { countExamples, exampleStatus, findRule, homeworkExamples, ruleStatus } from "../../shared/derive.ts";
 import type { ProgressMap } from "../../shared/derive.ts";
 import type {
@@ -14,7 +16,7 @@ import type {
   Rule,
   RuleStatus,
 } from "../../shared/model.ts";
-import type { HomeworkSummary, Lesson } from "../../shared/rpc.ts";
+import type { Binding, HomeworkSummary, Lesson } from "../../shared/rpc.ts";
 import { backgroundLines, exampleLines } from "./gherkin.ts";
 import type { GherkinLine } from "./gherkin.ts";
 import { firstSentence, homeworkEyebrow, homeworkLabel, percent, plural, relativeTime } from "./format.ts";
@@ -87,8 +89,10 @@ export interface LessonView {
   /** "Assembly line › The factory refuses …", or null without a focus. */
   crumb: string | null;
   focus: { ruleKey: string; label: "in focus" | "up next" } | null;
-  /** The feature holding the focus, drawn open; null when nothing is in focus. */
+  /** The feature holding the focus, its `rules` ending at the focus; null when nothing is in focus. */
   focusFeature: FeatureView | null;
+  /** The focus feature's Rules after the focus, folded ahead of it. */
+  laterRules: RuleView[];
   /** Every other feature, collapsed when there is a focus feature. */
   otherFeatures: FeatureView[];
   coachThreadId: string | null;
@@ -97,6 +101,34 @@ export interface LessonView {
 }
 
 const MAX_COMPASS_ITEMS = 6;
+
+export type CoachStart = "read-ahead" | "set-up" | "start" | "revisit";
+
+/**
+ * What a lesson offers before its coach thread exists. A coach needs a bound
+ * factory, so an unbound student is sent to set one up rather than shown a
+ * start that must fail. `binding` is null until the overview loads.
+ */
+export function coachStart(status: HomeworkStatus, binding: Binding["status"] | null): CoachStart {
+  if (status === "ahead") return "read-ahead";
+  if (binding === "unbound" || binding === "missing") return "set-up";
+  return status === "current" ? "start" : "revisit";
+}
+
+/** Fold id of a focus feature's "Later in this feature" group; feature slugs never hold ":". */
+export function laterFoldId(featureSlug: string): string {
+  return `later:${featureSlug}`;
+}
+
+/** The folds (feature slugs or laterFoldId) that must open for `ruleKey` to show. */
+export function foldsHiding(view: LessonView, ruleKey: string): string[] {
+  if (view.focusFeature !== null && view.laterRules.some((rule) => rule.key === ruleKey)) {
+    return [laterFoldId(view.focusFeature.slug)];
+  }
+  if (view.focusFeature === null) return [];
+  const feature = view.otherFeatures.find((candidate) => candidate.rules.some((rule) => rule.key === ruleKey));
+  return feature === undefined ? [] : [feature.slug];
+}
 
 function fileName(path: string): string {
   return path.split("/").pop() ?? path;
@@ -285,8 +317,10 @@ export function buildLesson(lesson: Lesson, homeworks: readonly HomeworkSummary[
   const features = homework.features.map((feature) =>
     featureView(feature, progress, focus?.ruleKey ?? null, upNext, now),
   );
-  const focusFeature = features.find((feature) => feature.rules.some((rule) => rule.key === focus?.ruleKey)) ?? null;
-  const focusRule = focusFeature?.rules.find((rule) => rule.key === focus?.ruleKey);
+  const holder = features.find((feature) => feature.rules.some((rule) => rule.key === focus?.ruleKey)) ?? null;
+  const focusIndex = holder?.rules.findIndex((rule) => rule.isFocus) ?? -1;
+  const focusFeature = holder === null ? null : { ...holder, rules: holder.rules.slice(0, focusIndex + 1) };
+  const focusRule = holder?.rules[focusIndex];
   const index = homeworks.findIndex((summary) => summary.id === homework.id);
   const previous = homeworks.slice(0, Math.max(0, index)).filter((summary) => !summary.builtin).at(-1) ?? null;
   return {
@@ -303,7 +337,8 @@ export function buildLesson(lesson: Lesson, homeworks: readonly HomeworkSummary[
     crumb: focusFeature === null || focusRule === undefined ? null : `${focusFeature.name} › ${focusRule.name}`,
     focus,
     focusFeature,
-    otherFeatures: features.filter((feature) => feature !== focusFeature),
+    laterRules: holder === null ? [] : holder.rules.slice(focusIndex + 1),
+    otherFeatures: features.filter((feature) => feature !== holder),
     coachThreadId: lesson.coachThreadId,
     readyToComplete: lesson.status === "done" && lesson.iterationStatus === "Done",
   };

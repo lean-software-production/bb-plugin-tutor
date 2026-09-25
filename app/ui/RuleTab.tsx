@@ -4,7 +4,7 @@ import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import type { PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
 import { useCourseNavigate, useLiveRefresh, useQuery, useTutorRpc } from "../hooks.ts";
 import { parseRuleTabParams, ruleTabTarget, ruleTabView } from "../model/rule-tab.ts";
-import { QUERY_KEYS, requestRule } from "../state/app-state.ts";
+import { QUERY_KEYS } from "../state/app-state.ts";
 import { Bar, InlineText, Loading, Notice } from "./common.tsx";
 
 const GLYPHS = { passing: "✓", "not-yet": "!", pending: "○", skipped: "–" } as const;
@@ -39,10 +39,7 @@ export function RuleTab({ threadId, params }: PluginThreadPanelProps) {
     }
     const view = ruleTabView(lesson.data, target, thread?.role === "side");
     const coachThreadId = lesson.data.coachThreadId;
-    const openLesson = (ruleKey: string | null) => {
-      if (ruleKey !== null) requestRule(target.homeworkId, ruleKey);
-      goCourse({ kind: "lesson", homeworkId: target.homeworkId });
-    };
+    const openLesson = (ruleKey: string | null) => goCourse({ kind: "lesson", homeworkId: target.homeworkId }, { ruleKey });
     if (view.kind === "no-rule") {
       return (
         <>

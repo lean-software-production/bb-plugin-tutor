@@ -12,7 +12,7 @@ import { usePortalScopeProps } from "../../lib/portal-scope.ts";
 import { useCourseNavigate, useQuery, useTutorRpc } from "../hooks.ts";
 import { progressCardView, termView } from "../model/cards.ts";
 import type { ProgressCardView } from "../model/cards.ts";
-import { QUERY_KEYS, requestRule } from "../state/app-state.ts";
+import { QUERY_KEYS } from "../state/app-state.ts";
 import { InlineText } from "./common.tsx";
 
 function SourceFallback({ source }: { source: string }) {
@@ -32,10 +32,7 @@ function ProgressCard({ view }: { view: ProgressCardView }) {
   const openRule = () => {
     if (rule === null) return;
     const opened = navigate.openThreadPanel({ actionId: SLOT_IDS.ruleTab, title: "Rule", params: rule });
-    if (!opened) {
-      requestRule(rule.homeworkId, rule.ruleKey);
-      goCourse({ kind: "lesson", homeworkId: rule.homeworkId });
-    }
+    if (!opened) goCourse({ kind: "lesson", homeworkId: rule.homeworkId }, { ruleKey: rule.ruleKey });
   };
   const completed = view.completedHomeworkId;
   return (

@@ -4,7 +4,7 @@ import { fixtureCourse, fixtureLesson, fixtureOverview, FIXTURE_NOW } from "../.
 import type { Example, Homework, Step } from "../../shared/model.ts";
 import type { Lesson } from "../../shared/rpc.ts";
 import { exampleLines, stepLines, stepTextTokens } from "./gherkin.ts";
-import { buildLesson, marginNote } from "./lesson.ts";
+import { buildLesson, coachStart, foldsHiding, laterFoldId, marginNote } from "./lesson.ts";
 
 const NOW = Date.parse(FIXTURE_NOW);
 const homeworks = fixtureOverview.homeworks;
@@ -84,10 +84,13 @@ test("the current lesson ends at the Rule in focus, other features collapsed ahe
   assert.deepEqual(view.otherFeatures.map((feature) => feature.name), ["Planning"]);
   assert.deepEqual(
     view.focusFeature?.rules.map((rule) => [rule.status, rule.isFocus, rule.isUpNext, rule.summary]),
-    [
-      ["not-yet", true, false, "1/2 · not yet"],
-      ["pending", false, false, "0/1"],
-    ],
+    [["not-yet", true, false, "1/2 · not yet"]],
+    "the lesson ends at the Rule in focus",
+  );
+  assert.deepEqual(
+    view.laterRules.map((rule) => [rule.name, rule.status, rule.summary]),
+    [["Validation is what the validator's agent decided", "pending", "0/1"]],
+    "Rules after the focus fold away ahead of it",
   );
   const planning = view.otherFeatures[0]?.rules[0];
   assert.deepEqual([planning?.isUpNext, planning?.summary], [true, "up next"], "suggested order puts reworded Rules first");
@@ -97,6 +100,14 @@ test("the current lesson ends at the Rule in focus, other features collapsed ahe
   ]);
   assert.equal(view.percent, 40);
   assert.equal(view.readyToComplete, false);
+});
+
+test("opening a Rule unfolds whatever hides it", () => {
+  const view = buildLesson(fixtureLesson, homeworks, NOW);
+  assert.deepEqual(foldsHiding(view, "planning/the-planner-writes-a-plan"), ["planning"]);
+  assert.deepEqual(foldsHiding(view, "validation/validation-is-what-the-validators-agent-decided"), [laterFoldId("validation")]);
+  assert.deepEqual(foldsHiding(view, "validation/a-task-is-finished-when-validation-is-satisfied"), []);
+  assert.deepEqual(foldsHiding(view, "planning/gone"), []);
 });
 
 test("the compass names what is new since the previous real homework", () => {
@@ -174,4 +185,14 @@ test("previews and finished homeworks have no focus and open every feature", () 
   assert.equal(finished.focus, null);
   assert.equal(finished.readyToComplete, true);
   assert.deepEqual(finished.chips.map((chip) => chip.tone), ["green", "green"]);
+});
+
+test("before a coach thread exists, an unbound student is sent to set up the factory instead of a start that must fail", () => {
+  assert.equal(coachStart("current", "unbound"), "set-up");
+  assert.equal(coachStart("current", "missing"), "set-up");
+  assert.equal(coachStart("done", "unbound"), "set-up");
+  assert.equal(coachStart("ahead", "unbound"), "read-ahead");
+  assert.equal(coachStart("current", "bound"), "start");
+  assert.equal(coachStart("done", "bound"), "revisit");
+  assert.equal(coachStart("current", null), "start", "until the overview loads, the backend decides");
 });

@@ -4,9 +4,9 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useBbNavigate, useRealtime, useRealtimeConnectionState, useRpc } from "@get-bb/plugin-sdk/app";
 import { NAV_PANEL_PATH, REALTIME_CHANNELS } from "../shared/constants.ts";
-import { formatRoute } from "../shared/routes.ts";
 import type { TutorRoute } from "../shared/routes.ts";
 import type { RpcContract } from "../shared/rpc.ts";
+import { coursePath } from "./model/course-route.ts";
 import { QUERY_KEYS, queryCache, staleKeys } from "./state/app-state.ts";
 import { errorMessage } from "./state/query-cache.ts";
 import type { QueryState } from "./state/query-cache.ts";
@@ -109,11 +109,19 @@ export function useAction<A extends unknown[]>(perform: (...args: A) => Promise<
   return { run, pending, error };
 }
 
-/** Navigate inside the course page; `replace` for redirects so back does not bounce. */
-export function useCourseNavigate(): (route: TutorRoute, options?: { replace?: boolean }) => void {
+export interface CourseNavigateOptions {
+  /** For redirects, so back does not bounce. */
+  replace?: boolean;
+  /** A lesson's Rule to open, kept in the URL. */
+  ruleKey?: string | null;
+}
+
+/** Navigate inside the course page. */
+export function useCourseNavigate(): (route: TutorRoute, options?: CourseNavigateOptions) => void {
   const navigate = useBbNavigate();
   return useCallback(
-    (route, options) => navigate.toPluginPanel(NAV_PANEL_PATH, { subPath: formatRoute(route), replace: options?.replace }),
+    (route, options) =>
+      navigate.toPluginPanel(NAV_PANEL_PATH, { subPath: coursePath(route, options?.ruleKey ?? null), replace: options?.replace }),
     [navigate],
   );
 }

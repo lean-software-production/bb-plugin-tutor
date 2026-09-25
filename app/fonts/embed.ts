@@ -9,10 +9,25 @@ interface Face {
   file: string;
   weight: string;
   format: "woff2" | "woff2-variations";
+  unicodeRange?: string;
 }
 
+// Archivo's word space is only 0.2em (0.19em at 800). At the rail's and the
+// margin notes' small sizes, with whole-pixel glyph positioning, words then
+// visibly run together ("Noother threads"). Leaving U+0020 and U+00A0 out of
+// the face makes the browser take spaces from the next family in
+// --tp-font-core (Helvetica Neue / Helvetica / Arial, about 0.28em), which
+// sets words apart without touching the letterforms or monospace text.
+const ALL_BUT_SPACES = "U+0-1F, U+21-9F, U+A1-10FFFF";
+
 const FACES: readonly Face[] = [
-  { family: "Tutor Archivo", file: "archivo-variable.woff2", weight: "300 800", format: "woff2-variations" },
+  {
+    family: "Tutor Archivo",
+    file: "archivo-variable.woff2",
+    weight: "300 800",
+    format: "woff2-variations",
+    unicodeRange: ALL_BUT_SPACES,
+  },
   { family: "Tutor JetBrains Mono", file: "jetbrains-mono-variable.woff2", weight: "100 800", format: "woff2-variations" },
   { family: "Tutor Spectral", file: "spectral-400.woff2", weight: "400", format: "woff2" },
   { family: "Tutor Spectral", file: "spectral-500.woff2", weight: "500", format: "woff2" },
@@ -35,6 +50,7 @@ export function renderFontsCss(): string {
         `  font-weight: ${face.weight};`,
         "  font-style: normal;",
         "  font-display: swap;",
+        ...(face.unicodeRange === undefined ? [] : [`  unicode-range: ${face.unicodeRange};`]),
         "}",
       ].join("\n");
     }).join("\n") +

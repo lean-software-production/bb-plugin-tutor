@@ -96,6 +96,11 @@ test("a bound student sees days, progress, the outline and every conversation", 
       ["pending", false, "new"],
     ],
   );
+  assert.equal(
+    rail.features[1]?.rules[0]?.subPath,
+    "lesson/002/validation/a-task-is-finished-when-validation-is-satisfied",
+    "a Rule link names the Rule, so a new tab opens it too",
+  );
   assert.deepEqual(
     rail.conversations.map((row) => [row.id, row.kind, row.indicator.tone, row.nested]),
     [

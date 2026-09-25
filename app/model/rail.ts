@@ -5,6 +5,7 @@ import { formatRoute } from "../../shared/routes.ts";
 import type { TutorRoute } from "../../shared/routes.ts";
 import type { HomeworkStatus, Novelty, RuleStatus } from "../../shared/model.ts";
 import type { Overview, TutorThread } from "../../shared/rpc.ts";
+import { coursePath } from "./course-route.ts";
 import { homeworkLabel, percent } from "./format.ts";
 import { indicatorView, isListed } from "./threads.ts";
 import type { IndicatorView, SidebarThreadLike } from "./threads.ts";
@@ -48,6 +49,8 @@ export interface RailRule {
   glyph: RuleGlyph;
   isFocus: boolean;
   novelty: Novelty;
+  /** The lesson, opened at this Rule. */
+  subPath: string;
 }
 
 export interface RailFeature {
@@ -149,7 +152,9 @@ function progressCard(overview: Overview): ProgressCardView | null {
 }
 
 function features(overview: Overview): RailFeature[] {
-  const outline = overview.current?.outline ?? [];
+  const current = overview.current;
+  if (current === null) return [];
+  const outline = current.outline;
   const holdsFocus = outline.findIndex((feature) => feature.rules.some((rule) => rule.isFocus));
   const firstOpen = outline.findIndex((feature) => feature.rules.some((rule) => rule.status !== "passing"));
   const expanded = holdsFocus >= 0 ? holdsFocus : firstOpen;
@@ -166,6 +171,7 @@ function features(overview: Overview): RailFeature[] {
       glyph: rule.status === "passing" ? "passing" : rule.isFocus ? "focus" : rule.status,
       isFocus: rule.isFocus,
       novelty: rule.novelty,
+      subPath: coursePath({ kind: "lesson", homeworkId: current.homeworkId }, rule.key),
     })),
   }));
 }

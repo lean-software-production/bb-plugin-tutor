@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { QUERY_KEYS, requestRule, ruleRequestStore, staleKeys } from "./app-state.ts";
+import { QUERY_KEYS, requestRule, ruleRequestStore, staleKeys, takeRuleRequest } from "./app-state.ts";
 import { createQueryCache, errorMessage } from "./query-cache.ts";
 import { createStore } from "./store.ts";
 
@@ -85,6 +85,53 @@ test("invalidate refetches watched keys, keeps old data on error, and never lose
   assert.equal(cache.peek("lesson:002").data, "v3");
 });
 
+test("a remount revalidates cached data in the background, but mounts moments apart share one answer", async () => {
+  let clock = 1_000;
+  const cache = createQueryCache({ now: () => clock });
+  const answers = [deferred<string>(), deferred<string>()];
+  let call = 0;
+  const fetcher = () => answers[call++]!.promise;
+  cache.ensure("lesson:002", fetcher);
+  answers[0]!.resolve("before the edit");
+  await tick();
+
+  clock += 500;
+  cache.ensure("lesson:002", fetcher);
+  assert.equal(call, 1, "surfaces mounting together do not refetch");
+
+  clock += 10_000;
+  cache.ensure("lesson:002", fetcher);
+  assert.equal(call, 2, "a page mounted later picks up changes made outside BB");
+  assert.deepEqual(
+    cache.peek("lesson:002"),
+    { status: "ready", data: "before the edit", error: null },
+    "the old answer stays on screen while it revalidates",
+  );
+  answers[1]!.resolve("after the edit");
+  await tick();
+  assert.equal(cache.peek("lesson:002").data, "after the edit");
+});
+
+test("an error is never cached: the next mount retries at once", async () => {
+  const clock = 1_000;
+  const cache = createQueryCache({ now: () => clock });
+  const answers = [deferred<string>(), deferred<string>()];
+  let call = 0;
+  const fetcher = () => answers[call++]!.promise;
+  cache.subscribe("overview", () => undefined);
+  cache.ensure("overview", fetcher);
+  answers[0]!.reject(new Error("Backend restarting."));
+  await tick();
+  assert.equal(call, 1, "a failure does not retry by itself");
+  assert.equal(cache.peek("overview").status, "error");
+
+  cache.ensure("overview", fetcher);
+  assert.equal(call, 2, "remounting retries even inside the sharing window");
+  answers[1]!.resolve("recovered");
+  await tick();
+  assert.deepEqual(cache.peek("overview"), { status: "ready", data: "recovered", error: null });
+});
+
 test("error messages are always readable", () => {
   assert.equal(errorMessage(new Error("No factory project is set up yet.")), "No factory project is set up yet.");
   assert.equal(errorMessage("plain"), "plain");
@@ -99,6 +146,15 @@ test("rule requests carry a fresh sequence number each time", () => {
   const second = ruleRequestStore.get();
   assert.equal(first?.ruleKey, "a/b");
   assert.notEqual(first?.seq, second?.seq);
+});
+
+test("a lesson takes its own Rule request once, so a remount does not replay it", () => {
+  requestRule("002", "a/b");
+  assert.equal(takeRuleRequest("003"), null, "another lesson leaves it alone");
+  assert.equal(ruleRequestStore.get()?.ruleKey, "a/b");
+  assert.equal(takeRuleRequest("002")?.ruleKey, "a/b");
+  assert.equal(ruleRequestStore.get(), null);
+  assert.equal(takeRuleRequest("002"), null, "handled requests are gone");
 });
 
 test("a change signal refreshes everything but the lexicon, unless the course changed", () => {
