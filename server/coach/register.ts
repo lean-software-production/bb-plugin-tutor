@@ -70,6 +70,12 @@ export async function registerTutor(bb: BbPluginApi, deps: WorldDeps): Promise<T
     });
   }
 
+  // A side chat BB made of a coach thread belongs in the course outline straight away.
+  bb.events.on("thread.created", ({ thread }) => {
+    const homeworkId = thread.originKind === "fork" && thread.sourceThreadId !== null ? rt.coaches.homeworkOf(thread.sourceThreadId) : undefined;
+    if (homeworkId !== undefined) rt.signals.publish("threads", homeworkId);
+  });
+
   registerRpc(rt);
   settings.onChange(() => rt.signals.publish("binding", null));
   void warmCoachRegistry(rt);

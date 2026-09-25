@@ -33,8 +33,8 @@ test("side chats and redirects name the Rule", () => {
   assert.match(sideChatSeed(homework, null, "Why a validator?"), /The student's question, which the coach moved here: Why a validator\?/);
   assert.ok(sideChatSeed(homework, null, "x".repeat(5000)).length < 2500);
   assert.match(redirectMessage(rule), /tutor_focus_rule \(rule assembly-line\//);
-  assert.ok(sideChatTitle(homework, rule).length <= 120);
-  assert.equal(sideChatTitle(homework, null), "Side question · Lesson 003");
+  assert.equal(sideChatTitle(rule), "Side question about a Rule");
+  assert.equal(sideChatTitle(null), "Side question");
   assert.equal(sideChatAnchor(homework, null), "A side question about Lesson 003");
 });
 

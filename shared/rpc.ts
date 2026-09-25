@@ -41,6 +41,8 @@ export const tutorThreadSchema = z.object({
   title: z.string().nullable(),
   /** The coach thread it belongs to; itself for a coach thread. */
   mainThreadId: threadIdSchema,
+  /** A side chat (a hidden fork, in the coach thread's right panel), not a thread of its own. */
+  sideChat: z.boolean(),
 });
 export type TutorThread = z.infer<typeof tutorThreadSchema>;
 
@@ -220,7 +222,7 @@ export const rpcContract = defineRpcContract({
     input: homeworkInput,
     output: completionSchema,
   },
-  /** For the rule tab and for routing: null when the thread is not one Tutor spawned. */
+  /** For the rule tab: null unless the thread is Tutor's, or a side chat BB made of a coach thread. */
   getThreadContext: {
     input: z.object({ threadId: threadIdSchema }),
     output: z.object({ thread: tutorThreadSchema.nullable() }),

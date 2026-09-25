@@ -326,7 +326,10 @@ test("a side chat BB made of a coach thread can mark Examples; a visible fork or
   const { coach, rule } = await adoptedCoach(host);
   const bbFork = (id: string, source: string, visibility: "hidden" | "visible" = "hidden") =>
     host.addThread({ id, originKind: "fork", originPluginId: "side-chat", sourceThreadId: source, visibility });
-  bbFork("thr_bb_side", coach);
+  const signals = host.harness.inspection.realtimeSignals.length;
+  const created = bbFork("thr_bb_side", coach);
+  await host.harness.behavior.emitThreadEvent("thread.created", { thread: makeThreadResponse({ ...created }) });
+  assert.deepEqual(host.harness.inspection.realtimeSignals.slice(signals).map((signal) => signal.payload), [{ reason: "threads", homeworkId: "000" }]);
   bbFork("thr_bb_visible", coach, "visible");
   bbFork("thr_bb_nested", "thr_bb_side");
 
@@ -348,7 +351,15 @@ test("a side chat BB made of a coach thread can mark Examples; a visible fork or
     role: "side",
     ruleKey: null,
     mainThreadId: coach,
+    sideChat: true,
   });
+  // The overview lists it under its lesson, as Tutor lists its own side chats.
+  const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.deepEqual(
+    overview.threads.filter((thread) => thread.id === "thr_bb_side").map((thread) => [thread.homeworkId, thread.mainThreadId, thread.sideChat]),
+    [["000", coach, true]],
+  );
+  assert.ok(!overview.threads.some((thread) => thread.id === "thr_bb_visible" || thread.id === "thr_bb_nested"));
   // Side chats BB made count on the completion page.
   for (const homework of homeworkExamples(findHomework(sandbox.course, "000") ?? assert.fail("no 000"))) {
     await ok(host, "tutor_mark_example", { example: homework.key, status: "skipped" }, coach);

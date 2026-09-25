@@ -77,9 +77,9 @@ export function redirectMessage(rule: Rule): string {
   return `I'd like to work on the Rule "${rule.name}" next. Please move the focus there with ${TOOL_NAMES.focusRule} (rule ${rule.key}).`;
 }
 
-export function sideChatTitle(homework: Homework, rule: Rule | null): string {
-  const title = rule === null ? `Side question · Lesson ${homework.id}` : `Side question · ${rule.name}`;
-  return title.length > 120 ? `${title.slice(0, 119)}…` : title;
+/** Short: the course outline lists it under its lesson, with its Rule beneath ("from: …"). */
+export function sideChatTitle(rule: Rule | null): string {
+  return rule === null ? "Side question" : "Side question about a Rule";
 }
 
 export interface InstructionFacts {

@@ -8,6 +8,7 @@ import {
   parseProgressCard,
   parseTermRef,
   ruleAnchor,
+  withoutLeadingDirectives,
   type ProgressCard,
 } from "./directives.ts";
 
@@ -89,4 +90,10 @@ test("a Rule anchor joins the thread, the homework and the Rule, and refuses any
   assert.equal(ruleAnchor("thr_abc", "3", "a/b"), null);
   assert.equal(ruleAnchor("thr_abc", "003", "a/b/c"), null);
   assert.equal(ruleAnchor("thr_abc", "003", 'a/b"]'), null);
+});
+
+test("a title drawn from a message drops the cards it opens with", () => {
+  assert.equal(withoutLeadingDirectives('::tutor-progress{kind="focus" title="x"}\n\nLet us start.'), "Let us start.");
+  assert.equal(withoutLeadingDirectives('::tutor-lesson{homework="000"} ::tutor-progress{kind="foc…'), "");
+  assert.equal(withoutLeadingDirectives("Plain text ::term{id=\"x\"}"), "Plain text ::term{id=\"x\"}");
 });

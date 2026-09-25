@@ -25,6 +25,7 @@ export function publicThread(record: TutorThreadRecord): TutorThread {
     ruleKey: record.ruleKey,
     title: record.title,
     mainThreadId: record.mainThreadId,
+    sideChat: record.sideChat,
   };
 }
 

@@ -163,6 +163,15 @@ export function ruleAnchor(threadId: string, homeworkId: string, ruleKey: string
   return `${threadId}|${homeworkId}/${ruleKey}`;
 }
 
+/**
+ * `text` without the directive lines it opens with, for a title drawn from a
+ * message: BB names a side chat after the message it replies to, and a coach's
+ * message often opens with a card. Handles a directive cut short ("…").
+ */
+export function withoutLeadingDirectives(text: string): string {
+  return text.replace(/^(?:\s*::[a-z-]+\{[^}\n]*(?:\}|…|\.\.\.|$))+\s*/, "").trim();
+}
+
 export function formatTermRef(ref: TermRef): string {
   const attrs = `${attribute("id", ref.id)}${attribute("label", ref.label)}`;
   return `::${DIRECTIVE_NAMES.term}{${attrs.trim()}}`;

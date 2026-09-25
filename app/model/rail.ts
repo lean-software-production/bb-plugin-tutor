@@ -3,6 +3,7 @@
 // and then its side chats; under the coach thread sit the lesson's Rules,
 // grouped by Feature, each leading to its section of the coach thread. Other
 // threads follow the tree. Pure, so every state is testable.
+import { withoutLeadingDirectives } from "../../shared/directives.ts";
 import { formatRoute } from "../../shared/routes.ts";
 import type { TutorRoute } from "../../shared/routes.ts";
 import type { HomeworkStatus, Novelty, RuleStatus } from "../../shared/model.ts";
@@ -148,36 +149,42 @@ function byRecent(a: SidebarThreadLike, b: SidebarThreadLike): number {
   return b.updatedAt - a.updatedAt;
 }
 
-/** The side chats and side threads of a coach thread, oldest first. */
+/**
+ * The side chats and side threads of a coach thread, oldest first: as the
+ * backend lists them (Tutor's, and BB's own side chats), with live status from
+ * BB's sidebar list when it has the thread, plus any side chat the sidebar
+ * shows before the backend does.
+ */
 function sideRowsOf(
   coachId: string,
   lesson: HomeworkSummary,
-  threads: readonly SidebarThreadLike[],
-  tutorById: ReadonlyMap<string, TutorThread>,
+  tutorThreads: readonly TutorThread[],
+  liveById: ReadonlyMap<string, SidebarThreadLike>,
   activeThreadId: string | null,
 ): SideRow[] {
   const ruleNames = new Map(lesson.outline.flatMap((feature) => feature.rules.map((rule) => [rule.key, rule.name] as const)));
-  return threads
-    .filter((thread) => {
-      if (thread.isArchived) return false;
-      const sideChat = thread.sourceThreadId === coachId && thread.isHidden;
-      const sideThread = thread.parentThreadId === coachId && thread.sourceThreadId === null && tutorById.has(thread.id);
-      return sideChat || sideThread;
-    })
-    .sort((a, b) => a.createdAt - b.createdAt)
-    .map((thread) => {
-      const tutor = tutorById.get(thread.id);
+  const listed = tutorThreads.filter((thread) => thread.role === "side" && thread.mainThreadId === coachId);
+  const listedIds = new Set(listed.map((thread) => thread.id));
+  const liveOnly = [...liveById.values()].filter(
+    (thread) => !listedIds.has(thread.id) && thread.sourceThreadId === coachId && thread.isHidden && !thread.isArchived,
+  );
+  const rows = [
+    ...listed.map((tutor) => ({ id: tutor.id, sideChat: tutor.sideChat, tutor, live: liveById.get(tutor.id) })),
+    ...liveOnly.map((live) => ({ id: live.id, sideChat: true, tutor: undefined, live })),
+  ].filter((row) => row.live?.isArchived !== true);
+  return rows
+    .sort((a, b) => (a.live?.createdAt ?? 0) - (b.live?.createdAt ?? 0))
+    .map(({ id, sideChat, tutor, live }) => {
       const ruleKey = tutor?.ruleKey ?? null;
       const ruleName = ruleKey === null ? undefined : ruleNames.get(ruleKey);
-      const sideChat = thread.sourceThreadId === coachId;
       return {
-        id: thread.id,
+        id,
         kind: sideChat ? "side-chat" : "side-thread",
-        title: thread.displayTitle || tutor?.title || "Side chat",
+        title: withoutLeadingDirectives(tutor?.title ?? live?.displayTitle ?? "") || "Side chat",
         caption: ruleName === undefined ? null : `from: ${ruleName}`,
-        href: sideChat ? threadHref(coachId) : thread.href,
-        isActive: thread.id === activeThreadId,
-        indicator: indicatorView(thread),
+        href: sideChat ? threadHref(coachId) : (live?.href ?? threadHref(id)),
+        isActive: id === activeThreadId,
+        indicator: live === undefined ? { tone: "none", label: null } : indicatorView(live),
       };
     });
 }
@@ -242,7 +249,7 @@ export function buildRail(input: RailInput): RailView {
       isViewed: lesson.id === viewed,
       coach,
       canStartCoach: ready && coachId === null && lesson.status === "current",
-      sideRows: coachId === null ? [] : sideRowsOf(coachId, lesson, input.threads, tutorById, activeThreadId),
+      sideRows: coachId === null ? [] : sideRowsOf(coachId, lesson, overview?.threads ?? [], liveById, activeThreadId),
       features: coachId === null ? [] : features(lesson.outline),
       startPath: formatRoute({ kind: "lesson", homeworkId: lesson.id }),
     };

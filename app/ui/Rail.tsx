@@ -10,6 +10,7 @@ import {
   useBbNavigate,
 } from "@get-bb/plugin-sdk/app";
 import type { PluginThreadListProps } from "@get-bb/plugin-sdk/app";
+import { coachThreadTitle } from "../../shared/constants.ts";
 import type { TutorRoute } from "../../shared/routes.ts";
 import {
   refreshAll,
@@ -210,7 +211,7 @@ function LessonThreads({ lesson, go, onNavigate }: { lesson: LessonNode; go: Go;
         )
       ) : (
         <>
-          <ThreadLink row={{ ...coach, title: `Coach · ${homeworkLabel(lesson.id)}` }} onNavigate={onNavigate} />
+          <ThreadLink row={{ ...coach, title: coachThreadTitle(lesson.id) }} onNavigate={onNavigate} />
           <div className="tp-rules" role="group" aria-label={`Rules of ${homeworkLabel(lesson.id)}`}>
             {lesson.features.map((feature) => (
               <div key={feature.slug} className="tp-rule-group">

@@ -135,6 +135,8 @@ export async function ensureSideChatTab(
 export interface SideChatRow {
   id: string;
   originPluginId: string | null;
+  projectId: string;
+  createdAt: number;
   sourceThreadId: string | null;
   visibility: "hidden" | "visible";
   archivedAt: number | null;
@@ -146,6 +148,9 @@ export interface SideChatRow {
 export function isSideChatOf(row: SideChatRow, coachThreadId: string): boolean {
   return row.sourceThreadId === coachThreadId && row.visibility === "hidden" && row.archivedAt === null;
 }
+
+/** BB's side chat seeds its fork with this before the message it replies to (bb-app 0.43.4). */
+export const BB_REPLY_PREFIX = /^Replying to this earlier message in the conversation:\s*/;
 
 /** Every side chat of the coach thread: Tutor's and those BB's "Reply in side chat" made. */
 export async function listSideChats(sdk: Sdk, coachThreadId: string): Promise<SideChatRow[]> {

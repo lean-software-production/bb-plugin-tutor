@@ -74,7 +74,10 @@ const overviewWithChat: Overview = {
       ruleKey: "validation/a-task-is-finished-when-validation-is-satisfied",
       title: "Side question · validation",
       mainThreadId: "thr_coach002",
+      sideChat: true,
     },
+    // BB's side chat as the backend lists it; the sidebar list may not carry hidden threads at all.
+    { id: "thr_bbchat002", homeworkId: "002", role: "side", ruleKey: null, title: "the outline is…", mainThreadId: "thr_coach002", sideChat: true },
   ],
 };
 

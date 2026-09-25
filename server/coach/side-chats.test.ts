@@ -28,7 +28,7 @@ test("a side chat is shown by either of BB's tab shapes, and nothing else", () =
 });
 
 test("only a live, hidden fork of the coach thread is its side chat", () => {
-  const row = { id: "f", originPluginId: "side-chat", sourceThreadId: "c", visibility: "hidden" as const, archivedAt: null, title: null, titleFallback: null };
+  const row = { id: "f", originPluginId: "side-chat", projectId: "p", createdAt: 1, sourceThreadId: "c", visibility: "hidden" as const, archivedAt: null, title: null, titleFallback: null };
   assert.ok(isSideChatOf(row, "c"));
   assert.ok(!isSideChatOf(row, "d"));
   assert.ok(!isSideChatOf({ ...row, visibility: "visible" }, "c"));

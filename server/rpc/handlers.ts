@@ -1,5 +1,6 @@
 // The RPC contract in shared/rpc.ts, served from the re-derived world. Every
 // handler fails by throwing an Error written for the student.
+import { withoutLeadingDirectives } from "../../shared/directives.ts";
 import { rpcContract } from "../../shared/rpc.ts";
 import type { Binding } from "../../shared/rpc.ts";
 import { findHomework, findRule, homeworkStatus } from "../../shared/derive.ts";
@@ -18,7 +19,7 @@ import {
   type MainThreadStart,
 } from "../coach/prompts.ts";
 import type { TutorRuntime } from "../coach/runtime.ts";
-import { ensureSideChatTab, forkSideChat, listSideChats } from "../coach/side-chats.ts";
+import { BB_REPLY_PREFIX, ensureSideChatTab, forkSideChat, listSideChats } from "../coach/side-chats.ts";
 import {
   findMainThread,
   listTutorThreads,
@@ -54,8 +55,6 @@ function requireRule(homework: Homework, ruleKey: string): Rule {
   return rule;
 }
 
-/** BB's side chat seeds its fork with this before the message it replies to (bb-app 0.43.4). */
-const BB_REPLY_PREFIX = /^Replying to this earlier message in the conversation:\s*/;
 
 export function registerRpc(rt: TutorRuntime): void {
   const { bb } = rt;
@@ -71,6 +70,32 @@ export function registerRpc(rt: TutorRuntime): void {
     const threads = await listTutorThreads(bb.sdk, bb.pluginId, world.binding.projectId);
     rt.coaches.remember(threads);
     return threads;
+  }
+
+  /**
+   * Side chats BB made ("Reply in side chat") of the coach threads, as Tutor
+   * lists its own: side chats of their homework, about no Rule in particular.
+   */
+  async function bbSideChatsOf(threads: readonly TutorThreadRecord[]): Promise<TutorThreadRecord[]> {
+    const mains = threads.filter((thread) => thread.role === "main");
+    const lists = await Promise.all(mains.map((main) => listSideChats(bb.sdk, main.id).catch(() => [])));
+    return mains.flatMap((main, index) =>
+      (lists[index] ?? [])
+        .filter((row) => row.originPluginId !== bb.pluginId && row.projectId === main.projectId)
+        .map((row) => ({
+          id: row.id,
+          homeworkId: main.homeworkId,
+          role: "side" as const,
+          ruleKey: null,
+          title: row.title ?? (withoutLeadingDirectives((row.titleFallback ?? "").replace(BB_REPLY_PREFIX, "")) || null),
+          mainThreadId: main.id,
+          sideChat: true,
+          courseId: main.courseId,
+          projectId: row.projectId,
+          createdAt: row.createdAt,
+          reachedRules: [],
+        })),
+    );
   }
 
   async function spawnMain(course: Course, binding: BoundFactory, homework: Homework, prompt: string): Promise<string> {
@@ -114,7 +139,8 @@ export function registerRpc(rt: TutorRuntime): void {
   bb.rpc.register(rpcContract, {
     getOverview: async () => {
       const world = await loadWorld();
-      return buildOverview(world, await threadsOf(world));
+      const threads = await threadsOf(world);
+      return buildOverview(world, [...threads, ...(await bbSideChatsOf(threads))]);
     },
 
     getLesson: async ({ homeworkId }) => {
@@ -146,7 +172,15 @@ export function registerRpc(rt: TutorRuntime): void {
       const coach = toTutorThread(main, await bb.sdk.threads.getPluginMetadata({ threadId: main.id }).catch(() => null));
       if (coach === null) return { thread: null };
       return {
-        thread: { id: thread.id, homeworkId: coach.homeworkId, role: "side" as const, ruleKey: null, title: thread.title, mainThreadId: main.id },
+        thread: {
+          id: thread.id,
+          homeworkId: coach.homeworkId,
+          role: "side" as const,
+          ruleKey: null,
+          title: thread.title,
+          mainThreadId: main.id,
+          sideChat: true,
+        },
       };
     },
 
@@ -213,7 +247,7 @@ export function registerRpc(rt: TutorRuntime): void {
         courseId: course.id,
         homeworkId: homework.id,
         ruleKey: rule?.key ?? null,
-        title: sideChatTitle(homework, rule),
+        title: sideChatTitle(rule),
         seed: sideChatSeed(homework, rule),
       });
       await ensureSideChatTab(bb.sdk, main.id, sideChatId, sideChatAnchor(homework, rule));

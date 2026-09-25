@@ -72,6 +72,7 @@ export function toTutorThread(row: ThreadRow, metadata: unknown): TutorThreadRec
     ruleKey: role === "main" ? null : (parsed.data.ruleKey ?? null),
     title: row.title,
     mainThreadId: row.parentThreadId ?? row.sourceThreadId ?? row.id,
+    sideChat: row.parentThreadId === null && row.sourceThreadId !== null,
     courseId: parsed.data.course,
     projectId: row.projectId,
     createdAt: row.createdAt,

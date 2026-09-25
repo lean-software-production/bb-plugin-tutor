@@ -377,7 +377,7 @@ export const fixtureBinding: Binding = {
 };
 
 export const fixtureThreads: TutorThread[] = [
-  { id: "thr_coach002", homeworkId: "002", role: "main", ruleKey: null, title: coachThreadTitle("002"), mainThreadId: "thr_coach002" },
+  { id: "thr_coach002", homeworkId: "002", role: "main", ruleKey: null, title: coachThreadTitle("002"), mainThreadId: "thr_coach002", sideChat: false },
   {
     id: "thr_side002",
     homeworkId: "002",
@@ -385,8 +385,9 @@ export const fixtureThreads: TutorThread[] = [
     ruleKey: fixtureStudent.progress?.focus ?? null,
     title: "Why does the validator see the diff?",
     mainThreadId: "thr_coach002",
+    sideChat: false,
   },
-  { id: "thr_coach001", homeworkId: "001", role: "main", ruleKey: null, title: coachThreadTitle("001"), mainThreadId: "thr_coach001" },
+  { id: "thr_coach001", homeworkId: "001", role: "main", ruleKey: null, title: coachThreadTitle("001"), mainThreadId: "thr_coach001", sideChat: false },
 ];
 
 /** The Rules the Homework 002 coach thread has focused: its sections can be jumped to. */
