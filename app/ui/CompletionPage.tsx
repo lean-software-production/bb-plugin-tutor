@@ -5,7 +5,7 @@ import { refreshAll, useAction, useCourseNavigate, useQuery, useTutorRpc } from 
 import { completionView, confettiPieces } from "../model/completion.ts";
 import type { NextHomeworkView } from "../model/completion.ts";
 import { QUERY_KEYS } from "../state/app-state.ts";
-import { Chips, InlineText, Loading, Notice, PaperPage } from "./common.tsx";
+import { Chips, ErrorNotice, InlineText, Loading, PaperPage } from "./common.tsx";
 
 const CONFETTI = confettiPieces();
 
@@ -18,7 +18,7 @@ export function CompletionPage({ homeworkId }: { homeworkId: string }) {
       <PaperPage>
         {completion.status === "error" ? (
           <>
-            <Notice tone="error">{completion.error}</Notice>
+            <ErrorNotice message={completion.error} />
             <button type="button" className="tp-btn tp-btn--ghost" onClick={() => goCourse({ kind: "lesson", homeworkId })}>
               Back to the lesson
             </button>
@@ -115,7 +115,7 @@ function NextHomework({ next }: { next: NextHomeworkView }) {
           Read the features first
         </button>
       </div>
-      {start.error === null ? null : <Notice tone="error">{start.error}</Notice>}
+      {start.error === null ? null : <ErrorNotice message={start.error} />}
     </div>
   );
 }

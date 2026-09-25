@@ -6,6 +6,7 @@ import type { Novelty } from "../../shared/model.ts";
 import type { GherkinLine } from "../model/gherkin.ts";
 import { parseInline } from "../model/inline.ts";
 import type { Chip } from "../model/lesson.ts";
+import { isConnectionLost } from "../model/rpc-errors.ts";
 
 /** App-relative URL of a course sub-route, for anchors that also work with middle-click. */
 export function coursePageHref(subPath: string): string {
@@ -68,6 +69,27 @@ export function Notice({ tone = "info", children }: { tone?: "info" | "error"; c
     <div className={`tp-notice tp-notice--${tone}`} role={tone === "error" ? "alert" : "status"}>
       {children}
     </div>
+  );
+}
+
+/** Shown after any error message: a lost connection to the Codespace is only fixed by reloading. */
+export function ReloadButton({ message }: { message: string | null }) {
+  if (!isConnectionLost(message)) return null;
+  return (
+    <button type="button" className="tp-btn tp-reload" onClick={() => window.location.reload()}>
+      Reload
+    </button>
+  );
+}
+
+/** An RPC failure as the student reads it, with Reload when the connection was lost. */
+export function ErrorNotice({ message }: { message: string | null }) {
+  if (message === null) return null;
+  return (
+    <Notice tone="error">
+      {message}
+      <ReloadButton message={message} />
+    </Notice>
   );
 }
 

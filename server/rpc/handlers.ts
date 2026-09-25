@@ -212,5 +212,15 @@ export function registerRpc(rt: TutorRuntime): void {
       });
       return { threadId: main.threadId };
     },
+
+    heartbeat: async () => {
+      try {
+        return await rt.activity.record();
+      } catch (cause) {
+        // A missed stamp only risks an idle stop; never an error the student sees.
+        bb.log.warn(`[tutor] could not record activity: ${cause instanceof Error ? cause.message : String(cause)}`);
+        return { recorded: false };
+      }
+    },
   });
 }

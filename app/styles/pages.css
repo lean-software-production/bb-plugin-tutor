@@ -44,6 +44,14 @@
   background: #fbeaea;
   color: #7a2a2a;
 }
+/* Reload after a lost-connection message, on its own line wherever the message sits. */
+.tutor-paper .tp-reload {
+  display: flex;
+  width: fit-content;
+  margin-top: 8px;
+  padding: 5px 12px;
+  font-size: 0.76rem;
+}
 .tutor-paper .tp-loading {
   margin: 1.4rem 0;
   color: var(--tp-muted);

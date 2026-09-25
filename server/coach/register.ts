@@ -1,8 +1,10 @@
 // Wires Tutor's backend into BB: settings, coach tools, configure scoping,
 // the dispatch guard, thread events and the RPC handlers.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import { createActivityRecorder, resolveDataDir } from "../activity/heartbeat.ts";
 import { registerRpc } from "../rpc/handlers.ts";
 import { coachConfiguration } from "./configure.ts";
+import { readFeatureConfig } from "./course-path.ts";
 import { decideDispatch } from "./dispatch-guard.ts";
 import { createKeyedLock } from "./keyed-lock.ts";
 import type { TutorRuntime } from "./runtime.ts";
@@ -20,6 +22,15 @@ export async function registerTutor(bb: BbPluginApi, deps: WorldDeps): Promise<T
     store: deps.store,
     signals: createStateSignals(bb),
     locks: createKeyedLock(),
+    activity: createActivityRecorder({
+      dataDir: async () =>
+        resolveDataDir({
+          fromBb: () => bb.server.experimental_dataDir,
+          env: deps.env,
+          configDataDir: (await readFeatureConfig(deps.featureConfigFile)).dataDir,
+        }),
+      now: deps.now,
+    }),
     now: deps.now,
   };
 

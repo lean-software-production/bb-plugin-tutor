@@ -15,13 +15,24 @@
       "icon": "FileText"
     },
     "server": "./server.ts",
-    "app": "./app.tsx"
+    "app": "./app.tsx",
+    "themes": [
+      {
+        "id": "paper",
+        "name": "Tutor paper",
+        "description": "The course workbook's paper, ink and blue, with Archivo type.",
+        "css": "./themes/paper.css",
+        "codeTheme": {
+          "light": "./themes/paper-code.json"
+        }
+      }
+    ]
   },
   "scripts": {
     "typecheck": "tsc -p .",
     "test": "node --experimental-strip-types --no-warnings=ExperimentalWarning --test \"shared/**/*.test.ts\" \"server/**/*.test.ts\" \"app/**/*.test.ts\" \"test/**/*.test.ts\"",
     "build": "bb plugin build .",
-    "fonts": "node --experimental-strip-types --no-warnings=ExperimentalWarning app/fonts/embed.ts"
+    "fonts": "node --experimental-strip-types --no-warnings=ExperimentalWarning app/fonts/embed.ts && node --experimental-strip-types --no-warnings=ExperimentalWarning app/theme/build.ts"
   },
   "dependencies": {
     "@cucumber/gherkin": "^42.0.1",

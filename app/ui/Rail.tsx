@@ -15,7 +15,7 @@ import { homeworkLabel } from "../model/format.ts";
 import { buildRail } from "../model/rail.ts";
 import type { RailFeature, RailView, ThreadRow } from "../model/rail.ts";
 import { railMountedStore, requestRule, routeStore } from "../state/app-state.ts";
-import { Bar, NewDot, coursePageHref, isPlainClick } from "./common.tsx";
+import { Bar, NewDot, ReloadButton, coursePageHref, isPlainClick } from "./common.tsx";
 
 const RULE_GLYPHS = { passing: "✓", "not-yet": "!", pending: "○", focus: "●" } as const;
 const OTHER_THREADS_SHOWN = 40;
@@ -77,6 +77,7 @@ function RailBody({ rail, go, onNavigate }: { rail: RailView; go: Go; onNavigate
       return (
         <div className="tp-rail-note tp-rail-note--error" role="alert">
           {rail.status.message}
+          <ReloadButton message={rail.status.message} />
         </div>
       );
     case "unbound":
@@ -264,9 +265,10 @@ function Conversations({ rail, onNavigate }: { rail: RailView; onNavigate: () =>
       ))}
       {[startSide.error, startCoach.error].map((error) =>
         error === null ? null : (
-          <p key={error} className="tp-rail-note tp-rail-note--error" role="alert">
+          <div key={error} className="tp-rail-note tp-rail-note--error" role="alert">
             {error}
-          </p>
+            <ReloadButton message={error} />
+          </div>
         ),
       )}
     </>

@@ -26,6 +26,8 @@ test("reads the feature config, ignoring empty keys and unreadable files", async
     const path = join(dir, "config.json");
     await writeFile(path, JSON.stringify({ course: "/workspaces/tutorial", factory: "" }));
     assert.deepEqual(await readFeatureConfig(path), { course: "/workspaces/tutorial" });
+    await writeFile(path, JSON.stringify({ course: "/workspaces/tutorial", dataDir: "/workspaces/.bb-state" }));
+    assert.deepEqual(await readFeatureConfig(path), { course: "/workspaces/tutorial", dataDir: "/workspaces/.bb-state" });
     await writeFile(path, "{ not json");
     assert.deepEqual(await readFeatureConfig(path), {});
     assert.deepEqual(await readFeatureConfig(join(dir, "missing.json")), {});

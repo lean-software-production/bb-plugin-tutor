@@ -5,7 +5,7 @@ import type { PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
 import { useCourseNavigate, useLiveRefresh, useQuery, useTutorRpc } from "../hooks.ts";
 import { parseRuleTabParams, ruleTabTarget, ruleTabView } from "../model/rule-tab.ts";
 import { QUERY_KEYS } from "../state/app-state.ts";
-import { Bar, InlineText, Loading, Notice } from "./common.tsx";
+import { Bar, ErrorNotice, InlineText, Loading } from "./common.tsx";
 
 const GLYPHS = { passing: "✓", "not-yet": "!", pending: "○", skipped: "–" } as const;
 
@@ -25,7 +25,7 @@ export function RuleTab({ threadId, params }: PluginThreadPanelProps) {
 
   const body = () => {
     if (context.data === null) {
-      return context.status === "error" ? <Notice tone="error">{context.error}</Notice> : <Loading label="Loading…" />;
+      return context.status === "error" ? <ErrorNotice message={context.error} /> : <Loading label="Loading…" />;
     }
     if (target === null) {
       return (
@@ -35,7 +35,7 @@ export function RuleTab({ threadId, params }: PluginThreadPanelProps) {
       );
     }
     if (lesson.data === null) {
-      return lesson.status === "error" ? <Notice tone="error">{lesson.error}</Notice> : <Loading label="Loading the Rule…" />;
+      return lesson.status === "error" ? <ErrorNotice message={lesson.error} /> : <Loading label="Loading the Rule…" />;
     }
     const view = ruleTabView(lesson.data, target, thread?.role === "side");
     const coachThreadId = lesson.data.coachThreadId;

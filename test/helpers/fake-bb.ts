@@ -44,7 +44,8 @@ interface SpawnArgs {
 export async function makeTutorHost(
   course: Course,
   factoryRoot: string,
-  settings: Record<string, string> = { factoryProject: PROJECT_ID },
+  settings: Record<string, string | boolean> = { factoryProject: PROJECT_ID },
+  options: { dataDir?: string; env?: Record<string, string>; featureConfigFile?: string } = {},
 ): Promise<TutorHost> {
   const threads: FakeThread[] = [];
   const running = new Set<string>();
@@ -86,6 +87,7 @@ export async function makeTutorHost(
     pluginId: "tutor",
     agentSkillIds: [SKILL_ID],
     settings,
+    ...(options.dataDir === undefined ? {} : { dataDir: options.dataDir }),
     sdk: {
       projects: {
         get: async ({ projectId }) => {
@@ -130,8 +132,8 @@ export async function makeTutorHost(
   const rt = await registerTutor(host.bb, {
     courseSource: { loadCourse: async () => course },
     store: createProgressStore(),
-    env: {},
-    featureConfigFile: "/nonexistent/tutor/config.json",
+    env: options.env ?? {},
+    featureConfigFile: options.featureConfigFile ?? "/nonexistent/tutor/config.json",
     now: () => NOW,
   });
   return { ...host, rt, threads, running, sent, addThread };

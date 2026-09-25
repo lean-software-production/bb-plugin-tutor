@@ -8,14 +8,25 @@ import { ProgressCardDirective, TermDirective } from "./app/ui/Directives.tsx";
 import { ContinueSection, CourseAccessory } from "./app/ui/Home.tsx";
 import { CourseRail } from "./app/ui/Rail.tsx";
 import { RuleTab } from "./app/ui/RuleTab.tsx";
+import { SimpleNavigation } from "./app/ui/SimpleNavigation.tsx";
+import { mountActivityReporter } from "./app/activity.ts";
 import "./app/paper.css";
 import "./app/styles/rail.css";
 import "./app/styles/lesson.css";
 import "./app/styles/pages.css";
 import "./app/styles/chat.css";
 import "./app/styles/panels.css";
+import "./app/styles/nav.css";
 
 export default definePluginApp((app) => {
+  // Reports the student's activity so the Codespace is not idle-stopped under them.
+  app.contentScripts.register({ id: SLOT_IDS.activity, mount: mountActivityReporter });
+  app.slots.experimental_sidebarNavigation({
+    id: SLOT_IDS.sidebarNavigation,
+    title: "Course navigation",
+    description: "BB's navigation without the Plugins and Skills rows (Tutor's simpleNavigation setting).",
+    component: SimpleNavigation,
+  });
   app.slots.experimental_threadList({
     id: SLOT_IDS.threadList,
     title: "Course rail",

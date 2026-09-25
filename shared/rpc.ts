@@ -252,5 +252,14 @@ export const rpcContract = defineRpcContract({
     input: z.object({ homeworkId: homeworkIdSchema, ruleKey: ruleKeySchema }),
     output: z.object({ threadId: threadIdSchema }),
   },
+  /**
+   * The student is using BB (app/activity.ts). Stamps the tutor feature's
+   * activity file, at most every 30 s; `recorded` is false when throttled or
+   * when BB's data dir is unknown.
+   */
+  heartbeat: {
+    input: z.null(),
+    output: z.object({ recorded: z.boolean() }),
+  },
 });
 export type RpcContract = typeof rpcContract;

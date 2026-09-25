@@ -36,7 +36,14 @@ export const SLOT_IDS = {
   navPanel: "course",
   homepageSection: "continue",
   ruleTab: "rule-tab",
+  /** `experimental_sidebarNavigation`: BB's navigation without the rows students don't need. */
+  sidebarNavigation: "simple-nav",
+  /** App-wide content script that reports the student's activity (app/activity.ts). */
+  activity: "activity",
 } as const;
+
+/** `bb.themes` id in package.json; BB lists it as `plugin:tutor:paper`. */
+export const THEME_ID = "paper";
 
 /** The single navPanel lives at `/plugins/tutor/<NAV_PANEL_PATH>/<subPath>`; see shared/routes.ts. */
 export const NAV_PANEL_PATH = "course";
@@ -47,6 +54,8 @@ export const SETTING_KEYS = {
   coursePath: "coursePath",
   /** `type: "project"`; the student's factory project. Written by `confirmFactory`. */
   factoryProject: "factoryProject",
+  /** `type: "boolean"`, default true; hides BB's Plugins and Skills navigation rows. */
+  simpleNavigation: "simpleNavigation",
 } as const;
 
 /**
@@ -60,9 +69,17 @@ export const ENV_VARS = {
   coursePath: "TUTOR_COURSE_PATH",
   factoryPath: "TUTOR_FACTORY_PATH",
 } as const;
-/** JSON `{ "course"?: string, "factory"?: string }`, written by the feature's install.sh. */
+/** JSON `{ "course"?: string, "factory"?: string, "dataDir"?: string }`, written by the feature's install.sh. */
 export const FEATURE_CONFIG_FILE = "/usr/local/etc/tutor/config.json";
 export const DEFAULT_COURSE_PATH = "/workspaces/tutorial";
+
+/**
+ * The student-activity heartbeat, shared with the feature's keep-alive:
+ * `<BB data dir>/<ACTIVITY_FILE>` holds one line, the ISO-8601 UTC time the
+ * student was last seen using BB. The keep-alive treats a stamp younger than
+ * 120 s as active.
+ */
+export const ACTIVITY_FILE = ".tutor-feature/activity";
 
 /** Paths inside the student's factory repo, relative to its root. */
 export const FACTORY_FILES = {

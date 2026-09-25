@@ -1,5 +1,6 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type { ProgressStore } from "../../shared/ports.ts";
+import type { ActivityRecorder } from "../activity/heartbeat.ts";
 import type { KeyedLock } from "./keyed-lock.ts";
 import type { TutorSettings } from "./settings.ts";
 import type { StateSignals } from "./signals.ts";
@@ -14,5 +15,7 @@ export interface TutorRuntime {
   signals: StateSignals;
   /** Serialises changes to one factory's files, and find-or-spawn of one homework's coach. */
   locks: KeyedLock;
+  /** The student-activity stamp the feature's keep-alive reads. */
+  activity: ActivityRecorder;
   now: () => Date;
 }

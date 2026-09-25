@@ -13,6 +13,13 @@ const descriptors = {
     label: "Factory project",
     description: "The BB project holding your factory repo, where the coach works. Tutor never creates it.",
   },
+  [SETTING_KEYS.simpleNavigation]: {
+    type: "boolean",
+    label: "Simple navigation",
+    description:
+      "Hide BB's Plugins and Skills rows from the sidebar navigation. Takes effect while Tutor's navigation is selected under Settings → Appearance → Navigation.",
+    default: true,
+  },
 } as const;
 
 export type TutorSettings = PluginSettingsHandle<typeof descriptors>;

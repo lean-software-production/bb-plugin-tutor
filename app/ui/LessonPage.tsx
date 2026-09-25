@@ -11,7 +11,7 @@ import { homeworkLabel } from "../model/format.ts";
 import { buildLesson, coachStart, foldsHiding } from "../model/lesson.ts";
 import type { CoachStart, LessonView, RuleView } from "../model/lesson.ts";
 import { QUERY_KEYS, ruleRequestStore, takeRuleRequest } from "../state/app-state.ts";
-import { Bar, Loading, Notice, coursePageHref, isPlainClick } from "./common.tsx";
+import { Bar, ErrorNotice, Loading, ReloadButton, coursePageHref, isPlainClick } from "./common.tsx";
 import { Lesson } from "./Lesson.tsx";
 
 /** Distance from the bottom beyond which "jump to latest" appears. */
@@ -35,7 +35,7 @@ export function LessonPage({ homeworkId, ruleKey }: { homeworkId: string; ruleKe
     return (
       <div className="tutor-grid tp-lt">
         <div className="tutor-paper tp-lt-message">
-          {lesson.status === "error" ? <Notice tone="error">{lesson.error}</Notice> : <Loading label="Loading the lesson…" />}
+          {lesson.status === "error" ? <ErrorNotice message={lesson.error} /> : <Loading label="Loading the lesson…" />}
         </div>
       </div>
     );
@@ -155,6 +155,7 @@ function LessonLayout({
           error === null ? null : (
             <span key={error} className="tp-inline-error" role="alert">
               {error}
+              <ReloadButton message={error} />
             </span>
           ),
         )}
@@ -174,7 +175,7 @@ function LessonLayout({
         ruleActions={ruleActions}
         banner={
           <>
-            {staleError === null ? null : <Notice tone="error">{staleError}</Notice>}
+            {staleError === null ? null : <ErrorNotice message={staleError} />}
             {view.readyToComplete ? (
               <a
                 className="tp-banner"
@@ -293,7 +294,7 @@ function StartCoach({
           <button type="button" className="tp-btn tp-btn--big" disabled={pending} onClick={onStart}>
             {pending ? "Starting…" : start === "start" ? "Start with your coach →" : "Open the coach thread →"}
           </button>
-          {error === null ? null : <Notice tone="error">{error}</Notice>}
+          {error === null ? null : <ErrorNotice message={error} />}
         </div>
       );
   }

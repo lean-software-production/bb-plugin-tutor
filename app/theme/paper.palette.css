@@ -1,0 +1,90 @@
+/*
+ * Tutor paper: BB's palette in the tutorial-engine workbook's colours
+ * (app/paper.css, docs/tutor/mockups.html). Light is the workbook itself; dark
+ * is the same paper at night, for a student whose BB is in dark mode.
+ *
+ * Everything set in the first block also applies in dark mode (`:root`
+ * matches in both), so every literal there is set again under .dark.
+ * Text tiers are literals rather than color-mix() so theme.test.ts can check
+ * their contrast.
+ */
+
+:root,
+.light {
+  /* anchors: paper and ink */
+  --canvas: #fbfaf6;
+  --ink: #1f2933;
+
+  /* surfaces: the workbook's ground, lines and rail */
+  --secondary: #f0eee7;
+  --accent: #f0eee7;
+  --muted: #f0eee7;
+  --border: #dedbd0;
+  --border-hairline: #dedbd0;
+  --border-seam: #d7d3c6;
+  --sidebar: #e8e5db;
+  --sidebar-foreground: #1f2933;
+  --sidebar-accent: #dcd8cb;
+  --sidebar-border: #d7d3c6;
+
+  /* accent: the workbook blue */
+  --primary: #2459a8;
+  --primary-foreground: #ffffff;
+  --file-accent: #173f78;
+
+  /* text tiers */
+  --muted-foreground: #56616c;
+  --readback-foreground: #5f6a74;
+  --subtle-foreground: #7b7a72;
+
+  /* semantic */
+  --destructive: #b43b3b;
+  --destructive-foreground: #ffffff;
+  --destructive-text: #b43b3b;
+  --warning: #8b5a00;
+  --warning-text: #8b5a00;
+  --attention: #b7791f;
+  --success: #1f735b;
+  --diff-added: #1f735b;
+  --diff-removed: #b43b3b;
+  --pr-merged: #6b46a8;
+
+  /* type: Archivo for the UI (inlined above); code keeps BB's mono. Word
+     spaces come from the next family, as in app/fonts/embed.ts. */
+  --font-sans: "Tutor Archivo", "Helvetica Neue", Helvetica, Arial, Inter, sans-serif;
+}
+
+.dark {
+  --canvas: #1b2027;
+  --ink: #e8e4d8;
+
+  --secondary: #252b33;
+  --accent: #252b33;
+  --muted: #2a3038;
+  --border: #353c45;
+  --border-hairline: #353c45;
+  --border-seam: #2e343c;
+  --sidebar: #161a20;
+  --sidebar-foreground: #e8e4d8;
+  --sidebar-accent: #242a32;
+  --sidebar-border: #2e343c;
+
+  --primary: #8fb4ec;
+  --primary-foreground: #10161d;
+  --file-accent: #a6c4f0;
+
+  --muted-foreground: #a9b1b9;
+  --readback-foreground: #9aa3ac;
+  --subtle-foreground: #7f8891;
+
+  --destructive: #e38787;
+  --destructive-foreground: #10161d;
+  --destructive-text: #ef9a9a;
+  --warning: #e0b35c;
+  --warning-text: #e8bf6e;
+  --attention: #e0b35c;
+  --success: #6fcaa6;
+  --diff-added: #6fcaa6;
+  --diff-removed: #ef9a9a;
+  --pr-merged: #b69cf0;
+}

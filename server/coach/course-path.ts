@@ -7,6 +7,8 @@ import { DEFAULT_COURSE_PATH, ENV_VARS } from "../../shared/constants.ts";
 export interface FeatureConfig {
   course?: string;
   factory?: string;
+  /** BB's data dir, for the activity heartbeat when BB itself cannot say. */
+  dataDir?: string;
 }
 
 export type Env = Readonly<Record<string, string | undefined>>;
@@ -25,10 +27,13 @@ export async function readFeatureConfig(path: string): Promise<FeatureConfig> {
   }
   if (typeof raw !== "object" || raw === null) return {};
   const config: FeatureConfig = {};
-  const course = nonEmpty((raw as Record<string, unknown>).course);
-  const factory = nonEmpty((raw as Record<string, unknown>).factory);
+  const record = raw as Record<string, unknown>;
+  const course = nonEmpty(record.course);
+  const factory = nonEmpty(record.factory);
+  const dataDir = nonEmpty(record.dataDir);
   if (course !== undefined) config.course = course;
   if (factory !== undefined) config.factory = factory;
+  if (dataDir !== undefined) config.dataDir = dataDir;
   return config;
 }
 

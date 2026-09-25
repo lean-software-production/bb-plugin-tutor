@@ -6,7 +6,7 @@ import { refreshAll, useAction, useCourseNavigate, useOverview, useQuery, useSto
 import { homeDecision } from "../model/home.ts";
 import { welcomeView } from "../model/welcome.ts";
 import { QUERY_KEYS, queryCache, railMountedStore } from "../state/app-state.ts";
-import { Loading, Notice, PaperPage } from "./common.tsx";
+import { ErrorNotice, Loading, Notice, PaperPage } from "./common.tsx";
 
 const COURSE_METHOD =
   "Each homework is a spec written in Gherkin; your coach works through it with you, one rule at a time, in the repo where your factory lives.";
@@ -24,7 +24,7 @@ export function WelcomePage() {
       <h1 className="tp-h1">{course?.title ?? "Your course"}</h1>
       {candidates.data === null || overview.data === null ? (
         candidates.status === "error" || overview.status === "error" ? (
-          <Notice tone="error">{candidates.error ?? overview.error}</Notice>
+          <ErrorNotice message={candidates.error ?? overview.error} />
         ) : (
           <Loading label="Looking for your factory project…" />
         )
@@ -131,7 +131,7 @@ function Picker({
               </button>
             ) : null}
           </div>
-          {confirm.error === null ? null : <Notice tone="error">{confirm.error}</Notice>}
+          {confirm.error === null ? null : <ErrorNotice message={confirm.error} />}
         </>
       )}
     </>

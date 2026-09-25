@@ -9,7 +9,7 @@ import { useCourseNavigate, useLiveRefresh, useOverview } from "../hooks.ts";
 import { parseCoursePath } from "../model/course-route.ts";
 import { homeDecision } from "../model/home.ts";
 import { routeStore } from "../state/app-state.ts";
-import { Loading, Notice, PaperPage } from "./common.tsx";
+import { ErrorNotice, Loading, PaperPage } from "./common.tsx";
 import { CompletionPage } from "./CompletionPage.tsx";
 import { LessonPage } from "./LessonPage.tsx";
 import { WelcomePage } from "./WelcomePage.tsx";
@@ -49,7 +49,7 @@ function CourseHome() {
   if (overview.status === "error" && overview.data === null) {
     return (
       <PaperPage>
-        <Notice tone="error">{overview.error}</Notice>
+        <ErrorNotice message={overview.error} />
       </PaperPage>
     );
   }
@@ -58,7 +58,7 @@ function CourseHome() {
       <PaperPage>
         <p className="tp-eyebrow">Tutor</p>
         <h1 className="tp-h1">The course could not be loaded</h1>
-        <Notice tone="error">{decision.message}</Notice>
+        <ErrorNotice message={decision.message} />
         <p className="tp-prose">
           Tutor reads the course from the <code>coursePath</code> setting, then <code>TUTOR_COURSE_PATH</code>, then the
           tutor feature's config, then <code>/workspaces/tutorial</code>. Check that the course is checked out there, or set

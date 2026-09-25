@@ -6,7 +6,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const APP_DIR = fileURLToPath(new URL("..", import.meta.url));
-const ROOTS = [".tutor-paper", ".tutor-grid"];
+// .tutor-nav is the sidebar navigation, drawn with BB's tokens (styles/nav.css).
+const ROOTS = [".tutor-paper", ".tutor-grid", ".tutor-nav"];
 
 function stylesheets(): string[] {
   const styles = readdirSync(`${APP_DIR}styles`)

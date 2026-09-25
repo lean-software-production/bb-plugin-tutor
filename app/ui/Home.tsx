@@ -5,7 +5,7 @@ import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import type { PluginHomepageSectionProps } from "@get-bb/plugin-sdk/app";
 import { refreshAll, useAction, useCourseNavigate, useLiveRefresh, useOverview, useTutorRpc } from "../hooks.ts";
 import { continueView } from "../model/home.ts";
-import { Bar, InlineText, Notice } from "./common.tsx";
+import { Bar, ErrorNotice, InlineText } from "./common.tsx";
 
 export function ContinueSection(_props: PluginHomepageSectionProps) {
   useLiveRefresh();
@@ -30,14 +30,14 @@ export function ContinueSection(_props: PluginHomepageSectionProps) {
   if (view === null) {
     return overview.status === "error" ? (
       <div className="tutor-paper">
-        <Notice tone="error">{overview.error}</Notice>
+        <ErrorNotice message={overview.error} />
       </div>
     ) : null;
   }
   if (view.kind === "error") {
     return (
       <div className="tutor-paper">
-        <Notice tone="error">{view.message}</Notice>
+        <ErrorNotice message={view.message} />
       </div>
     );
   }
@@ -94,7 +94,7 @@ export function ContinueSection(_props: PluginHomepageSectionProps) {
         <button type="button" className="tp-hs-btn tp-hs-btn--ghost" onClick={() => goCourse({ kind: "lesson", homeworkId: view.homeworkId })}>
           Open the lesson
         </button>
-        {toCoach.error === null ? null : <Notice tone="error">{toCoach.error}</Notice>}
+        {toCoach.error === null ? null : <ErrorNotice message={toCoach.error} />}
       </div>
       <div className="tp-hs-r">
         <div className="tp-hs-big">

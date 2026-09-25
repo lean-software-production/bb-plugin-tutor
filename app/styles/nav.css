@@ -1,0 +1,62 @@
+/*
+ * Tutor's sidebar navigation (app/ui/SimpleNavigation.tsx). It stands in for
+ * BB's own rows, so it is drawn with BB's tokens, not the paper ones, and
+ * follows whichever BB theme is active. Row metrics match BB's navigation.
+ * .tutor-nav is its root: BB tokens, no paper typography.
+ */
+.tutor-nav {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 4px 8px;
+  list-style: none;
+}
+.tutor-nav .tp-nav-item {
+  display: flex;
+  width: 100%;
+  min-height: 30px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--sidebar-foreground);
+  font: inherit;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  text-align: left;
+  cursor: pointer;
+}
+.tutor-nav .tp-nav-item:hover:not(:disabled) {
+  background: var(--sidebar-accent);
+}
+.tutor-nav .tp-nav-item[aria-current="page"] {
+  background: var(--state-active, var(--sidebar-accent));
+  font-weight: 500;
+}
+.tutor-nav .tp-nav-item:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.tutor-nav .tp-nav-item:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.tutor-nav .tp-nav-icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+.tutor-nav .tp-nav-label {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (pointer: coarse) {
+  .tutor-nav .tp-nav-item {
+    min-height: 44px;
+  }
+}

@@ -1,19 +1,22 @@
 // React bindings for Tutor's shared state: cached RPC queries that refresh on
 // the backend's change signal, actions with pending/error state, stores, and
 // navigation inside the course page.
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useBbNavigate, useRealtime, useRealtimeConnectionState, useRpc } from "@get-bb/plugin-sdk/app";
 import { NAV_PANEL_PATH, REALTIME_CHANNELS } from "../shared/constants.ts";
 import type { TutorRoute } from "../shared/routes.ts";
 import type { RpcContract } from "../shared/rpc.ts";
 import { coursePath } from "./model/course-route.ts";
+import { withConnectionLossDetection } from "./model/rpc-errors.ts";
 import { QUERY_KEYS, queryCache, staleKeys } from "./state/app-state.ts";
 import { errorMessage } from "./state/query-cache.ts";
 import type { QueryState } from "./state/query-cache.ts";
 import type { Store } from "./state/store.ts";
 
+/** Tutor's RPC client; a failure that did not come from BB rejects with ConnectionLostError. */
 export function useTutorRpc() {
-  return useRpc<RpcContract>();
+  const rpc = useRpc<RpcContract>();
+  return useMemo(() => withConnectionLossDetection(rpc), [rpc]);
 }
 
 export function useStore<T>(store: Store<T>): T {
