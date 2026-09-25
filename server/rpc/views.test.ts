@@ -5,7 +5,7 @@ import {
   fixtureCompletion,
   fixtureCourse,
   fixtureFreshStudent,
-  fixtureLesson,
+  fixtureLessonDetail,
   fixtureOverview,
   fixtureOverviewUnbound,
   fixtureReachedRules,
@@ -13,10 +13,10 @@ import {
   fixtureThreads,
 } from "../../shared/fixtures.ts";
 import type { StudentState } from "../../shared/model.ts";
-import { completionSchema, lessonSchema, overviewSchema } from "../../shared/rpc.ts";
+import { completionSchema, lessonDetailSchema, overviewSchema } from "../../shared/rpc.ts";
 import { makeWorld } from "../../test/helpers/world.ts";
 import type { TutorThreadRecord } from "../coach/threads.ts";
-import { buildCompletion, buildLesson, buildOverview } from "./views.ts";
+import { buildCompletion, buildLessonDetail, buildOverview } from "./views.ts";
 
 const records: TutorThreadRecord[] = fixtureThreads.map((thread, index) => ({
   ...thread,
@@ -44,14 +44,14 @@ test("a missing course still gives an overview", () => {
 });
 
 test("the current lesson carries progress, focus and its coach thread", () => {
-  const lesson = buildLesson(makeWorld(), "002", records);
-  assert.deepEqual(lessonSchema.parse(lesson), lesson);
-  assert.deepEqual(lesson, fixtureLesson);
-  const ahead = buildLesson(makeWorld(), "003", records);
+  const detail = buildLessonDetail(makeWorld(), "002", records);
+  assert.deepEqual(lessonDetailSchema.parse(detail), detail);
+  assert.deepEqual(detail, fixtureLessonDetail);
+  const ahead = buildLessonDetail(makeWorld(), "003", records);
   assert.equal(ahead.status, "ahead");
   assert.deepEqual(ahead.progress, {});
   assert.equal(ahead.iterationStatus, null);
-  assert.throws(() => buildLesson(makeWorld(), "009", records), /no lesson 009/);
+  assert.throws(() => buildLessonDetail(makeWorld(), "009", records), /no lesson 009/);
 });
 
 test("completion describes the finished homework and what comes next", () => {

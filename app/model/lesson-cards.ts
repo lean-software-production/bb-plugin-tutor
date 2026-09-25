@@ -5,7 +5,7 @@
 // the live lesson, so their statuses stay current however old the message.
 import { countExamples, homeworkExamples, ruleStatus } from "../../shared/derive.ts";
 import type { Novelty } from "../../shared/model.ts";
-import type { Lesson } from "../../shared/rpc.ts";
+import type { LessonDetail } from "../../shared/rpc.ts";
 import { homeworkEyebrow, percent, plural } from "./format.ts";
 import { featureView } from "./lesson.ts";
 import type { RuleView } from "./lesson.ts";
@@ -40,11 +40,11 @@ export interface LessonCardView {
   coachThreadId: string | null;
 }
 
-export function lessonCardView(lesson: Lesson): LessonCardView {
-  const { homework, progress } = lesson;
+export function lessonCardView(detail: LessonDetail): LessonCardView {
+  const { homework, progress } = detail;
   const counts = countExamples(homeworkExamples(homework), progress);
-  const focus = lesson.status === "current" ? lesson.focus : null;
-  const reached = new Set(lesson.reachedRules);
+  const focus = detail.status === "current" ? detail.focus : null;
+  const reached = new Set(detail.reachedRules);
   return {
     homeworkId: homework.id,
     eyebrow: homeworkEyebrow(homework.id, homework.set),
@@ -69,12 +69,12 @@ export function lessonCardView(lesson: Lesson): LessonCardView {
             name: rule.name,
             glyph: status === "passing" ? "passing" : rule.key === focus ? "focus" : status,
             novelty: rule.novelty,
-            reached: lesson.coachThreadId !== null && reached.has(rule.key),
+            reached: detail.coachThreadId !== null && reached.has(rule.key),
           };
         }),
       };
     }),
-    coachThreadId: lesson.coachThreadId,
+    coachThreadId: detail.coachThreadId,
   };
 }
 
@@ -91,26 +91,26 @@ export interface RuleCardView {
 }
 
 /** Null when the lesson has no such Rule (a card from a stale message). */
-export function ruleCardView(lesson: Lesson, ruleKey: string, now: number): RuleCardView | null {
-  for (const feature of lesson.homework.features) {
+export function ruleCardView(detail: LessonDetail, ruleKey: string, now: number): RuleCardView | null {
+  for (const feature of detail.homework.features) {
     if (!feature.rules.some((rule) => rule.key === ruleKey)) continue;
-    const focus = lesson.status === "current" ? lesson.focus : null;
-    const view = featureView(feature, lesson.progress, focus, null, now);
+    const focus = detail.status === "current" ? detail.focus : null;
+    const view = featureView(feature, detail.progress, focus, null, now);
     const rule = view.rules.find((candidate) => candidate.key === ruleKey);
     if (rule === undefined) return null;
     const counts = countExamples(
       feature.rules.find((candidate) => candidate.key === ruleKey)?.examples ?? [],
-      lesson.progress,
+      detail.progress,
     );
     return {
-      homeworkId: lesson.homework.id,
+      homeworkId: detail.homework.id,
       featureName: feature.name,
       featureNovelty: feature.novelty,
       rule,
       passing: counts.passing,
       total: counts.total,
-      current: lesson.status === "current",
-      coachThreadId: lesson.coachThreadId,
+      current: detail.status === "current",
+      coachThreadId: detail.coachThreadId,
     };
   }
   return null;

@@ -4,21 +4,21 @@
 //
 //   ""                 home: redirects to the current lesson, or to welcome
 //   "welcome"          first run: confirm or pick the factory project (screen 8)
-//   "lesson/003"       lesson page: the lesson leads the coach thread (screen 2A)
+//   "start/003"        start page, or the lesson's coach thread once it has one
 //   "complete/003"     between homeworks (screen 7)
 const HOMEWORK_ID = /^\d{3}$/;
 
 export type TutorRoute =
   | { kind: "home" }
   | { kind: "welcome" }
-  | { kind: "lesson"; homeworkId: string }
+  | { kind: "start"; homeworkId: string }
   | { kind: "complete"; homeworkId: string };
 
 /** Unknown or malformed sub-paths are treated as home. */
 export function parseRoute(subPath: string): TutorRoute {
   const [head = "", id = "", ...rest] = subPath.replace(/^\/+|\/+$/g, "").split("/");
   if (head === "welcome" && id === "" && rest.length === 0) return { kind: "welcome" };
-  if ((head === "lesson" || head === "complete") && HOMEWORK_ID.test(id) && rest.length === 0) {
+  if ((head === "start" || head === "complete") && HOMEWORK_ID.test(id) && rest.length === 0) {
     return { kind: head, homeworkId: id };
   }
   return { kind: "home" };
@@ -30,7 +30,7 @@ export function formatRoute(route: TutorRoute): string {
       return "";
     case "welcome":
       return "welcome";
-    case "lesson":
+    case "start":
     case "complete":
       return `${route.kind}/${route.homeworkId}`;
   }

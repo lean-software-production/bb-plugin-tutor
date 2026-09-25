@@ -1,4 +1,4 @@
-// The route `lesson/<id>[/<rule>]`. The coach lives in BB's own thread view,
+// The route `start/<id>[/<rule>]`. The coach lives in BB's own thread view,
 // with the lesson carried into it by the lesson card and Rule cards, so a
 // lesson that has a coach thread opens it (at the Rule's section when the
 // route names one). A lesson without one shows its start page: the paper
@@ -35,26 +35,26 @@ function markRedirected(): void {
 }
 
 /** `ruleKey` is the Rule named in the URL. */
-export function LessonPage({ homeworkId, ruleKey }: { homeworkId: string; ruleKey: string | null }) {
+export function StartPage({ homeworkId, ruleKey }: { homeworkId: string; ruleKey: string | null }) {
   const rpc = useTutorRpc();
   const overview = useOverview();
-  const lesson = useQuery(QUERY_KEYS.lesson(homeworkId), () => rpc.call("getLesson", { homeworkId }));
-  if (lesson.data === null) {
+  const detail = useQuery(QUERY_KEYS.lessonDetail(homeworkId), () => rpc.call("getLessonDetail", { homeworkId }));
+  if (detail.data === null) {
     return (
       <div className="tutor-grid tp-lt">
         <div className="tutor-paper tp-lt-message">
-          {lesson.status === "error" ? <ErrorNotice message={lesson.error} /> : <Loading label="Loading the lesson…" />}
+          {detail.status === "error" ? <ErrorNotice message={detail.error} /> : <Loading label="Loading the lesson…" />}
         </div>
       </div>
     );
   }
-  if (lesson.data.coachThreadId !== null) {
-    return <ToCoach homeworkId={homeworkId} coachThreadId={lesson.data.coachThreadId} ruleKey={ruleKey} reached={lesson.data.reachedRules} />;
+  if (detail.data.coachThreadId !== null) {
+    return <ToCoach homeworkId={homeworkId} coachThreadId={detail.data.coachThreadId} ruleKey={ruleKey} reached={detail.data.reachedRules} />;
   }
-  const view = buildLesson(lesson.data, overview.data?.homeworks ?? [], Date.now());
+  const view = buildLesson(detail.data, overview.data?.homeworks ?? [], Date.now());
   const start = coachStart(view.status, overview.data?.binding.status ?? null);
   return (
-    <StartPage key={homeworkId} view={view} start={start} urlRuleKey={ruleKey} staleError={lesson.status === "error" ? lesson.error : null} />
+    <StartPageBody key={homeworkId} view={view} start={start} urlRuleKey={ruleKey} staleError={detail.status === "error" ? detail.error : null} />
   );
 }
 
@@ -95,7 +95,7 @@ function ToCoach({
   );
 }
 
-function StartPage({
+function StartPageBody({
   view,
   start,
   urlRuleKey,

@@ -133,7 +133,7 @@ test("one tree: every lesson, the current one open, with its coach thread, Rules
     ],
   );
   const ahead = rail.lessons.find((lesson) => lesson.id === "003");
-  assert.deepEqual([ahead?.features, ahead?.sideRows, ahead?.canStartCoach, ahead?.startPath], [[], [], false, "lesson/003"]);
+  assert.deepEqual([ahead?.features, ahead?.sideRows, ahead?.canStartCoach, ahead?.startPath], [[], [], false, "start/003"]);
 });
 
 test("other threads keep BB usable: grouped by project, newest first, children nested, hidden ones and course threads left out", () => {
@@ -148,7 +148,7 @@ test("other threads keep BB usable: grouped by project, newest first, children n
 });
 
 test("the lesson on screen opens too: its start page, its coach thread or a side thread", () => {
-  const onPage = buildRail(input({ route: { kind: "lesson", homeworkId: "003" } }));
+  const onPage = buildRail(input({ route: { kind: "start", homeworkId: "003" } }));
   assert.deepEqual(
     onPage.lessons.filter((lesson) => lesson.expandedByDefault).map((lesson) => lesson.id),
     ["002", "003"],

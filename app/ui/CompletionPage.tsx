@@ -20,7 +20,7 @@ export function CompletionPage({ homeworkId }: { homeworkId: string }) {
         {completion.status === "error" ? (
           <>
             <ErrorNotice message={completion.error} />
-            <button type="button" className="tp-btn tp-btn--ghost" onClick={() => goCourse({ kind: "lesson", homeworkId })}>
+            <button type="button" className="tp-btn tp-btn--ghost" onClick={() => goCourse({ kind: "start", homeworkId })}>
               Back to the lesson
             </button>
           </>
@@ -114,7 +114,7 @@ function NextHomework({ next }: { next: NextHomeworkView }) {
         <button type="button" className="tp-btn tp-btn--big" disabled={start.pending} onClick={() => void start.run()}>
           {start.pending ? "Starting…" : next.startLabel}
         </button>
-        <button type="button" className="tp-btn tp-btn--ghost" onClick={() => goCourse({ kind: "lesson", homeworkId: next.id })}>
+        <button type="button" className="tp-btn tp-btn--ghost" onClick={() => goCourse({ kind: "start", homeworkId: next.id })}>
           Read the features first
         </button>
       </div>

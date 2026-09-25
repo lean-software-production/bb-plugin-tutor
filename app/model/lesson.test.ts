@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fixtureCourse, fixtureLesson, fixtureOverview, FIXTURE_NOW } from "../../shared/fixtures.ts";
+import { fixtureCourse, fixtureLessonDetail, fixtureOverview, FIXTURE_NOW } from "../../shared/fixtures.ts";
 import type { Example, Homework, Step } from "../../shared/model.ts";
-import type { Lesson } from "../../shared/rpc.ts";
+import type { LessonDetail } from "../../shared/rpc.ts";
 import { exampleLines, stepLines, stepTextTokens } from "./gherkin.ts";
 import { buildLesson, coachStart, foldsHiding, laterFoldId, marginNote } from "./lesson.ts";
 
@@ -15,8 +15,8 @@ function homework(id: string): Homework {
   return found;
 }
 
-function exampleOf(lesson: Lesson, name: string): Example {
-  const found = lesson.homework.features
+function exampleOf(detail: LessonDetail, name: string): Example {
+  const found = detail.homework.features
     .flatMap((feature) => feature.rules.flatMap((rule) => rule.examples))
     .find((example) => example.name === name);
   if (found === undefined) throw new Error(`no example ${name}`);
@@ -60,7 +60,7 @@ test("docstrings and tables print verbatim, one row per line", () => {
 });
 
 test("an Example prints its tags above the header line", () => {
-  const tagged = exampleOf({ ...fixtureLesson }, "A stand-in that is never satisfied");
+  const tagged = exampleOf({ ...fixtureLessonDetail }, "A stand-in that is never satisfied");
   const { lines, headerIndex } = exampleLines(tagged);
   assert.equal(headerIndex, 1);
   assert.deepEqual(lines[0]?.tokens, [{ kind: "tag", text: "@real-agent" }]);
@@ -72,7 +72,7 @@ test("an Example prints its tags above the header line", () => {
 });
 
 test("the current lesson ends at the Rule in focus, other features collapsed ahead of it", () => {
-  const view = buildLesson(fixtureLesson, homeworks, NOW);
+  const view = buildLesson(fixtureLessonDetail, homeworks, NOW);
   assert.equal(view.eyebrow, "Lesson 2 · Set after day 2");
   assert.equal(view.barTitle, "Lesson 2 · Checking the work");
   assert.deepEqual(view.focus, {
@@ -103,7 +103,7 @@ test("the current lesson ends at the Rule in focus, other features collapsed ahe
 });
 
 test("opening a Rule unfolds whatever hides it", () => {
-  const view = buildLesson(fixtureLesson, homeworks, NOW);
+  const view = buildLesson(fixtureLessonDetail, homeworks, NOW);
   assert.deepEqual(foldsHiding(view, "planning/the-planner-writes-a-plan"), ["planning"]);
   assert.deepEqual(foldsHiding(view, "validation/validation-is-what-the-validators-agent-decided"), [laterFoldId("validation")]);
   assert.deepEqual(foldsHiding(view, "validation/a-task-is-finished-when-validation-is-satisfied"), []);
@@ -111,7 +111,7 @@ test("opening a Rule unfolds whatever hides it", () => {
 });
 
 test("the compass names what is new since the previous real homework", () => {
-  const view = buildLesson(fixtureLesson, homeworks, NOW);
+  const view = buildLesson(fixtureLessonDetail, homeworks, NOW);
   assert.deepEqual(view.compass, {
     title: "New since lesson 1",
     items: [
@@ -119,33 +119,33 @@ test("the compass names what is new since the previous real homework", () => {
       { file: "validation.feature", text: "A validator decides whether a task is finished." },
     ],
   });
-  const first = buildLesson({ ...fixtureLesson, homework: homework("001"), status: "done", progress: {} }, homeworks, NOW);
+  const first = buildLesson({ ...fixtureLessonDetail, homework: homework("001"), status: "done", progress: {} }, homeworks, NOW);
   assert.equal(first.compass, null, "everything is new in the first homework");
-  const builtin = buildLesson({ ...fixtureLesson, homework: homework("000"), status: "done", progress: {} }, homeworks, NOW);
+  const builtin = buildLesson({ ...fixtureLessonDetail, homework: homework("000"), status: "done", progress: {} }, homeworks, NOW);
   assert.equal(builtin.compass, null);
 });
 
 test("margin notes carry the coach's words and the evidence", () => {
-  const progress = fixtureLesson.progress;
-  const carried = marginNote(exampleOf(fixtureLesson, "A seed becomes a plan"), progress, NOW);
+  const progress = fixtureLessonDetail.progress;
+  const carried = marginNote(exampleOf(fixtureLessonDetail, "A seed becomes a plan"), progress, NOW);
   assert.equal(carried?.tone, "green");
   assert.equal(carried?.label, "Carried over");
   assert.equal(carried?.text, "Passing since lesson 1.");
   assert.match(carried?.evidence ?? "", /plan written/);
 
-  const marked = marginNote(exampleOf(fixtureLesson, "The work is right first time"), progress, NOW);
+  const marked = marginNote(exampleOf(fixtureLessonDetail, "The work is right first time"), progress, NOW);
   assert.deepEqual([marked?.tone, marked?.label, marked?.text], ["green", "Coach · 14m ago", null]);
 
-  const notYet = marginNote(exampleOf(fixtureLesson, "The work is wrong first time"), progress, NOW);
+  const notYet = marginNote(exampleOf(fixtureLessonDetail, "The work is wrong first time"), progress, NOW);
   assert.deepEqual(
     [notYet?.tone, notYet?.label, notYet?.text],
     ["amber", "Coach · not yet · just now", "Crashed in the doer loop instead of retrying when the validator said no."],
   );
 
-  const realAgent = marginNote(exampleOf(fixtureLesson, "A stand-in that is never satisfied"), progress, NOW);
+  const realAgent = marginNote(exampleOf(fixtureLessonDetail, "A stand-in that is never satisfied"), progress, NOW);
   assert.equal(realAgent?.tone, "purple");
 
-  const reworded = exampleOf(fixtureLesson, "An existing plan is kept");
+  const reworded = exampleOf(fixtureLessonDetail, "An existing plan is kept");
   assert.equal(marginNote(reworded, progress, NOW)?.label, "Reworded");
   const stale = { [reworded.key]: { status: "passing" as const, hash: `sha256:${"0".repeat(64)}`, at: FIXTURE_NOW, evidence: "x" } };
   assert.deepEqual(marginNote(reworded, stale, NOW)?.tone, "muted", "a hash mismatch reads as pending again");
@@ -158,17 +158,17 @@ test("margin notes carry the coach's words and the evidence", () => {
 });
 
 test("without a stored focus the lesson ends at the first open Rule in suggested order", () => {
-  const view = buildLesson({ ...fixtureLesson, focus: null }, homeworks, NOW);
+  const view = buildLesson({ ...fixtureLessonDetail, focus: null }, homeworks, NOW);
   assert.deepEqual(view.focus, { ruleKey: "planning/the-planner-writes-a-plan", label: "up next" });
   assert.equal(view.focusFeature?.name, "Planning");
 
-  const unknown = buildLesson({ ...fixtureLesson, focus: "planning/gone" }, homeworks, NOW);
+  const unknown = buildLesson({ ...fixtureLessonDetail, focus: "planning/gone" }, homeworks, NOW);
   assert.equal(unknown.focus?.label, "up next", "a focus naming a missing Rule is ignored");
 });
 
 test("previews and finished homeworks have no focus and open every feature", () => {
   const preview = buildLesson(
-    { ...fixtureLesson, homework: homework("003"), status: "ahead", iterationStatus: null, focus: null, progress: {} },
+    { ...fixtureLessonDetail, homework: homework("003"), status: "ahead", iterationStatus: null, focus: null, progress: {} },
     homeworks,
     NOW,
   );
@@ -181,7 +181,7 @@ test("previews and finished homeworks have no focus and open every feature", () 
   ]);
   assert.equal(preview.compass, null, "fixture homework 3 is all new");
 
-  const finished = buildLesson({ ...fixtureLesson, status: "done", iterationStatus: "Done" }, homeworks, NOW);
+  const finished = buildLesson({ ...fixtureLessonDetail, status: "done", iterationStatus: "Done" }, homeworks, NOW);
   assert.equal(finished.focus, null);
   assert.equal(finished.readyToComplete, true);
   assert.deepEqual(finished.chips.map((chip) => chip.tone), ["green", "green"]);

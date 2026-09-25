@@ -103,7 +103,7 @@ function RailBody({ rail, go, onNavigate }: { rail: RailView; go: Go; onNavigate
               key={lesson.id}
               className="tp-lesson-row tp-lesson-row--ahead"
               href={coursePageHref(lesson.startPath)}
-              onClick={(event) => go(event, { kind: "lesson", homeworkId: lesson.id })}
+              onClick={(event) => go(event, { kind: "start", homeworkId: lesson.id })}
             >
               <span className="tp-gl-mark" aria-hidden>
                 ○
@@ -201,7 +201,7 @@ function LessonThreads({ lesson, go, onNavigate }: { lesson: LessonNode; go: Go;
           <a
             className="tp-th tp-th--page"
             href={coursePageHref(lesson.startPath)}
-            onClick={(event) => go(event, { kind: "lesson", homeworkId: lesson.id })}
+            onClick={(event) => go(event, { kind: "start", homeworkId: lesson.id })}
           >
             <span className="tp-ic" aria-hidden>
               ¶

@@ -1,5 +1,5 @@
 // Pure derivations over the model that both the backend (overview, tools) and
-// the frontend (lesson page) need, so the two can never disagree about what a
+// the frontend (start page, cards, outline) need, so the two can never disagree about what a
 // glyph or a count means.
 import { BUILTIN_HOMEWORK_ID } from "./constants.ts";
 import type {

@@ -27,21 +27,21 @@ function SourceFallback({ source }: { source: string }) {
   return <p>{source}</p>;
 }
 
-function useLesson(homeworkId: string | null) {
+function useLessonDetail(homeworkId: string | null) {
   const rpc = useTutorRpc();
   // The fetcher only runs for a non-null key, so homeworkId is set whenever it is called.
-  return useQuery(homeworkId === null ? null : QUERY_KEYS.lesson(homeworkId), () =>
-    rpc.call("getLesson", { homeworkId: homeworkId ?? "" }),
+  return useQuery(homeworkId === null ? null : QUERY_KEYS.lessonDetail(homeworkId), () =>
+    rpc.call("getLessonDetail", { homeworkId: homeworkId ?? "" }),
   );
 }
 
 /** `::tutor-lesson{homework="003"}`: the lesson that opens a coach thread. */
 export function LessonCardDirective({ attributes, source }: PluginMessageDirectiveProps) {
   const ref = parseLessonRef(attributes);
-  const lesson = useLesson(ref?.homeworkId ?? null);
+  const detail = useLessonDetail(ref?.homeworkId ?? null);
   if (ref === null) return <SourceFallback source={source} />;
-  if (lesson.data === null) {
-    return lesson.status === "error" ? (
+  if (detail.data === null) {
+    return detail.status === "error" ? (
       <SourceFallback source={source} />
     ) : (
       <div className="tutor-paper tp-lcard tp-lcard--loading" role="status">
@@ -49,7 +49,7 @@ export function LessonCardDirective({ attributes, source }: PluginMessageDirecti
       </div>
     );
   }
-  return <LessonCard view={lessonCardView(lesson.data)} />;
+  return <LessonCard view={lessonCardView(detail.data)} />;
 }
 
 function LessonCard({ view }: { view: LessonCardView }) {
@@ -145,10 +145,10 @@ function RuleCardDirective({
   rule: { homeworkId: string; ruleKey: string };
   threadId: string;
 }) {
-  const lesson = useLesson(rule.homeworkId);
+  const detail = useLessonDetail(rule.homeworkId);
   const anchor = ruleAnchor(threadId, rule.homeworkId, rule.ruleKey);
   const anchorProps: Record<string, string> = anchor === null ? {} : { [RULE_ANCHOR_ATTRIBUTE]: anchor };
-  const view = lesson.data === null ? null : ruleCardView(lesson.data, rule.ruleKey, Date.now());
+  const view = detail.data === null ? null : ruleCardView(detail.data, rule.ruleKey, Date.now());
   if (view === null) return <ProgressCard view={card} anchorProps={anchorProps} />;
   return <RuleCard view={view} anchorProps={anchorProps} />;
 }
@@ -227,7 +227,7 @@ function ProgressCard({ view, anchorProps = {} }: { view: ProgressCardView; anch
       return;
     }
     const opened = navigate.openThreadPanel({ actionId: SLOT_IDS.ruleTab, title: "Rule", params: rule });
-    if (!opened) goCourse({ kind: "lesson", homeworkId: rule.homeworkId }, { ruleKey: rule.ruleKey });
+    if (!opened) goCourse({ kind: "start", homeworkId: rule.homeworkId }, { ruleKey: rule.ruleKey });
   };
   const completed = view.completedHomeworkId;
   return (

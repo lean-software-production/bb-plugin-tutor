@@ -26,7 +26,7 @@ import type {
   CandidateProject,
   Completion,
   FeatureOutline,
-  Lesson,
+  LessonDetail,
   Overview,
   TutorThread,
 } from "./rpc.ts";
@@ -490,7 +490,7 @@ export const fixtureOverviewUnbound: Overview = {
   threads: [],
 };
 
-export const fixtureLesson: Lesson = {
+export const fixtureLessonDetail: LessonDetail = {
   homework: homework2,
   status: "current",
   iterationStatus: "WIP",

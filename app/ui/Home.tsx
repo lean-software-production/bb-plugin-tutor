@@ -94,7 +94,7 @@ export function ContinueSection(_props: PluginHomepageSectionProps) {
           </button>
         )}
         {view.coachThreadId === null ? (
-          <button type="button" className="tp-hs-btn tp-hs-btn--ghost" onClick={() => goCourse({ kind: "lesson", homeworkId: view.homeworkId })}>
+          <button type="button" className="tp-hs-btn tp-hs-btn--ghost" onClick={() => goCourse({ kind: "start", homeworkId: view.homeworkId })}>
             Open the start page
           </button>
         ) : null}

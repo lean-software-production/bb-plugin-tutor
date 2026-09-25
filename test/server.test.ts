@@ -13,7 +13,7 @@ import {
 import type { PluginAgentToolResult } from "@get-bb/plugin-sdk";
 import { ALL_TOOL_NAMES } from "../shared/constants.ts";
 import { findHomework, homeworkExamples } from "../shared/derive.ts";
-import type { Completion, Lesson, Overview } from "../shared/rpc.ts";
+import type { Completion, LessonDetail, Overview } from "../shared/rpc.ts";
 import { NOT_A_TUTOR_THREAD } from "../server/coach/auth.ts";
 import { makeSandbox, type Sandbox } from "./helpers/disk.ts";
 import { makeTutorHost, PROJECT_ID, type TutorHost } from "./helpers/fake-bb.ts";
@@ -186,9 +186,9 @@ test("the coach tools round-trip progress through the factory repo and carry pas
   assert.match(progress1, /^iteration: "001"\n/);
   assert.match(progress1, /evidence: \|-?\n {6}\$ \.\/factory\n {6}plan written/);
 
-  const lesson = (await host.harness.behavior.callRpc("getLesson", { homeworkId: "001" })) as Lesson;
-  assert.equal(lesson.progress[seedBecomesPlan.key]?.status, "passing");
-  assert.equal(lesson.coachThreadId, coach1);
+  const detail = (await host.harness.behavior.callRpc("getLessonDetail", { homeworkId: "001" })) as LessonDetail;
+  assert.equal(detail.progress[seedBecomesPlan.key]?.status, "passing");
+  assert.equal(detail.coachThreadId, coach1);
 
   await ok(host, "tutor_complete_iteration", { iteration: "001", summary: "It plans." }, coach1);
   assert.equal(await readFile(join(root, "spec/ITERATION"), "utf8"), "001 Done\n");
@@ -214,7 +214,7 @@ test("the coach tools round-trip progress through the factory repo and carry pas
   // Homework 1 stays truthful after moving on: its record moved into the history, without evidence.
   assert.match(history2, /^ {2}"001":\n {4}adopted: /m);
   assert.doesNotMatch(history2, /evidence/);
-  const done1 = (await host.harness.behavior.callRpc("getLesson", { homeworkId: "001" })) as Lesson;
+  const done1 = (await host.harness.behavior.callRpc("getLessonDetail", { homeworkId: "001" })) as LessonDetail;
   assert.equal(done1.status, "done");
   assert.equal(done1.progress[keptPlan.key]?.status, "passing");
   const completion1 = (await host.harness.behavior.callRpc("getCompletion", { homeworkId: "001" })) as Completion;
@@ -440,14 +440,14 @@ test("a provider that cannot fork gets a clear error, and no side thread is spaw
 test("focusing a Rule records it on the coach thread, so the outline can jump to its section", async (t) => {
   const { host } = await setup(t);
   const { coach, rule } = await adoptedCoach(host);
-  const before = (await host.harness.behavior.callRpc("getLesson", { homeworkId: "000" })) as Lesson;
+  const before = (await host.harness.behavior.callRpc("getLessonDetail", { homeworkId: "000" })) as LessonDetail;
   assert.deepEqual(before.reachedRules, [], "adopting sets a focus but opens no section");
   const focused = await ok(host, "tutor_focus_rule", { rule }, coach);
   assert.match(focused, /start your next message with this line/);
   await ok(host, "tutor_focus_rule", { rule }, coach);
   assert.deepEqual(host.threads.find((thread) => thread.id === coach)?.metadata.reachedRules, [rule]);
-  const lesson = (await host.harness.behavior.callRpc("getLesson", { homeworkId: "000" })) as Lesson;
-  assert.deepEqual(lesson.reachedRules, [rule]);
+  const detail = (await host.harness.behavior.callRpc("getLessonDetail", { homeworkId: "000" })) as LessonDetail;
+  assert.deepEqual(detail.reachedRules, [rule]);
   const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
   const rules = overview.homeworks.find((homework) => homework.id === "000")?.outline.flatMap((feature) => feature.rules) ?? [];
   assert.deepEqual(rules.filter((candidate) => candidate.reached).map((candidate) => candidate.key), [rule]);
@@ -455,7 +455,7 @@ test("focusing a Rule records it on the coach thread, so the outline can jump to
   const thread = host.threads.find((candidate) => candidate.id === coach);
   assert.ok(thread !== undefined);
   thread.metadata.reachedRules = [rule, 42, "not a key", { x: 1 }];
-  const again = (await host.harness.behavior.callRpc("getLesson", { homeworkId: "000" })) as Lesson;
+  const again = (await host.harness.behavior.callRpc("getLessonDetail", { homeworkId: "000" })) as LessonDetail;
   assert.deepEqual(again.reachedRules, [rule]);
 });
 
@@ -558,9 +558,9 @@ test("concurrent tool calls never lose each other's progress", async (t) => {
   await Promise.all(
     examples.map((example) => ok(host, "tutor_mark_example", { example: example.key, status: "skipped" }, coach)),
   );
-  const lesson = (await host.harness.behavior.callRpc("getLesson", { homeworkId: "000" })) as Lesson;
+  const detail = (await host.harness.behavior.callRpc("getLessonDetail", { homeworkId: "000" })) as LessonDetail;
   assert.deepEqual(
-    examples.filter((example) => lesson.progress[example.key]?.status !== "skipped").map((example) => example.key),
+    examples.filter((example) => detail.progress[example.key]?.status !== "skipped").map((example) => example.key),
     [],
   );
 });

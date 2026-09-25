@@ -16,7 +16,7 @@ export const QUERY_KEYS = {
   overview: "overview",
   lexicon: "lexicon",
   candidates: "candidates",
-  lesson: (homeworkId: string) => `lesson:${homeworkId}`,
+  lessonDetail: (homeworkId: string) => `lessonDetail:${homeworkId}`,
   completion: (homeworkId: string) => `completion:${homeworkId}`,
   threadContext: (threadId: string) => `thread:${threadId}`,
 } as const;

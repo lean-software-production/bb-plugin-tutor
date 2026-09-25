@@ -30,7 +30,7 @@ import {
 import type { World } from "../coach/world.ts";
 import { overlaps, realPath } from "../paths.ts";
 import { listCandidates } from "./candidates.ts";
-import { buildCompletion, buildLesson, buildOverview, publicThread, requireCourse, requireHomework } from "./views.ts";
+import { buildCompletion, buildLessonDetail, buildOverview, publicThread, requireCourse, requireHomework } from "./views.ts";
 
 type Bound = Extract<Binding, { status: "bound" }>;
 
@@ -143,9 +143,9 @@ export function registerRpc(rt: TutorRuntime): void {
       return buildOverview(world, [...threads, ...(await bbSideChatsOf(threads))]);
     },
 
-    getLesson: async ({ homeworkId }) => {
+    getLessonDetail: async ({ homeworkId }) => {
       const world = await loadWorld();
-      return buildLesson(world, homeworkId, await threadsOf(world));
+      return buildLessonDetail(world, homeworkId, await threadsOf(world));
     },
 
     getCompletion: async ({ homeworkId }) => {

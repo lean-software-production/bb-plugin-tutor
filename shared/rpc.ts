@@ -139,7 +139,7 @@ export const overviewSchema = z.object({
 });
 export type Overview = z.infer<typeof overviewSchema>;
 
-export const lessonSchema = z.object({
+export const lessonDetailSchema = z.object({
   homework: homeworkSchema,
   status: homeworkStatusSchema,
   /** The student's iteration status when this is the current homework, else null. */
@@ -154,7 +154,7 @@ export const lessonSchema = z.object({
   /** Rules the coach has focused in that thread: their sections can be jumped to. */
   reachedRules: z.array(ruleKeySchema),
 });
-export type Lesson = z.infer<typeof lessonSchema>;
+export type LessonDetail = z.infer<typeof lessonDetailSchema>;
 
 export const completionSchema = z.object({
   homework: z.object({ id: homeworkIdSchema, title: z.string(), set: z.string().nullable() }),
@@ -213,9 +213,9 @@ export const rpcContract = defineRpcContract({
     input: z.null(),
     output: overviewSchema,
   },
-  getLesson: {
+  getLessonDetail: {
     input: homeworkInput,
-    output: lessonSchema,
+    output: lessonDetailSchema,
   },
   /** Between homeworks (screen 7). Fails unless the homework is done. */
   getCompletion: {

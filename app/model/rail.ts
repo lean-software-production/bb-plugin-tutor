@@ -196,7 +196,7 @@ export function viewedHomework(
   lessons: readonly { id: string; coachThreadId: string | null }[],
   threads: readonly Pick<SidebarThreadLike, "id" | "parentThreadId" | "sourceThreadId">[],
 ): string | null {
-  if (route !== null && (route.kind === "lesson" || route.kind === "complete")) return route.homeworkId;
+  if (route !== null && (route.kind === "start" || route.kind === "complete")) return route.homeworkId;
   if (activeThreadId === null) return null;
   const active = threads.find((thread) => thread.id === activeThreadId);
   const coachId = active?.sourceThreadId ?? active?.parentThreadId ?? activeThreadId;
@@ -251,7 +251,7 @@ export function buildRail(input: RailInput): RailView {
       canStartCoach: ready && coachId === null && lesson.status === "current",
       sideRows: coachId === null ? [] : sideRowsOf(coachId, lesson, overview?.threads ?? [], liveById, activeThreadId),
       features: coachId === null ? [] : features(lesson.outline),
-      startPath: formatRoute({ kind: "lesson", homeworkId: lesson.id }),
+      startPath: formatRoute({ kind: "start", homeworkId: lesson.id }),
     };
   });
 

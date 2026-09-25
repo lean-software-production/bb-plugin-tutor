@@ -16,12 +16,12 @@ export function homeDecision(overview: Overview): HomeDecision {
     const first = overview.homeworks[0];
     return first === undefined
       ? { kind: "error", message: "This course has no homeworks yet." }
-      : { kind: "redirect", route: { kind: "lesson", homeworkId: first.id } };
+      : { kind: "redirect", route: { kind: "start", homeworkId: first.id } };
   }
   return {
     kind: "redirect",
     route: {
-      kind: current.iterationStatus === "Done" ? "complete" : "lesson",
+      kind: current.iterationStatus === "Done" ? "complete" : "start",
       homeworkId: current.homeworkId,
     },
   };

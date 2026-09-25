@@ -5,7 +5,7 @@ import { countExamples, exampleStatus, findRule } from "../../shared/derive.ts";
 import { RULE_KEY_PATTERN } from "../../shared/keys.ts";
 import { formatRoute } from "../../shared/routes.ts";
 import type { ExampleStatus } from "../../shared/model.ts";
-import type { Lesson, TutorThread } from "../../shared/rpc.ts";
+import type { LessonDetail, TutorThread } from "../../shared/rpc.ts";
 import { percent } from "./format.ts";
 
 const HOMEWORK_ID = /^\d{3}$/;
@@ -45,7 +45,7 @@ export interface RuleTabExample {
 }
 
 export type RuleTabView =
-  | { kind: "no-rule"; lessonSubPath: string }
+  | { kind: "no-rule"; startPath: string }
   | {
       kind: "rule";
       eyebrow: string;
@@ -54,7 +54,7 @@ export type RuleTabView =
       total: number;
       percent: number;
       examples: RuleTabExample[];
-      lessonSubPath: string;
+      startPath: string;
     };
 
 function detail(status: ExampleStatus, note: string | undefined, carried: boolean): string {
@@ -70,17 +70,17 @@ function detail(status: ExampleStatus, note: string | undefined, carried: boolea
   }
 }
 
-export function ruleTabView(lesson: Lesson, target: RuleTabTarget, fromSideThread: boolean): RuleTabView {
-  const lessonSubPath = formatRoute({ kind: "lesson", homeworkId: lesson.homework.id });
-  const key = target.ruleKey ?? lesson.focus;
-  const rule = key === null ? undefined : findRule(lesson.homework, key);
-  if (rule === undefined) return { kind: "no-rule", lessonSubPath };
-  const feature = lesson.homework.features.find((candidate) => candidate.rules.includes(rule));
-  const where = feature?.name ?? lesson.homework.title;
-  const counts = countExamples(rule.examples, lesson.progress);
+export function ruleTabView(lessonDetail: LessonDetail, target: RuleTabTarget, fromSideThread: boolean): RuleTabView {
+  const startPath = formatRoute({ kind: "start", homeworkId: lessonDetail.homework.id });
+  const key = target.ruleKey ?? lessonDetail.focus;
+  const rule = key === null ? undefined : findRule(lessonDetail.homework, key);
+  if (rule === undefined) return { kind: "no-rule", startPath };
+  const feature = lessonDetail.homework.features.find((candidate) => candidate.rules.includes(rule));
+  const where = feature?.name ?? lessonDetail.homework.title;
+  const counts = countExamples(rule.examples, lessonDetail.progress);
   const eyebrow = fromSideThread
     ? `Spun off from · ${where}`
-    : rule.key === lesson.focus
+    : rule.key === lessonDetail.focus
       ? `Rule in focus · ${where}`
       : `Rule · ${where}`;
   return {
@@ -91,8 +91,8 @@ export function ruleTabView(lesson: Lesson, target: RuleTabTarget, fromSideThrea
     total: counts.total,
     percent: percent(counts.passing, counts.total),
     examples: rule.examples.map((example) => {
-      const entry = lesson.progress[example.key];
-      const status = exampleStatus(example, lesson.progress);
+      const entry = lessonDetail.progress[example.key];
+      const status = exampleStatus(example, lessonDetail.progress);
       return {
         key: example.key,
         name: example.name,
@@ -100,6 +100,6 @@ export function ruleTabView(lesson: Lesson, target: RuleTabTarget, fromSideThrea
         detail: detail(status, entry?.note, entry?.carriedFrom !== undefined),
       };
     }),
-    lessonSubPath,
+    startPath,
   };
 }

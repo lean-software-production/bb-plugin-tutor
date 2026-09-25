@@ -16,7 +16,7 @@ import type {
   Rule,
   RuleStatus,
 } from "../../shared/model.ts";
-import type { Binding, HomeworkSummary, Lesson } from "../../shared/rpc.ts";
+import type { Binding, HomeworkSummary, LessonDetail } from "../../shared/rpc.ts";
 import { backgroundLines, exampleLines } from "./gherkin.ts";
 import type { GherkinLine } from "./gherkin.ts";
 import { firstSentence, homeworkEyebrow, homeworkLabel, percent, plural, relativeTime } from "./format.ts";
@@ -208,24 +208,24 @@ function ruleSummary(rule: Rule, status: RuleStatus, isUpNext: boolean, progress
 }
 
 /** The Rule the lesson ends at: the coach's focus, else the first open Rule in suggested order. */
-function resolveFocus(lesson: Lesson, progress: ProgressMap): LessonView["focus"] {
-  if (lesson.status !== "current") return null;
-  if (lesson.focus !== null && findRule(lesson.homework, lesson.focus) !== undefined) {
-    return { ruleKey: lesson.focus, label: "in focus" };
+function resolveFocus(detail: LessonDetail, progress: ProgressMap): LessonView["focus"] {
+  if (detail.status !== "current") return null;
+  if (detail.focus !== null && findRule(detail.homework, detail.focus) !== undefined) {
+    return { ruleKey: detail.focus, label: "in focus" };
   }
-  const open = lesson.homework.suggestedRuleOrder.find((key) => {
-    const rule = findRule(lesson.homework, key);
+  const open = detail.homework.suggestedRuleOrder.find((key) => {
+    const rule = findRule(detail.homework, key);
     return rule !== undefined && ruleStatus(rule, progress) !== "passing";
   });
   return open === undefined ? null : { ruleKey: open, label: "up next" };
 }
 
-function upNextKey(lesson: Lesson, progress: ProgressMap, focusKey: string | null): string | null {
-  if (lesson.status !== "current") return null;
+function upNextKey(detail: LessonDetail, progress: ProgressMap, focusKey: string | null): string | null {
+  if (detail.status !== "current") return null;
   return (
-    lesson.homework.suggestedRuleOrder.find((key) => {
+    detail.homework.suggestedRuleOrder.find((key) => {
       if (key === focusKey) return false;
-      const rule = findRule(lesson.homework, key);
+      const rule = findRule(detail.homework, key);
       return rule !== undefined && ruleStatus(rule, progress) !== "passing";
     }) ?? null
   );
@@ -311,11 +311,11 @@ export function featureView(
 }
 
 /** `homeworks` is the course order from getOverview, used to name the previous homework. */
-export function buildLesson(lesson: Lesson, homeworks: readonly HomeworkSummary[], now: number): LessonView {
-  const { homework, progress } = lesson;
+export function buildLesson(detail: LessonDetail, homeworks: readonly HomeworkSummary[], now: number): LessonView {
+  const { homework, progress } = detail;
   const counts = countExamples(homeworkExamples(homework), progress);
-  const focus = resolveFocus(lesson, progress);
-  const upNext = upNextKey(lesson, progress, focus?.ruleKey ?? null);
+  const focus = resolveFocus(detail, progress);
+  const upNext = upNextKey(detail, progress, focus?.ruleKey ?? null);
   const features = homework.features.map((feature) =>
     featureView(feature, progress, focus?.ruleKey ?? null, upNext, now),
   );
@@ -331,17 +331,17 @@ export function buildLesson(lesson: Lesson, homeworks: readonly HomeworkSummary[
     eyebrow: homeworkEyebrow(homework.id, homework.set),
     barTitle: `${homeworkLabel(homework.id)} · ${homework.title}`,
     dek: homework.dek,
-    status: lesson.status,
+    status: detail.status,
     counts,
     percent: percent(counts.passing, counts.total),
-    chips: chips(lesson.status, counts, homework),
+    chips: chips(detail.status, counts, homework),
     compass: compass(homework, previous),
     crumb: focusFeature === null || focusRule === undefined ? null : `${focusFeature.name} › ${focusRule.name}`,
     focus,
     focusFeature,
     laterRules: holder === null ? [] : holder.rules.slice(focusIndex + 1),
     otherFeatures: features.filter((feature) => feature !== holder),
-    coachThreadId: lesson.coachThreadId,
-    readyToComplete: lesson.status === "done" && lesson.iterationStatus === "Done",
+    coachThreadId: detail.coachThreadId,
+    readyToComplete: detail.status === "done" && detail.iterationStatus === "Done",
   };
 }

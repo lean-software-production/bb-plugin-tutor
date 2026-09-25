@@ -21,7 +21,7 @@ export interface NextHomeworkView {
   /** The student has already started it: the button continues its coach thread. */
   started: boolean;
   startLabel: string;
-  lessonSubPath: string;
+  startPath: string;
 }
 
 export interface CompletionView {
@@ -76,7 +76,7 @@ export function completionView(completion: Completion, now: number): CompletionV
                   },
             started: next.status !== "ahead",
             startLabel: `${next.status === "ahead" ? "Start" : "Continue"} ${homeworkLabel(next.id).toLowerCase()} with your coach →`,
-            lessonSubPath: formatRoute({ kind: "lesson", homeworkId: next.id }),
+            startPath: formatRoute({ kind: "start", homeworkId: next.id }),
           },
   };
 }

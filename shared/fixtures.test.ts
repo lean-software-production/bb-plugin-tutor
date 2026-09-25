@@ -4,14 +4,14 @@ import { courseSchema, progressFileSchema } from "./model.ts";
 import {
   candidateProjectSchema,
   completionSchema,
-  lessonSchema,
+  lessonDetailSchema,
   overviewSchema,
 } from "./rpc.ts";
 import {
   fixtureCandidates,
   fixtureCompletion,
   fixtureCourse,
-  fixtureLesson,
+  fixtureLessonDetail,
   fixtureOverview,
   fixtureOverviewUnbound,
   fixtureStudent,
@@ -22,7 +22,7 @@ test("fixtures satisfy their schemas", () => {
   progressFileSchema.parse(fixtureStudent.progress);
   overviewSchema.parse(fixtureOverview);
   overviewSchema.parse(fixtureOverviewUnbound);
-  lessonSchema.parse(fixtureLesson);
+  lessonDetailSchema.parse(fixtureLessonDetail);
   completionSchema.parse(fixtureCompletion);
   for (const candidate of fixtureCandidates) candidateProjectSchema.parse(candidate);
 });

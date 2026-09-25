@@ -12,7 +12,7 @@ import {
   type ProgressMap,
 } from "../../shared/derive.ts";
 import type { Course, Homework } from "../../shared/model.ts";
-import type { Completion, CurrentState, FeatureOutline, Lesson, Overview, TutorThread } from "../../shared/rpc.ts";
+import type { Completion, CurrentState, FeatureOutline, LessonDetail, Overview, TutorThread } from "../../shared/rpc.ts";
 import { progressFor, recordedProgress } from "../progress/current.ts";
 import { findMainThread, type TutorThreadRecord } from "../coach/threads.ts";
 import type { World } from "../coach/world.ts";
@@ -138,7 +138,7 @@ export function buildOverview(world: World, threads: readonly TutorThreadRecord[
   };
 }
 
-export function buildLesson(world: World, homeworkId: string, threads: readonly TutorThreadRecord[]): Lesson {
+export function buildLessonDetail(world: World, homeworkId: string, threads: readonly TutorThreadRecord[]): LessonDetail {
   const course = requireCourse(world);
   const homework = requireHomework(course, homeworkId);
   const pointer = world.pointer;

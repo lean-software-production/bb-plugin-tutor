@@ -6,7 +6,7 @@ import {
   fixtureBinding,
   fixtureCandidates,
   fixtureCompletion,
-  fixtureLesson,
+  fixtureLessonDetail,
   fixtureLexicon,
   fixtureOverview,
   fixtureOverviewUnbound,
@@ -105,7 +105,7 @@ test("terms resolve against the lexicon; unknown ids fall back", () => {
 // ---------------------------------------------------------------------------
 
 test("the course root sends the student where they are", () => {
-  assert.deepEqual(homeDecision(fixtureOverview), { kind: "redirect", route: { kind: "lesson", homeworkId: "002" } });
+  assert.deepEqual(homeDecision(fixtureOverview), { kind: "redirect", route: { kind: "start", homeworkId: "002" } });
   assert.deepEqual(homeDecision(fixtureOverviewUnbound), { kind: "redirect", route: { kind: "welcome" } });
   const done: Overview = {
     ...fixtureOverview,
@@ -118,7 +118,7 @@ test("the course root sends the student where they are", () => {
   });
   assert.deepEqual(homeDecision({ ...fixtureOverview, current: null }), {
     kind: "redirect",
-    route: { kind: "lesson", homeworkId: "000" },
+    route: { kind: "start", homeworkId: "000" },
   });
 });
 
@@ -173,7 +173,7 @@ test("the completion page recaps the homework and introduces the next", () => {
   assert.equal(view.next?.diff?.title, "FACTORY.md — what changed since lesson 1");
   assert.equal(view.next?.started, false);
   assert.equal(view.next?.startLabel, "Start lesson 2 with your coach →");
-  assert.equal(view.next?.lessonSubPath, "lesson/002");
+  assert.equal(view.next?.startPath, "start/002");
 
   const sameDay = completionView(
     {
@@ -240,7 +240,7 @@ test("the rule tab targets explicit params, else the thread's own homework and R
 });
 
 test("the rule tab shows the Rule and its Examples", () => {
-  const view = ruleTabView(fixtureLesson, { homeworkId: "002", ruleKey: null }, false);
+  const view = ruleTabView(fixtureLessonDetail, { homeworkId: "002", ruleKey: null }, false);
   assert.equal(view.kind, "rule");
   if (view.kind !== "rule") return;
   assert.equal(view.eyebrow, "Rule in focus · Validation");
@@ -250,13 +250,13 @@ test("the rule tab shows the Rule and its Examples", () => {
     view.examples.map((example) => example.detail),
     ["Passing", "Not yet — Crashed in the doer loop instead of retrying when the validator said no."],
   );
-  assert.equal(view.lessonSubPath, "lesson/002");
+  assert.equal(view.startPath, "start/002");
 
-  const spun = ruleTabView(fixtureLesson, { homeworkId: "002", ruleKey: "planning/the-planner-writes-a-plan" }, true);
+  const spun = ruleTabView(fixtureLessonDetail, { homeworkId: "002", ruleKey: "planning/the-planner-writes-a-plan" }, true);
   assert.equal(spun.kind === "rule" ? spun.eyebrow : null, "Spun off from · Planning");
   assert.equal(spun.kind === "rule" ? spun.examples[0]?.detail : null, "Passing · carried over");
-  assert.deepEqual(ruleTabView({ ...fixtureLesson, focus: null }, { homeworkId: "002", ruleKey: null }, false), {
+  assert.deepEqual(ruleTabView({ ...fixtureLessonDetail, focus: null }, { homeworkId: "002", ruleKey: null }, false), {
     kind: "no-rule",
-    lessonSubPath: "lesson/002",
+    startPath: "start/002",
   });
 });
