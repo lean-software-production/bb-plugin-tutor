@@ -18,8 +18,10 @@ import {
 import { authorizeCaller, type Caller } from "./auth.ts";
 import { factoryLockKey } from "./lock-keys.ts";
 import type { TutorRuntime } from "./runtime.ts";
+import { sideChatAnchor, sideChatSeed } from "./prompts.ts";
+import { ensureSideChatTab, forkSideChat } from "./side-chats.ts";
 import { statusText } from "./status-text.ts";
-import { spawnSideThread } from "./threads.ts";
+import { recordReachedRule } from "./threads.ts";
 import type { World } from "./world.ts";
 
 type Action<Name extends ToolName> = (
@@ -40,8 +42,9 @@ function refusal(text: string): PluginAgentToolResult {
   return { content: [{ type: "text", text }], isError: true };
 }
 
-async function applyOutcome(rt: TutorRuntime, root: string, outcome: Outcome): Promise<void> {
+async function applyOutcome(rt: TutorRuntime, root: string, outcome: Outcome, caller: Caller): Promise<void> {
   if ("error" in outcome) return;
+  if (outcome.reached !== undefined) await recordReachedRule(rt.bb.sdk, caller.mainThreadId, outcome.reached);
   if (outcome.adopt !== undefined) await copyHomeworkSpec(root, outcome.adopt);
   if (outcome.iteration !== undefined) await rt.store.writeIteration(root, outcome.iteration);
   if (outcome.progress !== undefined) await rt.store.writeProgress(root, outcome.progress);
@@ -64,7 +67,7 @@ function register<Name extends ToolName>(rt: TutorRuntime, spec: ToolSpec<Name>)
         if ("error" in state) return refusal(state.error);
         const outcome = await spec.action(state, input, caller, isoSeconds(rt.now()));
         if ("error" in outcome) return refusal(outcome.error);
-        await applyOutcome(rt, state.root, outcome);
+        await applyOutcome(rt, state.root, outcome, caller);
         return outcome.text;
       };
       try {
@@ -80,42 +83,45 @@ function register<Name extends ToolName>(rt: TutorRuntime, spec: ToolSpec<Name>)
   });
 }
 
-async function sideThread(
+async function sideChat(
   rt: TutorRuntime,
   state: CoachState,
-  input: ToolParameters<"tutor_side_thread">,
+  input: ToolParameters<"tutor_side_chat">,
   caller: Caller,
 ): Promise<Outcome> {
   const rule = input.rule === undefined ? null : (findRule(state.homework, input.rule) ?? null);
   if (input.rule !== undefined && rule === null) {
-    return { error: `There is no Rule ${input.rule} in homework ${state.homework.id}. Call tutor_status for the keys.` };
+    return { error: `There is no Rule ${input.rule} in lesson ${state.homework.id}. Call tutor_status for the keys.` };
   }
-  const threadId = await spawnSideThread(rt.bb.sdk, {
-    projectId: state.projectId,
-    factory: { root: state.root, hostId: state.hostId },
+  const sideChatId = await forkSideChat(rt.bb.sdk, {
+    coachThreadId: caller.mainThreadId,
     courseId: state.course.id,
     homeworkId: state.homework.id,
-    parentThreadId: caller.mainThreadId,
     ruleKey: rule?.key ?? null,
     title: input.title,
-    prompt: input.prompt,
+    seed: sideChatSeed(state.homework, rule, input.prompt),
   });
+  await ensureSideChatTab(rt.bb.sdk, caller.mainThreadId, sideChatId, sideChatAnchor(state.homework, rule));
   rt.signals.publish("threads", state.homework.id);
-  return { text: `Started side thread ${threadId} ("${input.title}"). It shares this working tree.` };
+  return {
+    text:
+      `Started side chat ${sideChatId} ("${input.title}"). It opens as the "Side chat" tab in the coach thread's right panel ` +
+      "and shares this working tree. Tell the student to continue there, then carry on with the Rule.",
+  };
 }
 
 export function registerCoachTools(rt: TutorRuntime): void {
   register(rt, {
     name: TOOL_NAMES.status,
     description:
-      "Where the student is: the current homework, the Rule in focus, and every Rule's Examples with their keys and status. Call it before using the other tutor tools.",
+      "Where the student is: the current lesson, the Rule in focus, and every Rule's Examples with their keys and status. Call it before using the other tutor tools.",
     label: { pending: "Checking course progress", completed: "Checked course progress" },
     action: (state) => ({ text: statusText(state) }),
   });
   register(rt, {
     name: TOOL_NAMES.focusRule,
     description:
-      "Move the cursor to a Rule of the current homework (main coach thread only). Returns a ::tutor-progress card to echo.",
+      "Move the focus to a Rule of the current lesson (coach thread only). Returns the Rule card, a ::tutor-progress line to put at the top of your next message.",
     label: { pending: "Moving to a Rule", completed: "Moved to a Rule" },
     action: (state, input, caller) => focusAction(state, input, caller.isMain),
   });
@@ -129,22 +135,22 @@ export function registerCoachTools(rt: TutorRuntime): void {
   register(rt, {
     name: TOOL_NAMES.adoptIteration,
     description:
-      "Adopt the next homework as coach-me does: copy its README.md, FACTORY.md and features/ into spec/, its sample seed into seeds/, write spec/ITERATION as WIP and start spec/PROGRESS.yaml, carrying over Examples already passing. Does not commit.",
-    label: { pending: "Adopting the homework", completed: "Adopted the homework" },
+      "Adopt the next lesson (a homework iteration) as coach-me does: copy its README.md, FACTORY.md and features/ into spec/, its sample seed into seeds/, write spec/ITERATION as WIP and start spec/PROGRESS.yaml, carrying over Examples already passing. Does not commit.",
+    label: { pending: "Adopting the lesson", completed: "Adopted the lesson" },
     action: (state, input, _caller, now) => adoptAction(state, input, now),
   });
   register(rt, {
     name: TOOL_NAMES.completeIteration,
     description:
-      "Finish the current homework: write spec/ITERATION as Done and store your two- or three-sentence summary for the student. Returns a ::tutor-progress card to echo.",
-    label: { pending: "Completing the homework", completed: "Completed the homework" },
+      "Finish the current lesson: write spec/ITERATION as Done and store your two- or three-sentence summary for the student. Returns a ::tutor-progress card to echo.",
+    label: { pending: "Completing the lesson", completed: "Completed the lesson" },
     action: (state, input) => completeAction(state, input),
   });
   register(rt, {
-    name: TOOL_NAMES.sideThread,
+    name: TOOL_NAMES.sideChat,
     description:
-      "Start a side thread under this homework's coach, optionally about one Rule, for a question that would derail the main thread. It shares the working tree.",
-    label: { pending: "Starting a side thread", completed: "Started a side thread" },
-    action: (state, input, caller) => sideThread(rt, state, input, caller),
+      "Move a side question into a BB side chat of this lesson's coach thread, optionally about one Rule, so the coach thread stays on its Rule. It opens as the \"Side chat\" tab in the coach thread's right panel and shares the working tree.",
+    label: { pending: "Starting a side chat", completed: "Started a side chat" },
+    action: (state, input, caller) => sideChat(rt, state, input, caller),
   });
 }

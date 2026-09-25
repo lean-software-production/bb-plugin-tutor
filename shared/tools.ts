@@ -47,7 +47,7 @@ export const toolParameterSchemas = {
       }
     }),
   [TOOL_NAMES.adoptIteration]: z.object({
-    iteration: homeworkIdSchema.describe("The homework to adopt: the one after the student's Done iteration."),
+    iteration: homeworkIdSchema.describe("The lesson to adopt: the one after the student's Done iteration."),
   }),
   [TOOL_NAMES.completeIteration]: z.object({
     iteration: homeworkIdSchema,
@@ -58,10 +58,15 @@ export const toolParameterSchemas = {
       .max(MAX_SUMMARY_LENGTH)
       .describe("Two or three sentences for the student: what their factory can do now."),
   }),
-  [TOOL_NAMES.sideThread]: z.object({
+  [TOOL_NAMES.sideChat]: z.object({
     title: z.string().trim().min(1).max(120),
-    prompt: z.string().trim().min(1).max(4000).describe("The side thread's first message."),
-    rule: ruleKeySchema.optional().describe("The Rule the side thread is about, if any."),
+    prompt: z
+      .string()
+      .trim()
+      .min(1)
+      .max(4000)
+      .describe("The side question, as the student asked it: the side chat's agent reads it before the student's first message."),
+    rule: ruleKeySchema.optional().describe("The Rule the side chat is about, if any."),
   }),
 } satisfies Record<ToolName, z.ZodType>;
 

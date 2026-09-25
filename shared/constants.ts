@@ -13,7 +13,7 @@ export const TOOL_NAMES = {
   markExample: "tutor_mark_example",
   adoptIteration: "tutor_adopt_iteration",
   completeIteration: "tutor_complete_iteration",
-  sideThread: "tutor_side_thread",
+  sideChat: "tutor_side_chat",
 } as const;
 export type ToolName = (typeof TOOL_NAMES)[keyof typeof TOOL_NAMES];
 export const ALL_TOOL_NAMES: readonly ToolName[] = Object.values(TOOL_NAMES);
@@ -24,10 +24,23 @@ export const REALTIME_CHANNELS = {
   stateChanged: "state-changed",
 } as const;
 
-/** Message directive names: `::tutor-progress{…}` and `::term{…}`. */
+/** Message directive names: `::tutor-lesson{…}`, `::tutor-progress{…}` and `::term{…}`. */
 export const DIRECTIVE_NAMES = {
+  lesson: "tutor-lesson",
   progress: "tutor-progress",
   term: "term",
+} as const;
+
+/**
+ * BB's built-in side chat: a hidden fork of a thread, shown in its right
+ * panel by the side-chat plugin's panel. Tutor writes the same tab BB writes
+ * for "Reply in side chat" (bb-app 0.43.4), so the panel renders Tutor's side
+ * chats too.
+ */
+export const BB_SIDE_CHAT = {
+  pluginId: "side-chat",
+  actionId: "side-chat",
+  title: "Side chat",
 } as const;
 
 /** Frontend slot registration ids. */
@@ -101,7 +114,7 @@ export const COURSE_FILES = {
 /** Homework 0, "Using your tutor": shipped with the plugin, prepended to every course. */
 export const BUILTIN_HOMEWORK_ID = "000";
 
-/** Title of a homework's main coach thread. */
+/** Title of a homework's coach thread. Students read "lesson" for homework (docs/tutor/GLOSSARY.md). */
 export function coachThreadTitle(homeworkId: string): string {
-  return `Coach · Homework ${homeworkId}`;
+  return `Coach · Lesson ${homeworkId}`;
 }

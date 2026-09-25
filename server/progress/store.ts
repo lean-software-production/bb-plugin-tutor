@@ -58,7 +58,7 @@ export function createProgressStore(): ProgressStore {
 
     async writeIteration(factoryRoot: string, state: IterationState): Promise<void> {
       if (state.iteration === BUILTIN_HOMEWORK_ID) {
-        throw new Error("Homework 0 is tracked in spec/PROGRESS.yaml only; spec/ITERATION is never written for it.");
+        throw new Error("Lesson 0 is tracked in spec/PROGRESS.yaml only; spec/ITERATION is never written for it.");
       }
       await ownFolder(factoryRoot, FACTORY_FILES.specDir);
       await writeFileAtomic(join(factoryRoot, FACTORY_FILES.iteration), formatIteration(state));

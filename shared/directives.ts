@@ -1,12 +1,16 @@
-// Attribute contracts for the two message directives. BB renders them in
+// Attribute contracts for the three message directives. BB renders them in
 // every thread (not only Tutor's), and the attributes are whatever the model
 // wrote, so the frontend parses them here and renders nothing it did not
 // validate. The backend and the skill use the format functions to tell the
 // coach exactly what to write. Zod-free on purpose: the frontend imports this
 // module at runtime.
 //
+//   ::tutor-lesson{homework="003"}         the lesson card opening a coach thread
 //   ::tutor-progress{kind="rule-passing" title="…" passed="30" total="41" next="…"}
 //   ::term{id="doer"}
+//
+// A `focus` progress card is also a Rule's section header: it carries a DOM
+// anchor (ruleAnchor) that the course outline scrolls to.
 //
 // Directives are leaf (block) directives: each must sit on its own line.
 import { DIRECTIVE_NAMES } from "./constants.ts";
@@ -18,6 +22,7 @@ const MAX_TITLE = 160;
 const MAX_NOTE = 400;
 const MAX_COUNT = 100_000;
 const HOMEWORK_ID = /^\d{3}$/;
+const THREAD_ID = /^[A-Za-z0-9_-]{1,128}$/;
 
 export const PROGRESS_KINDS = [
   /** ✓ green: every Example of a Rule holds. `next` names the Rule now in focus. */
@@ -26,7 +31,7 @@ export const PROGRESS_KINDS = [
   "example-passing",
   /** ! amber: an Example does not hold yet; `note` says why. */
   "not-yet",
-  /** ● blue: the coach moved the cursor to a Rule. */
+  /** ● blue: the coach moved the focus to a Rule. It is also the Rule card that opens the Rule's section. */
   "focus",
   /** ✓ green, larger: the homework is done. */
   "homework-complete",
@@ -45,6 +50,10 @@ export interface ProgressCard {
   homeworkId: string | null;
   ruleKey: string | null;
   exampleKey: string | null;
+}
+
+export interface LessonRef {
+  homeworkId: string;
 }
 
 export interface TermRef {
@@ -99,6 +108,12 @@ export function parseProgressCard(attributes: Attributes): ProgressCard | null {
   };
 }
 
+/** Null when the homework id is missing or malformed: render the fallback. */
+export function parseLessonRef(attributes: Attributes): LessonRef | null {
+  const homeworkId = matching(attributes.homework, HOMEWORK_ID);
+  return homeworkId === null ? null : { homeworkId };
+}
+
 export function parseTermRef(attributes: Attributes): TermRef | null {
   const id = matching(attributes.id, SLUG_PATTERN);
   if (id === null) return null;
@@ -129,6 +144,23 @@ export function formatProgressCard(card: ProgressCard): string {
     attribute("example", card.exampleKey),
   ].join("");
   return `::${DIRECTIVE_NAMES.progress}{${attrs.trim()}}`;
+}
+
+export function formatLessonRef(ref: LessonRef): string {
+  return `::${DIRECTIVE_NAMES.lesson}{${attribute("homework", ref.homeworkId).trim()}}`;
+}
+
+/** The DOM attribute a Rule section card carries, and the outline looks for. */
+export const RULE_ANCHOR_ATTRIBUTE = "data-tutor-rule-anchor";
+
+/**
+ * `<threadId>|<homeworkId>/<ruleKey>`: where the coach started a Rule. Only
+ * anchors in a homework's own coach thread count, so the thread is part of
+ * it. Null for anything malformed.
+ */
+export function ruleAnchor(threadId: string, homeworkId: string, ruleKey: string): string | null {
+  if (!THREAD_ID.test(threadId) || !HOMEWORK_ID.test(homeworkId) || !RULE_KEY_PATTERN.test(ruleKey)) return null;
+  return `${threadId}|${homeworkId}/${ruleKey}`;
 }
 
 export function formatTermRef(ref: TermRef): string {

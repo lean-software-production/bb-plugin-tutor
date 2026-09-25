@@ -24,7 +24,7 @@ export function statusText(state: CoachState): string {
   const lines = [
     `Course: ${course.title}. Coaching method: ${course.coachPath ?? "(the course has no coach file)"}.`,
     `Factory: ${state.root}.`,
-    `Homework ${homework.id} "${homework.title}": ${pointer.iterationStatus}. ` +
+    `Lesson ${homework.id} "${homework.title}": ${pointer.iterationStatus}. ` +
       `${counts.passing}/${counts.total} passing, ${counts.notYet} not yet, ${counts.skipped} skipped, ${counts.pending} pending.`,
     `Focus: ${focus ?? "none"}.`,
   ];

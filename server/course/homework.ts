@@ -29,7 +29,7 @@ export async function readHomework(
   for (const path of [readmePath, factoryPath, seedPath, join(entry.dir, FEATURES_DIR)]) await guard(path);
   const readme = await readTextIfPresent(readmePath, display(readmePath));
   if (readme === null) {
-    throw new CourseLoadError(`Homework ${entry.id} has no README.md in ${display(entry.dir)}.`);
+    throw new CourseLoadError(`Lesson ${entry.id} has no README.md in ${display(entry.dir)}.`);
   }
   return {
     id: entry.id,
@@ -52,7 +52,7 @@ async function readFeatures(entry: HomeworkEntry, display: DisplayPath): Promise
     .map((name) => `${FEATURES_DIR}/${name}`)
     .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
   if (paths.length === 0) {
-    throw new CourseLoadError(`Homework ${entry.id} has no feature files in ${display(featuresDir)}.`);
+    throw new CourseLoadError(`Lesson ${entry.id} has no feature files in ${display(featuresDir)}.`);
   }
   const features: FeatureFile[] = [];
   for (const path of paths) {
@@ -64,7 +64,7 @@ async function readFeatures(entry: HomeworkEntry, display: DisplayPath): Promise
   const repeated = slugs.find((slug, index) => slugs.indexOf(slug) !== index);
   if (repeated !== undefined) {
     throw new CourseLoadError(
-      `Homework ${entry.id} has two feature files that both become "${repeated}"; rename one.`,
+      `Lesson ${entry.id} has two feature files that both become "${repeated}"; rename one.`,
     );
   }
   return features;

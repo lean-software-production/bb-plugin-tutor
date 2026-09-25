@@ -79,7 +79,7 @@ test("marking refuses unknown keys and homeworks not under way", () => {
   assert.ok("error" in fresh && /tutor_adopt_iteration/.test(fresh.error));
 });
 
-test("only the main thread moves the cursor", () => {
+test("only the coach thread moves the focus, and the Rule card leads its next message", () => {
   const rule = homework2.features[0]?.rules[0];
   assert.ok(rule !== undefined);
   const side = focusAction(stateOf(), { rule: rule.key }, false);
@@ -87,6 +87,9 @@ test("only the main thread moves the cursor", () => {
   const main = focusAction(stateOf(), { rule: rule.key }, true);
   assert.equal(cardIn(main)?.kind, "focus");
   assert.ok("progress" in main && main.progress?.focus === rule.key);
+  assert.ok("text" in main && main.reached === rule.key);
+  assert.match(main.text, /start your next message with this line, exactly as written and on a line of its own/);
+  assert.match(main.text, /\n::tutor-progress\{kind="focus"[^\n]*\}$/);
 });
 
 test("adoption: Homework 0 or the first homework to begin with, then the one after a Done one", () => {
@@ -129,5 +132,5 @@ test("completing writes Done and the summary; Homework 0 needs every Example to 
 
   const onZero: StudentState = { iteration: null, progress: { iteration: "000", examples: {} }, problems: [] };
   const zero = completeAction(stateOf(onZero), { iteration: "000", summary: "x" });
-  assert.ok("error" in zero && /Homework 0/.test(zero.error));
+  assert.ok("error" in zero && /Lesson 0/.test(zero.error));
 });

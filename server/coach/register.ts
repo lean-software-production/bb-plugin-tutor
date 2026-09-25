@@ -3,6 +3,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { createActivityRecorder, resolveDataDir } from "../activity/heartbeat.ts";
 import { registerRpc } from "../rpc/handlers.ts";
+import { createCoachRegistry } from "./coach-registry.ts";
 import { coachConfiguration } from "./configure.ts";
 import { readFeatureConfig } from "./course-path.ts";
 import { decideDispatch } from "./dispatch-guard.ts";
@@ -10,6 +11,7 @@ import { createKeyedLock } from "./keyed-lock.ts";
 import type { TutorRuntime } from "./runtime.ts";
 import { defineTutorSettings } from "./settings.ts";
 import { createStateSignals } from "./signals.ts";
+import { listTutorThreads } from "./threads.ts";
 import { registerCoachTools } from "./tools.ts";
 import { createWorldSource, type WorldDeps } from "./world.ts";
 
@@ -22,6 +24,7 @@ export async function registerTutor(bb: BbPluginApi, deps: WorldDeps): Promise<T
     store: deps.store,
     signals: createStateSignals(bb),
     locks: createKeyedLock(),
+    coaches: createCoachRegistry(),
     activity: createActivityRecorder({
       dataDir: async () =>
         resolveDataDir({
@@ -36,7 +39,10 @@ export async function registerTutor(bb: BbPluginApi, deps: WorldDeps): Promise<T
 
   registerCoachTools(rt);
   bb.agents.configure((context) =>
-    coachConfiguration(context, bb.pluginId, { coachPath: rt.world.lastCourse()?.coachPath ?? null }),
+    coachConfiguration(context, bb.pluginId, {
+      coachPath: rt.world.lastCourse()?.coachPath ?? null,
+      coachHomework: (threadId) => rt.coaches.homeworkOf(threadId),
+    }),
   );
   bb.experimental_hooks.on("message.dispatch", async (context) => {
     const decision = await decideDispatch(bb.sdk, bb.pluginId, context, deps.now().getTime());
@@ -45,17 +51,20 @@ export async function registerTutor(bb: BbPluginApi, deps: WorldDeps): Promise<T
   });
 
   const recheck = () => void bb.experimental_hooks.recheck("message.dispatch");
+  // A side chat BB made of a coach thread is not Tutor's, but a coach turn may be waiting for it.
+  const mayHoldATurn = (thread: { originPluginId: string | null; originKind: string | null }) =>
+    thread.originPluginId === bb.pluginId || thread.originKind === "fork";
   bb.events.on("thread.idle", async ({ thread }) => {
-    if (thread.originPluginId !== bb.pluginId) return;
+    if (!mayHoldATurn(thread)) return;
     recheck();
-    rt.signals.observe(await rt.world.load(), { publishIfUnseen: true });
+    if (thread.originPluginId === bb.pluginId) rt.signals.observe(await rt.world.load(), { publishIfUnseen: true });
   });
   bb.events.on("thread.failed", ({ thread }) => {
-    if (thread.originPluginId === bb.pluginId) recheck();
+    if (mayHoldATurn(thread)) recheck();
   });
   for (const event of ["thread.archived", "thread.unarchived", "thread.deleted"] as const) {
     bb.events.on(event, ({ thread }) => {
-      if (thread.originPluginId !== bb.pluginId) return;
+      if (!mayHoldATurn(thread)) return;
       recheck();
       rt.signals.publish("threads", null);
     });
@@ -63,5 +72,17 @@ export async function registerTutor(bb: BbPluginApi, deps: WorldDeps): Promise<T
 
   registerRpc(rt);
   settings.onChange(() => rt.signals.publish("binding", null));
+  void warmCoachRegistry(rt);
   return rt;
+}
+
+/** So configure knows the coach threads from the start, not only after the first page load. */
+async function warmCoachRegistry(rt: TutorRuntime): Promise<void> {
+  try {
+    const world = await rt.world.load();
+    if (world.binding.status !== "bound") return;
+    rt.coaches.remember(await listTutorThreads(rt.bb.sdk, rt.bb.pluginId, world.binding.projectId));
+  } catch (cause) {
+    rt.bb.log.warn(`[tutor] could not list coach threads at start: ${cause instanceof Error ? cause.message : String(cause)}`);
+  }
 }

@@ -34,7 +34,7 @@ async function seedPresent(path: string, display: string): Promise<boolean> {
 async function requireFeatureFiles(homework: Homework): Promise<void> {
   const names = await readdir(join(homework.dir, FEATURES_DIR)).catch(() => []);
   if (!names.some((name) => name.endsWith(".feature"))) {
-    throw new Error(`Homework ${homework.id} has no feature files in ${homework.dir}, so it cannot be adopted.`);
+    throw new Error(`Lesson ${homework.id} has no feature files in ${homework.dir}, so it cannot be adopted.`);
   }
 }
 

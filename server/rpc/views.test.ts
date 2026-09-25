@@ -8,6 +8,7 @@ import {
   fixtureLesson,
   fixtureOverview,
   fixtureOverviewUnbound,
+  fixtureReachedRules,
   fixtureStudent,
   fixtureThreads,
 } from "../../shared/fixtures.ts";
@@ -22,6 +23,7 @@ const records: TutorThreadRecord[] = fixtureThreads.map((thread, index) => ({
   courseId: "software-factory",
   projectId: "prj_factory",
   createdAt: 100 - index,
+  reachedRules: thread.id === "thr_coach002" ? fixtureReachedRules : [],
 }));
 
 test("the overview matches the fixture the frontend was built against", () => {
@@ -49,7 +51,7 @@ test("the current lesson carries progress, focus and its coach thread", () => {
   assert.equal(ahead.status, "ahead");
   assert.deepEqual(ahead.progress, {});
   assert.equal(ahead.iterationStatus, null);
-  assert.throws(() => buildLesson(makeWorld(), "009", records), /no homework 009/);
+  assert.throws(() => buildLesson(makeWorld(), "009", records), /no lesson 009/);
 });
 
 test("completion describes the finished homework and what comes next", () => {

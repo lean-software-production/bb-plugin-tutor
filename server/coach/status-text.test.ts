@@ -9,7 +9,7 @@ test("lists the homework, the focus and every Example key with its status", () =
   const state = coachStateOf(makeWorld());
   assert.ok(!("error" in state));
   const text = statusText(state);
-  assert.match(text, /Homework 002 "Checking the work": WIP\. 2\/5 passing, 1 not yet, 0 skipped, 2 pending\./);
+  assert.match(text, /Lesson 002 "Checking the work": WIP\. 2\/5 passing, 1 not yet, 0 skipped, 2 pending\./);
   assert.match(text, /Focus: validation\/a-task-is-finished-when-validation-is-satisfied\./);
   assert.match(text, /^● validation\/a-task-is-finished-when-validation-is-satisfied — /m);
   assert.match(text, /! validation\/.*\/the-work-is-wrong-first-time — The work is wrong first time \(Crashed/);

@@ -15,12 +15,24 @@ export interface FakeThread {
   id: string;
   projectId: string;
   parentThreadId: string | null;
+  sourceThreadId: string | null;
+  lifecycleOwnerThreadId: string | null;
+  originKind: "fork" | null;
   originPluginId: string | null;
+  visibility: "hidden" | "visible";
   title: string | null;
+  titleFallback: string | null;
   createdAt: number;
   archivedAt: number | null;
-  metadata: unknown;
+  metadata: Record<string, unknown>;
   prompt: string;
+  /** A fork's agent-only seed. */
+  seed: string;
+}
+
+export interface FakeTabs {
+  revision: number;
+  tabs: { id: string; kind: string; [field: string]: unknown }[];
 }
 
 export interface TutorHost extends FakePluginHost {
@@ -28,6 +40,12 @@ export interface TutorHost extends FakePluginHost {
   threads: FakeThread[];
   running: Set<string>;
   sent: { threadId: string; text: string }[];
+  /** Each thread's right-panel tabs, as BB stores them. */
+  tabs: Map<string, FakeTabs>;
+  /** Tab writes to fail with BB's revision conflict before one succeeds. */
+  tabConflicts: { remaining: number };
+  /** When set, forks fail the way BB fails them for a provider that cannot fork. */
+  forkRefusal: { message: string | null };
   /** Adds a thread Tutor did not spawn (or one in another project). */
   addThread(thread: Partial<FakeThread> & { id: string }): FakeThread;
 }
@@ -37,8 +55,23 @@ interface SpawnArgs {
   parentThreadId?: string;
   originPluginId?: string;
   title?: string;
-  pluginMetadata?: unknown;
+  pluginMetadata?: Record<string, unknown>;
   prompt?: string;
+}
+
+interface ForkArgs {
+  sourceThreadId: string;
+  lifecycleOwnerThreadId?: string;
+  originPluginId?: string;
+  visibility?: "hidden" | "visible";
+  title?: string;
+  pluginMetadata?: Record<string, unknown>;
+  agentContextSeed?: { type: string; text?: string }[];
+}
+
+/** An error shaped like the SDK's BbHttpError. */
+function httpError(status: number, code: string, message: string): Error {
+  return Object.assign(new Error(message), { status, code });
 }
 
 export async function makeTutorHost(
@@ -50,17 +83,26 @@ export async function makeTutorHost(
   const threads: FakeThread[] = [];
   const running = new Set<string>();
   const sent: { threadId: string; text: string }[] = [];
+  const tabs = new Map<string, FakeTabs>();
+  const tabConflicts = { remaining: 0 };
+  const forkRefusal: { message: string | null } = { message: null };
   let clock = 1000;
   const addThread = (thread: Partial<FakeThread> & { id: string }): FakeThread => {
     const row: FakeThread = {
       projectId: PROJECT_ID,
       parentThreadId: null,
+      sourceThreadId: null,
+      lifecycleOwnerThreadId: null,
+      originKind: null,
       originPluginId: null,
+      visibility: "visible",
       title: null,
+      titleFallback: null,
       createdAt: (clock += 1),
       archivedAt: null,
       metadata: {},
       prompt: "",
+      seed: "",
       ...thread,
     };
     threads.push(row);
@@ -111,15 +153,60 @@ export async function makeTutorHost(
             prompt: spawn.prompt ?? "",
           });
         },
+        fork: async (args) => {
+          const fork = args as ForkArgs;
+          const source = find(fork.sourceThreadId);
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          if (forkRefusal.message !== null) throw httpError(400, "invalid_request", forkRefusal.message);
+          return addThread({
+            id: `thr_${threads.length + 1}`,
+            projectId: source.projectId,
+            sourceThreadId: source.id,
+            lifecycleOwnerThreadId: fork.lifecycleOwnerThreadId ?? null,
+            originKind: "fork",
+            originPluginId: fork.originPluginId ?? null,
+            visibility: fork.visibility ?? "visible",
+            title: fork.title ?? null,
+            metadata: fork.pluginMetadata ?? {},
+            seed: (fork.agentContextSeed ?? []).map((part) => part.text ?? "").join(""),
+          });
+        },
         get: async ({ threadId }) => find(threadId),
         list: async (args = {}) =>
           threads.filter(
             (thread) =>
               (args.originPluginId === undefined || thread.originPluginId === args.originPluginId) &&
               (args.projectId === undefined || thread.projectId === args.projectId) &&
+              (args.sourceThreadId === undefined || thread.sourceThreadId === args.sourceThreadId) &&
+              (args.includeHidden === true || thread.visibility === "visible") &&
               (args.archived !== false || thread.archivedAt === null),
           ),
         getPluginMetadata: async ({ threadId }) => find(threadId).metadata,
+        updatePluginMetadata: async ({ threadId, set = {}, remove = [] }) => {
+          const thread = find(threadId);
+          thread.metadata = { ...thread.metadata, ...set };
+          for (const key of remove) delete thread.metadata[key];
+          return thread.metadata;
+        },
+        tabs: {
+          get: async ({ threadId }) => {
+            find(threadId);
+            return structuredClone(tabs.get(threadId) ?? { revision: 0, tabs: [] });
+          },
+          update: async ({ threadId, expectedRevision, tabs: next }) => {
+            const current = tabs.get(threadId) ?? { revision: 0, tabs: [] };
+            if (tabConflicts.remaining > 0) {
+              // Another client wrote first: BB's tab strip adds a tab of its own.
+              tabConflicts.remaining -= 1;
+              tabs.set(threadId, { revision: current.revision + 1, tabs: [...current.tabs, { id: `other-${current.revision}`, kind: "new-tab" }] });
+              throw httpError(409, "thread_tabs_conflict", "Thread tabs changed on another client");
+            }
+            if (expectedRevision !== current.revision) throw httpError(409, "thread_tabs_conflict", "Thread tabs changed on another client");
+            const stored = { revision: current.revision + 1, tabs: structuredClone(next) as FakeTabs["tabs"] };
+            tabs.set(threadId, stored);
+            return stored;
+          },
+        },
         listRunning: async () => [...running].map((id) => ({ id, hostId: "host_1" })),
         send: async (args) => {
           const block = args.input[0];
@@ -136,5 +223,5 @@ export async function makeTutorHost(
     featureConfigFile: options.featureConfigFile ?? "/nonexistent/tutor/config.json",
     now: () => NOW,
   });
-  return { ...host, rt, threads, running, sent, addThread };
+  return { ...host, rt, threads, running, sent, tabs, tabConflicts, forkRefusal, addThread };
 }

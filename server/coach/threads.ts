@@ -1,9 +1,16 @@
 // Tutor's coach threads: one main thread per homework in the factory project,
-// side threads as its children. Plugin metadata is used to list and find them
+// with side chats as hidden forks of it (and, from before side chats, side
+// threads as its children). Plugin metadata is used to list and find them
 // only; it is writable by the thread's own agent, so it never authorises.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { coachThreadTitle } from "../../shared/constants.ts";
-import { coachThreadMetadataSchema, type CoachThreadMetadata } from "../../shared/model.ts";
+import { RULE_KEY_PATTERN } from "../../shared/keys.ts";
+import {
+  MAX_REACHED_RULES,
+  REACHED_RULES_METADATA_KEY,
+  coachThreadMetadataSchema,
+  type CoachThreadMetadata,
+} from "../../shared/model.ts";
 import type { TutorThread } from "../../shared/rpc.ts";
 
 type Sdk = BbPluginApi["sdk"];
@@ -14,7 +21,11 @@ export interface ThreadRow {
   id: string;
   projectId: string;
   parentThreadId: string | null;
+  /** The thread it was forked from; set for side chats. */
+  sourceThreadId: string | null;
+  originKind: "fork" | null;
   originPluginId: string | null;
+  visibility: "hidden" | "visible";
   title: string | null;
   createdAt: number;
   archivedAt: number | null;
@@ -24,32 +35,59 @@ export interface TutorThreadRecord extends TutorThread {
   courseId: string;
   projectId: string;
   createdAt: number;
+  /** Main threads only: the Rules the coach has focused there, oldest first. */
+  reachedRules: string[];
 }
 
 /**
- * The thread as Tutor lists it, or null when its metadata is not Tutor's.
- * The role comes from the thread's structure (side threads have a parent),
- * which the thread's agent cannot rewrite.
+ * A thread's place under its homework, from its structure, which the
+ * thread's agent cannot rewrite: a fork (a side chat) or a child (a side
+ * thread from before side chats) is a side thread, whatever the metadata
+ * claims. A hidden thread that is neither is not Tutor's to list.
  */
+export function threadRole(row: Pick<ThreadRow, "parentThreadId" | "sourceThreadId" | "originKind" | "visibility">): TutorThread["role"] | null {
+  if (row.parentThreadId !== null) return "side";
+  if (row.sourceThreadId !== null || row.originKind === "fork") return row.sourceThreadId === null ? null : "side";
+  return row.visibility === "hidden" ? null : "main";
+}
+
+/** The Rule keys in `metadata[REACHED_RULES_METADATA_KEY]`, ignoring anything that is not one. */
+export function reachedRulesOf(metadata: unknown): string[] {
+  const value =
+    typeof metadata === "object" && metadata !== null ? (metadata as Record<string, unknown>)[REACHED_RULES_METADATA_KEY] : undefined;
+  if (!Array.isArray(value)) return [];
+  const keys = value.filter((key): key is string => typeof key === "string" && RULE_KEY_PATTERN.test(key));
+  return [...new Set(keys)].slice(0, MAX_REACHED_RULES);
+}
+
+/** The thread as Tutor lists it, or null when its metadata is not Tutor's. */
 export function toTutorThread(row: ThreadRow, metadata: unknown): TutorThreadRecord | null {
   const parsed = coachThreadMetadataSchema.safeParse(metadata);
-  if (!parsed.success) return null;
-  const role = row.parentThreadId === null ? "main" : "side";
+  const role = threadRole(row);
+  if (!parsed.success || role === null) return null;
   return {
     id: row.id,
     homeworkId: parsed.data.iteration,
     role,
-    ruleKey: role === "side" ? (parsed.data.ruleKey ?? null) : null,
+    ruleKey: role === "main" ? null : (parsed.data.ruleKey ?? null),
     title: row.title,
+    mainThreadId: row.parentThreadId ?? row.sourceThreadId ?? row.id,
     courseId: parsed.data.course,
     projectId: row.projectId,
     createdAt: row.createdAt,
+    reachedRules: role === "main" ? reachedRulesOf(metadata) : [],
   };
 }
 
-/** Live (not archived) Tutor threads in `projectId`, newest first. */
+/** Live (not archived) Tutor threads in `projectId`, side chats included, newest first. */
 export async function listTutorThreads(sdk: Sdk, pluginId: string, projectId: string): Promise<TutorThreadRecord[]> {
-  const rows = await sdk.threads.list({ originPluginId: pluginId, projectId, archived: false, limit: LIST_LIMIT });
+  const rows = await sdk.threads.list({
+    originPluginId: pluginId,
+    projectId,
+    archived: false,
+    includeHidden: true,
+    limit: LIST_LIMIT,
+  });
   const mine = rows.filter(
     (row) => row.originPluginId === pluginId && row.projectId === projectId && row.archivedAt === null,
   );
@@ -62,7 +100,7 @@ export async function listTutorThreads(sdk: Sdk, pluginId: string, projectId: st
   return records.filter((record) => record !== null).sort((a, b) => b.createdAt - a.createdAt);
 }
 
-/** The homework's main coach thread: the newest one wins. */
+/** The homework's main coach thread: the newest one wins. Side chats and side threads never do. */
 export function findMainThread(
   threads: readonly TutorThreadRecord[],
   courseId: string,
@@ -75,7 +113,7 @@ export function findMainThread(
 
 /**
  * The student's repo itself, so the coach edits the tree Tutor reads
- * spec/PROGRESS.yaml from, and side threads share it with the main thread.
+ * spec/PROGRESS.yaml from. Side chats reuse the coach's environment.
  */
 function factoryEnvironment(factory: FactoryLocation) {
   return { type: "host", hostId: factory.hostId, workspace: { type: "unmanaged", path: factory.root } } as const;
@@ -107,22 +145,10 @@ export async function spawnMainThread(sdk: Sdk, spawn: SpawnMain): Promise<strin
   return thread.id;
 }
 
-export interface SpawnSide extends SpawnMain {
-  parentThreadId: string;
-  ruleKey: string | null;
-  title: string;
-}
-
-export async function spawnSideThread(sdk: Sdk, spawn: SpawnSide): Promise<string> {
-  const pluginMetadata: CoachThreadMetadata = { course: spawn.courseId, iteration: spawn.homeworkId, role: "side" };
-  if (spawn.ruleKey !== null) pluginMetadata.ruleKey = spawn.ruleKey;
-  const thread = await sdk.threads.spawn({
-    projectId: spawn.projectId,
-    parentThreadId: spawn.parentThreadId,
-    environment: factoryEnvironment(spawn.factory),
-    title: spawn.title,
-    pluginMetadata,
-    prompt: spawn.prompt,
-  });
-  return thread.id;
+/** Adds `ruleKey` to the main thread's reached Rules, keeping the ones already there. */
+export async function recordReachedRule(sdk: Sdk, threadId: string, ruleKey: string): Promise<void> {
+  const metadata = await sdk.threads.getPluginMetadata({ threadId }).catch(() => null);
+  const reached = reachedRulesOf(metadata);
+  if (reached.includes(ruleKey) || reached.length >= MAX_REACHED_RULES) return;
+  await sdk.threads.updatePluginMetadata({ threadId, set: { [REACHED_RULES_METADATA_KEY]: [...reached, ruleKey] } });
 }

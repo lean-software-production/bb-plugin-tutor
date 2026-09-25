@@ -50,7 +50,7 @@ async function openCoach(host: TutorHost, homeworkId: string) {
   return (await host.harness.behavior.callRpc("openCoach", { homeworkId })) as { threadId: string; created: boolean };
 }
 
-test("configure offers the tools, skill and instructions only to Tutor-spawned threads", async (t) => {
+test("configure offers the tools, skill and instructions to Tutor's threads and to side chats of its coach threads", async (t) => {
   const { host } = await setup(t);
   const mine = await host.harness.behavior.resolveAgentConfiguration(
     makePluginAgentConfigurationContext({
@@ -60,13 +60,25 @@ test("configure offers the tools, skill and instructions only to Tutor-spawned t
   );
   assert.deepEqual(mine.tools.map((entry) => entry.name).sort(), [...ALL_TOOL_NAMES].sort());
   assert.deepEqual(mine.skills, ["tutor"]);
-  assert.match(mine.instructions ?? "", /main coach thread for Homework 002/);
+  assert.match(mine.instructions ?? "", /coach thread for Lesson 002/);
 
-  for (const origin of [
-    { kind: null, pluginId: null },
-    { kind: "fork" as const, pluginId: "side-chat" },
+  const coach = (await openCoach(host, "000")).threadId;
+  const sideChat = (sourceThreadId: string) =>
+    host.harness.behavior.resolveAgentConfiguration(
+      makePluginAgentConfigurationContext({
+        origin: { kind: "fork", pluginId: "side-chat" },
+        thread: { id: "thr_fork", title: null, parentThreadId: null, sourceThreadId },
+      }),
+    );
+  const bbs = await sideChat(coach);
+  assert.deepEqual(bbs.tools.map((entry) => entry.name).sort(), [...ALL_TOOL_NAMES].sort());
+  assert.match(bbs.instructions ?? "", /side chat of the Lesson 000 coach thread/);
+
+  for (const other of [
+    await host.harness.behavior.resolveAgentConfiguration(makePluginAgentConfigurationContext({ origin: { kind: null, pluginId: null } })),
+    await host.harness.behavior.resolveAgentConfiguration(makePluginAgentConfigurationContext({ origin: { kind: "fork", pluginId: "side-chat" } })),
+    await sideChat("thr_not_a_coach"),
   ]) {
-    const other = await host.harness.behavior.resolveAgentConfiguration(makePluginAgentConfigurationContext({ origin }));
     assert.deepEqual([other.tools, other.skills, other.instructions], [[], [], null]);
   }
 });
@@ -75,23 +87,35 @@ test("every tool refuses threads Tutor did not spawn, whatever their metadata sa
   const { sandbox, host } = await setup(t);
   host.addThread({ id: "thr_foreign", metadata: { course: "software-factory", iteration: "000", role: "main" } });
   host.addThread({ id: "thr_elsewhere", originPluginId: "tutor", projectId: "prj_other" });
+  host.addThread({ id: "thr_plain_parent" });
+  // Forks answer to their source: a side chat of an ordinary thread gets nothing, whatever its metadata claims.
+  host.addThread({
+    id: "thr_fork_of_plain",
+    originKind: "fork",
+    originPluginId: "tutor",
+    sourceThreadId: "thr_plain_parent",
+    visibility: "hidden",
+    metadata: { course: "software-factory", iteration: "000", role: "side" },
+  });
   const inputs: Record<string, unknown> = {
     tutor_status: {},
     tutor_focus_rule: { rule: "a/b" },
     tutor_mark_example: { example: "a/b/c", status: "skipped" },
     tutor_adopt_iteration: { iteration: "000" },
     tutor_complete_iteration: { iteration: "000", summary: "x" },
-    tutor_side_thread: { title: "t", prompt: "p" },
+    tutor_side_chat: { title: "t", prompt: "p" },
   };
   for (const name of ALL_TOOL_NAMES) {
     const result = await tool(host, name, inputs[name], "thr_foreign");
     assert.ok(isError(result), name);
     assert.equal(text(result), NOT_A_TUTOR_THREAD);
+    assert.equal(text(await tool(host, name, inputs[name], "thr_fork_of_plain")), NOT_A_TUTOR_THREAD, name);
     const elsewhere = await tool(host, name, inputs[name], "thr_elsewhere");
     assert.ok(isError(elsewhere) && /not in the student's factory project/.test(text(elsewhere)), name);
   }
   assert.deepEqual(await readdir(sandbox.factoryRoot), []);
   assert.equal(host.harness.inspection.sdk.callsTo("threads.spawn").length, 0);
+  assert.equal(host.harness.inspection.sdk.callsTo("threads.fork").length, 0);
 });
 
 test("tools refuse while no factory project is bound", async (t) => {
@@ -106,7 +130,7 @@ test("openCoach spawns one main thread per homework in the factory, then finds i
   const first = await openCoach(host, "000");
   assert.equal(first.created, true);
   const [spawn] = host.harness.inspection.sdk.callsTo("threads.spawn")[0] as [Record<string, unknown>];
-  assert.equal(spawn.title, "Coach · Homework 000");
+  assert.equal(spawn.title, "Coach · Lesson 000");
   assert.equal(spawn.projectId, PROJECT_ID);
   assert.deepEqual(spawn.pluginMetadata, { course: "software-factory", iteration: "000", role: "main" });
   assert.deepEqual(spawn.environment, {
@@ -115,6 +139,7 @@ test("openCoach spawns one main thread per homework in the factory, then finds i
     workspace: { type: "unmanaged", path: sandbox.factoryRoot },
   });
   assert.match(String(spawn.prompt), /tutor_adopt_iteration with iteration "000"/);
+  assert.match(String(spawn.prompt), /\n::tutor-lesson\{homework="000"\}\n/);
 
   assert.deepEqual(await openCoach(host, "000"), { threadId: first.threadId, created: false });
   assert.equal(host.harness.inspection.sdk.callsTo("threads.spawn").length, 1);
@@ -198,30 +223,229 @@ test("the coach tools round-trip progress through the factory repo and carry pas
   assert.equal(completion1.next?.status, "current");
 });
 
-test("side threads hang off the main thread, and only the main thread moves the cursor", async (t) => {
-  const { host } = await setup(t);
+async function adoptedCoach(host: TutorHost): Promise<{ coach: string; rule: string }> {
   const coach = (await openCoach(host, "000")).threadId;
   await ok(host, "tutor_adopt_iteration", { iteration: "000" }, coach);
   const status = await ok(host, "tutor_status", {}, coach);
   const rule = /^● (\S+) —/m.exec(status)?.[1];
   assert.ok(rule !== undefined, status);
+  return { coach, rule };
+}
 
-  await ok(host, "tutor_side_thread", { title: "Why a rail?", prompt: "Why is there a rail?", rule }, coach);
-  const side = host.threads.find((thread) => thread.parentThreadId === coach);
-  assert.ok(side !== undefined);
-  assert.equal(side.title, "Why a rail?");
-  assert.deepEqual(side.metadata, { course: "software-factory", iteration: "000", role: "side", ruleKey: rule });
+type Tab = { id: string; kind: string; pluginId?: string; actionId?: string; title?: string; paramsJson?: string | null };
 
-  const refused = await tool(host, "tutor_focus_rule", { rule }, side.id);
-  assert.ok(isError(refused) && /Only the main coach thread/.test(text(refused)));
+function sideChatTabsOf(host: TutorHost, coach: string): Tab[] {
+  return (host.tabs.get(coach)?.tabs ?? []).filter((tab) => (tab as Tab).pluginId === "side-chat") as Tab[];
+}
+
+test("tutor_side_chat forks the coach thread as a hidden side chat and adds BB's Side chat tab", async (t) => {
+  const { host } = await setup(t);
+  const { coach, rule } = await adoptedCoach(host);
+  host.tabs.set(coach, { revision: 4, tabs: [{ id: "thread-info:thread-info:none", kind: "thread-info" }] });
+
+  const started = await ok(host, "tutor_side_chat", { title: "Why an outline?", prompt: "Why is there an outline?", rule }, coach);
+  const [fork] = host.harness.inspection.sdk.callsTo("threads.fork")[0] as [Record<string, unknown>];
+  assert.deepEqual(
+    { ...fork, agentContextSeed: undefined },
+    {
+      sourceThreadId: coach,
+      lifecycleOwnerThreadId: coach,
+      visibility: "hidden",
+      title: "Why an outline?",
+      pluginMetadata: { course: "software-factory", iteration: "000", role: "side", ruleKey: rule },
+      origin: "plugin",
+      originPluginId: "tutor",
+      agentContextSeed: undefined,
+    },
+  );
+  const seed = fork.agentContextSeed as { type: string; text: string; mentions: unknown[]; visibility: string }[];
+  assert.equal(seed.length, 1);
+  assert.deepEqual([seed[0]?.type, seed[0]?.visibility, seed[0]?.mentions], ["text", "agent-only", []]);
+  assert.match(seed[0]?.text ?? "", /The student's question, which the coach moved here: Why is there an outline\?/);
+
+  const sideChat = host.threads.find((thread) => thread.sourceThreadId === coach);
+  assert.ok(sideChat !== undefined);
+  assert.match(started, new RegExp(`Started side chat ${sideChat.id}`));
+  const stored = host.tabs.get(coach);
+  assert.equal(stored?.revision, 5);
+  assert.equal(stored?.tabs[0]?.kind, "thread-info", "BB's own tabs stay");
+  const [tab] = sideChatTabsOf(host, coach);
+  assert.ok(tab !== undefined);
+  const paramsJson = JSON.stringify({ threadId: sideChat.id, sourceThreadId: coach, sourceMessageText: tab.paramsJson === undefined ? "" : JSON.parse(tab.paramsJson ?? "{}").sourceMessageText, sourceSeqEnd: null });
+  assert.deepEqual(tab, {
+    id: `plugin-panel:${encodeURIComponent(`side-chat:side-chat:${paramsJson}`)}:none`,
+    kind: "plugin-panel",
+    pluginId: "side-chat",
+    actionId: "side-chat",
+    title: "Side chat",
+    paramsJson,
+  });
+
+  // A side chat can mark Examples but never moves the focus; the coach thread can.
+  const refused = await tool(host, "tutor_focus_rule", { rule }, sideChat.id);
+  assert.ok(isError(refused) && /Only the coach thread moves the focus/.test(text(refused)));
   await ok(host, "tutor_focus_rule", { rule }, coach);
 
-  const context = (await host.harness.behavior.callRpc("getThreadContext", { threadId: side.id })) as {
-    thread: { role: string; ruleKey: string } | null;
+  const context = (await host.harness.behavior.callRpc("getThreadContext", { threadId: sideChat.id })) as {
+    thread: { role: string; ruleKey: string; mainThreadId: string } | null;
   };
-  assert.deepEqual([context.thread?.role, context.thread?.ruleKey], ["side", rule]);
+  assert.deepEqual([context.thread?.role, context.thread?.ruleKey, context.thread?.mainThreadId], ["side", rule, coach]);
   host.addThread({ id: "thr_foreign" });
   assert.deepEqual(await host.harness.behavior.callRpc("getThreadContext", { threadId: "thr_foreign" }), { thread: null });
+});
+
+test("a side chat never counts as the coach thread, even when its metadata says it is", async (t) => {
+  const { host } = await setup(t);
+  const { coach } = await adoptedCoach(host);
+  // A fork made after the coach, claiming to be a main thread: the newest "main" would otherwise win.
+  host.addThread({
+    id: "thr_claims_main",
+    originKind: "fork",
+    originPluginId: "tutor",
+    sourceThreadId: coach,
+    visibility: "hidden",
+    metadata: { course: "software-factory", iteration: "000", role: "main" },
+  });
+  assert.deepEqual(await openCoach(host, "000"), { threadId: coach, created: false });
+  const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.equal(overview.current?.coachThreadId, coach);
+  assert.equal(overview.homeworks.find((homework) => homework.id === "000")?.coachThreadId, coach);
+  assert.deepEqual(
+    overview.threads.map((thread) => [thread.id, thread.role, thread.mainThreadId]).sort(),
+    [
+      [coach, "main", coach],
+      ["thr_claims_main", "side", coach],
+    ].sort(),
+  );
+  const refused = await tool(host, "tutor_focus_rule", { rule: "tutor/x" }, "thr_claims_main");
+  assert.ok(isError(refused) && /Only the coach thread moves the focus/.test(text(refused)));
+});
+
+test("a side chat BB made of a coach thread can mark Examples; a visible fork or a fork of a side chat cannot", async (t) => {
+  const { sandbox, host } = await setup(t);
+  const { coach, rule } = await adoptedCoach(host);
+  const bbFork = (id: string, source: string, visibility: "hidden" | "visible" = "hidden") =>
+    host.addThread({ id, originKind: "fork", originPluginId: "side-chat", sourceThreadId: source, visibility });
+  bbFork("thr_bb_side", coach);
+  bbFork("thr_bb_visible", coach, "visible");
+  bbFork("thr_bb_nested", "thr_bb_side");
+
+  const example = homeworkExamples(findHomework(sandbox.course, "000") ?? assert.fail("no 000"))[0];
+  assert.ok(example !== undefined);
+  await ok(host, "tutor_mark_example", { example: example.key, status: "skipped" }, "thr_bb_side");
+  const refused = await tool(host, "tutor_focus_rule", { rule }, "thr_bb_side");
+  assert.ok(isError(refused) && /Only the coach thread moves the focus/.test(text(refused)));
+  for (const id of ["thr_bb_visible", "thr_bb_nested"]) {
+    assert.equal(text(await tool(host, "tutor_status", {}, id)), NOT_A_TUTOR_THREAD, id);
+  }
+  const context = (await host.harness.behavior.callRpc("getThreadContext", { threadId: "thr_bb_side" })) as {
+    thread: { homeworkId: string; role: string; ruleKey: string | null; mainThreadId: string } | null;
+  };
+  assert.deepEqual(context.thread && { ...context.thread, id: undefined, title: undefined }, {
+    id: undefined,
+    title: undefined,
+    homeworkId: "000",
+    role: "side",
+    ruleKey: null,
+    mainThreadId: coach,
+  });
+  // Side chats BB made count on the completion page.
+  for (const homework of homeworkExamples(findHomework(sandbox.course, "000") ?? assert.fail("no 000"))) {
+    await ok(host, "tutor_mark_example", { example: homework.key, status: "skipped" }, coach);
+  }
+  await ok(host, "tutor_complete_iteration", { iteration: "000", summary: "Done." }, coach);
+  const completion = (await host.harness.behavior.callRpc("getCompletion", { homeworkId: "000" })) as Completion;
+  assert.equal(completion.sideThreads, 1);
+});
+
+test("Ask a side question: startSideThread forks a side chat, retrying the tab write when another client wrote first", async (t) => {
+  const { host } = await setup(t);
+  await assert.rejects(host.harness.behavior.callRpc("startSideThread", { homeworkId: "000", ruleKey: null }), /Start with your coach for lesson 000 first/);
+  const { coach, rule } = await adoptedCoach(host);
+  host.tabConflicts.remaining = 2;
+  const started = (await host.harness.behavior.callRpc("startSideThread", { homeworkId: "000", ruleKey: rule })) as {
+    coachThreadId: string;
+    sideChatId: string;
+  };
+  assert.equal(started.coachThreadId, coach);
+  const sideChat = host.threads.find((thread) => thread.id === started.sideChatId);
+  assert.deepEqual([sideChat?.visibility, sideChat?.originKind, sideChat?.sourceThreadId], ["hidden", "fork", coach]);
+  assert.match(sideChat?.seed ?? "", /Wait for the student's question/);
+  assert.equal(host.harness.inspection.sdk.callsTo("threads.tabs.update").length, 3);
+  const tabs = host.tabs.get(coach)?.tabs ?? [];
+  assert.deepEqual(tabs.map((tab) => tab.kind), ["new-tab", "new-tab", "plugin-panel"], "the other client's tabs survive");
+  assert.ok(host.harness.inspection.realtimeSignals.some((signal) => (signal.payload as { reason: string }).reason === "threads"));
+
+  // ensureSideChatTab puts a closed tab back, once.
+  host.tabs.set(coach, { revision: 9, tabs: [] });
+  assert.deepEqual(await host.harness.behavior.callRpc("ensureSideChatTab", { sideChatId: started.sideChatId }), { coachThreadId: coach });
+  assert.deepEqual(await host.harness.behavior.callRpc("ensureSideChatTab", { sideChatId: started.sideChatId }), { coachThreadId: coach });
+  assert.equal(sideChatTabsOf(host, coach).length, 1);
+  assert.match(sideChatTabsOf(host, coach)[0]?.paramsJson ?? "", /A side question about the Rule/);
+
+  // ...and does the same for a side chat BB made, which it recognises in either tab shape.
+  host.addThread({
+    id: "thr_bb_side",
+    originKind: "fork",
+    originPluginId: "side-chat",
+    sourceThreadId: coach,
+    visibility: "hidden",
+    titleFallback: "Replying to this earlier message in the conversation: the outline is…",
+  });
+  host.tabs.set(coach, { revision: 12, tabs: [{ id: "legacy", kind: "side-chat", threadId: "thr_bb_side", title: "Side chat", sourceMessageText: "", sourceSeqEnd: null }] });
+  await host.harness.behavior.callRpc("ensureSideChatTab", { sideChatId: "thr_bb_side" });
+  assert.equal(host.tabs.get(coach)?.revision, 12, "a legacy side-chat tab already shows it");
+  host.tabs.set(coach, { revision: 13, tabs: [] });
+  await host.harness.behavior.callRpc("ensureSideChatTab", { sideChatId: "thr_bb_side" });
+  assert.match(sideChatTabsOf(host, coach)[0]?.paramsJson ?? "", /"sourceMessageText":"the outline is…"/);
+
+  host.addThread({ id: "thr_plain" });
+  await assert.rejects(host.harness.behavior.callRpc("ensureSideChatTab", { sideChatId: "thr_plain" }), /isn't a side chat/);
+  await assert.rejects(host.harness.behavior.callRpc("ensureSideChatTab", { sideChatId: coach }), /isn't a side chat/);
+});
+
+test("a tab write that keeps conflicting fails after a few tries instead of looping", async (t) => {
+  const { host } = await setup(t);
+  const { rule } = await adoptedCoach(host);
+  host.tabConflicts.remaining = 10;
+  await assert.rejects(host.harness.behavior.callRpc("startSideThread", { homeworkId: "000", ruleKey: rule }), /Thread tabs changed/);
+  assert.equal(host.harness.inspection.sdk.callsTo("threads.tabs.update").length, 3);
+});
+
+test("a provider that cannot fork gets a clear error, and no side thread is spawned instead", async (t) => {
+  const { host } = await setup(t);
+  const { coach, rule } = await adoptedCoach(host);
+  host.forkRefusal.message = "Provider scripted does not support thread forks";
+  await assert.rejects(
+    host.harness.behavior.callRpc("startSideThread", { homeworkId: "000", ruleKey: rule }),
+    /can't open side chats: its provider can't fork a conversation/,
+  );
+  const result = await tool(host, "tutor_side_chat", { title: "t", prompt: "p" }, coach);
+  assert.ok(isError(result) && /can't open side chats/.test(text(result)));
+  assert.equal(host.harness.inspection.sdk.callsTo("threads.spawn").length, 1, "only the coach thread was ever spawned");
+  assert.equal(host.tabs.get(coach), undefined);
+});
+
+test("focusing a Rule records it on the coach thread, so the outline can jump to its section", async (t) => {
+  const { host } = await setup(t);
+  const { coach, rule } = await adoptedCoach(host);
+  const before = (await host.harness.behavior.callRpc("getLesson", { homeworkId: "000" })) as Lesson;
+  assert.deepEqual(before.reachedRules, [], "adopting sets a focus but opens no section");
+  const focused = await ok(host, "tutor_focus_rule", { rule }, coach);
+  assert.match(focused, /start your next message with this line/);
+  await ok(host, "tutor_focus_rule", { rule }, coach);
+  assert.deepEqual(host.threads.find((thread) => thread.id === coach)?.metadata.reachedRules, [rule]);
+  const lesson = (await host.harness.behavior.callRpc("getLesson", { homeworkId: "000" })) as Lesson;
+  assert.deepEqual(lesson.reachedRules, [rule]);
+  const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  const rules = overview.homeworks.find((homework) => homework.id === "000")?.outline.flatMap((feature) => feature.rules) ?? [];
+  assert.deepEqual(rules.filter((candidate) => candidate.reached).map((candidate) => candidate.key), [rule]);
+  // The metadata is untrusted: junk in it is ignored, not fatal.
+  const thread = host.threads.find((candidate) => candidate.id === coach);
+  assert.ok(thread !== undefined);
+  thread.metadata.reachedRules = [rule, 42, "not a key", { x: 1 }];
+  const again = (await host.harness.behavior.callRpc("getLesson", { homeworkId: "000" })) as Lesson;
+  assert.deepEqual(again.reachedRules, [rule]);
 });
 
 test("redirectFocus asks the main coach thread to move, as the student", async (t) => {
@@ -242,23 +466,38 @@ test("the dispatch guard holds a Tutor turn while a sibling Tutor thread runs", 
   const coach = (await openCoach(host, "000")).threadId;
   host.addThread({ id: "thr_side", originPluginId: "tutor", parentThreadId: coach, title: "Side" });
   host.addThread({ id: "thr_plain" });
-  const attempt = (id: string, originPluginId: string | null) =>
-    guard(
+  host.addThread({ id: "thr_bb_side", originKind: "fork", originPluginId: "side-chat", sourceThreadId: coach, visibility: "hidden", titleFallback: "Replying to…" });
+  host.addThread({ id: "thr_tutor_side", originKind: "fork", originPluginId: "tutor", sourceThreadId: coach, visibility: "hidden", title: "Side question" });
+  const attempt = (id: string) => {
+    const thread = host.threads.find((candidate) => candidate.id === id);
+    assert.ok(thread !== undefined);
+    return guard(
       makeMessageDispatchHookContext({
-        thread: makeThreadResponse({ id, originPluginId, projectId: PROJECT_ID }),
+        thread: makeThreadResponse({ ...thread, projectId: PROJECT_ID }),
         project: { id: PROJECT_ID },
       }),
     );
+  };
 
-  assert.deepEqual(await attempt("thr_side", "tutor"), { action: "proceed" });
+  assert.deepEqual(await attempt("thr_side"), { action: "proceed" });
   host.running.add(coach);
-  const held = await attempt("thr_side", "tutor");
-  assert.equal(held.action, "wait");
-  assert.match(held.action === "wait" ? held.reason : "", /Coach · Homework 000/);
-  assert.deepEqual(await attempt("thr_plain", null), { action: "proceed" });
-  assert.deepEqual(await attempt(coach, "tutor"), { action: "proceed" });
+  for (const id of ["thr_side", "thr_bb_side", "thr_tutor_side"]) {
+    const held = await attempt(id);
+    assert.equal(held.action, "wait", id);
+    assert.match(held.action === "wait" ? held.reason : "", /Coach · Lesson 000/);
+  }
+  assert.deepEqual(await attempt("thr_plain"), { action: "proceed" });
+  assert.deepEqual(await attempt(coach), { action: "proceed" });
 
+  // A running side chat, BB's or Tutor's (both hidden), holds the coach thread's turn.
   host.running.delete(coach);
+  for (const id of ["thr_bb_side", "thr_tutor_side"]) {
+    host.running.add(id);
+    const held = await attempt(coach);
+    assert.equal(held.action, "wait", id);
+    host.running.delete(id);
+  }
+
   await host.harness.behavior.emitThreadEvent("thread.idle", {
     thread: makeThreadResponse({ id: coach, originPluginId: "tutor", projectId: PROJECT_ID }),
     lastAssistantText: null,

@@ -377,21 +377,37 @@ export const fixtureBinding: Binding = {
 };
 
 export const fixtureThreads: TutorThread[] = [
-  { id: "thr_coach002", homeworkId: "002", role: "main", ruleKey: null, title: coachThreadTitle("002") },
+  { id: "thr_coach002", homeworkId: "002", role: "main", ruleKey: null, title: coachThreadTitle("002"), mainThreadId: "thr_coach002" },
   {
     id: "thr_side002",
     homeworkId: "002",
     role: "side",
     ruleKey: fixtureStudent.progress?.focus ?? null,
     title: "Why does the validator see the diff?",
+    mainThreadId: "thr_coach002",
   },
-  { id: "thr_coach001", homeworkId: "001", role: "main", ruleKey: null, title: coachThreadTitle("001") },
+  { id: "thr_coach001", homeworkId: "001", role: "main", ruleKey: null, title: coachThreadTitle("001"), mainThreadId: "thr_coach001" },
 ];
 
-function outline(homeworkId: string): FeatureOutline[] {
+/** The Rules the Homework 002 coach thread has focused: its sections can be jumped to. */
+export const fixtureReachedRules: string[] = [fixtureStudent.progress?.focus].filter((key): key is string => typeof key === "string");
+
+interface OutlineInput {
+  progress: Readonly<Record<string, ExampleProgress>>;
+  focus: string | null;
+  reached: readonly string[];
+}
+
+const NOTHING_RECORDED: OutlineInput = { progress: {}, focus: null, reached: [] };
+
+/** Homework 002 is the one under way; the others have nothing recorded. */
+function recorded(homeworkId: string): OutlineInput {
+  if (homeworkId !== "002") return NOTHING_RECORDED;
+  return { progress: fixtureStudent.progress?.examples ?? {}, focus: fixtureStudent.progress?.focus ?? null, reached: fixtureReachedRules };
+}
+
+function outline(homeworkId: string, { progress, focus, reached }: OutlineInput = recorded(homeworkId)): FeatureOutline[] {
   const hw = fixtureCourse.homeworks.find((h) => h.id === homeworkId);
-  const progress = fixtureStudent.progress?.examples ?? {};
-  const focus = fixtureStudent.progress?.focus ?? null;
   return (hw?.features ?? []).map((f) => ({
     slug: f.slug,
     name: f.name,
@@ -414,9 +430,12 @@ function outline(homeworkId: string): FeatureOutline[] {
           .filter((at): at is string => at !== undefined)
           .sort()
           .at(-1) ?? null,
+      reached: reached.includes(rule.key),
     })),
   }));
 }
+
+const coachByHomework: Readonly<Record<string, string>> = { "001": "thr_coach001", "002": "thr_coach002" };
 
 const statusByHomework = { "000": "done", "001": "done", "002": "current", "003": "ahead" } as const;
 
@@ -431,6 +450,8 @@ export const fixtureOverview: Overview = {
     builtin: hw.builtin,
     status: statusByHomework[hw.id as keyof typeof statusByHomework],
     counts: countExamples(homeworkExamples(hw), hw.id === "002" ? (fixtureStudent.progress?.examples ?? {}) : {}),
+    coachThreadId: coachByHomework[hw.id] ?? null,
+    outline: outline(hw.id),
   })),
   current: {
     homeworkId: "002",
@@ -461,6 +482,8 @@ export const fixtureOverviewUnbound: Overview = {
     ...hw,
     status: hw.id === BUILTIN_HOMEWORK_ID ? "current" : "ahead",
     counts: countExamples(examplesOf(hw.id), {}),
+    coachThreadId: null,
+    outline: outline(hw.id, NOTHING_RECORDED),
   })),
   current: null,
   threads: [],
@@ -473,6 +496,7 @@ export const fixtureLesson: Lesson = {
   focus: fixtureStudent.progress?.focus ?? null,
   progress: fixtureStudent.progress?.examples ?? {},
   coachThreadId: "thr_coach002",
+  reachedRules: fixtureReachedRules,
 };
 
 export const fixtureCompletion: Completion = {

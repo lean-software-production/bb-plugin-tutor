@@ -226,9 +226,19 @@ export interface StudentState {
 export const coachThreadMetadataSchema = z.object({
   course: z.string(),
   iteration: homeworkIdSchema,
+  /** "side" for a side chat (a fork Tutor made), and for a side thread spawned before side chats. */
   role: z.enum(["main", "side"]),
   ruleKey: ruleKeySchema.optional(),
 });
+
+/**
+ * Also under Tutor's metadata on a main coach thread: the Rules the coach has
+ * focused there (tutor_focus_rule), in order. The coach opens each Rule's
+ * section in the conversation when it focuses it, so these are the Rules the
+ * course outline can jump to. Read leniently: it is untrusted like the rest.
+ */
+export const REACHED_RULES_METADATA_KEY = "reachedRules";
+export const MAX_REACHED_RULES = 500;
 export type CoachThreadMetadata = z.infer<typeof coachThreadMetadataSchema>;
 
 // ---------------------------------------------------------------------------

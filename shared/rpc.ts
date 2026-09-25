@@ -27,13 +27,20 @@ import {
 // Payload pieces
 // ---------------------------------------------------------------------------
 
-/** A thread Tutor spawned, as the backend knows it (live status comes from useSidebarThreads). */
+/**
+ * A thread Tutor spawned or forked, as the backend knows it (live status comes
+ * from useSidebarThreads). `main` is the homework's coach thread. `side` is a
+ * side chat, a hidden fork of it shown in its right panel, or a side thread
+ * spawned under it before side chats existed.
+ */
 export const tutorThreadSchema = z.object({
   id: threadIdSchema,
   homeworkId: homeworkIdSchema,
   role: z.enum(["main", "side"]),
   ruleKey: ruleKeySchema.nullable(),
   title: z.string().nullable(),
+  /** The coach thread it belongs to; itself for a coach thread. */
+  mainThreadId: threadIdSchema,
 });
 export type TutorThread = z.infer<typeof tutorThreadSchema>;
 
@@ -58,17 +65,6 @@ export const courseInfoSchema = z.object({
 });
 export type CourseInfo = z.infer<typeof courseInfoSchema>;
 
-export const homeworkSummarySchema = z.object({
-  id: homeworkIdSchema,
-  title: z.string(),
-  set: z.string().nullable(),
-  builtin: z.boolean(),
-  status: homeworkStatusSchema,
-  /** Against the student's progress for the current homework; all-pending for other homeworks. */
-  counts: exampleCountsSchema,
-});
-export type HomeworkSummary = z.infer<typeof homeworkSummarySchema>;
-
 export const ruleOutlineSchema = z.object({
   key: ruleKeySchema,
   name: z.string(),
@@ -78,6 +74,8 @@ export const ruleOutlineSchema = z.object({
   counts: exampleCountsSchema,
   /** Latest `at` among its Examples' progress entries. */
   lastAt: z.string().nullable(),
+  /** The coach has focused it in the homework's coach thread, so its section there can be jumped to. */
+  reached: z.boolean(),
 });
 export type RuleOutline = z.infer<typeof ruleOutlineSchema>;
 
@@ -90,6 +88,21 @@ export const featureOutlineSchema = z.object({
   rules: z.array(ruleOutlineSchema),
 });
 export type FeatureOutline = z.infer<typeof featureOutlineSchema>;
+
+export const homeworkSummarySchema = z.object({
+  id: homeworkIdSchema,
+  title: z.string(),
+  set: z.string().nullable(),
+  builtin: z.boolean(),
+  status: homeworkStatusSchema,
+  /** Recorded progress: the current homework's, a done one's history entry, else all pending. */
+  counts: exampleCountsSchema,
+  /** The homework's main coach thread, or null before it has one. */
+  coachThreadId: threadIdSchema.nullable(),
+  /** Its features and Rules, for the course outline. */
+  outline: z.array(featureOutlineSchema),
+});
+export type HomeworkSummary = z.infer<typeof homeworkSummarySchema>;
 
 export const lastNoteSchema = z.object({
   exampleKey: exampleKeySchema,
@@ -136,6 +149,8 @@ export const lessonSchema = z.object({
    */
   progress: z.record(exampleKeySchema, exampleProgressSchema),
   coachThreadId: threadIdSchema.nullable(),
+  /** Rules the coach has focused in that thread: their sections can be jumped to. */
+  reachedRules: z.array(ruleKeySchema),
 });
 export type Lesson = z.infer<typeof lessonSchema>;
 
@@ -144,6 +159,7 @@ export const completionSchema = z.object({
   counts: exampleCountsSchema,
   /** Rules whose novelty is not unchanged. */
   freshRules: z.number().int().nonnegative(),
+  /** Side chats (and older side threads) of the homework's coach thread. */
   sideThreads: z.number().int().nonnegative(),
   adoptedAt: z.string().nullable(),
   summary: z.string().nullable(),
@@ -235,18 +251,28 @@ export const rpcContract = defineRpcContract({
     input: homeworkInput,
     output: z.object({ threadId: threadIdSchema }),
   },
-  /** A child of the homework's main thread, optionally about one Rule. */
+  /**
+   * A BB side chat of the homework's main coach thread, optionally about one
+   * Rule: a hidden fork, plus BB's "Side chat" tab in the coach thread's right
+   * panel. A plugin cannot select that tab, so the frontend points to it.
+   */
   startSideThread: {
-    input: z.object({
-      homeworkId: homeworkIdSchema,
-      ruleKey: ruleKeySchema.nullable(),
-      title: z.string().trim().min(1).max(120).optional(),
-    }),
-    output: z.object({ threadId: threadIdSchema }),
+    input: z.object({ homeworkId: homeworkIdSchema, ruleKey: ruleKeySchema.nullable() }),
+    output: z.object({ coachThreadId: threadIdSchema, sideChatId: threadIdSchema }),
   },
   /**
-   * The student clicked a Rule: send the main coach thread a message asking to
-   * move there. The coach moves the cursor (tutor_focus_rule), not the UI.
+   * Puts a side chat's tab back in its coach thread's right panel if it was
+   * closed. The side chat must be a hidden fork of a Tutor main coach thread
+   * (Tutor's, or one BB made with "Reply in side chat").
+   */
+  ensureSideChatTab: {
+    input: z.object({ sideChatId: threadIdSchema }),
+    output: z.object({ coachThreadId: threadIdSchema }),
+  },
+  /**
+   * The student asked for a Rule (the Rule tab's "Work on this Rule next"):
+   * send the main coach thread a message asking to move there. The coach
+   * moves the focus (tutor_focus_rule), not the UI.
    */
   redirectFocus: {
     input: z.object({ homeworkId: homeworkIdSchema, ruleKey: ruleKeySchema }),

@@ -1,10 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  formatLessonRef,
   formatProgressCard,
   formatTermRef,
+  parseLessonRef,
   parseProgressCard,
   parseTermRef,
+  ruleAnchor,
   type ProgressCard,
 } from "./directives.ts";
 
@@ -69,4 +72,21 @@ test("term refs round-trip and reject bad ids", () => {
   assert.deepEqual(parseTermRef({ id: "doer" }), { id: "doer", label: null });
   assert.equal(parseTermRef({ id: "<script>" }), null);
   assert.equal(parseTermRef({}), null);
+});
+
+test("a lesson card names one homework, and nothing else is accepted", () => {
+  const source = formatLessonRef({ homeworkId: "003" });
+  assert.equal(source, '::tutor-lesson{homework="003"}');
+  assert.deepEqual(parseLessonRef(attributesOf(source)), { homeworkId: "003" });
+  for (const homework of [undefined, "", "3", "0003", "003 ", "../003", "abc"]) {
+    assert.equal(parseLessonRef(homework === undefined ? {} : { homework }), null, String(homework));
+  }
+});
+
+test("a Rule anchor joins the thread, the homework and the Rule, and refuses anything malformed", () => {
+  assert.equal(ruleAnchor("thr_abc", "003", "assembly-line/refuses"), "thr_abc|003/assembly-line/refuses");
+  assert.equal(ruleAnchor("thr abc", "003", "a/b"), null);
+  assert.equal(ruleAnchor("thr_abc", "3", "a/b"), null);
+  assert.equal(ruleAnchor("thr_abc", "003", "a/b/c"), null);
+  assert.equal(ruleAnchor("thr_abc", "003", 'a/b"]'), null);
 });

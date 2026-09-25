@@ -48,7 +48,7 @@ test("malformed files become problems, never exceptions", async () => {
 });
 
 test("refuses to write spec/ITERATION for Homework 0", async () => {
-  await assert.rejects(store.writeIteration("/nonexistent", { iteration: "000", status: "WIP" }), /Homework 0/);
+  await assert.rejects(store.writeIteration("/nonexistent", { iteration: "000", status: "WIP" }), /Lesson 0/);
 });
 
 test("refuses to write through a spec/ that is a symbolic link", async () => {

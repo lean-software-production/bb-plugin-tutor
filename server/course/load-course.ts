@@ -104,18 +104,18 @@ function checkHomeworkIds(manifest: CourseManifest, where: string): void {
   const seen = new Set<string>();
   for (const { id } of manifest.homeworks) {
     if (id === BUILTIN_HOMEWORK_ID) {
-      throw new CourseLoadError(`${where}: homework ${id} is reserved for the built-in Homework 0.`);
+      throw new CourseLoadError(`${where}: lesson ${id} is reserved for the built-in Lesson 0.`);
     }
-    if (seen.has(id)) throw new CourseLoadError(`${where}: homework ${id} is listed twice.`);
+    if (seen.has(id)) throw new CourseLoadError(`${where}: lesson ${id} is listed twice.`);
     seen.add(id);
   }
 }
 
 async function readBuiltinHomeworks(): Promise<HomeworkContent[]> {
-  const display = (path: string): string => `Homework 0 (built in): ${displayWithin(BUILTIN_COURSE_ROOT)(path)}`;
+  const display = (path: string): string => `Lesson 0 (built in): ${displayWithin(BUILTIN_COURSE_ROOT)(path)}`;
   const yamlPath = join(BUILTIN_COURSE_ROOT, COURSE_FILES.manifest);
   const yaml = await readTextIfPresent(yamlPath, display(yamlPath));
-  if (yaml === null) throw new CourseLoadError(`Tutor's built-in Homework 0 is missing from ${BUILTIN_COURSE_ROOT}.`);
+  if (yaml === null) throw new CourseLoadError(`Tutor's built-in Lesson 0 is missing from ${BUILTIN_COURSE_ROOT}.`);
   const manifest = parseCourseYaml(yaml, BUILTIN_COURSE_ROOT, display(yamlPath));
   const guard = guardWithin(BUILTIN_COURSE_ROOT, display);
   return Promise.all(manifest.homeworks.map((entry) => readHomework(entry, true, display, guard)));

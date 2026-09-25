@@ -35,7 +35,14 @@ export interface CoachState {
 
 export type Outcome =
   | { error: string }
-  | { text: string; progress?: ProgressFile; iteration?: IterationState; adopt?: Homework };
+  | {
+      text: string;
+      progress?: ProgressFile;
+      iteration?: IterationState;
+      adopt?: Homework;
+      /** A Rule the coach thread has now reached: its section starts in the coach's next message. */
+      reached?: string;
+    };
 
 export function coachStateOf(world: World): CoachState | { error: string } {
   if (world.course === null || world.pointer === null) {
@@ -45,7 +52,7 @@ export function coachStateOf(world: World): CoachState | { error: string } {
     return { error: "No factory project is set up yet. The student confirms it on the Course page." };
   }
   const homework = findHomework(world.course, world.pointer.homeworkId);
-  if (homework === undefined) return { error: `Homework ${world.pointer.homeworkId} is not in this course.` };
+  if (homework === undefined) return { error: `Lesson ${world.pointer.homeworkId} is not in this course.` };
   return {
     course: world.course,
     projectId: world.binding.projectId,
@@ -75,14 +82,23 @@ function echo(line: string): string {
   return `Echo this card in your reply, on a line of its own:\n${line}`;
 }
 
+/** The focus card opens the Rule's section, so it leads the message that turns to the Rule. */
+function sectionHeader(line: string): string {
+  return [
+    "When you turn to this Rule, start your next message with this line, exactly as written and on a line of its own.",
+    "BB draws it as the Rule card, where the Rule's section of this conversation starts; the course outline jumps there.",
+    line,
+  ].join("\n");
+}
+
 /** The progress to change, refusing when the homework is not under way. */
 function underWay(state: CoachState): ProgressFile | { error: string } {
   const { homework, pointer } = state;
   if (pointer.iterationStatus === "not-started" || state.progress === null) {
-    return { error: `Homework ${homework.id} has not been adopted yet. Call tutor_adopt_iteration first.` };
+    return { error: `Lesson ${homework.id} has not been adopted yet. Call tutor_adopt_iteration first.` };
   }
   if (pointer.iterationStatus === "Done" && !homework.builtin) {
-    return { error: `Homework ${homework.id} is already complete. Adopt the next one with tutor_adopt_iteration.` };
+    return { error: `Lesson ${homework.id} is already complete. Adopt the next one with tutor_adopt_iteration.` };
   }
   return state.progress;
 }
@@ -98,13 +114,13 @@ function suggestedNextRule(homework: Homework, progress: ProgressMap, except: st
 
 export function focusAction(state: CoachState, input: ToolParameters<"tutor_focus_rule">, isMain: boolean): Outcome {
   if (!isMain) {
-    return { error: "Only the main coach thread moves the cursor. Suggest the Rule to the student instead." };
+    return { error: "Only the coach thread moves the focus. Suggest the Rule to the student instead." };
   }
   const progress = underWay(state);
   if ("error" in progress) return progress;
   const rule = findRule(state.homework, input.rule);
   if (rule === undefined) {
-    return { error: `There is no Rule ${input.rule} in homework ${state.homework.id}. Call tutor_status for the keys.` };
+    return { error: `There is no Rule ${input.rule} in lesson ${state.homework.id}. Call tutor_status for the keys.` };
   }
   const counts = countExamples(rule.examples, progress.examples);
   const line = card({
@@ -116,8 +132,9 @@ export function focusAction(state: CoachState, input: ToolParameters<"tutor_focu
     ruleKey: rule.key,
   });
   return {
-    text: `The cursor is on ${rule.key}.\n${echo(line)}`,
+    text: `The focus is on ${rule.key}.\n${sectionHeader(line)}`,
     progress: { ...progress, focus: rule.key },
+    reached: rule.key,
   };
 }
 
@@ -128,7 +145,7 @@ export function markAction(state: CoachState, input: ToolParameters<"tutor_mark_
   const example = findExample(homework, input.example);
   const rule = findRule(homework, ruleKeyOfExample(input.example) ?? "");
   if (example === undefined || rule === undefined) {
-    return { error: `There is no Example ${input.example} in homework ${homework.id}. Call tutor_status for the keys.` };
+    return { error: `There is no Example ${input.example} in lesson ${homework.id}. Call tutor_status for the keys.` };
   }
   const entry: ExampleProgress = { status: input.status, hash: example.hash, at: now };
   if (input.note !== undefined) entry.note = input.note;
@@ -146,7 +163,7 @@ export function markAction(state: CoachState, input: ToolParameters<"tutor_mark_
     line = card({ kind: "rule-passing", title: rule.name, next: next?.name ?? null, ...common });
     hint = next === undefined
       ? "\nEvery Rule holds now. When the student is ready, finish with tutor_complete_iteration."
-      : `\nSuggested next Rule: ${next.key}. Move the cursor with tutor_focus_rule when you get there.`;
+      : `\nSuggested next Rule: ${next.key}. Move the focus with tutor_focus_rule when you get there.`;
   } else if (input.status === "not-yet") {
     line = card({ kind: "not-yet", title: example.name, note: input.note ?? null, exampleKey: example.key, ...common });
   } else if (input.status === "passing") {
@@ -173,15 +190,15 @@ export function adoptAction(state: CoachState, input: ToolParameters<"tutor_adop
   const targets = adoptionTargets(state.course, state.pointer);
   const homework = findHomework(state.course, input.iteration);
   if (homework === undefined || !targets.includes(input.iteration)) {
-    const current = `The student is on homework ${state.pointer.homeworkId} (${state.pointer.iterationStatus}).`;
+    const current = `The student is on lesson ${state.pointer.homeworkId} (${state.pointer.iterationStatus}).`;
     const allowed = targets.length === 0 ? "Nothing can be adopted now." : `You can adopt: ${targets.join(", ")}.`;
-    return { error: `Homework ${input.iteration} cannot be adopted now. ${current} ${allowed}` };
+    return { error: `Lesson ${input.iteration} cannot be adopted now. ${current} ${allowed}` };
   }
   const progress = carryOver(state.student.progress, homework, now);
   const carried = Object.keys(progress.examples).length;
   const total = homeworkExamples(homework).length;
-  const summary = `Adopted homework ${homework.id} "${homework.title}": ${total} examples, ${carried} carried over as passing.`;
-  if (homework.builtin) return { text: `${summary}\nThis homework lives in Tutor only: nothing was copied into spec/.`, progress };
+  const summary = `Adopted lesson ${homework.id} "${homework.title}": ${total} examples, ${carried} carried over as passing.`;
+  if (homework.builtin) return { text: `${summary}\nThis lesson lives in Tutor only: nothing was copied into spec/.`, progress };
   return {
     text: [
       summary,
@@ -198,19 +215,19 @@ export function adoptAction(state: CoachState, input: ToolParameters<"tutor_adop
 export function completeAction(state: CoachState, input: ToolParameters<"tutor_complete_iteration">): Outcome {
   const { homework, pointer } = state;
   if (input.iteration !== homework.id) {
-    return { error: `The student is on homework ${homework.id}, not ${input.iteration}.` };
+    return { error: `The student is on lesson ${homework.id}, not ${input.iteration}.` };
   }
   const progress = state.progress;
   if (progress === null || pointer.iterationStatus === "not-started") {
-    return { error: `Homework ${homework.id} has not been adopted yet.` };
+    return { error: `Lesson ${homework.id} has not been adopted yet.` };
   }
   const counts = countExamples(homeworkExamples(homework), progress.examples);
   const open = counts.total - counts.passing - counts.skipped;
   if (homework.builtin && open > 0) {
-    return { error: `Homework 0 is done once every Example is passing or skipped; ${open} are not yet.` };
+    return { error: `Lesson 0 is done once every Example is passing or skipped; ${open} are not yet.` };
   }
   if (!homework.builtin && pointer.iterationStatus === "Done") {
-    return { error: `Homework ${homework.id} is already complete.` };
+    return { error: `Lesson ${homework.id} is already complete.` };
   }
   const line = card({
     kind: "homework-complete",
@@ -222,7 +239,7 @@ export function completeAction(state: CoachState, input: ToolParameters<"tutor_c
   const caveat = open > 0 ? `\nNote: ${open} examples are not marked passing or skipped.` : "";
   const commit = homework.builtin ? "" : `\nCommit the implementation and spec/ with the message "Implement homework ${homework.id}".`;
   const outcome: Outcome = {
-    text: `Homework ${homework.id} is complete.${caveat}${commit}\n${echo(line)}`,
+    text: `Lesson ${homework.id} is complete.${caveat}${commit}\n${echo(line)}`,
     progress: { ...progress, summary: input.summary },
   };
   if (!homework.builtin) outcome.iteration = { iteration: homework.id, status: "Done" };

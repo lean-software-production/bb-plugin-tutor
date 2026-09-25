@@ -192,7 +192,7 @@ test("a malformed feature file names the file and line", async () => {
 test("a homework without a README.md is a readable error", async () => {
   await withCopy("ledger", async (root) => {
     await rm(join(root, "docs/iterations/001-first-steps/README.md"));
-    await rejectsWith(load(root), /^Homework 001 has no README\.md in docs\/iterations\/001-first-steps\.$/);
+    await rejectsWith(load(root), /^Lesson 001 has no README\.md in docs\/iterations\/001-first-steps\.$/);
   });
 });
 
@@ -200,9 +200,9 @@ test("course.yaml may not reuse Homework 0's id or list an id twice", async () =
   await withCopy("synthetic", async (root) => {
     const entry = (id: string): string => `  - { id: "${id}", title: T, dir: homeworks/one }\n`;
     await writeFile(join(root, "course.yaml"), `id: x\ntitle: X\nhomeworks:\n${entry("000")}`);
-    await rejectsWith(load(root), /^course\.yaml: homework 000 is reserved for the built-in Homework 0\.$/);
+    await rejectsWith(load(root), /^course\.yaml: lesson 000 is reserved for the built-in Lesson 0\.$/);
     await writeFile(join(root, "course.yaml"), `id: x\ntitle: X\nhomeworks:\n${entry("001")}${entry("001")}`);
-    await rejectsWith(load(root), /^course\.yaml: homework 001 is listed twice\.$/);
+    await rejectsWith(load(root), /^course\.yaml: lesson 001 is listed twice\.$/);
   });
 });
 
@@ -278,9 +278,9 @@ test("a homework without feature files is a readable error; FACTORY.md is option
     const features = join(root, "docs/iterations/002-second-steps/features");
     await rm(join(features, "steps.feature"));
     await writeFile(join(features, "notes.md"), "not a feature\n");
-    await rejectsWith(load(root), /^Homework 002 has no feature files in docs\/iterations\/002-second-steps\/features\.$/);
+    await rejectsWith(load(root), /^Lesson 002 has no feature files in docs\/iterations\/002-second-steps\/features\.$/);
     await rm(features, { recursive: true });
-    await rejectsWith(load(root), /^Homework 002 has no feature files in docs\/iterations\/002-second-steps\/features\.$/);
+    await rejectsWith(load(root), /^Lesson 002 has no feature files in docs\/iterations\/002-second-steps\/features\.$/);
   });
   const course = await load(fixture("ledger"));
   assert.equal(homework(course, "001").factoryMd, "");
