@@ -1,18 +1,19 @@
-// View model of the course rail (mockup 1B): brand, days strip, progress
-// card, the current homework's features and Rules, then Conversations,
-// Earlier homeworks and Other threads. Pure, so every state is testable.
+// View model of the course outline in BB's sidebar: one tree. Each lesson
+// (homework) is a top-level row; under it sit its BB threads, the coach thread
+// and then its side chats; under the coach thread sit the lesson's Rules,
+// grouped by Feature, each leading to its section of the coach thread. Other
+// threads follow the tree. Pure, so every state is testable.
 import { formatRoute } from "../../shared/routes.ts";
 import type { TutorRoute } from "../../shared/routes.ts";
 import type { HomeworkStatus, Novelty, RuleStatus } from "../../shared/model.ts";
-import type { Overview, TutorThread } from "../../shared/rpc.ts";
-import { coursePath } from "./course-route.ts";
-import { homeworkLabel, percent } from "./format.ts";
+import type { FeatureOutline, HomeworkSummary, Overview, TutorThread } from "../../shared/rpc.ts";
+import { percent } from "./format.ts";
 import { indicatorView, isListed } from "./threads.ts";
 import type { IndicatorView, SidebarThreadLike } from "./threads.ts";
 
 export interface RailInput {
   overview: Overview | null;
-  /** Why the overview could not be fetched (the rail still lists threads). */
+  /** Why the overview could not be fetched (the outline still lists threads). */
   overviewError: string | null;
   threads: readonly SidebarThreadLike[];
   projects: readonly { id: string; name: string }[];
@@ -21,47 +22,23 @@ export interface RailInput {
   route: TutorRoute | null;
 }
 
-export interface DayChip {
-  id: string;
-  title: string;
-  status: HomeworkStatus;
-  /** The homework the student is looking at right now. */
-  isViewed: boolean;
-  subPath: string;
-}
-
-export interface ProgressCardView {
-  eyebrow: string;
-  title: string;
-  passing: number;
-  total: number;
-  fresh: number;
-  percent: number;
-  complete: boolean;
-  route: TutorRoute;
-}
-
 export type RuleGlyph = RuleStatus | "focus";
 
-export interface RailRule {
+export interface OutlineRule {
   key: string;
   name: string;
   glyph: RuleGlyph;
   isFocus: boolean;
   novelty: Novelty;
-  /** The lesson, opened at this Rule. */
-  subPath: string;
+  /** The coach has started it in the coach thread, so it has a section to jump to. */
+  reached: boolean;
 }
 
-export interface RailFeature {
+export interface OutlineFeature {
   slug: string;
   name: string;
   novelty: Novelty;
-  count: string;
-  /** Every Rule passes: drawn quieter. */
-  dim: boolean;
-  expandedByDefault: boolean;
-  rules: RailRule[];
+  rules: OutlineRule[];
 }
 
 export type ThreadRowKind = "coach" | "side" | "plain";
@@ -72,9 +49,44 @@ export interface ThreadRow {
   title: string;
   kind: ThreadRowKind;
   nested: boolean;
-  muted: boolean;
   isActive: boolean;
   indicator: IndicatorView;
+}
+
+/**
+ * A side chat (a hidden fork of the coach thread, shown in its right panel)
+ * or a side thread from before side chats (a thread of its own).
+ */
+export interface SideRow {
+  id: string;
+  kind: "side-chat" | "side-thread";
+  title: string;
+  /** "from: <Rule>" when it was started about a Rule. */
+  caption: string | null;
+  /** A side chat opens in the coach thread; a side thread is a thread of its own. */
+  href: string;
+  isActive: boolean;
+  indicator: IndicatorView;
+}
+
+export interface LessonNode {
+  id: string;
+  title: string;
+  status: HomeworkStatus;
+  /** "3/9" Examples hold. */
+  count: string;
+  percent: number;
+  expandedByDefault: boolean;
+  /** The lesson on screen: its start page, its coach thread or one of its side threads. */
+  isViewed: boolean;
+  coach: ThreadRow | null;
+  /** No coach thread yet, and this is the lesson the student is on. */
+  canStartCoach: boolean;
+  sideRows: SideRow[];
+  /** Under the coach thread: empty until it exists. */
+  features: OutlineFeature[];
+  /** The start page, for a lesson without a coach thread. */
+  startPath: string;
 }
 
 export interface OtherThreadGroup {
@@ -92,31 +104,13 @@ export type RailStatus =
 export interface RailView {
   brand: string;
   status: RailStatus;
-  days: DayChip[];
-  progress: ProgressCardView | null;
-  features: RailFeature[];
-  /** Homework whose conversations the tray lists; null before the course loads. */
-  currentHomeworkId: string | null;
-  conversations: ThreadRow[];
-  /** No coach thread exists yet for the current homework. */
-  canStartCoach: boolean;
-  earlier: ThreadRow[];
+  lessons: LessonNode[];
   others: OtherThreadGroup[];
 }
 
-function lessonPath(homeworkId: string): string {
-  return formatRoute({ kind: "lesson", homeworkId });
-}
-
-/** Which homework is on screen: the route's, or the open coach thread's. */
-export function viewedHomework(
-  route: TutorRoute | null,
-  activeThreadId: string | null,
-  tutorThreads: readonly TutorThread[],
-): string | null {
-  if (route !== null && (route.kind === "lesson" || route.kind === "complete")) return route.homeworkId;
-  if (activeThreadId === null) return null;
-  return tutorThreads.find((thread) => thread.id === activeThreadId)?.homeworkId ?? null;
+/** BB's own thread URL, for a coach thread the sidebar has not listed yet. */
+export function threadHref(threadId: string): string {
+  return `/threads/${threadId}`;
 }
 
 function statusOf(input: RailInput): RailStatus {
@@ -133,45 +127,18 @@ function statusOf(input: RailInput): RailStatus {
   return { kind: "ready" };
 }
 
-function progressCard(overview: Overview): ProgressCardView | null {
-  const current = overview.current;
-  if (current === null) return null;
-  const summary = overview.homeworks.find((homework) => homework.id === current.homeworkId);
-  const complete = current.iterationStatus === "Done";
-  const set = summary?.set ?? null;
-  return {
-    eyebrow: set === null ? homeworkLabel(current.homeworkId) : `${homeworkLabel(current.homeworkId)} · ${set}`,
-    title: summary?.title ?? homeworkLabel(current.homeworkId),
-    passing: current.counts.passing,
-    total: current.counts.total,
-    fresh: current.counts.fresh,
-    percent: percent(current.counts.passing, current.counts.total),
-    complete,
-    route: { kind: complete ? "complete" : "lesson", homeworkId: current.homeworkId },
-  };
-}
-
-function features(overview: Overview): RailFeature[] {
-  const current = overview.current;
-  if (current === null) return [];
-  const outline = current.outline;
-  const holdsFocus = outline.findIndex((feature) => feature.rules.some((rule) => rule.isFocus));
-  const firstOpen = outline.findIndex((feature) => feature.rules.some((rule) => rule.status !== "passing"));
-  const expanded = holdsFocus >= 0 ? holdsFocus : firstOpen;
-  return outline.map((feature, index) => ({
+function features(outline: readonly FeatureOutline[]): OutlineFeature[] {
+  return outline.map((feature) => ({
     slug: feature.slug,
     name: feature.name,
     novelty: feature.novelty,
-    count: `${feature.counts.passing}/${feature.counts.total}`,
-    dim: feature.rules.length > 0 && feature.rules.every((rule) => rule.status === "passing"),
-    expandedByDefault: index === expanded,
     rules: feature.rules.map((rule) => ({
       key: rule.key,
       name: rule.name,
       glyph: rule.status === "passing" ? "passing" : rule.isFocus ? "focus" : rule.status,
       isFocus: rule.isFocus,
       novelty: rule.novelty,
-      subPath: coursePath({ kind: "lesson", homeworkId: current.homeworkId }, rule.key),
+      reached: rule.reached,
     })),
   }));
 }
@@ -181,85 +148,116 @@ function byRecent(a: SidebarThreadLike, b: SidebarThreadLike): number {
   return b.updatedAt - a.updatedAt;
 }
 
+/** The side chats and side threads of a coach thread, oldest first. */
+function sideRowsOf(
+  coachId: string,
+  lesson: HomeworkSummary,
+  threads: readonly SidebarThreadLike[],
+  tutorById: ReadonlyMap<string, TutorThread>,
+  activeThreadId: string | null,
+): SideRow[] {
+  const ruleNames = new Map(lesson.outline.flatMap((feature) => feature.rules.map((rule) => [rule.key, rule.name] as const)));
+  return threads
+    .filter((thread) => {
+      if (thread.isArchived) return false;
+      const sideChat = thread.sourceThreadId === coachId && thread.isHidden;
+      const sideThread = thread.parentThreadId === coachId && thread.sourceThreadId === null && tutorById.has(thread.id);
+      return sideChat || sideThread;
+    })
+    .sort((a, b) => a.createdAt - b.createdAt)
+    .map((thread) => {
+      const tutor = tutorById.get(thread.id);
+      const ruleKey = tutor?.ruleKey ?? null;
+      const ruleName = ruleKey === null ? undefined : ruleNames.get(ruleKey);
+      const sideChat = thread.sourceThreadId === coachId;
+      return {
+        id: thread.id,
+        kind: sideChat ? "side-chat" : "side-thread",
+        title: thread.displayTitle || tutor?.title || "Side chat",
+        caption: ruleName === undefined ? null : `from: ${ruleName}`,
+        href: sideChat ? threadHref(coachId) : thread.href,
+        isActive: thread.id === activeThreadId,
+        indicator: indicatorView(thread),
+      };
+    });
+}
+
+/** Which lesson is on screen: the start page's, or that of the open coach thread or side thread. */
+export function viewedHomework(
+  route: TutorRoute | null,
+  activeThreadId: string | null,
+  lessons: readonly { id: string; coachThreadId: string | null }[],
+  threads: readonly Pick<SidebarThreadLike, "id" | "parentThreadId" | "sourceThreadId">[],
+): string | null {
+  if (route !== null && (route.kind === "lesson" || route.kind === "complete")) return route.homeworkId;
+  if (activeThreadId === null) return null;
+  const active = threads.find((thread) => thread.id === activeThreadId);
+  const coachId = active?.sourceThreadId ?? active?.parentThreadId ?? activeThreadId;
+  return lessons.find((lesson) => lesson.coachThreadId === coachId || lesson.coachThreadId === activeThreadId)?.id ?? null;
+}
+
 export function buildRail(input: RailInput): RailView {
   const { overview, activeThreadId } = input;
   const status = statusOf(input);
-  const tutorThreads = overview?.threads ?? [];
-  const tutorById = new Map(tutorThreads.map((thread) => [thread.id, thread]));
-  const listed = input.threads.filter(isListed);
-  const liveById = new Map(listed.map((thread) => [thread.id, thread]));
+  const summaries = overview?.course === null ? [] : (overview?.homeworks ?? []);
+  const tutorById = new Map((overview?.threads ?? []).map((thread) => [thread.id, thread]));
+  const liveById = new Map(input.threads.map((thread) => [thread.id, thread]));
+  const ready = status.kind === "ready";
+  const viewed = viewedHomework(input.route, activeThreadId, summaries, input.threads);
 
-  const viewed = viewedHomework(input.route, activeThreadId, tutorThreads);
-  const currentHomeworkId =
-    overview?.current?.homeworkId ?? overview?.homeworks.find((homework) => homework.status === "current")?.id ?? null;
-  const coachThreadId = overview?.current?.coachThreadId ?? null;
-  const onLessonOf = input.route?.kind === "lesson" ? input.route.homeworkId : null;
+  const row = (live: SidebarThreadLike, kind: ThreadRowKind, nested: boolean): ThreadRow => ({
+    id: live.id,
+    href: live.href,
+    title: live.displayTitle || tutorById.get(live.id)?.title || "Untitled thread",
+    kind,
+    nested,
+    isActive: live.id === activeThreadId,
+    indicator: indicatorView(live),
+  });
 
-  const row = (live: SidebarThreadLike, kind: ThreadRowKind, nested: boolean, muted: boolean): ThreadRow => {
-    const tutor = tutorById.get(live.id);
-    // The lesson page hosts its homework's coach thread, so it counts as open there.
-    const hostedByLesson =
-      activeThreadId === null && tutor?.role === "main" && onLessonOf !== null && tutor.homeworkId === onLessonOf;
+  const lessons = summaries.map((lesson): LessonNode => {
+    const coachId = ready ? lesson.coachThreadId : null;
+    const live = coachId === null ? undefined : liveById.get(coachId);
+    const coach: ThreadRow | null =
+      coachId === null
+        ? null
+        : live === undefined
+          ? {
+              id: coachId,
+              href: threadHref(coachId),
+              title: tutorById.get(coachId)?.title ?? "Coach",
+              kind: "coach",
+              nested: false,
+              isActive: coachId === activeThreadId,
+              indicator: { tone: "none", label: null },
+            }
+          : row(live, "coach", false);
     return {
-      id: live.id,
-      href: live.href,
-      title: live.displayTitle || tutor?.title || "Untitled thread",
-      kind,
-      nested,
-      muted,
-      isActive: live.id === activeThreadId || hostedByLesson,
-      indicator: indicatorView(live),
+      id: lesson.id,
+      title: lesson.title,
+      status: lesson.status,
+      count: `${lesson.counts.passing}/${lesson.counts.total}`,
+      percent: percent(lesson.counts.passing, lesson.counts.total),
+      expandedByDefault: ready && (lesson.status === "current" || lesson.id === viewed),
+      isViewed: lesson.id === viewed,
+      coach,
+      canStartCoach: ready && coachId === null && lesson.status === "current",
+      sideRows: coachId === null ? [] : sideRowsOf(coachId, lesson, input.threads, tutorById, activeThreadId),
+      features: coachId === null ? [] : features(lesson.outline),
+      startPath: formatRoute({ kind: "lesson", homeworkId: lesson.id }),
     };
-  };
-
-  const tutorRows = (homeworkId: string, muted: boolean): ThreadRow[] => {
-    const mine = tutorThreads.filter((thread) => thread.homeworkId === homeworkId && liveById.has(thread.id));
-    const created = (thread: TutorThread) => liveById.get(thread.id)?.createdAt ?? 0;
-    const mains = mine
-      .filter((thread) => thread.role === "main")
-      .sort((a, b) => Number(b.id === coachThreadId) - Number(a.id === coachThreadId) || created(b) - created(a));
-    const sides = mine.filter((thread) => thread.role === "side").sort((a, b) => created(a) - created(b));
-    const live = (thread: TutorThread) => liveById.get(thread.id) as SidebarThreadLike;
-    return [
-      ...mains.map((thread) => row(live(thread), "coach", false, muted)),
-      ...sides.map((thread) => row(live(thread), "side", muted, muted)),
-    ];
-  };
-
-  const conversations = currentHomeworkId === null ? [] : tutorRows(currentHomeworkId, false);
-  const earlierIds = [...new Set(tutorThreads.map((thread) => thread.homeworkId))]
-    .filter((id) => id !== currentHomeworkId)
-    .sort((a, b) => b.localeCompare(a));
-  const earlier = earlierIds.flatMap((id) => tutorRows(id, true));
+  });
 
   const others = otherGroups(
-    listed.filter((thread) => !tutorById.has(thread.id)),
+    input.threads.filter(isListed).filter((thread) => !tutorById.has(thread.id)),
     input.projects,
-    (live, nested) => row(live, "plain", nested, false),
+    (live, nested) => row(live, "plain", nested),
   );
 
-  const ready = status.kind === "ready" && overview !== null;
-  return {
-    brand: overview?.course?.title ?? "Tutor",
-    status,
-    days: (overview?.course === null ? [] : (overview?.homeworks ?? [])).map((homework) => ({
-      id: homework.id,
-      title: homework.title,
-      status: homework.status,
-      isViewed: homework.id === viewed,
-      subPath: lessonPath(homework.id),
-    })),
-    progress: ready ? progressCard(overview) : null,
-    features: ready ? features(overview) : [],
-    currentHomeworkId: ready ? currentHomeworkId : null,
-    conversations: ready ? conversations : [],
-    canStartCoach: ready && currentHomeworkId !== null && !conversations.some((thread) => thread.kind === "coach"),
-    earlier: ready ? earlier : [],
-    others,
-  };
+  return { brand: overview?.course?.title ?? "Tutor", status, lessons, others };
 }
 
-/** Non-Tutor threads, grouped by project, children nested under their parent. */
+/** Non-course threads, grouped by project, children nested under their parent. */
 function otherGroups(
   threads: readonly SidebarThreadLike[],
   projects: readonly { id: string; name: string }[],

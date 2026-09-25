@@ -73,8 +73,8 @@ test("an Example prints its tags above the header line", () => {
 
 test("the current lesson ends at the Rule in focus, other features collapsed ahead of it", () => {
   const view = buildLesson(fixtureLesson, homeworks, NOW);
-  assert.equal(view.eyebrow, "Homework 2 · Set after day 2");
-  assert.equal(view.barTitle, "Homework 2 · Checking the work");
+  assert.equal(view.eyebrow, "Lesson 2 · Set after day 2");
+  assert.equal(view.barTitle, "Lesson 2 · Checking the work");
   assert.deepEqual(view.focus, {
     ruleKey: "validation/a-task-is-finished-when-validation-is-satisfied",
     label: "in focus",
@@ -113,7 +113,7 @@ test("opening a Rule unfolds whatever hides it", () => {
 test("the compass names what is new since the previous real homework", () => {
   const view = buildLesson(fixtureLesson, homeworks, NOW);
   assert.deepEqual(view.compass, {
-    title: "New since homework 1",
+    title: "New since lesson 1",
     items: [
       { file: "planning.feature", text: "1 reworded: “The planner writes a plan”." },
       { file: "validation.feature", text: "A validator decides whether a task is finished." },
@@ -130,7 +130,7 @@ test("margin notes carry the coach's words and the evidence", () => {
   const carried = marginNote(exampleOf(fixtureLesson, "A seed becomes a plan"), progress, NOW);
   assert.equal(carried?.tone, "green");
   assert.equal(carried?.label, "Carried over");
-  assert.equal(carried?.text, "Passing since homework 1.");
+  assert.equal(carried?.text, "Passing since lesson 1.");
   assert.match(carried?.evidence ?? "", /plan written/);
 
   const marked = marginNote(exampleOf(fixtureLesson, "The work is right first time"), progress, NOW);

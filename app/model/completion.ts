@@ -32,7 +32,7 @@ export interface CompletionView {
   next: NextHomeworkView | null;
 }
 
-/** "Homework 4 · Also set after day 3" when both homeworks were set the same day. */
+/** "Lesson 4 · Also set after day 3" when both lessons were set the same day. */
 function nextEyebrow(next: NonNullable<Completion["next"]>, finishedSet: string | null): string {
   const label = setLabel(next.set);
   if (label === null) return homeworkLabel(next.id);
@@ -46,7 +46,7 @@ export function completionView(completion: Completion, now: number): CompletionV
   const stats: Stat[] = [
     { value: `${counts.passing}/${counts.total}`, label: "examples hold" },
     { value: String(completion.freshRules), label: completion.freshRules === 1 ? "new or reworded rule" : "new or reworded rules" },
-    { value: String(completion.sideThreads), label: completion.sideThreads === 1 ? "side thread" : "side threads" },
+    { value: String(completion.sideThreads), label: completion.sideThreads === 1 ? "side chat" : "side chats" },
   ];
   if (since !== null) stats.push({ value: since, label: since === "today" ? "adopted" : "since adopted" });
   return {

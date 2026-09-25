@@ -4,7 +4,7 @@
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { DIRECTIVE_NAMES, NAV_PANEL_PATH, SLOT_IDS } from "./shared/constants.ts";
 import { CoursePage } from "./app/ui/CoursePage.tsx";
-import { ProgressCardDirective, TermDirective } from "./app/ui/Directives.tsx";
+import { LessonCardDirective, ProgressCardDirective, TermDirective } from "./app/ui/Directives.tsx";
 import { ContinueSection, CourseAccessory } from "./app/ui/Home.tsx";
 import { CourseRail } from "./app/ui/Rail.tsx";
 import { RuleTab } from "./app/ui/RuleTab.tsx";
@@ -29,8 +29,8 @@ export default definePluginApp((app) => {
   });
   app.slots.experimental_threadList({
     id: SLOT_IDS.threadList,
-    title: "Course rail",
-    description: "The course: homeworks, the Rules of the current one, and your conversations.",
+    title: "Course outline",
+    description: "The course as one tree: each lesson, its coach thread and side chats, and the Rules your coach works through.",
     component: CourseRail,
   });
   app.slots.navPanel({
@@ -41,6 +41,7 @@ export default definePluginApp((app) => {
     component: CoursePage,
     experimental_sidebarAccessory: CourseAccessory,
   });
+  app.slots.messageDirective({ id: DIRECTIVE_NAMES.lesson, component: LessonCardDirective });
   app.slots.messageDirective({ id: DIRECTIVE_NAMES.progress, component: ProgressCardDirective });
   app.slots.messageDirective({ id: DIRECTIVE_NAMES.term, component: TermDirective });
   app.slots.homepageSection({

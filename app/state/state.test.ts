@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { QUERY_KEYS, requestRule, ruleRequestStore, staleKeys, takeRuleRequest } from "./app-state.ts";
+import { QUERY_KEYS, staleKeys } from "./app-state.ts";
 import { createQueryCache, errorMessage } from "./query-cache.ts";
 import { createStore } from "./store.ts";
 
@@ -137,24 +137,6 @@ test("error messages are always readable", () => {
   assert.equal(errorMessage("plain"), "plain");
   assert.equal(errorMessage({}), "Something went wrong.");
   assert.equal(errorMessage(new Error("  ")), "Something went wrong.");
-});
-
-test("rule requests carry a fresh sequence number each time", () => {
-  requestRule("002", "a/b");
-  const first = ruleRequestStore.get();
-  requestRule("002", "a/b");
-  const second = ruleRequestStore.get();
-  assert.equal(first?.ruleKey, "a/b");
-  assert.notEqual(first?.seq, second?.seq);
-});
-
-test("a lesson takes its own Rule request once, so a remount does not replay it", () => {
-  requestRule("002", "a/b");
-  assert.equal(takeRuleRequest("003"), null, "another lesson leaves it alone");
-  assert.equal(ruleRequestStore.get()?.ruleKey, "a/b");
-  assert.equal(takeRuleRequest("002")?.ruleKey, "a/b");
-  assert.equal(ruleRequestStore.get(), null);
-  assert.equal(takeRuleRequest("002"), null, "handled requests are gone");
 });
 
 test("a change signal refreshes everything but the lexicon, unless the course changed", () => {

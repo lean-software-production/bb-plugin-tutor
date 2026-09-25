@@ -42,21 +42,21 @@ export type ContinueView =
       percent: number;
       freshRules: number;
       freshRulesPassing: number;
-      /** "Homeworks 1–2 done ✓", or null before any real homework is done. */
+      /** "Lessons 1–2 done ✓", or null before any real lesson is done. */
       doneLabel: string | null;
       coachThreadId: string | null;
       complete: boolean;
     };
 
-/** "Homeworks 1–2", "Homeworks 1, 3", "Homework 1". */
+/** "Lessons 1–2", "Lessons 1, 3", "Lesson 1". */
 export function doneHomeworksLabel(ids: readonly string[]): string | null {
   const numbers = ids.map(homeworkNumber).sort((a, b) => a - b);
   const first = numbers[0];
   const last = numbers.at(-1);
   if (first === undefined || last === undefined) return null;
-  if (numbers.length === 1) return `Homework ${first} done ✓`;
+  if (numbers.length === 1) return `Lesson ${first} done ✓`;
   const contiguous = numbers.every((n, index) => n === first + index);
-  return contiguous ? `Homeworks ${first}–${last} done ✓` : `Homeworks ${numbers.join(", ")} done ✓`;
+  return contiguous ? `Lessons ${first}–${last} done ✓` : `Lessons ${numbers.join(", ")} done ✓`;
 }
 
 export function continueView(overview: Overview): ContinueView {

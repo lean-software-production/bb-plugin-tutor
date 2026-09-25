@@ -1,7 +1,7 @@
 /*
- * Lesson page (mockup 2A, ".lt") and the paper lesson with annotated Gherkin
- * (mockup 6B). The page is a .tutor-grid scroller around BB's ThreadChat, so
- * only the plugin-owned parts (.tutor-paper) get paper typography.
+ * A lesson's start page (from mockup 2A, ".lt") and the paper lesson with
+ * annotated Gherkin (mockup 6B), which the Rule card in the coach thread
+ * reuses. The page is a .tutor-grid scroller.
  */
 
 .tutor-grid.tp-lt {
@@ -56,10 +56,6 @@
   min-height: 0;
   overflow: auto;
 }
-.tutor-grid .tp-lt-inner {
-  min-height: 100%;
-  padding-bottom: 8px;
-}
 .tutor-paper.tp-lead {
   width: min(740px, calc(100% - 96px));
   margin: 0 auto;
@@ -70,39 +66,6 @@
   margin: 0 auto;
   padding: 3rem 0;
 }
-.tutor-paper .tp-convo-div {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 3.2rem 0 1.2rem;
-  color: var(--tp-muted);
-  font-size: 0.64rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-.tutor-paper .tp-convo-div::before,
-.tutor-paper .tp-convo-div::after {
-  flex: 1;
-  border-top: 1px solid #cfcabb;
-  content: "";
-}
-.tutor-paper.tp-chipdown {
-  position: sticky;
-  bottom: 98px;
-  left: calc(100% - 58px);
-  display: grid;
-  width: 34px;
-  height: 34px;
-  place-items: center;
-  border: 1px solid var(--tp-line);
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: var(--tp-shadow);
-  color: var(--tp-blue);
-  font-weight: 800;
-}
-
 /* ---- lesson header ---- */
 .tutor-paper .tp-lesson .tp-h1 {
   font-size: 3rem;

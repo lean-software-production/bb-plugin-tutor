@@ -79,7 +79,7 @@ test("a homework-complete card links to the completion page, focus cards are blu
   const done = parseProgressCard({ kind: "homework-complete", title: "The assembly line", homework: "003", rule: "a/b" });
   assert.ok(done !== null);
   const view = progressCardView(done);
-  assert.deepEqual([view.eyebrow, view.completedHomeworkId, view.rule], ["Homework 3 complete", "003", null]);
+  assert.deepEqual([view.eyebrow, view.completedHomeworkId, view.rule], ["Lesson 3 complete", "003", null]);
   const focus = parseProgressCard({ kind: "focus", title: "Refuses an unknown machine" });
   assert.deepEqual(focus === null ? null : [progressCardView(focus).tone, progressCardView(focus).mark], ["blue", "●"]);
 });
@@ -126,13 +126,13 @@ test("the Continue section reads from the overview alone", () => {
   const view = continueView(fixtureOverview);
   assert.equal(view.kind, "continue");
   if (view.kind !== "continue") return;
-  assert.equal(view.eyebrow, "Continue · Homework 2 · Day 2");
+  assert.equal(view.eyebrow, "Continue · Lesson 2 · Day 2");
   assert.equal(view.title, "Checking the work");
   assert.equal(view.focusRuleName, "A task is finished when validation is satisfied");
   assert.equal(view.lastNote?.exampleName, "The work is wrong first time");
   assert.deepEqual([view.passing, view.total, view.percent], [2, 5, 40]);
   assert.deepEqual([view.freshRules, view.freshRulesPassing], [3, 0]);
-  assert.equal(view.doneLabel, "Homework 1 done ✓");
+  assert.equal(view.doneLabel, "Lesson 1 done ✓");
   assert.equal(view.coachThreadId, "thr_coach002");
   assert.equal(view.complete, false);
 
@@ -146,8 +146,8 @@ test("the Continue section reads from the overview alone", () => {
 
 test("done homeworks read as a range", () => {
   assert.equal(doneHomeworksLabel([]), null);
-  assert.equal(doneHomeworksLabel(["002", "001"]), "Homeworks 1–2 done ✓");
-  assert.equal(doneHomeworksLabel(["001", "003"]), "Homeworks 1, 3 done ✓");
+  assert.equal(doneHomeworksLabel(["002", "001"]), "Lessons 1–2 done ✓");
+  assert.equal(doneHomeworksLabel(["001", "003"]), "Lessons 1, 3 done ✓");
 });
 
 // ---------------------------------------------------------------------------
@@ -156,23 +156,23 @@ test("done homeworks read as a range", () => {
 
 test("the completion page recaps the homework and introduces the next", () => {
   const view = completionView(fixtureCompletion, NOW);
-  assert.equal(view.eyebrow, "Homework 1 complete");
+  assert.equal(view.eyebrow, "Lesson 1 complete");
   assert.deepEqual(view.stats, [
     { value: "2/2", label: "examples hold" },
     { value: "1", label: "new or reworded rule" },
-    { value: "0", label: "side threads" },
+    { value: "0", label: "side chats" },
     { value: "3 days", label: "since adopted" },
   ]);
   assert.equal(view.summary, fixtureCompletion.summary);
-  assert.equal(view.next?.eyebrow, "Homework 2 · Set after day 2");
+  assert.equal(view.next?.eyebrow, "Lesson 2 · Set after day 2");
   assert.deepEqual(view.next?.chips, [
     { text: "3 rules · 5 examples", tone: "plain" },
     { text: "1 carry over as passing", tone: "green" },
     { text: "4 new or reworded", tone: "amber" },
   ]);
-  assert.equal(view.next?.diff?.title, "FACTORY.md — what changed since homework 1");
+  assert.equal(view.next?.diff?.title, "FACTORY.md — what changed since lesson 1");
   assert.equal(view.next?.started, false);
-  assert.equal(view.next?.startLabel, "Start homework 2 with your coach →");
+  assert.equal(view.next?.startLabel, "Start lesson 2 with your coach →");
   assert.equal(view.next?.lessonSubPath, "lesson/002");
 
   const sameDay = completionView(
@@ -184,7 +184,7 @@ test("the completion page recaps the homework and introduces the next", () => {
     },
     NOW,
   );
-  assert.equal(sameDay.next?.eyebrow, "Homework 2 · Also set after day 3");
+  assert.equal(sameDay.next?.eyebrow, "Lesson 2 · Also set after day 3");
   assert.equal(sameDay.next?.diff, null);
   assert.equal(sameDay.stats.length, 3, "no adoption date, no 'since adopted'");
   assert.equal(completionView({ ...fixtureCompletion, next: null }, NOW).next, null);
@@ -195,7 +195,7 @@ test("once the next homework has started, the completion page continues it", () 
   assert.ok(next !== null);
   const view = completionView({ ...fixtureCompletion, next: { ...next, status: "current" } }, NOW);
   assert.equal(view.next?.started, true);
-  assert.equal(view.next?.startLabel, "Continue homework 2 with your coach →");
+  assert.equal(view.next?.startLabel, "Continue lesson 2 with your coach →");
 });
 
 test("confetti is deterministic and stays in the top right", () => {

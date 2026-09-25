@@ -1,8 +1,11 @@
-// The "Rule" tab in a thread's right panel (mockups 2C and 4): the Rule a side
-// thread was spun off from, or the one in focus, with its Examples.
+// The "Rule" tab in a thread's right panel (mockups 2C and 4), an optional
+// reference: the Rule a side chat was started about, or the one in focus,
+// with its Examples, a way to its section of the coach thread and "Work on
+// this Rule next".
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import type { PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
-import { useCourseNavigate, useLiveRefresh, useQuery, useTutorRpc } from "../hooks.ts";
+import { toast } from "sonner";
+import { useAction, useLiveRefresh, useOpenRule, useQuery, useTutorRpc } from "../hooks.ts";
 import { parseRuleTabParams, ruleTabTarget, ruleTabView } from "../model/rule-tab.ts";
 import { QUERY_KEYS } from "../state/app-state.ts";
 import { Bar, ErrorNotice, InlineText, Loading } from "./common.tsx";
@@ -13,7 +16,11 @@ export function RuleTab({ threadId, params }: PluginThreadPanelProps) {
   useLiveRefresh();
   const rpc = useTutorRpc();
   const navigate = useBbNavigate();
-  const goCourse = useCourseNavigate();
+  const openRule = useOpenRule();
+  const redirect = useAction(async (homeworkId: string, ruleKey: string) => {
+    await rpc.call("redirectFocus", { homeworkId, ruleKey });
+    toast.success("Asked your coach to move to this Rule.");
+  });
   const context = useQuery(QUERY_KEYS.threadContext(threadId), () => rpc.call("getThreadContext", { threadId }));
   const thread = context.data?.thread ?? null;
   const target = context.data === null ? null : ruleTabTarget(parseRuleTabParams(params), thread);
@@ -30,7 +37,7 @@ export function RuleTab({ threadId, params }: PluginThreadPanelProps) {
     if (target === null) {
       return (
         <p className="tp-yah-note">
-          This tab shows a Rule from your course. Open it from a coach thread, a side thread, or a progress card.
+          This tab shows a Rule from your course. Open it from a coach thread, a side chat, or a progress card.
         </p>
       );
     }
@@ -39,20 +46,12 @@ export function RuleTab({ threadId, params }: PluginThreadPanelProps) {
     }
     const view = ruleTabView(lesson.data, target, thread?.role === "side");
     const coachThreadId = lesson.data.coachThreadId;
-    const openLesson = (ruleKey: string | null) => goCourse({ kind: "lesson", homeworkId: target.homeworkId }, { ruleKey });
     if (view.kind === "no-rule") {
-      return (
-        <>
-          <p className="tp-yah-note">No Rule is in focus yet. Your coach picks one when you start.</p>
-          <div className="tp-acts">
-            <button type="button" className="tp-pri" onClick={() => openLesson(null)}>
-              Open lesson
-            </button>
-          </div>
-        </>
-      );
+      return <p className="tp-yah-note">No Rule is in focus yet. Your coach picks one when you start.</p>;
     }
     const ruleKey = target.ruleKey ?? lesson.data.focus;
+    const reached = ruleKey !== null && lesson.data.reachedRules.includes(ruleKey);
+    const canRedirect = lesson.data.status === "current" && ruleKey !== null && ruleKey !== lesson.data.focus;
     return (
       <>
         <p className="tp-eyebrow">{view.eyebrow}</p>
@@ -85,10 +84,18 @@ export function RuleTab({ threadId, params }: PluginThreadPanelProps) {
               Back to coach
             </button>
           ) : null}
-          <button type="button" className="tp-pri" onClick={() => openLesson(ruleKey)}>
-            Open lesson
-          </button>
+          {reached && coachThreadId !== null && ruleKey !== null ? (
+            <button type="button" className="tp-pri" onClick={() => openRule({ coachThreadId, homeworkId: target.homeworkId, ruleKey })}>
+              Show in the conversation
+            </button>
+          ) : null}
+          {canRedirect ? (
+            <button type="button" disabled={redirect.pending} onClick={() => void redirect.run(target.homeworkId, ruleKey)}>
+              Work on this Rule next
+            </button>
+          ) : null}
         </div>
+        {redirect.error === null ? null : <ErrorNotice message={redirect.error} />}
       </>
     );
   };

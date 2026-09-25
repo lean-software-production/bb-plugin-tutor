@@ -21,7 +21,7 @@ export interface LessonProps {
   onToggleFeature: (foldId: string) => void;
   /** Extra controls under a Rule drawn open (redirect, side thread). */
   ruleActions: (rule: RuleView) => ReactNode;
-  /** Shown above the lesson, e.g. "you finished this homework". */
+  /** Shown above the lesson, e.g. "you finished this lesson". */
   banner?: ReactNode;
 }
 
@@ -249,7 +249,7 @@ function RuleOpen({
   );
 }
 
-function AnnotatedExample({ example }: { example: ExampleView }) {
+export function AnnotatedExample({ example }: { example: ExampleView }) {
   const rows = example.lines.length;
   return (
     <div className={`tp-anno tp-anno--${example.status}`} aria-label={`Example ${example.name}: ${example.status}`}>

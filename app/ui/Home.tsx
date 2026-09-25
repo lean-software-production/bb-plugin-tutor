@@ -1,4 +1,6 @@
 // BB home's "Continue" section (mockup 5) and the Course nav row's accessory.
+// The lesson lives in the coach thread, so "Continue with your coach" is the
+// way back; a lesson without a coach thread also offers its start page.
 // BB passes homepageSection a projectId that is usually null, so both read
 // the student's place (and the coach thread) from getOverview instead.
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
@@ -66,7 +68,7 @@ export function ContinueSection(_props: PluginHomepageSectionProps) {
         <h2>{view.title}</h2>
         <p>
           {view.complete ? (
-            "You finished this homework. The next one is ready when you are."
+            "You finished this lesson. The next one is ready when you are."
           ) : (
             <>
               {view.focusRuleName === null ? null : (
@@ -91,9 +93,11 @@ export function ContinueSection(_props: PluginHomepageSectionProps) {
             Continue with your coach →
           </button>
         )}
-        <button type="button" className="tp-hs-btn tp-hs-btn--ghost" onClick={() => goCourse({ kind: "lesson", homeworkId: view.homeworkId })}>
-          Open the lesson
-        </button>
+        {view.coachThreadId === null ? (
+          <button type="button" className="tp-hs-btn tp-hs-btn--ghost" onClick={() => goCourse({ kind: "lesson", homeworkId: view.homeworkId })}>
+            Open the start page
+          </button>
+        ) : null}
         {toCoach.error === null ? null : <ErrorNotice message={toCoach.error} />}
       </div>
       <div className="tp-hs-r">
@@ -105,7 +109,7 @@ export function ContinueSection(_props: PluginHomepageSectionProps) {
         <Bar percent={view.percent} label={`${view.passing} of ${view.total} examples hold`} />
         {view.freshRules === 0 ? null : (
           <div className="tp-hs-now">
-            <b>New in this homework</b>
+            <b>New in this lesson</b>
             {view.freshRules} {view.freshRules === 1 ? "rule" : "rules"} · {view.freshRulesPassing} done
           </div>
         )}

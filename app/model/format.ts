@@ -5,9 +5,9 @@ export function homeworkNumber(id: string): number {
   return Number.parseInt(id, 10);
 }
 
-/** "003" → "Homework 3". */
+/** "003" → "Lesson 3": students read "lesson" for a homework (docs/tutor/GLOSSARY.md). */
 export function homeworkLabel(id: string): string {
-  return `Homework ${homeworkNumber(id)}`;
+  return `Lesson ${homeworkNumber(id)}`;
 }
 
 /** Ledger "Day 3" reads "Set after day 3"; anything else ("Start here") is shown as written. */
@@ -17,7 +17,7 @@ export function setLabel(set: string | null): string | null {
   return day === null ? set.trim() : `Set after day ${day[1]}`;
 }
 
-/** "Homework 3 · Set after day 3", or just "Homework 3". */
+/** "Lesson 3 · Set after day 3", or just "Lesson 3". */
 export function homeworkEyebrow(id: string, set: string | null): string {
   const label = setLabel(set);
   return label === null ? homeworkLabel(id) : `${homeworkLabel(id)} · ${label}`;
@@ -27,7 +27,7 @@ export function plural(count: number, singular: string, pluralForm = `${singular
   return `${count} ${count === 1 ? singular : pluralForm}`;
 }
 
-/** Share of `total`, 0–100, safe for an empty homework. */
+/** Share of `total`, 0–100, safe for an empty lesson. */
 export function percent(part: number, total: number): number {
   if (total <= 0) return 0;
   return Math.max(0, Math.min(100, Math.round((part / total) * 100)));

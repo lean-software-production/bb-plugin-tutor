@@ -10,6 +10,7 @@ export type SidebarThreadLike = Pick<
   | "href"
   | "displayTitle"
   | "parentThreadId"
+  | "sourceThreadId"
   | "indicator"
   | "indicatorLabel"
   | "isHidden"

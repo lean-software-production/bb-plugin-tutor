@@ -3,10 +3,13 @@
 // navigation inside the course page.
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useBbNavigate, useRealtime, useRealtimeConnectionState, useRpc } from "@get-bb/plugin-sdk/app";
+import { toast } from "sonner";
 import { NAV_PANEL_PATH, REALTIME_CHANNELS } from "../shared/constants.ts";
 import type { TutorRoute } from "../shared/routes.ts";
 import type { RpcContract } from "../shared/rpc.ts";
 import { coursePath } from "./model/course-route.ts";
+import { SIDE_CHAT_HINT } from "./model/side-chat.ts";
+import { jumpToRuleSection, type RuleTarget } from "./rule-jump.ts";
 import { withConnectionLossDetection } from "./model/rpc-errors.ts";
 import { QUERY_KEYS, queryCache, staleKeys } from "./state/app-state.ts";
 import { errorMessage } from "./state/query-cache.ts";
@@ -132,4 +135,38 @@ export function useCourseNavigate(): (route: TutorRoute, options?: CourseNavigat
 /** Refetch everything after a mutation instead of waiting for the backend's signal. */
 export function refreshAll(): void {
   invalidateSoon(() => true);
+}
+
+/** Opens the coach thread at a Rule's section, loading older history as needed (app/rule-jump.ts). */
+export function useOpenRule(): (target: RuleTarget) => void {
+  const navigate = useBbNavigate();
+  return useCallback((target) => jumpToRuleSection(target, (threadId) => navigate.toThread(threadId)), [navigate]);
+}
+
+/**
+ * "Ask a side question": a BB side chat of the lesson's coach thread, then the
+ * coach thread with a pointer to its "Side chat" tab (a plugin cannot select
+ * that tab itself).
+ */
+export function useAskSideQuestion(onDone: () => void = () => undefined): Action<[homeworkId: string, ruleKey: string | null]> {
+  const rpc = useTutorRpc();
+  const navigate = useBbNavigate();
+  return useAction(async (homeworkId: string, ruleKey: string | null) => {
+    const { coachThreadId } = await rpc.call("startSideThread", { homeworkId, ruleKey });
+    refreshAll();
+    navigate.toThread(coachThreadId);
+    toast.success(SIDE_CHAT_HINT);
+    onDone();
+  });
+}
+
+/** Opens a side chat: its coach thread, with the side chat's tab put back if it was closed. */
+export function useOpenSideChat(): Action<[sideChatId: string]> {
+  const rpc = useTutorRpc();
+  const navigate = useBbNavigate();
+  return useAction(async (sideChatId: string) => {
+    const { coachThreadId } = await rpc.call("ensureSideChatTab", { sideChatId });
+    navigate.toThread(coachThreadId);
+    toast.message(SIDE_CHAT_HINT);
+  });
 }

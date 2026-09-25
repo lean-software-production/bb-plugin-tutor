@@ -1,6 +1,7 @@
-// Between homeworks (mockup 7): the recap, the next homework's introduction
-// and "Start homework N", which spawns its coach thread (the first turn adopts
-// the spec), or "Continue homework N" once it has started.
+// Between lessons (mockup 7): the recap, the next lesson's introduction and
+// "Start lesson N", which spawns its coach thread (the first turn adopts the
+// spec) and opens it, or "Continue lesson N" once it has started.
+import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { refreshAll, useAction, useCourseNavigate, useQuery, useTutorRpc } from "../hooks.ts";
 import { completionView, confettiPieces } from "../model/completion.ts";
 import type { NextHomeworkView } from "../model/completion.ts";
@@ -66,7 +67,7 @@ export function CompletionPage({ homeworkId }: { homeworkId: string }) {
       </div>
       {view.next === null ? (
         <div className="tp-next">
-          <p className="tp-eyebrow">That was the last homework</p>
+          <p className="tp-eyebrow">That was the last lesson</p>
           <h1 className="tp-h1">You finished the course.</h1>
           <p className="tp-dek">Your factory, its spec and every conversation with your coach stay in your repo.</p>
         </div>
@@ -79,12 +80,14 @@ export function CompletionPage({ homeworkId }: { homeworkId: string }) {
 
 function NextHomework({ next }: { next: NextHomeworkView }) {
   const rpc = useTutorRpc();
+  const navigate = useBbNavigate();
   const goCourse = useCourseNavigate();
   const start = useAction(async () => {
-    if (next.started) await rpc.call("openCoach", { homeworkId: next.id });
-    else await rpc.call("startNextHomework", { homeworkId: next.id });
+    const { threadId } = next.started
+      ? await rpc.call("openCoach", { homeworkId: next.id })
+      : await rpc.call("startNextHomework", { homeworkId: next.id });
     refreshAll();
-    goCourse({ kind: "lesson", homeworkId: next.id });
+    navigate.toThread(threadId);
   });
   return (
     <div className="tp-next">

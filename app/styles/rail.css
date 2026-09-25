@@ -1,4 +1,8 @@
-/* Course rail (mockup 1B, ".cs"). Fills BB's sidebar scroll area. */
+/*
+ * The course outline (revises mockup 1B): one tree of lessons, each with its
+ * coach thread, the coach thread's Rules and its side chats. Fills BB's
+ * sidebar scroll area.
+ */
 
 .tutor-paper.tp-rail {
   display: flex;
@@ -47,109 +51,128 @@
   font-size: 12px;
 }
 
-/* ---- days strip ---- */
-.tutor-paper .tp-days {
+/* ---- the tree: lessons ---- */
+.tutor-paper.tp-rail .tp-tree {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tutor-paper.tp-rail .tp-lesson-head {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin: 4px 0 10px;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 6px 7px 2px;
+  border-radius: 7px;
+  color: #3d4a55;
 }
-.tutor-paper .tp-day {
-  flex: 1 0 30px;
-  text-align: center;
-  padding: 4px 0;
-  border: 1px solid #ddd9cc;
-  border-radius: 6px;
-  background: #f3f1ea;
+.tutor-paper.tp-rail .tp-lesson-head:hover {
+  background: rgb(255 255 255 / 0.45);
+}
+.tutor-paper .tp-caret {
+  flex: none;
+  width: 10px;
   color: #8d8b82;
-  font: 600 0.6rem var(--tp-font-mono);
+  font-size: 0.6rem;
+  line-height: 1.5rem;
 }
-.tutor-paper .tp-day--done {
-  border-color: #bfe0d2;
-  background: var(--tp-green-pale);
+.tutor-paper .tp-lesson-mark {
+  flex: none;
+  width: 12px;
+  color: var(--tp-todo);
+  font-size: 0.7rem;
+  line-height: 1.5rem;
+  text-align: center;
+}
+.tutor-paper .tp-lesson--done .tp-lesson-mark {
   color: var(--tp-green);
 }
-.tutor-paper .tp-day--current {
-  border-color: #b6cce9;
-  background: var(--tp-blue-select);
-  color: var(--tp-blue-ink);
-}
-.tutor-paper .tp-day--viewed {
-  box-shadow: 0 0 0 2px var(--tp-blue);
-}
-
-/* ---- progress card ---- */
-.tutor-paper .tp-progress-card {
-  display: block;
-  margin-bottom: 12px;
-  padding: 12px 12px 10px;
-  border: 1px solid var(--tp-line);
-  border-radius: 10px;
-  background: var(--tp-paper);
-  box-shadow: var(--tp-shadow);
-}
-.tutor-paper .tp-progress-card .tp-ey {
-  display: block;
+.tutor-paper .tp-lesson--current .tp-lesson-mark {
   color: var(--tp-blue);
-  font-size: 0.58rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
 }
-.tutor-paper .tp-progress-card .tp-tt {
-  display: block;
-  margin-top: 3px;
-  font: 500 1.15rem/1.05 var(--tp-font-display);
-  letter-spacing: -0.03em;
+.tutor-paper .tp-lesson-text {
+  display: grid;
+  flex: 1;
+  gap: 4px;
+  min-width: 0;
 }
-.tutor-paper .tp-progress-card .tp-bar {
-  margin: 9px 0 3px;
+.tutor-paper .tp-lesson-title {
+  font: 500 0.92rem/1.25 var(--tp-font-display);
+  letter-spacing: -0.01em;
 }
-.tutor-paper .tp-progress-card .tp-lb {
+.tutor-paper .tp-lesson-title .tp-n {
+  color: #8d8b82;
+  font: 500 0.64rem var(--tp-font-mono);
+  letter-spacing: 0;
+}
+.tutor-paper .tp-lesson--current .tp-lesson-title {
+  color: var(--tp-blue-ink);
+  font-weight: 600;
+}
+.tutor-paper .tp-lesson--ahead .tp-lesson-title {
+  color: #6b7179;
+}
+.tutor-paper .tp-lesson--viewed > .tp-lesson-head {
+  background: rgb(255 255 255 / 0.6);
+}
+.tutor-paper .tp-lesson-meter {
   display: flex;
-  justify-content: space-between;
-  color: var(--tp-muted);
-  font-size: 0.6rem;
+  align-items: center;
+  gap: 7px;
 }
-
-/* ---- outline: features and Rules ---- */
-.tutor-paper .tp-outline {
+.tutor-paper .tp-lesson-bar {
+  flex: 1;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: #e2ded2;
+}
+.tutor-paper .tp-lesson-bar i {
+  display: block;
+  height: 100%;
+  background: var(--tp-green);
+}
+.tutor-paper .tp-lesson-count {
+  flex: none;
+  color: #8d8b82;
+  font: 500 0.6rem var(--tp-font-mono);
+}
+.tutor-paper .tp-lesson-body {
   display: grid;
   gap: 1px;
+  margin: 0 0 8px 16px;
+}
+
+/* ---- the tree: the coach thread's Rules ---- */
+.tutor-paper .tp-rules {
+  display: grid;
+  gap: 1px;
+  margin: 0 0 4px 14px;
 }
 .tutor-paper.tp-rail .tp-feat {
   display: flex;
-  justify-content: space-between;
-  gap: 6px;
-  width: 100%;
+  align-items: center;
+  gap: 4px;
   padding: 6px 6px 2px 2px;
   color: #6b7179;
-  font-size: 0.6rem;
+  font-size: 0.58rem;
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-}
-.tutor-paper .tp-feat .tp-c {
-  flex: none;
-  color: #8d8b82;
-  font-family: var(--tp-font-mono);
-  font-weight: 500;
-  letter-spacing: 0;
-}
-.tutor-paper.tp-rail .tp-feat--dim {
-  color: #8f949a;
 }
 .tutor-paper .tp-rrow {
   display: flex;
   gap: 6px;
   padding: 3px 6px;
   border-radius: 4px;
-  color: #68717a;
+  color: #56616c;
   font-size: 0.68rem;
   line-height: 1.22;
 }
-.tutor-paper .tp-rrow:hover {
-  background: rgb(255 255 255 / 0.4);
+.tutor-paper a.tp-rrow:hover {
+  background: rgb(255 255 255 / 0.5);
 }
 .tutor-paper .tp-rrow .tp-g {
   flex: none;
@@ -179,8 +202,17 @@
 .tutor-paper .tp-rrow--focus .tp-g {
   color: var(--tp-blue);
 }
+/* Not reached yet: no section to jump to. Muted, still 4.5:1 on the outline. */
+.tutor-paper .tp-rrow--unreached {
+  color: #6f757b;
+  font-weight: 400;
+  cursor: default;
+}
+.tutor-paper .tp-rrow--unreached .tp-g {
+  opacity: 0.7;
+}
 
-/* ---- tray separators and thread rows ---- */
+/* ---- separators and thread rows ---- */
 .tutor-paper .tp-sep {
   display: flex;
   justify-content: space-between;
@@ -245,12 +277,6 @@
   width: calc(100% - 14px);
   margin-left: 14px;
 }
-.tutor-paper .tp-th--muted {
-  color: #8f949a;
-}
-.tutor-paper .tp-th--muted.tp-th--coach .tp-ic {
-  opacity: 0.6;
-}
 .tutor-paper .tp-th--on,
 .tutor-paper .tp-th--on:hover {
   background: #fff;
@@ -258,9 +284,34 @@
   color: var(--tp-blue-ink);
   font-weight: 700;
 }
-.tutor-paper .tp-th--start {
+.tutor-paper .tp-th--start,
+.tutor-paper .tp-th--page {
   color: var(--tp-blue-ink);
   font-weight: 700;
+}
+.tutor-paper .tp-th--side {
+  align-items: flex-start;
+}
+.tutor-paper .tp-th--side .tp-ic {
+  border-color: transparent;
+  background: none;
+}
+.tutor-paper .tp-side-text {
+  display: grid;
+  min-width: 0;
+}
+.tutor-paper .tp-cap {
+  overflow: hidden;
+  color: #6f757b;
+  font-size: 0.58rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tutor-paper .tp-th--ask {
+  color: #56616c;
+}
+.tutor-paper .tp-th--ask .tp-ic {
+  border-style: dashed;
 }
 
 /* Indicator dots drawn from PluginSidebarThread.indicator. */
@@ -357,7 +408,7 @@
   border-left: 3px solid var(--tp-red);
   color: #7a2a2a;
 }
-/* The rail resets its buttons; Reload stays the paper's blue button. */
+/* The outline resets its buttons; Reload stays the paper's blue button. */
 .tutor-paper.tp-rail .tp-rail-note .tp-reload {
   border: 1px solid #1d4c91;
   background: var(--tp-blue);

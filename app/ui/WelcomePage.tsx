@@ -9,7 +9,7 @@ import { QUERY_KEYS, queryCache, railMountedStore } from "../state/app-state.ts"
 import { ErrorNotice, Loading, Notice, PaperPage } from "./common.tsx";
 
 const COURSE_METHOD =
-  "Each homework is a spec written in Gherkin; your coach works through it with you, one rule at a time, in the repo where your factory lives.";
+  "Each lesson is a spec written in Gherkin; your coach works through it with you, one rule at a time, in the repo where your factory lives.";
 
 export function WelcomePage() {
   const rpc = useTutorRpc();
@@ -37,7 +37,7 @@ export function WelcomePage() {
       )}
       {railMounted ? null : (
         <p className="tp-tip">
-          Tip: turn on the course rail under <b>Settings → Appearance → Sidebar</b>, and pick <b>Course rail</b>.
+          Tip: turn on the course outline under <b>Settings → Appearance → Sidebar</b>, and pick <b>Course outline</b>.
         </p>
       )}
     </PaperPage>

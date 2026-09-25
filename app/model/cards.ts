@@ -29,7 +29,7 @@ const LOOK: Record<ProgressKind, { tone: CardTone; mark: string; eyebrow: string
   "example-passing": { tone: "green", mark: "✓", eyebrow: "Example passing" },
   "not-yet": { tone: "amber", mark: "!", eyebrow: "Not yet" },
   focus: { tone: "blue", mark: "●", eyebrow: "Now working on" },
-  "homework-complete": { tone: "green", mark: "✓", eyebrow: "Homework complete" },
+  "homework-complete": { tone: "green", mark: "✓", eyebrow: "Lesson complete" },
 };
 
 export function progressCardView(card: ProgressCard): ProgressCardView {

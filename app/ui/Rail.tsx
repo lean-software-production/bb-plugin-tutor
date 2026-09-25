@@ -1,5 +1,7 @@
-// The course rail (mockup 1B), BB's sidebar thread list replaced. BB still
-// draws New thread, Search, the plugin nav rows and the footer around it.
+// The course outline, BB's sidebar thread list replaced: one tree of lessons,
+// each with its coach thread, the coach thread's Rules and its side chats,
+// then the project's other threads. BB still draws New thread, Search, the
+// plugin nav rows and the footer around it.
 import { useEffect, useState } from "react";
 import type { MouseEvent } from "react";
 import {
@@ -8,17 +10,29 @@ import {
   useBbNavigate,
 } from "@get-bb/plugin-sdk/app";
 import type { PluginThreadListProps } from "@get-bb/plugin-sdk/app";
-import { formatRoute } from "../../shared/routes.ts";
 import type { TutorRoute } from "../../shared/routes.ts";
-import { refreshAll, useAction, useCourseNavigate, useLiveRefresh, useOverview, useStore, useTutorRpc } from "../hooks.ts";
+import {
+  refreshAll,
+  useAction,
+  useAskSideQuestion,
+  useCourseNavigate,
+  useLiveRefresh,
+  useOpenRule,
+  useOpenSideChat,
+  useOverview,
+  useStore,
+  useTutorRpc,
+} from "../hooks.ts";
 import { homeworkLabel } from "../model/format.ts";
 import { buildRail } from "../model/rail.ts";
-import type { RailFeature, RailView, ThreadRow } from "../model/rail.ts";
-import { railMountedStore, requestRule, routeStore } from "../state/app-state.ts";
-import { Bar, NewDot, ReloadButton, coursePageHref, isPlainClick } from "./common.tsx";
+import type { LessonNode, OutlineRule, RailView, SideRow, ThreadRow } from "../model/rail.ts";
+import { railMountedStore, routeStore } from "../state/app-state.ts";
+import { NewDot, ReloadButton, coursePageHref, isPlainClick } from "./common.tsx";
 
 const RULE_GLYPHS = { passing: "✓", "not-yet": "!", pending: "○", focus: "●" } as const;
+const LESSON_GLYPHS = { done: "✓", current: "●", ahead: "○" } as const;
 const OTHER_THREADS_SHOWN = 40;
+export const NOT_REACHED_HINT = "Your coach hasn't reached this Rule yet";
 
 export function CourseRail({ activeThreadId, activeProjectId, onNavigate }: PluginThreadListProps) {
   useLiveRefresh();
@@ -40,16 +54,16 @@ export function CourseRail({ activeThreadId, activeProjectId, onNavigate }: Plug
   });
 
   const goCourse = useCourseNavigate();
-  const go = (event: MouseEvent, target: TutorRoute, ruleKey: string | null = null) => {
+  const go = (event: MouseEvent, target: TutorRoute) => {
     if (!isPlainClick(event)) return;
     event.preventDefault();
-    goCourse(target, { ruleKey });
+    goCourse(target);
     onNavigate();
   };
   const factoryProjectId = overview.data?.binding.status === "bound" ? overview.data.binding.projectId : null;
 
   return (
-    <nav className="tutor-paper tp-rail" aria-label="Course">
+    <nav className="tutor-paper tp-rail" aria-label="Course outline">
       <a className="tp-rail-brand" href={coursePageHref("")} onClick={(event) => go(event, { kind: "home" })}>
         <span className="tp-brand-mark" aria-hidden>
           ⚙
@@ -67,7 +81,7 @@ export function CourseRail({ activeThreadId, activeProjectId, onNavigate }: Plug
   );
 }
 
-type Go = (event: MouseEvent, target: TutorRoute, ruleKey?: string | null) => void;
+type Go = (event: MouseEvent, target: TutorRoute) => void;
 
 function RailBody({ rail, go, onNavigate }: { rail: RailView; go: Go; onNavigate: () => void }) {
   switch (rail.status.kind) {
@@ -83,18 +97,18 @@ function RailBody({ rail, go, onNavigate }: { rail: RailView; go: Go; onNavigate
     case "unbound":
       return (
         <>
-          {rail.days.map((day) => (
+          {rail.lessons.map((lesson) => (
             <a
-              key={day.id}
+              key={lesson.id}
               className="tp-lesson-row tp-lesson-row--ahead"
-              href={coursePageHref(day.subPath)}
-              onClick={(event) => go(event, { kind: "lesson", homeworkId: day.id })}
+              href={coursePageHref(lesson.startPath)}
+              onClick={(event) => go(event, { kind: "lesson", homeworkId: lesson.id })}
             >
               <span className="tp-gl-mark" aria-hidden>
                 ○
               </span>
-              <span className="tp-n">{day.id}</span>
-              {day.title}
+              <span className="tp-n">{lesson.id}</span>
+              {lesson.title}
             </a>
           ))}
           <a className="tp-setup-card" href={coursePageHref("welcome")} onClick={(event) => go(event, { kind: "welcome" })}>
@@ -103,182 +117,231 @@ function RailBody({ rail, go, onNavigate }: { rail: RailView; go: Go; onNavigate
         </>
       );
     case "ready":
-      return <ReadyRail rail={rail} go={go} onNavigate={onNavigate} />;
+      return (
+        <ul className="tp-tree" aria-label="Lessons">
+          {rail.lessons.map((lesson) => (
+            <LessonBranch key={lesson.id} lesson={lesson} go={go} onNavigate={onNavigate} />
+          ))}
+        </ul>
+      );
   }
 }
 
-function ReadyRail({ rail, go, onNavigate }: { rail: RailView; go: Go; onNavigate: () => void }) {
-  const progress = rail.progress;
-  const currentId = rail.currentHomeworkId;
+function LessonBranch({ lesson, go, onNavigate }: { lesson: LessonNode; go: Go; onNavigate: () => void }) {
+  const [open, setOpen] = useState(lesson.expandedByDefault);
+  useEffect(() => {
+    if (lesson.expandedByDefault) setOpen(true);
+  }, [lesson.expandedByDefault]);
+  const childrenId = `tp-lesson-${lesson.id}`;
   return (
-    <>
-      <div className="tp-days" aria-label="Homeworks">
-        {rail.days.map((day) => (
-          <a
-            key={day.id}
-            className={`tp-day tp-day--${day.status}${day.isViewed ? " tp-day--viewed" : ""}`}
-            href={coursePageHref(day.subPath)}
-            title={`${homeworkLabel(day.id)} · ${day.title}`}
-            aria-label={`${homeworkLabel(day.id)}, ${day.title}, ${day.status}`}
-            aria-current={day.isViewed ? "page" : undefined}
-            onClick={(event) => go(event, { kind: "lesson", homeworkId: day.id })}
-          >
-            {day.id}
-          </a>
-        ))}
-      </div>
-      {progress === null ? null : (
-        <a
-          className="tp-progress-card"
-          href={coursePageHref(formatRoute(progress.route))}
-          onClick={(event) => go(event, progress.route)}
-        >
-          <span className="tp-ey">{progress.eyebrow}</span>
-          <span className="tp-tt">{progress.title}</span>
-          <Bar percent={progress.percent} label={`${progress.passing} of ${progress.total} examples hold`} />
-          <span className="tp-lb">
-            <span>
-              {progress.passing} of {progress.total}
-            </span>
-            <span>{progress.complete ? "Complete ✓" : `${progress.fresh} new`}</span>
-          </span>
-        </a>
-      )}
-      {currentId === null ? null : (
-        <div className="tp-outline">
-          {rail.features.map((feature) => (
-            <RailFeatureGroup key={feature.slug} feature={feature} homeworkId={currentId} go={go} />
-          ))}
-        </div>
-      )}
-      <Conversations rail={rail} onNavigate={onNavigate} />
-      {rail.earlier.length === 0 ? null : (
-        <>
-          <div className="tp-sep">
-            <span>Earlier homeworks</span>
-          </div>
-          {rail.earlier.map((row) => (
-            <ThreadLink key={row.id} row={row} onNavigate={onNavigate} />
-          ))}
-        </>
-      )}
-    </>
-  );
-}
-
-function RailFeatureGroup({ feature, homeworkId, go }: { feature: RailFeature; homeworkId: string; go: Go }) {
-  const [open, setOpen] = useState(feature.expandedByDefault);
-  useEffect(() => setOpen(feature.expandedByDefault), [feature.expandedByDefault]);
-  return (
-    <>
+    <li className={`tp-lesson tp-lesson--${lesson.status}${lesson.isViewed ? " tp-lesson--viewed" : ""}`}>
       <button
         type="button"
-        className={`tp-feat${feature.dim ? " tp-feat--dim" : ""}`}
+        className="tp-lesson-head"
         aria-expanded={open}
+        aria-controls={childrenId}
+        aria-label={`${homeworkLabel(lesson.id)}, ${lesson.title}, ${lesson.status}, ${lesson.count} examples hold`}
         onClick={() => setOpen(!open)}
       >
-        <span>
-          {feature.name}
-          <NewDot novelty={feature.novelty === "new" ? "new" : "unchanged"} />
+        <span className="tp-caret" aria-hidden>
+          {open ? "▾" : "▸"}
         </span>
-        <span className="tp-c">
-          {feature.count}
-          {open ? "" : " ›"}
+        <span className="tp-lesson-mark" aria-hidden>
+          {LESSON_GLYPHS[lesson.status]}
+        </span>
+        <span className="tp-lesson-text">
+          <span className="tp-lesson-title">
+            <span className="tp-n">{lesson.id}</span> {lesson.title}
+          </span>
+          <span className="tp-lesson-meter" aria-hidden>
+            <span className="tp-lesson-bar">
+              <i style={{ width: `${lesson.percent}%` }} />
+            </span>
+            <span className="tp-lesson-count">{lesson.count}</span>
+          </span>
         </span>
       </button>
-      {open
-        ? feature.rules.map((rule) => (
-            <a
-              key={rule.key}
-              className={`tp-rrow tp-rrow--${rule.glyph}${rule.isFocus ? " tp-rrow--focus" : ""}`}
-              href={coursePageHref(rule.subPath)}
-              aria-current={rule.isFocus ? "step" : undefined}
-              onClick={(event) => {
-                // The store request also scrolls back to a Rule whose URL is already open.
-                if (isPlainClick(event)) requestRule(homeworkId, rule.key);
-                go(event, { kind: "lesson", homeworkId }, rule.key);
-              }}
-            >
-              <span className="tp-g" aria-hidden>
-                {RULE_GLYPHS[rule.glyph]}
-              </span>
-              <span className="tp-rname">
-                {rule.name}
-                <NewDot novelty={rule.novelty} />
-              </span>
-            </a>
-          ))
-        : null}
-    </>
+      {open ? (
+        <div id={childrenId} className="tp-lesson-body">
+          <LessonThreads lesson={lesson} go={go} onNavigate={onNavigate} />
+        </div>
+      ) : null}
+    </li>
   );
 }
 
-function Conversations({ rail, onNavigate }: { rail: RailView; onNavigate: () => void }) {
+function LessonThreads({ lesson, go, onNavigate }: { lesson: LessonNode; go: Go; onNavigate: () => void }) {
   const rpc = useTutorRpc();
   const navigate = useBbNavigate();
-  const goCourse = useCourseNavigate();
-  const homeworkId = rail.currentHomeworkId;
-  const focus = rail.features.flatMap((feature) => feature.rules).find((rule) => rule.isFocus)?.key ?? null;
-  const startSide = useAction(async () => {
-    if (homeworkId === null) return;
-    const { threadId } = await rpc.call("startSideThread", { homeworkId, ruleKey: focus });
+  const openRule = useOpenRule();
+  const openSideChat = useOpenSideChat();
+  const askSide = useAskSideQuestion(onNavigate);
+  const startCoach = useAction(async () => {
+    const { threadId } = await rpc.call("openCoach", { homeworkId: lesson.id });
     refreshAll();
     navigate.toThread(threadId);
     onNavigate();
   });
-  // The lesson page hosts the coach thread, so a new coach opens there.
-  const startCoach = useAction(async () => {
-    if (homeworkId === null) return;
-    await rpc.call("openCoach", { homeworkId });
-    refreshAll();
-    goCourse({ kind: "lesson", homeworkId });
-    onNavigate();
-  });
-  if (homeworkId === null) return null;
+  const coach = lesson.coach;
+  const focus = lesson.features.flatMap((feature) => feature.rules).find((rule) => rule.isFocus)?.key ?? null;
+  const errors = [startCoach.error, askSide.error, openSideChat.error].filter((error): error is string => error !== null);
+
   return (
     <>
-      <div className="tp-sep">
-        <span>Conversations</span>
-        {rail.canStartCoach ? null : (
+      {coach === null ? (
+        lesson.canStartCoach ? (
+          <button type="button" className="tp-th tp-th--coach tp-th--start" disabled={startCoach.pending} onClick={() => void startCoach.run()}>
+            <span className="tp-ic" aria-hidden>
+              ✦
+            </span>
+            <span className="tp-t">{startCoach.pending ? "Starting your coach…" : "Start with your coach"}</span>
+          </button>
+        ) : (
+          <a
+            className="tp-th tp-th--page"
+            href={coursePageHref(lesson.startPath)}
+            onClick={(event) => go(event, { kind: "lesson", homeworkId: lesson.id })}
+          >
+            <span className="tp-ic" aria-hidden>
+              ¶
+            </span>
+            <span className="tp-t">{lesson.status === "ahead" ? "Read ahead" : "Open the start page"}</span>
+          </a>
+        )
+      ) : (
+        <>
+          <ThreadLink row={{ ...coach, title: `Coach · ${homeworkLabel(lesson.id)}` }} onNavigate={onNavigate} />
+          <div className="tp-rules" role="group" aria-label={`Rules of ${homeworkLabel(lesson.id)}`}>
+            {lesson.features.map((feature) => (
+              <div key={feature.slug} className="tp-rule-group">
+                <div className="tp-feat">
+                  {feature.name}
+                  <NewDot novelty={feature.novelty === "new" ? "new" : "unchanged"} />
+                </div>
+                {feature.rules.map((rule) => (
+                  <RuleRow
+                    key={rule.key}
+                    rule={rule}
+                    href={coach.href}
+                    onOpen={() => {
+                      openRule({ coachThreadId: coach.id, homeworkId: lesson.id, ruleKey: rule.key });
+                      onNavigate();
+                    }}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+          {lesson.sideRows.map((row) => (
+            <SideLink
+              key={row.id}
+              row={row}
+              onOpen={() => {
+                void openSideChat.run(row.id);
+                onNavigate();
+              }}
+              onNavigate={onNavigate}
+            />
+          ))}
           <button
             type="button"
-            className="tp-sep-action"
-            aria-label="Start a side thread about the Rule in focus"
-            title="Start a side thread about the Rule in focus"
-            disabled={startSide.pending}
-            onClick={() => void startSide.run()}
+            className="tp-th tp-th--ask"
+            disabled={askSide.pending}
+            onClick={() => void askSide.run(lesson.id, lesson.status === "current" ? focus : null)}
           >
-            +
+            <span className="tp-ic" aria-hidden>
+              +
+            </span>
+            <span className="tp-t">{askSide.pending ? "Opening a side chat…" : "Ask a side question"}</span>
           </button>
-        )}
-      </div>
-      {rail.canStartCoach ? (
-        <button type="button" className="tp-th tp-th--coach tp-th--start" disabled={startCoach.pending} onClick={() => void startCoach.run()}>
-          <span className="tp-ic" aria-hidden>
-            ✦
-          </span>
-          <span className="tp-t">{startCoach.pending ? "Starting your coach…" : "Start with your coach"}</span>
-        </button>
-      ) : null}
-      {rail.conversations.map((row) => (
-        <ThreadLink key={row.id} row={row} onNavigate={onNavigate} />
-      ))}
-      {[startSide.error, startCoach.error].map((error) =>
-        error === null ? null : (
-          <div key={error} className="tp-rail-note tp-rail-note--error" role="alert">
-            {error}
-            <ReloadButton message={error} />
-          </div>
-        ),
+        </>
       )}
+      {errors.map((error) => (
+        <div key={error} className="tp-rail-note tp-rail-note--error" role="alert">
+          {error}
+          <ReloadButton message={error} />
+        </div>
+      ))}
     </>
+  );
+}
+
+function RuleRow({ rule, href, onOpen }: { rule: OutlineRule; href: string; onOpen: () => void }) {
+  const classes = `tp-rrow tp-rrow--${rule.glyph}${rule.isFocus ? " tp-rrow--focus" : ""}${rule.reached ? "" : " tp-rrow--unreached"}`;
+  const body = (
+    <>
+      <span className="tp-g" aria-hidden>
+        {RULE_GLYPHS[rule.glyph]}
+      </span>
+      <span className="tp-rname">
+        {rule.name}
+        <NewDot novelty={rule.novelty} />
+      </span>
+    </>
+  );
+  if (!rule.reached) {
+    return (
+      <span className={classes} aria-disabled="true" title={NOT_REACHED_HINT} data-rule-key={rule.key}>
+        {body}
+        <span className="tp-sr-only">, {NOT_REACHED_HINT.toLowerCase()}</span>
+      </span>
+    );
+  }
+  return (
+    <a
+      className={classes}
+      href={href}
+      aria-current={rule.isFocus ? "step" : undefined}
+      title="Show where your coach started this Rule"
+      data-rule-key={rule.key}
+      onClick={(event) => {
+        if (!isPlainClick(event)) return;
+        event.preventDefault();
+        onOpen();
+      }}
+    >
+      {body}
+    </a>
+  );
+}
+
+function SideLink({ row, onOpen, onNavigate }: { row: SideRow; onOpen: () => void; onNavigate: () => void }) {
+  const classes = ["tp-th", "tp-th--side"];
+  if (row.isActive) classes.push("tp-th--on");
+  const label = row.indicator.label === null ? row.title : `${row.title} — ${row.indicator.label}`;
+  return (
+    <a
+      className={classes.join(" ")}
+      href={row.href}
+      aria-current={row.isActive ? "page" : undefined}
+      aria-label={row.caption === null ? label : `${label}, ${row.caption}`}
+      data-side-kind={row.kind}
+      onClick={(event) => {
+        if (row.kind === "side-thread") {
+          // BB routes a plain click on `href` itself.
+          onNavigate();
+          return;
+        }
+        if (!isPlainClick(event)) return;
+        event.preventDefault();
+        onOpen();
+      }}
+    >
+      <span className="tp-ic" aria-hidden>
+        ↳
+      </span>
+      <span className="tp-side-text">
+        <span className="tp-t">{row.title}</span>
+        {row.caption === null ? null : <span className="tp-cap">{row.caption}</span>}
+      </span>
+      {row.indicator.tone === "none" ? null : <span className={`tp-ind tp-ind--${row.indicator.tone}`} aria-hidden />}
+    </a>
   );
 }
 
 function ThreadLink({ row, onNavigate }: { row: ThreadRow; onNavigate: () => void }) {
   const classes = ["tp-th", `tp-th--${row.kind}`];
   if (row.nested) classes.push("tp-th--nest");
-  if (row.muted) classes.push("tp-th--muted");
   if (row.isActive) classes.push("tp-th--on");
   const icon = row.kind === "coach" ? "✦" : row.kind === "side" ? "↳" : "·";
   return (
@@ -289,7 +352,7 @@ function ThreadLink({ row, onNavigate }: { row: ThreadRow; onNavigate: () => voi
       aria-label={row.indicator.label === null ? row.title : `${row.title} — ${row.indicator.label}`}
       data-sidebar-thread-shortcut-target=""
       data-sidebar-thread-id={row.id}
-      // BB routes a plain click on `href` itself; the rail only closes the mobile drawer.
+      // BB routes a plain click on `href` itself; the outline only closes the mobile drawer.
       onClick={() => onNavigate()}
     >
       <span className="tp-ic" aria-hidden>

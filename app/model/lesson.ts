@@ -78,7 +78,7 @@ export interface LessonView {
   homeworkId: string;
   title: string;
   eyebrow: string;
-  /** "Homework 3 · The assembly line", for the page's top bar. */
+  /** "Lesson 3 · The assembly line", for the page's top bar. */
   barTitle: string;
   dek: string;
   status: HomeworkStatus;
@@ -171,9 +171,9 @@ export function marginNote(example: Example, progress: ProgressMap, now: number)
       if (example.tags.includes("real-agent")) {
         return { tone: "purple", label: "@real-agent", text: "Needs a real agent — slow and costs tokens.", evidence: null };
       }
-      if (example.novelty === "new") return { tone: "blue", label: "New", text: "New in this homework.", evidence: null };
+      if (example.novelty === "new") return { tone: "blue", label: "New", text: "New in this lesson.", evidence: null };
       if (example.novelty === "reworded") {
-        return { tone: "blue", label: "Reworded", text: "Reworded since the last homework.", evidence: null };
+        return { tone: "blue", label: "Reworded", text: "Reworded since the last lesson.", evidence: null };
       }
       return null;
   }
@@ -253,7 +253,7 @@ function compass(homework: Homework, previous: HomeworkSummary | null): LessonVi
   }
   if (items.length === 0) return null;
   return {
-    title: previous === null ? "New in this homework" : `New since ${homeworkLabel(previous.id).toLowerCase()}`,
+    title: previous === null ? "New in this lesson" : `New since ${homeworkLabel(previous.id).toLowerCase()}`,
     items: items.slice(0, MAX_COMPASS_ITEMS),
   };
 }
@@ -273,7 +273,7 @@ function chips(status: HomeworkStatus, counts: ExampleCounts, homework: Homework
   return result;
 }
 
-function featureView(
+export function featureView(
   feature: FeatureFile,
   progress: ProgressMap,
   focusKey: string | null,
