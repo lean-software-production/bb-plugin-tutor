@@ -21,7 +21,7 @@ import { authorizeCaller, type Caller } from "./auth.ts";
 import { factoryLockKey } from "./lock-keys.ts";
 import type { TutorRuntime } from "./runtime.ts";
 import { sideChatAnchor, sideChatSeed } from "./prompts.ts";
-import { ensureSideChatTab, forkSideChat } from "./side-chats.ts";
+import { openSideChat } from "./side-chats.ts";
 import { statusText } from "./status-text.ts";
 import { recordReachedRule } from "./threads.ts";
 import type { World } from "./world.ts";
@@ -108,15 +108,18 @@ async function sideChat(
   if (input.rule !== undefined && rule === null) {
     return { error: `There is no Rule ${input.rule} in lesson ${lesson.id}. Call tutor_status for the keys.` };
   }
-  const sideChatId = await forkSideChat(rt.bb.sdk, {
-    coachThreadId: caller.coachThreadId,
-    courseId: state.course.id,
-    lessonId: lesson.id,
-    ruleKey: rule?.key ?? null,
-    title: input.title,
-    seed: sideChatSeed(lesson, rule, input.prompt),
-  });
-  await ensureSideChatTab(rt.bb.sdk, caller.coachThreadId, sideChatId, sideChatAnchor(lesson, rule));
+  const sideChatId = await openSideChat(
+    rt.bb.sdk,
+    {
+      coachThreadId: caller.coachThreadId,
+      courseId: state.course.id,
+      lessonId: lesson.id,
+      ruleKey: rule?.key ?? null,
+      title: input.title,
+      seed: sideChatSeed(lesson, rule, input.prompt),
+    },
+    sideChatAnchor(lesson, rule),
+  );
   rt.signals.publish("threads", lesson.id);
   return {
     text:

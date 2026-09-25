@@ -19,7 +19,7 @@ import {
   type CoachThreadStart,
 } from "../coach/prompts.ts";
 import type { TutorRuntime } from "../coach/runtime.ts";
-import { BB_REPLY_PREFIX, ensureSideChatTab, forkSideChat, listSideChats } from "../coach/side-chats.ts";
+import { BB_REPLY_PREFIX, ensureSideChatTab, listSideChats, openSideChat } from "../coach/side-chats.ts";
 import {
   findCoachThread,
   listTutorThreads,
@@ -242,15 +242,18 @@ export function registerRpc(rt: TutorRuntime): void {
       const rule = ruleKey === null ? null : requireRule(lesson, ruleKey);
       const coachThread = findCoachThread(await threadsOf(world), course.id, lesson.id);
       if (coachThread === undefined) throw new Error(`Start with your coach for lesson ${lesson.id} first.`);
-      const sideChatId = await forkSideChat(bb.sdk, {
-        coachThreadId: coachThread.id,
-        courseId: course.id,
-        lessonId: lesson.id,
-        ruleKey: rule?.key ?? null,
-        title: sideChatTitle(rule),
-        seed: sideChatSeed(lesson, rule),
-      });
-      await ensureSideChatTab(bb.sdk, coachThread.id, sideChatId, sideChatAnchor(lesson, rule));
+      const sideChatId = await openSideChat(
+        bb.sdk,
+        {
+          coachThreadId: coachThread.id,
+          courseId: course.id,
+          lessonId: lesson.id,
+          ruleKey: rule?.key ?? null,
+          title: sideChatTitle(rule),
+          seed: sideChatSeed(lesson, rule),
+        },
+        sideChatAnchor(lesson, rule),
+      );
       rt.signals.publish("threads", lesson.id);
       return { coachThreadId: coachThread.id, sideChatId };
     },

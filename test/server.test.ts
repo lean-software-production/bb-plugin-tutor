@@ -473,12 +473,27 @@ test("Ask a side question: startSideChat forks a side chat, retrying the tab wri
   await assert.rejects(host.harness.behavior.callRpc("ensureSideChatTab", { sideChatId: coach }), /isn't a side chat/);
 });
 
-test("a tab write that keeps conflicting fails after a few tries instead of looping", async (t) => {
+test("a tab write that keeps conflicting fails after a few tries instead of looping, and leaves no side chat behind", async (t) => {
   const { host } = await setup(t);
-  const { rule } = await adoptedCoach(host);
+  const { coach, rule } = await adoptedCoach(host);
+  const liveSideChats = () => host.threads.filter((thread) => thread.sourceThreadId === coach && thread.archivedAt === null).map((thread) => thread.id);
   host.tabConflicts.remaining = 10;
   await assert.rejects(host.harness.behavior.callRpc("startSideChat", { lessonId: "000", ruleKey: rule }), /Thread tabs changed/);
   assert.equal(host.harness.inspection.sdk.callsTo("threads.tabs.update").length, 3);
+  assert.deepEqual(liveSideChats(), [], "the button's fork was cleaned up");
+
+  host.tabConflicts.remaining = 10;
+  const result = await tool(host, "tutor_side_chat", { title: "t", prompt: "p", rule }, coach);
+  assert.ok(isError(result) && /Thread tabs changed/.test(text(result)), text(result));
+  assert.deepEqual(liveSideChats(), [], "the tool's fork was cleaned up");
+
+  // When the clean-up fails too, both failures are reported.
+  host.tabConflicts.remaining = 10;
+  host.archiveRefusal.message = "database is locked";
+  await assert.rejects(
+    host.harness.behavior.callRpc("startSideChat", { lessonId: "000", ruleKey: rule }),
+    (error: Error) => /Thread tabs changed/.test(error.message) && /couldn't remove the unused side chat thr_\d+: database is locked/.test(error.message),
+  );
 });
 
 test("a provider that cannot fork gets a clear error, and no side thread is spawned instead", async (t) => {

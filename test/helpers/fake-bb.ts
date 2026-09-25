@@ -46,6 +46,8 @@ export interface TutorHost extends FakePluginHost {
   tabConflicts: { remaining: number };
   /** When set, forks fail the way BB fails them for a provider that cannot fork. */
   forkRefusal: { message: string | null };
+  /** When set, archiving a thread fails with this message. */
+  archiveRefusal: { message: string | null };
   /** Adds a thread Tutor did not spawn (or one in another project). */
   addThread(thread: Partial<FakeThread> & { id: string }): FakeThread;
 }
@@ -86,6 +88,7 @@ export async function makeTutorHost(
   const tabs = new Map<string, FakeTabs>();
   const tabConflicts = { remaining: 0 };
   const forkRefusal: { message: string | null } = { message: null };
+  const archiveRefusal: { message: string | null } = { message: null };
   let clock = 1000;
   const addThread = (thread: Partial<FakeThread> & { id: string }): FakeThread => {
     const row: FakeThread = {
@@ -172,6 +175,12 @@ export async function makeTutorHost(
           });
         },
         get: async ({ threadId }) => find(threadId),
+        archive: async ({ threadId }) => {
+          const thread = find(threadId);
+          if (archiveRefusal.message !== null) throw httpError(500, "internal_error", archiveRefusal.message);
+          thread.archivedAt = clock += 1;
+          return { ok: true, archivedThreadIds: [threadId] };
+        },
         list: async (args = {}) =>
           threads.filter(
             (thread) =>
@@ -223,5 +232,5 @@ export async function makeTutorHost(
     featureConfigFile: options.featureConfigFile ?? "/nonexistent/tutor/config.json",
     now: () => NOW,
   });
-  return { ...host, rt, threads, running, sent, tabs, tabConflicts, forkRefusal, addThread };
+  return { ...host, rt, threads, running, sent, tabs, tabConflicts, forkRefusal, archiveRefusal, addThread };
 }

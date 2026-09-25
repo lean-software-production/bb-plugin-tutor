@@ -132,6 +132,27 @@ export async function ensureSideChatTab(
   }
 }
 
+/**
+ * Forks the side chat and opens its tab: the one way both the button and the
+ * coach's tool start a side chat. A fork whose tab never got written would sit
+ * in the coach thread unseen, so when the tab write fails the fork is archived
+ * before the error surfaces; if archiving fails too, the error names both.
+ */
+export async function openSideChat(sdk: Sdk, fork: ForkSideChat, sourceMessageText: string): Promise<string> {
+  const sideChatId = await forkSideChat(sdk, fork);
+  try {
+    await ensureSideChatTab(sdk, fork.coachThreadId, sideChatId, sourceMessageText);
+  } catch (cause) {
+    try {
+      await sdk.threads.archive({ threadId: sideChatId });
+    } catch (cleanup) {
+      throw new Error(`${errorText(cause)} (and couldn't remove the unused side chat ${sideChatId}: ${errorText(cleanup)})`, { cause });
+    }
+    throw cause;
+  }
+  return sideChatId;
+}
+
 export interface SideChatRow {
   id: string;
   originPluginId: string | null;
