@@ -6,6 +6,7 @@ import { resolveCurrent, type CurrentPointer } from "../../shared/derive.ts";
 import type { Course, StudentState } from "../../shared/model.ts";
 import type { CourseSource, ProgressStore } from "../../shared/ports.ts";
 import type { Binding } from "../../shared/rpc.ts";
+import { overlaps, realPath } from "../paths.ts";
 import { resolveFactory } from "./binding.ts";
 import { readFeatureConfig, resolveCoursePath, resolveFactoryHint, type Env } from "./course-path.ts";
 import type { TutorSettings } from "./settings.ts";
@@ -65,10 +66,16 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
       const values = await settings.get();
       const config = await readFeatureConfig(deps.featureConfigFile);
       const coursePath = resolveCoursePath(values.coursePath, deps.env, config);
-      const [courseResult, { binding, hostId }] = await Promise.all([
+      const [courseResult, factory] = await Promise.all([
         loadCourse(coursePath),
         resolveFactory(bb.sdk, values.factoryProject),
       ]);
+      // Re-checked on every load, not just at confirmFactory: a factory whose folder now
+      // leads into the course would have the coach write spec/ and seeds/ into the course.
+      const { binding, hostId } =
+        factory.binding.status === "bound" && overlaps(await realPath(factory.binding.root), await realPath(coursePath))
+          ? { binding: { status: "missing" as const, projectId: factory.binding.projectId }, hostId: null }
+          : factory;
       const student = binding.status === "bound" ? await deps.store.read(binding.root) : EMPTY_STUDENT;
       if (courseResult.course !== null) last = courseResult.course;
       return {

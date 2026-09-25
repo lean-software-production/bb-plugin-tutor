@@ -76,6 +76,7 @@ async function readManifest(root: string, display: DisplayPath, guard: PathGuard
     );
   }
   const readmePath = join(root, "README.md");
+  await guard(readmePath);
   const readme = await readTextIfPresent(readmePath, display(readmePath));
   const id = slugify(basename(root));
   const ifPresent = async (path: string): Promise<string | null> => ((await isFile(path)) ? path : null);

@@ -349,3 +349,17 @@ test("confirmFactory refuses the course checkout, a folder inside it, or one hol
   t.after(() => host.harness.lifecycle.dispose());
   assert.equal(((await host.harness.behavior.callRpc("confirmFactory", { projectId: PROJECT_ID })) as { status: string }).status, "bound");
 });
+
+test("a stored binding that now leads into the course is treated as missing: no coach, no writes", async (t) => {
+  const sandbox = await makeSandbox();
+  t.after(() => sandbox.cleanup());
+  const link = join(sandbox.root, "factory-link");
+  await symlink(sandbox.course.root, link);
+  const host = await makeTutorHost(sandbox.course, link, { factoryProject: PROJECT_ID, coursePath: sandbox.course.root });
+  t.after(() => host.harness.lifecycle.dispose());
+  const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.equal(overview.binding.status, "missing");
+  await assert.rejects(host.harness.behavior.callRpc("openCoach", { homeworkId: "000" }));
+  assert.equal(host.harness.inspection.sdk.callsTo("threads.spawn").length, 0);
+  assert.equal(await readdir(join(sandbox.course.root, "spec")).catch(() => null), null, "nothing written into the course");
+});

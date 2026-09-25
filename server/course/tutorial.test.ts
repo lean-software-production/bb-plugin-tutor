@@ -23,7 +23,8 @@ describe("the tutorial course", { skip: coursePath === undefined && "TUTOR_TEST_
 
   test("every homework in the ledger parses, after Homework 0", () => {
     courseSchema.parse(course);
-    assert.equal(course.source, "ledger");
+    // The ledger until tutorial ships course.yaml (lean-software-production/tutorial#2); either must load the same course.
+    assert.ok(course.source === "ledger" || course.source === "course.yaml", course.source);
     assert.deepEqual(
       course.homeworks.map((hw) => hw.id),
       ["000", "001", "002", "003", "004", "005", "006", "007"],

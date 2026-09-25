@@ -253,6 +253,12 @@ test("a symbolic link may not lead a homework, the coach or the lexicon out of t
       await symlink(join(outside, "ledger/002"), dir);
       await rejectsWith(load(root), /^docs\/iterations\/README\.md: docs\/iterations\/002-second-steps leads outside the course folder\.$/);
     });
+    await withCopy("ledger", async (root) => {
+      await writeFile(join(outside, "course-readme.md"), "# Not the course\n");
+      await rm(join(root, "README.md"), { force: true });
+      await symlink(join(outside, "course-readme.md"), join(root, "README.md"));
+      await rejectsWith(load(root), /^README\.md leads outside the course folder\.$/);
+    });
   } finally {
     await rm(outside, { recursive: true, force: true });
   }
