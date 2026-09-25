@@ -126,7 +126,7 @@ export const currentStateSchema = z.object({
 });
 export type CurrentState = z.infer<typeof currentStateSchema>;
 
-/** Everything the rail, the home section and the first-run page need in one call. */
+/** Everything the outline, the home section and the first-run page need in one call. */
 export const overviewSchema = z.object({
   course: courseInfoSchema.nullable(),
   /** Why the course could not be loaded (course is then null). */

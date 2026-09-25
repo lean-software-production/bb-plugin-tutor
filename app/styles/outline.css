@@ -4,30 +4,30 @@
  * sidebar scroll area.
  */
 
-.tutor-paper.tp-rail {
+.tutor-paper.tp-outline {
   display: flex;
   flex-direction: column;
   min-height: 100%;
   padding: 16px 12px 18px;
-  background: var(--tp-rail);
+  background: var(--tp-outline);
   font-size: 13px;
 }
-.tutor-paper.tp-rail a {
+.tutor-paper.tp-outline a {
   color: inherit;
   text-decoration: none;
 }
-.tutor-paper.tp-rail button {
+.tutor-paper.tp-outline button {
   border: 0;
   background: none;
   color: inherit;
   text-align: left;
 }
-.tutor-paper.tp-rail :focus-visible {
+.tutor-paper.tp-outline :focus-visible {
   outline: 2px solid var(--tp-blue);
   outline-offset: 1px;
 }
 
-.tutor-paper .tp-rail-brand {
+.tutor-paper .tp-outline-brand {
   display: flex;
   gap: 9px;
   align-items: center;
@@ -52,14 +52,14 @@
 }
 
 /* ---- the tree: lessons ---- */
-.tutor-paper.tp-rail .tp-tree {
+.tutor-paper.tp-outline .tp-tree {
   display: grid;
   gap: 2px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
-.tutor-paper.tp-rail .tp-lesson-head {
+.tutor-paper.tp-outline .tp-lesson-head {
   display: flex;
   align-items: flex-start;
   gap: 6px;
@@ -68,7 +68,7 @@
   border-radius: 7px;
   color: #3d4a55;
 }
-.tutor-paper.tp-rail .tp-lesson-head:hover {
+.tutor-paper.tp-outline .tp-lesson-head:hover {
   background: rgb(255 255 255 / 0.45);
 }
 .tutor-paper .tp-caret {
@@ -151,7 +151,7 @@
   gap: 1px;
   margin: 0 0 4px 14px;
 }
-.tutor-paper.tp-rail .tp-feat {
+.tutor-paper.tp-outline .tp-feat {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -226,14 +226,14 @@
   letter-spacing: 0.09em;
   text-transform: uppercase;
 }
-.tutor-paper.tp-rail .tp-sep-action {
+.tutor-paper.tp-outline .tp-sep-action {
   padding: 0 4px;
   border-radius: 4px;
   color: #77776f;
   font-size: 0.85rem;
   line-height: 1;
 }
-.tutor-paper.tp-rail .tp-sep-action:hover {
+.tutor-paper.tp-outline .tp-sep-action:hover {
   background: rgb(255 255 255 / 0.6);
   color: var(--tp-ink);
 }
@@ -358,7 +358,7 @@
   font-size: 0.6rem;
   font-weight: 700;
 }
-.tutor-paper.tp-rail .tp-rail-more {
+.tutor-paper.tp-outline .tp-outline-more {
   padding: 4px 7px;
   color: var(--tp-blue);
   font-size: 0.66rem;
@@ -397,19 +397,19 @@
   font-size: 0.72rem;
   font-weight: 700;
 }
-.tutor-paper .tp-rail-note {
+.tutor-paper .tp-outline-note {
   display: block;
   margin: 4px 0;
   padding: 4px 7px;
   color: var(--tp-muted);
   font-size: 0.68rem;
 }
-.tutor-paper .tp-rail-note--error {
+.tutor-paper .tp-outline-note--error {
   border-left: 3px solid var(--tp-red);
   color: #7a2a2a;
 }
 /* The outline resets its buttons; Reload stays the paper's blue button. */
-.tutor-paper.tp-rail .tp-rail-note .tp-reload {
+.tutor-paper.tp-outline .tp-outline-note .tp-reload {
   border: 1px solid #1d4c91;
   background: var(--tp-blue);
   color: #fff;

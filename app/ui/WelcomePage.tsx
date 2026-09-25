@@ -5,7 +5,7 @@ import type { Binding, CandidateProject } from "../../shared/rpc.ts";
 import { refreshAll, useAction, useCourseNavigate, useOverview, useQuery, useStore, useTutorRpc } from "../hooks.ts";
 import { homeDecision } from "../model/home.ts";
 import { welcomeView } from "../model/welcome.ts";
-import { QUERY_KEYS, queryCache, railMountedStore } from "../state/app-state.ts";
+import { QUERY_KEYS, queryCache, outlineMountedStore } from "../state/app-state.ts";
 import { ErrorNotice, Loading, Notice, PaperPage } from "./common.tsx";
 
 const COURSE_METHOD =
@@ -15,7 +15,7 @@ export function WelcomePage() {
   const rpc = useTutorRpc();
   const overview = useOverview();
   const candidates = useQuery(QUERY_KEYS.candidates, () => rpc.call("listCandidateProjects", null));
-  const railMounted = useStore(railMountedStore);
+  const outlineMounted = useStore(outlineMountedStore);
   const course = overview.data?.course ?? null;
 
   return (
@@ -35,7 +35,7 @@ export function WelcomePage() {
           description={course?.description ?? null}
         />
       )}
-      {railMounted ? null : (
+      {outlineMounted ? null : (
         <p className="tp-tip">
           Tip: turn on the course outline under <b>Settings → Appearance → Sidebar</b>, and pick <b>Course outline</b>.
         </p>

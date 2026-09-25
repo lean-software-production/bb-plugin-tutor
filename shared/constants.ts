@@ -45,7 +45,7 @@ export const BB_SIDE_CHAT = {
 
 /** Frontend slot registration ids. */
 export const SLOT_IDS = {
-  threadList: "course-rail",
+  threadList: "course-outline",
   navPanel: "course",
   homepageSection: "continue",
   ruleTab: "rule-tab",

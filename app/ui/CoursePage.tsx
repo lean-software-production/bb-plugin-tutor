@@ -1,6 +1,6 @@
 // The one navPanel ("Course"), routed by sub-path (shared/routes.ts, plus a
 // lesson's Rule: model/course-route.ts). It also publishes the route so the
-// rail can tell which lesson is on screen, because BB passes the rail
+// outline can tell which lesson is on screen, because BB passes the outline
 // activeThreadId: null on plugin pages.
 import { useEffect } from "react";
 import type { PluginNavPanelProps } from "@get-bb/plugin-sdk/app";

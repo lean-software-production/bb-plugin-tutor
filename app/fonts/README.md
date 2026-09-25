@@ -14,5 +14,5 @@ licensed; the typefaces themselves are under the SIL Open Font License 1.1:
 another plugin loads.
 
 The Archivo face leaves out U+0020 and U+00A0 (`unicode-range`), so word spaces come from the
-fallback sans-serif: Archivo's own 0.2em space runs words together at the rail's small sizes. The
+fallback sans-serif: Archivo's own 0.2em space runs words together at the outline's small sizes. The
 file itself matches Google Fonts' Archivo Latin subset (same space advance, `HVAR` and widths).

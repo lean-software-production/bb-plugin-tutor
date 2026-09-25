@@ -142,18 +142,18 @@ const lesson0 = lesson({
   set: "Start here",
   dir: "/usr/local/share/tutor/plugin/server/course/lesson-0",
   builtin: true,
-  readme: "# Lesson 0 — Using your tutor\n\nLearn the course rail by using it.\n",
-  dek: "Learn the course rail by using it.",
+  readme: "# Lesson 0 — Using your tutor\n\nLearn the course outline by using it.\n",
+  dek: "Learn the course outline by using it.",
   factoryMd: "",
   seedSpec: null,
   features: [
-    feature("features/tutor.feature", "Your tutor", "How the course rail and your coach work together.", [
+    feature("features/tutor.feature", "Your tutor", "How the course outline and your coach work together.", [
       {
-        name: "The rail shows where you are",
+        name: "The outline shows where you are",
         examples: [
           {
             name: "The rule in focus is marked",
-            steps: steps("Given the coach has moved to a rule", "Then the rail marks that rule"),
+            steps: steps("Given the coach has moved to a rule", "Then the outline marks that rule"),
             novelty: "new",
           },
           {

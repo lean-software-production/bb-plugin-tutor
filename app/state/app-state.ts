@@ -10,7 +10,7 @@ export const queryCache = createQueryCache();
 export const routeStore = createStore<TutorRoute | null>(null);
 
 /** Whether the course outline is the selected sidebar list (it only mounts when it is). */
-export const railMountedStore = createStore(false);
+export const outlineMountedStore = createStore(false);
 
 export const QUERY_KEYS = {
   overview: "overview",

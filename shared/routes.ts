@@ -1,5 +1,5 @@
 // Sub-routes of the single navPanel at /plugins/tutor/course/<subPath>.
-// The rail works out the active lesson from this route, because BB passes
+// The outline works out the active lesson from this route, because BB passes
 // activeThreadId as null on plugin pages.
 //
 //   ""                 home: redirects to the current lesson, or to welcome

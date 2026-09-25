@@ -9,7 +9,7 @@ import type { LessonDetail } from "../../shared/rpc.ts";
 import { lessonEyebrow, percent, plural } from "./format.ts";
 import { featureView } from "./lesson.ts";
 import type { RuleView } from "./lesson.ts";
-import type { RuleGlyph } from "./rail.ts";
+import type { RuleGlyph } from "./outline.ts";
 
 export interface LessonCardRule {
   key: string;

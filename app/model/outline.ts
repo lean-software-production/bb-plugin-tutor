@@ -12,7 +12,7 @@ import { percent } from "./format.ts";
 import { indicatorView, isListed } from "./threads.ts";
 import type { IndicatorView, SidebarThreadLike } from "./threads.ts";
 
-export interface RailInput {
+export interface OutlineInput {
   overview: Overview | null;
   /** Why the overview could not be fetched (the outline still lists threads). */
   overviewError: string | null;
@@ -96,15 +96,15 @@ export interface OtherThreadGroup {
   rows: ThreadRow[];
 }
 
-export type RailStatus =
+export type OutlineStatus =
   | { kind: "loading" }
   | { kind: "error"; message: string }
   | { kind: "unbound"; missing: boolean }
   | { kind: "ready" };
 
-export interface RailView {
+export interface OutlineView {
   brand: string;
-  status: RailStatus;
+  status: OutlineStatus;
   lessons: LessonNode[];
   others: OtherThreadGroup[];
 }
@@ -114,7 +114,7 @@ export function threadHref(threadId: string): string {
   return `/threads/${threadId}`;
 }
 
-function statusOf(input: RailInput): RailStatus {
+function statusOf(input: OutlineInput): OutlineStatus {
   const { overview } = input;
   if (overview === null) {
     return input.overviewError === null ? { kind: "loading" } : { kind: "error", message: input.overviewError };
@@ -203,7 +203,7 @@ export function viewedLesson(
   return lessons.find((lesson) => lesson.coachThreadId === coachId || lesson.coachThreadId === activeThreadId)?.id ?? null;
 }
 
-export function buildRail(input: RailInput): RailView {
+export function buildOutline(input: OutlineInput): OutlineView {
   const { overview, activeThreadId } = input;
   const status = statusOf(input);
   const summaries = overview?.course === null ? [] : (overview?.lessons ?? []);

@@ -12,7 +12,7 @@ interface Face {
   unicodeRange?: string;
 }
 
-// Archivo's word space is only 0.2em (0.19em at 800). At the rail's and the
+// Archivo's word space is only 0.2em (0.19em at 800). At the outline's and the
 // margin notes' small sizes, with whole-pixel glyph positioning, words then
 // visibly run together ("Noother threads"). Leaving U+0020 and U+00A0 out of
 // the face makes the browser take spaces from the next family in

@@ -6,12 +6,12 @@ import { DIRECTIVE_NAMES, NAV_PANEL_PATH, SLOT_IDS } from "./shared/constants.ts
 import { CoursePage } from "./app/ui/CoursePage.tsx";
 import { LessonCardDirective, ProgressCardDirective, TermDirective } from "./app/ui/Directives.tsx";
 import { ContinueSection, CourseAccessory } from "./app/ui/Home.tsx";
-import { CourseRail } from "./app/ui/Rail.tsx";
+import { CourseOutline } from "./app/ui/Outline.tsx";
 import { RuleTab } from "./app/ui/RuleTab.tsx";
 import { SimpleNavigation } from "./app/ui/SimpleNavigation.tsx";
 import { mountActivityReporter } from "./app/activity.ts";
 import "./app/paper.css";
-import "./app/styles/rail.css";
+import "./app/styles/outline.css";
 import "./app/styles/lesson.css";
 import "./app/styles/pages.css";
 import "./app/styles/chat.css";
@@ -31,7 +31,7 @@ export default definePluginApp((app) => {
     id: SLOT_IDS.threadList,
     title: "Course outline",
     description: "The course as one tree: each lesson, its coach thread and side chats, and the Rules your coach works through.",
-    component: CourseRail,
+    component: CourseOutline,
   });
   app.slots.navPanel({
     id: SLOT_IDS.navPanel,

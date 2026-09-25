@@ -1,4 +1,4 @@
-// One cache of RPC results for every Tutor surface in the window. The rail,
+// One cache of RPC results for every Tutor surface in the window. The outline,
 // the course page and the home section all read getOverview; this makes them
 // share one request and one refetch when the backend signals a change.
 // Mounting a surface revalidates its data in the background (the old answer

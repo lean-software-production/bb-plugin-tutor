@@ -1,5 +1,5 @@
 // A minimal external store for React's useSyncExternalStore. The course page,
-// the rail and the directive cards are separate slot trees in one bundle, so
+// the outline and the directive cards are separate slot trees in one bundle, so
 // module-level stores are how they share client-local state (the current
 // Tutor route, a Rule to scroll to) without a server round trip.
 

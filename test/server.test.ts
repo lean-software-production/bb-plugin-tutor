@@ -159,7 +159,7 @@ test("the coach tools round-trip progress through the factory repo and carry pas
   const lesson0 = findLesson(course, "000");
   assert.ok(lesson0 !== undefined);
   for (const example of lessonExamples(lesson0)) {
-    await ok(host, "tutor_mark_example", { example: example.key, status: "passing", evidence: "seen in the rail" }, coach0);
+    await ok(host, "tutor_mark_example", { example: example.key, status: "passing", evidence: "seen in the outline" }, coach0);
   }
   await ok(host, "tutor_complete_iteration", { iteration: "000", summary: "You know your way around." }, coach0);
 

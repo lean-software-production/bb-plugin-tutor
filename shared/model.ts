@@ -116,7 +116,7 @@ export type DiffLine = z.infer<typeof diffLineSchema>;
 export const lessonSchema = z.object({
   id: lessonIdSchema,
   title: z.string(),
-  /** Ledger "Set after" / course.yaml `set`, e.g. "Day 3". Groups the rail's days strip. */
+  /** Ledger "Set after" / course.yaml `set`, e.g. "Day 3". Groups the outline's days strip. */
   set: z.string().nullable(),
   /** Absolute path of the lesson directory (for Lesson 0: inside the plugin). */
   dir: z.string(),
@@ -252,7 +252,7 @@ export type LessonStatus = z.infer<typeof lessonStatusSchema>;
 export const iterationProgressSchema = z.enum(["not-started", "WIP", "Done"]);
 export type IterationProgress = z.infer<typeof iterationProgressSchema>;
 
-/** Rail glyph: passing ✓ (all passing or skipped), not-yet ! (any not-yet), pending ○. */
+/** Outline glyph: passing ✓ (all passing or skipped), not-yet ! (any not-yet), pending ○. */
 export const ruleStatusSchema = z.enum(["passing", "not-yet", "pending"]);
 export type RuleStatus = z.infer<typeof ruleStatusSchema>;
 
