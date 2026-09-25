@@ -194,5 +194,6 @@ test("before a coach thread exists, an unbound student is sent to set up the fac
   assert.equal(coachStart("ahead", "unbound"), "read-ahead");
   assert.equal(coachStart("current", "bound"), "start");
   assert.equal(coachStart("done", "bound"), "revisit");
-  assert.equal(coachStart("current", null), "start", "until the overview loads, the backend decides");
+  assert.equal(coachStart("current", null), "loading", "no coach action until the binding is known");
+  assert.equal(coachStart("ahead", null), "read-ahead");
 });

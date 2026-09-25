@@ -140,6 +140,8 @@ interface Preserved {
   pastEntries: Record<string, Record<string, RawMap>>;
   /** A history entry's `examples` that is not a mapping, verbatim, by homework id. */
   pastExamples: Record<string, unknown>;
+  /** The replaced file's `iteration`: when it moves into the history, its Examples' unknown fields go with it. */
+  iteration?: string;
 }
 
 function extraFields(map: RawMap, known: readonly string[]): RawMap {
@@ -163,6 +165,7 @@ function preserved(previousText: string | null): Preserved {
   if ("problem" in loaded || !isMap(loaded.raw)) return result;
   result.top = extraFields(loaded.raw, TOP_KEYS);
   result.entries = entryExtras(loaded.raw.examples);
+  if (loaded.raw.iteration !== undefined) result.iteration = String(homeworkIdLike(loaded.raw.iteration));
   const history = loaded.raw.history;
   if (!isMap(history)) return result;
   for (const [rawId, value] of Object.entries(history)) {
@@ -218,6 +221,7 @@ export function formatProgress(progress: ProgressFile, previousText: string | nu
 }
 
 function orderedPast(past: PastHomework, id: string, extras: Preserved): RawMap {
+  const entryExtras = extras.pastEntries[id] ?? (id === extras.iteration ? extras.entries : undefined);
   const ordered: RawMap = {};
   for (const field of PAST_KEYS) {
     if (field === "examples") {
@@ -228,7 +232,7 @@ function orderedPast(past: PastHomework, id: string, extras: Preserved): RawMap 
           : Object.fromEntries(
               Object.keys(past.examples)
                 .sort()
-                .map((key) => [key, orderedEntry(past.examples[key] as ExampleProgress, extras.pastEntries[id]?.[key])]),
+                .map((key) => [key, orderedEntry(past.examples[key] as ExampleProgress, entryExtras?.[key])]),
             );
     } else if (past[field] !== undefined) {
       ordered[field] = past[field];

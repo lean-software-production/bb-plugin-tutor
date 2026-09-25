@@ -102,15 +102,17 @@ export interface LessonView {
 
 const MAX_COMPASS_ITEMS = 6;
 
-export type CoachStart = "read-ahead" | "set-up" | "start" | "revisit";
+export type CoachStart = "read-ahead" | "loading" | "set-up" | "start" | "revisit";
 
 /**
  * What a lesson offers before its coach thread exists. A coach needs a bound
  * factory, so an unbound student is sent to set one up rather than shown a
- * start that must fail. `binding` is null until the overview loads.
+ * start that must fail. `binding` is null until the overview loads, and
+ * nothing is offered until then.
  */
 export function coachStart(status: HomeworkStatus, binding: Binding["status"] | null): CoachStart {
   if (status === "ahead") return "read-ahead";
+  if (binding === null) return "loading";
   if (binding === "unbound" || binding === "missing") return "set-up";
   return status === "current" ? "start" : "revisit";
 }

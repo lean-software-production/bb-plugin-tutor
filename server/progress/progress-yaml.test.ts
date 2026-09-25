@@ -167,3 +167,23 @@ test("keeps unknown fields in history entries and their Examples", () => {
   assert.match(written, /\n {2}"001":\n {4}examples:\n {6}a\/b\/c:\n {8}status: passing\n[\s\S]* {8}at: .*\n {8}ci: green\n {4}reviewer: ana\n?$/);
   assert.deepEqual(parseProgress(written).progress, parsed.progress);
 });
+
+test("an Example's unknown fields follow it into the history when the next homework is adopted", () => {
+  const previous = [
+    'iteration: "001"',
+    "examples:",
+    "  agent/pi/default:",
+    "    status: passing",
+    `    hash: ${hash}`,
+    "    at: 2026-09-25T10:00:00Z",
+    "    ci: green",
+    "",
+  ].join("\n");
+  const adopted: ProgressFile = {
+    iteration: "002",
+    examples: {},
+    history: { "001": { examples: { "agent/pi/default": { status: "passing", hash, at: "2026-09-25T10:00:00Z" } } } },
+  };
+  const written = formatProgress(adopted, previous);
+  assert.match(written, /history:\n {2}"001":\n {4}examples:\n {6}agent\/pi\/default:\n(?: {8}\w+: .+\n)*? {8}ci: green\n/);
+});

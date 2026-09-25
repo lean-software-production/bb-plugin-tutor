@@ -84,9 +84,9 @@ test("refuses a seeds/ that is a symbolic link, and a seed that is one, writing 
     await rm(join(sandbox.factoryRoot, "seeds"));
     await mkdir(join(sandbox.factoryRoot, "seeds"));
     await symlink(join(outside, "tetris.md"), join(sandbox.factoryRoot, "seeds/tetris.md"));
-    const result = await copyHomeworkSpec(sandbox.factoryRoot, homework);
-    assert.equal(result.seedAlreadyThere, true);
+    await assert.rejects(copyHomeworkSpec(sandbox.factoryRoot, homework), /seeds\/tetris\.md is a symbolic link/);
     assert.deepEqual(await readdir(outside), []);
+    assert.equal(await readdir(join(sandbox.factoryRoot, "spec")).catch(() => null), null, "spec/ is still untouched");
   } finally {
     await sandbox.cleanup();
   }

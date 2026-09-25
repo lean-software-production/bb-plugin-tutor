@@ -23,11 +23,11 @@ async function exists(path: string): Promise<boolean> {
 }
 
 /** Whether anything is at `path`, a dangling symbolic link included. */
-async function occupied(path: string): Promise<boolean> {
-  return lstat(path).then(
-    () => true,
-    () => false,
-  );
+/** Whether the seed is already there. A symbolic link in its place is refused, dangling or not. */
+async function seedPresent(path: string, display: string): Promise<boolean> {
+  const stats = await lstat(path).catch(() => null);
+  if (stats?.isSymbolicLink()) throw new Error(`${display} is a symbolic link; replace it with the seed file itself.`);
+  return stats !== null;
 }
 
 /** Refuses a homework with nothing to coach before anything in spec/ is replaced. */
@@ -56,6 +56,8 @@ export async function copyHomeworkSpec(factoryRoot: string, homework: Homework):
   await requireFeatureFiles(homework);
   const specDir = await ownFolder(factoryRoot, FACTORY_FILES.specDir);
   const seedsDir = homework.seedSpec === null ? null : await ownFolder(factoryRoot, FACTORY_FILES.seedsDir);
+  const seed = homework.seedSpec === null ? null : `${FACTORY_FILES.seedsDir}/${seedFileName(homework.seedSpec, homework.id)}`;
+  const seedAlreadyThere = seed !== null && (await seedPresent(join(factoryRoot, seed), seed));
   await mkdir(specDir, { recursive: true });
   for (const entry of await readdir(specDir)) {
     if (!KEPT_IN_SPEC.has(entry)) await rm(join(specDir, entry), { recursive: true, force: true });
@@ -71,12 +73,10 @@ export async function copyHomeworkSpec(factoryRoot: string, homework: Homework):
   await cp(join(homework.dir, FEATURES_DIR), join(specDir, FEATURES_DIR), { recursive: true });
   written.push(`${FACTORY_FILES.specDir}/${FEATURES_DIR}/`);
 
-  if (homework.seedSpec === null || seedsDir === null) return { written, seed: null, seedAlreadyThere: false };
-  const seed = `${FACTORY_FILES.seedsDir}/${seedFileName(homework.seedSpec, homework.id)}`;
-  const seedPath = join(factoryRoot, seed);
-  if (await occupied(seedPath)) return { written, seed, seedAlreadyThere: true };
+  if (homework.seedSpec === null || seedsDir === null || seed === null) return { written, seed: null, seedAlreadyThere: false };
+  if (seedAlreadyThere) return { written, seed, seedAlreadyThere: true };
   await mkdir(seedsDir, { recursive: true });
-  // "wx" never follows a (dangling) symbolic link to create a file elsewhere.
-  await writeFile(seedPath, homework.seedSpec, { encoding: "utf8", flag: "wx" });
+  // "wx" never follows a symbolic link created since the check to write elsewhere.
+  await writeFile(join(factoryRoot, seed), homework.seedSpec, { encoding: "utf8", flag: "wx" });
   return { written: [...written, seed], seed, seedAlreadyThere: false };
 }

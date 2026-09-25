@@ -236,6 +236,11 @@ test("a symbolic link may not lead a homework, the coach or the lexicon out of t
       await rejectsWith(load(root), /^course\.yaml: lexicon\.yaml leads outside the course folder\.$/);
     });
     await withCopy("synthetic", async (root) => {
+      await rename(join(root, "course.yaml"), join(outside, "course.yaml"));
+      await symlink(join(outside, "course.yaml"), join(root, "course.yaml"));
+      await rejectsWith(load(root), /^course\.yaml leads outside the course folder\.$/);
+    });
+    await withCopy("synthetic", async (root) => {
       await writeFile(join(outside, "README.md"), "# Not the course\n");
       await rm(join(root, "homeworks/two/README.md"));
       await symlink(join(outside, "README.md"), join(root, "homeworks/two/README.md"));

@@ -259,6 +259,8 @@ function StartCoach({
   onSetUp: () => void;
 }) {
   switch (start) {
+    case "loading":
+      return null;
     case "read-ahead":
       return (
         <div className="tp-start">

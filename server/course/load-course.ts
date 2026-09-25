@@ -31,9 +31,9 @@ export async function loadCourse(coursePath: string): Promise<Course> {
     throw new CourseLoadError(`There is no course folder at ${root}.`);
   }
   const display = displayWithin(root);
-  const { manifest, source, displayPath } = await readManifest(root, display);
-  checkHomeworkIds(manifest, displayPath);
   const guard = guardWithin(root, display);
+  const { manifest, source, displayPath } = await readManifest(root, display, guard);
+  checkHomeworkIds(manifest, displayPath);
   await checkManifestPaths(manifest, displayPath, guard);
 
   const builtin = await readBuiltinHomeworks();
@@ -59,14 +59,16 @@ function displayWithin(root: string): DisplayPath {
   };
 }
 
-async function readManifest(root: string, display: DisplayPath): Promise<LocatedManifest> {
+async function readManifest(root: string, display: DisplayPath, guard: PathGuard): Promise<LocatedManifest> {
   const yamlPath = join(root, COURSE_FILES.manifest);
+  await guard(yamlPath);
   const yaml = await readTextIfPresent(yamlPath, display(yamlPath));
   if (yaml !== null) {
     const displayPath = display(yamlPath);
     return { manifest: parseCourseYaml(yaml, root, displayPath), source: "course.yaml", displayPath };
   }
   const ledgerPath = join(root, COURSE_FILES.ledger);
+  await guard(ledgerPath);
   const ledger = await readTextIfPresent(ledgerPath, display(ledgerPath));
   if (ledger === null) {
     throw new CourseLoadError(
