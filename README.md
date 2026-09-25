@@ -68,7 +68,7 @@ Coach threads are spawned by Tutor directly in the factory folder, and only they
 | `server.ts` | Backend entry (factory) |
 | `app.tsx` | Frontend entry (`definePluginApp`) |
 | `shared/` | Model, keys, RPC contract, tool schemas, directive attributes, routes, fixtures |
-| `server/course/` | Course loading: course.yaml or ledger, Gherkin, slugs, hashes, novelty, lexicon, Lesson 0 |
+| `server/course/` | Course loading: course.yaml or ledger, Gherkin, slugs, hashes, new/reworded changes, lexicon, Lesson 0 |
 | `server/progress/`, `server/coach/`, `server/rpc/` | Student state, coach tools and threads, RPC handlers |
 | `app/` | Course outline (`Outline.tsx`), start page, lesson and Rule cards and other directives, the jump to a Rule's section, rule tab, home section, sidebar navigation, activity reporter; `paper.css`, fonts and the theme source |
 | `themes/` | The `paper` BB theme (generated CSS) and its light code theme |

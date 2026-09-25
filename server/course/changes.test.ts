@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { FeatureFile } from "../../shared/model.ts";
 import { parseFeatureFile } from "./feature.ts";
-import { suggestedRuleOrder, withNovelty } from "./novelty.ts";
+import { suggestedRuleOrder, withChanges } from "./changes.ts";
 
 function feature(path: string, body: string): FeatureFile {
   return parseFeatureFile({ text: `Feature: ${path}\n${body}`, path: `features/${path}.feature`, displayPath: path });
@@ -30,26 +30,26 @@ const after = [
 ];
 
 test("the first lesson is all new", () => {
-  const [a] = withNovelty(before, null);
-  assert.equal(a?.novelty, "new");
-  assert.ok(a?.rules.every((rule) => rule.novelty === "new" && rule.examples.every((e) => e.novelty === "new")));
+  const [a] = withChanges(before, null);
+  assert.equal(a?.change, "new");
+  assert.ok(a?.rules.every((rule) => rule.change === "new" && rule.examples.every((e) => e.change === "new")));
 });
 
 test("a Rule without Examples is new unless it existed before", () => {
-  const [a] = withNovelty(after, before);
+  const [a] = withChanges(after, before);
   assert.deepEqual(
-    a?.rules.map((rule) => [rule.slug, rule.novelty]),
+    a?.rules.map((rule) => [rule.slug, rule.change]),
     [
       ["kept", "unchanged"],
       ["emptied", "unchanged"],
       ["empty-from-the-start", "new"],
     ],
   );
-  assert.equal(a?.novelty, "unchanged");
+  assert.equal(a?.change, "unchanged");
 });
 
 test("the suggested order puts Rules that are not unchanged first, each group in file order", () => {
-  const features = withNovelty(
+  const features = withChanges(
     [
       feature("a", "  Rule: Old\n    Example: Same\n      Then same\n  Rule: Fresh\n    Example: New\n      Then new\n"),
       feature("b", "  Rule: Also fresh\n    Example: Newer\n      Then newer\n"),

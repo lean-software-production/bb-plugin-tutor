@@ -30,7 +30,7 @@ export function countExamples(examples: readonly Example[], progress: ProgressMa
   const counts: ExampleCounts = { total: 0, passing: 0, notYet: 0, skipped: 0, pending: 0, fresh: 0 };
   for (const example of examples) {
     counts.total += 1;
-    if (example.novelty !== "unchanged") counts.fresh += 1;
+    if (example.change !== "unchanged") counts.fresh += 1;
     switch (exampleStatus(example, progress)) {
       case "passing":
         counts.passing += 1;

@@ -17,7 +17,7 @@ import {
   lessonStatusSchema,
   iterationProgressSchema,
   lexiconEntrySchema,
-  noveltySchema,
+  changeSchema,
   ruleKeySchema,
   ruleStatusSchema,
   threadIdSchema,
@@ -70,7 +70,7 @@ export type CourseInfo = z.infer<typeof courseInfoSchema>;
 export const ruleOutlineSchema = z.object({
   key: ruleKeySchema,
   name: z.string(),
-  novelty: noveltySchema,
+  change: changeSchema,
   status: ruleStatusSchema,
   isFocus: z.boolean(),
   counts: exampleCountsSchema,
@@ -85,7 +85,7 @@ export const featureOutlineSchema = z.object({
   slug: z.string(),
   name: z.string(),
   path: z.string(),
-  novelty: noveltySchema,
+  change: changeSchema,
   counts: exampleCountsSchema,
   rules: z.array(ruleOutlineSchema),
 });
@@ -159,7 +159,7 @@ export type LessonDetail = z.infer<typeof lessonDetailSchema>;
 export const completionSchema = z.object({
   lesson: z.object({ id: lessonIdSchema, title: z.string(), set: z.string().nullable() }),
   counts: exampleCountsSchema,
-  /** Rules whose novelty is not unchanged. */
+  /** Rules that are new or reworded. */
   freshRules: z.number().int().nonnegative(),
   /** Side chats (and older side threads) of the lesson's coach thread. */
   sideChats: z.number().int().nonnegative(),

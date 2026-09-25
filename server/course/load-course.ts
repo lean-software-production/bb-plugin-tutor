@@ -1,6 +1,6 @@
 // Reads a course from disk into the shared Course model: the manifest (from
 // course.yaml or the ledger), Lesson 0 in front, every lesson's content,
-// then novelty, suggested Rule order and FACTORY.md diffs between lessons.
+// then new/reworded changes, suggested Rule order and FACTORY.md diffs between lessons.
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { BUILTIN_LESSON_ID, COURSE_FILES } from "../../shared/constants.ts";
 import { slugify } from "../../shared/keys.ts";
@@ -15,7 +15,7 @@ import { parseLedger } from "./ledger.ts";
 import { parseLexicon } from "./lexicon.ts";
 import { parseCourseYaml } from "./manifest.ts";
 import type { CourseManifest } from "./manifest.ts";
-import { suggestedRuleOrder, withNovelty } from "./novelty.ts";
+import { suggestedRuleOrder, withChanges } from "./changes.ts";
 import { firstHeading, readmeDek, sharedSentences } from "./readme.ts";
 
 interface LocatedManifest {
@@ -131,7 +131,7 @@ function deriveInOrder(contents: readonly LessonContent[]): Lesson[] {
 }
 
 function derive(content: LessonContent, previous: LessonContent | null, boilerplate: ReadonlySet<string>): Lesson {
-  const features = withNovelty(content.features, previous?.features ?? null);
+  const features = withChanges(content.features, previous?.features ?? null);
   return {
     ...content,
     dek: readmeDek(content.readme, boilerplate),

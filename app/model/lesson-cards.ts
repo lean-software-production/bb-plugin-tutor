@@ -4,7 +4,7 @@
 // the Rule's Examples as annotated Gherkin, mockup 6B). Both are drawn from
 // the live lesson, so their statuses stay current however old the message.
 import { countExamples, lessonExamples, ruleStatus } from "../../shared/derive.ts";
-import type { Novelty } from "../../shared/model.ts";
+import type { Change } from "../../shared/model.ts";
 import type { LessonDetail } from "../../shared/rpc.ts";
 import { lessonEyebrow, percent, plural } from "./format.ts";
 import { featureView } from "./lesson.ts";
@@ -15,7 +15,7 @@ export interface LessonCardRule {
   key: string;
   name: string;
   glyph: RuleGlyph;
-  novelty: Novelty;
+  change: Change;
   /** It has a section in the coach thread to jump to. */
   reached: boolean;
 }
@@ -23,7 +23,7 @@ export interface LessonCardRule {
 export interface LessonCardFeature {
   slug: string;
   name: string;
-  novelty: Novelty;
+  change: Change;
   count: string;
   rules: LessonCardRule[];
 }
@@ -60,7 +60,7 @@ export function lessonCardView(detail: LessonDetail): LessonCardView {
       return {
         slug: feature.slug,
         name: feature.name,
-        novelty: feature.novelty,
+        change: feature.change,
         count: `${featureCounts.passing}/${featureCounts.total}`,
         rules: feature.rules.map((rule) => {
           const status = ruleStatus(rule, progress);
@@ -68,7 +68,7 @@ export function lessonCardView(detail: LessonDetail): LessonCardView {
             key: rule.key,
             name: rule.name,
             glyph: status === "passing" ? "passing" : rule.key === focus ? "focus" : status,
-            novelty: rule.novelty,
+            change: rule.change,
             reached: detail.coachThreadId !== null && reached.has(rule.key),
           };
         }),
@@ -81,7 +81,7 @@ export function lessonCardView(detail: LessonDetail): LessonCardView {
 export interface RuleCardView {
   lessonId: string;
   featureName: string;
-  featureNovelty: Novelty;
+  featureChange: Change;
   rule: RuleView;
   passing: number;
   total: number;
@@ -105,7 +105,7 @@ export function ruleCardView(detail: LessonDetail, ruleKey: string, now: number)
     return {
       lessonId: detail.lesson.id,
       featureName: feature.name,
-      featureNovelty: feature.novelty,
+      featureChange: feature.change,
       rule,
       passing: counts.passing,
       total: counts.total,

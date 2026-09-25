@@ -69,7 +69,7 @@ export function continueView(overview: Overview): ContinueView {
   }
   const summary = overview.lessons.find((lesson) => lesson.id === current.lessonId);
   const set = summary?.set ?? null;
-  const rules = current.outline.flatMap((feature) => feature.rules).filter((rule) => rule.novelty !== "unchanged");
+  const rules = current.outline.flatMap((feature) => feature.rules).filter((rule) => rule.change !== "unchanged");
   return {
     kind: "continue",
     lessonId: current.lessonId,

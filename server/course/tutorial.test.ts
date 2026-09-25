@@ -50,11 +50,11 @@ describe("the tutorial course", { skip: coursePath === undefined && "TUTOR_TEST_
 
   test("assembly-line.feature is new in lesson 003", () => {
     const assemblyLine = lesson("003").features.find((feature) => feature.slug === "assembly-line");
-    assert.equal(assemblyLine?.novelty, "new");
-    assert.ok(assemblyLine?.rules.every((rule) => rule.novelty === "new"));
+    assert.equal(assemblyLine?.change, "new");
+    assert.ok(assemblyLine?.rules.every((rule) => rule.change === "new"));
     const rules = lesson("003").features.flatMap((feature) => feature.rules);
     const order = lesson("003").suggestedRuleOrder;
-    const firstUnchanged = order.findIndex((key) => rules.find((rule) => rule.key === key)?.novelty === "unchanged");
+    const firstUnchanged = order.findIndex((key) => rules.find((rule) => rule.key === key)?.change === "unchanged");
     for (const rule of assemblyLine?.rules ?? []) assert.ok(order.indexOf(rule.key) < firstUnchanged, rule.key);
   });
 
@@ -64,7 +64,7 @@ describe("the tutorial course", { skip: coursePath === undefined && "TUTOR_TEST_
       ["006", "007"],
     ] as const) {
       const earlier = new Set(lessonExamples(lesson(previous)).map((example) => example.hash));
-      const unchanged = lessonExamples(lesson(current)).filter((example) => example.novelty === "unchanged");
+      const unchanged = lessonExamples(lesson(current)).filter((example) => example.change === "unchanged");
       assert.ok(unchanged.length > 0, `${current} has unchanged Examples`);
       for (const example of unchanged) assert.ok(earlier.has(example.hash), example.key);
     }

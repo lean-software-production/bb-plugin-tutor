@@ -59,12 +59,12 @@ export function outline(
     slug: feature.slug,
     name: feature.name,
     path: feature.path,
-    novelty: feature.novelty,
+    change: feature.change,
     counts: countExamples(feature.rules.flatMap((rule) => rule.examples), progress),
     rules: feature.rules.map((rule) => ({
       key: rule.key,
       name: rule.name,
-      novelty: rule.novelty,
+      change: rule.change,
       status: ruleStatus(rule, progress),
       isFocus: rule.key === focus,
       counts: countExamples(rule.examples, progress),
@@ -181,7 +181,7 @@ export function buildCompletion(
   return {
     lesson: { id: lesson.id, title: lesson.title, set: lesson.set },
     counts: countExamples(lessonExamples(lesson), progress?.examples ?? {}),
-    freshRules: lesson.features.flatMap((feature) => feature.rules).filter((rule) => rule.novelty !== "unchanged").length,
+    freshRules: lesson.features.flatMap((feature) => feature.rules).filter((rule) => rule.change !== "unchanged").length,
     sideChats:
       threads.filter((thread) => thread.courseId === course.id && thread.lessonId === lesson.id && thread.role === "sideChat").length +
       bbSideChats,
@@ -199,7 +199,7 @@ export function buildCompletion(
             rules: next.features.reduce((sum, feature) => sum + feature.rules.length, 0),
             examples: nextExamples.length,
             carryOver: nextExamples.filter((example) => passingHashes.has(example.hash)).length,
-            fresh: nextExamples.filter((example) => example.novelty !== "unchanged").length,
+            fresh: nextExamples.filter((example) => example.change !== "unchanged").length,
             factoryDiff: next.factoryDiff,
           },
   };

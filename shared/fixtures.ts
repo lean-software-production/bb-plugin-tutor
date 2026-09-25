@@ -16,7 +16,7 @@ import type {
   FeatureFile,
   Lesson,
   LexiconEntry,
-  Novelty,
+  Change,
   Rule,
   Step,
   StudentState,
@@ -59,7 +59,7 @@ function steps(...lines: string[]): Step[] {
 interface ExampleSpec {
   name: string;
   steps: Step[];
-  novelty: Novelty;
+  change: Change;
   tags?: string[];
 }
 interface RuleSpec {
@@ -68,9 +68,9 @@ interface RuleSpec {
   examples: ExampleSpec[];
 }
 
-function aggregate(novelties: readonly Novelty[]): Novelty {
-  if (novelties.length > 0 && novelties.every((n) => n === "new")) return "new";
-  if (novelties.every((n) => n === "unchanged")) return "unchanged";
+function aggregate(changes: readonly Change[]): Change {
+  if (changes.length > 0 && changes.every((n) => n === "new")) return "new";
+  if (changes.every((n) => n === "unchanged")) return "unchanged";
   return "reworded";
 }
 
@@ -91,7 +91,7 @@ function feature(path: string, name: string, description: string, specs: RuleSpe
         steps: example.steps,
         hash: fakeHash(`${example.name}\n${example.steps.map((s) => `${s.keyword} ${s.text}`).join("\n")}`),
         line: 10 + ruleIndex * 10 + exampleIndex * 4,
-        novelty: example.novelty,
+        change: example.change,
       };
     });
     return {
@@ -103,7 +103,7 @@ function feature(path: string, name: string, description: string, specs: RuleSpe
       background: [],
       examples,
       line: 8 + ruleIndex * 10,
-      novelty: aggregate(examples.map((example) => example.novelty)),
+      change: aggregate(examples.map((example) => example.change)),
     };
   });
   return {
@@ -114,15 +114,15 @@ function feature(path: string, name: string, description: string, specs: RuleSpe
     tags: [],
     background: steps("Given the factory keeps its jobs in a new, empty folder"),
     rules,
-    novelty: aggregate(rules.flatMap((rule) => rule.examples.map((example) => example.novelty))),
+    change: aggregate(rules.flatMap((rule) => rule.examples.map((example) => example.change))),
   };
 }
 
 function suggestedOrder(features: FeatureFile[]): string[] {
   const rules = features.flatMap((f) => f.rules);
   return [
-    ...rules.filter((rule) => rule.novelty !== "unchanged"),
-    ...rules.filter((rule) => rule.novelty === "unchanged"),
+    ...rules.filter((rule) => rule.change !== "unchanged"),
+    ...rules.filter((rule) => rule.change === "unchanged"),
   ].map((rule) => rule.key);
 }
 
@@ -133,7 +133,7 @@ function lesson(fields: Omit<Lesson, "suggestedRuleOrder">): Lesson {
 const seedBecomesPlan: ExampleSpec = {
   name: "A seed becomes a plan",
   steps: steps("Given a job with no plan", "When the factory runs", "Then the job has a plan"),
-  novelty: "new",
+  change: "new",
 };
 
 const lesson0 = lesson({
@@ -154,12 +154,12 @@ const lesson0 = lesson({
           {
             name: "The rule in focus is marked",
             steps: steps("Given the coach has moved to a rule", "Then the outline marks that rule"),
-            novelty: "new",
+            change: "new",
           },
           {
             name: "A side chat appears under its rule",
             steps: steps("When you open a side chat about a rule", "Then it appears under that rule"),
-            novelty: "new",
+            change: "new",
           },
         ],
       },
@@ -187,7 +187,7 @@ const lesson1 = lesson({
           {
             name: "An existing plan is kept",
             steps: steps("Given a job with a plan", "When the factory runs", "Then the plan is unchanged"),
-            novelty: "new",
+            change: "new",
           },
         ],
       },
@@ -211,11 +211,11 @@ const lesson2 = lesson({
       {
         name: "The planner writes a plan",
         examples: [
-          { ...seedBecomesPlan, novelty: "unchanged" },
+          { ...seedBecomesPlan, change: "unchanged" },
           {
             name: "An existing plan is kept",
             steps: steps("Given a job with a plan", "When the factory runs again", "Then the plan is unchanged"),
-            novelty: "reworded",
+            change: "reworded",
           },
         ],
       },
@@ -228,7 +228,7 @@ const lesson2 = lesson({
           {
             name: "The work is right first time",
             steps: steps("Given a validator that is satisfied", "When the doer finishes its attempt", "Then the task is finished"),
-            novelty: "new",
+            change: "new",
           },
           {
             name: "The work is wrong first time",
@@ -237,7 +237,7 @@ const lesson2 = lesson({
               "When the doer finishes its attempt",
               'Then the doer tries again with "the validator\'s report"',
             ),
-            novelty: "new",
+            change: "new",
           },
         ],
       },
@@ -247,7 +247,7 @@ const lesson2 = lesson({
           {
             name: "A stand-in that is never satisfied",
             steps: steps("Given a validator configured with the never-satisfied stand-in", "When the factory runs", "Then the doer has made three attempts"),
-            novelty: "new",
+            change: "new",
             tags: ["real-agent"],
           },
         ],
@@ -284,7 +284,7 @@ const lesson3 = lesson({
               "When the factory reads the assembly line",
               "Then it refuses it",
             ),
-            novelty: "new",
+            change: "new",
           },
         ],
       },
@@ -413,7 +413,7 @@ function outline(lessonId: string, { progress, focus, reached }: OutlineInput = 
     slug: f.slug,
     name: f.name,
     path: f.path,
-    novelty: f.novelty,
+    change: f.change,
     counts: countExamples(
       f.rules.flatMap((rule) => rule.examples),
       progress,
@@ -421,7 +421,7 @@ function outline(lessonId: string, { progress, focus, reached }: OutlineInput = 
     rules: f.rules.map((rule) => ({
       key: rule.key,
       name: rule.name,
-      novelty: rule.novelty,
+      change: rule.change,
       status: ruleStatus(rule, progress),
       isFocus: rule.key === focus,
       counts: countExamples(rule.examples, progress),

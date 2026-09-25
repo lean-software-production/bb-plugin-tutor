@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { clipLines, plural } from "../model/format.ts";
 import { laterFoldId } from "../model/lesson.ts";
 import type { ExampleView, FeatureView, LessonView, MarginNote, RuleView } from "../model/lesson.ts";
-import { Chips, GherkinLines, GherkinRow, InlineText, NewDot } from "./common.tsx";
+import { Chips, GherkinLines, GherkinRow, InlineText, ChangeBadge } from "./common.tsx";
 
 const GUTTER_GLYPHS = { passing: "✓", "not-yet": "!", pending: "○", skipped: "–" } as const;
 const RULE_GLYPHS = { passing: "✓", "not-yet": "!", pending: "○" } as const;
@@ -60,7 +60,7 @@ export function Lesson({ view, openRules, openFeatures, onToggleRule, onToggleFe
               name={
                 <>
                   {feature.name}
-                  <NewDot novelty={feature.novelty} mixedLabel="changed" />
+                  <ChangeBadge change={feature.change} mixedLabel="changed" />
                 </>
               }
               file={feature.file}
@@ -107,7 +107,7 @@ function FeatureSection({ feature, focusLabel, children }: { feature: FeatureVie
       <div className="tp-featurehead">
         <p className="tp-section-label">
           Feature · {feature.file}
-          <NewDot novelty={feature.novelty} mixedLabel="changed" />
+          <ChangeBadge change={feature.change} mixedLabel="changed" />
         </p>
         <div className="tp-row">
           <h2 className="tp-h2">{feature.name}</h2>
@@ -196,7 +196,7 @@ function RuleList({
             </span>
             <span className="tp-rule-name">
               {rule.name}
-              <NewDot novelty={rule.novelty} />
+              <ChangeBadge change={rule.change} />
             </span>
             <span className="tp-x">{rule.summary}</span>
           </button>
@@ -219,7 +219,7 @@ function RuleOpen({
     <section className={rule.isFocus ? "tp-rule tp-rule--focus" : "tp-rule"} data-rule-key={rule.key} aria-label={`Rule ${rule.name}`}>
       <p className="tp-section-label">
         {label}
-        <NewDot novelty={rule.novelty} />
+        <ChangeBadge change={rule.change} />
         {onCollapse === null ? null : (
           <button type="button" className="tp-link-button" onClick={onCollapse}>
             collapse

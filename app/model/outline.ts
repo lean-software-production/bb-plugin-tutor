@@ -6,7 +6,7 @@
 import { withoutLeadingDirectives } from "../../shared/directives.ts";
 import { formatRoute } from "../../shared/routes.ts";
 import type { TutorRoute } from "../../shared/routes.ts";
-import type { LessonStatus, Novelty, RuleStatus } from "../../shared/model.ts";
+import type { LessonStatus, Change, RuleStatus } from "../../shared/model.ts";
 import type { FeatureOutline, LessonSummary, Overview, TutorThread } from "../../shared/rpc.ts";
 import { percent } from "./format.ts";
 import { indicatorView, isListed } from "./threads.ts";
@@ -30,7 +30,7 @@ export interface OutlineRule {
   name: string;
   glyph: RuleGlyph;
   isFocus: boolean;
-  novelty: Novelty;
+  change: Change;
   /** The coach has started it in the coach thread, so it has a section to jump to. */
   reached: boolean;
 }
@@ -38,7 +38,7 @@ export interface OutlineRule {
 export interface OutlineFeature {
   slug: string;
   name: string;
-  novelty: Novelty;
+  change: Change;
   rules: OutlineRule[];
 }
 
@@ -132,13 +132,13 @@ function features(outline: readonly FeatureOutline[]): OutlineFeature[] {
   return outline.map((feature) => ({
     slug: feature.slug,
     name: feature.name,
-    novelty: feature.novelty,
+    change: feature.change,
     rules: feature.rules.map((rule) => ({
       key: rule.key,
       name: rule.name,
       glyph: rule.status === "passing" ? "passing" : rule.isFocus ? "focus" : rule.status,
       isFocus: rule.isFocus,
-      novelty: rule.novelty,
+      change: rule.change,
       reached: rule.reached,
     })),
   }));

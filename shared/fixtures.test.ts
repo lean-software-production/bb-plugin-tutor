@@ -39,6 +39,6 @@ test("an unchanged example keeps its hash across lessons", () => {
   const [, one, two] = fixtureCourse.lessons;
   const inOne = one?.features[0]?.rules[0]?.examples[0];
   const inTwo = two?.features[0]?.rules[0]?.examples[0];
-  assert.equal(inTwo?.novelty, "unchanged");
+  assert.equal(inTwo?.change, "unchanged");
   assert.equal(inOne?.hash, inTwo?.hash);
 });

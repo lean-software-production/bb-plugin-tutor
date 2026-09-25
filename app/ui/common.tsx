@@ -2,7 +2,7 @@
 // a `.tutor-paper` ancestor; see app/paper.css.
 import type { MouseEvent, ReactNode } from "react";
 import { NAV_PANEL_PATH, PLUGIN_ID } from "../../shared/constants.ts";
-import type { Novelty } from "../../shared/model.ts";
+import type { Change } from "../../shared/model.ts";
 import type { GherkinLine } from "../model/gherkin.ts";
 import { parseInline } from "../model/inline.ts";
 import type { Chip } from "../model/lesson.ts";
@@ -39,9 +39,9 @@ export function InlineText({ text }: { text: string }) {
 }
 
 /** A feature's "reworded" means a mix of new and reworded Rules, so it reads "changed". */
-export function NewDot({ novelty, mixedLabel = "reworded" }: { novelty: Novelty; mixedLabel?: string }) {
-  if (novelty === "unchanged") return null;
-  return <span className="tp-newdot">{novelty === "new" ? "new" : mixedLabel}</span>;
+export function ChangeBadge({ change, mixedLabel = "reworded" }: { change: Change; mixedLabel?: string }) {
+  if (change === "unchanged") return null;
+  return <span className="tp-change-badge">{change === "new" ? "new" : mixedLabel}</span>;
 }
 
 export function Bar({ percent, label }: { percent: number; label: string }) {

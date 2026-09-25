@@ -1,5 +1,5 @@
 // Parses one .feature file into the shared model with @cucumber/gherkin.
-// Novelty is left as "new" here; novelty.ts compares lessons afterwards.
+// The change is left as "new" here; changes.ts compares lessons afterwards.
 import { AstBuilder, GherkinClassicTokenMatcher, Parser } from "@cucumber/gherkin";
 import { IdGenerator } from "@cucumber/messages";
 import type * as Gherkin from "@cucumber/messages";
@@ -73,7 +73,7 @@ export function parseFeatureFile(source: FeatureSource): FeatureFile {
     tags: tagNames(feature.tags),
     background: background.map(toStep),
     rules,
-    novelty: "new",
+    change: "new",
   };
 }
 
@@ -124,7 +124,7 @@ function toRule(featureSlug: string, slug: string, parts: RuleParts): Rule {
     background: parts.background.map(toStep),
     examples,
     line: parts.line,
-    novelty: "new",
+    change: "new",
   };
 }
 
@@ -139,7 +139,7 @@ function toExample(featureSlug: string, ruleSlug: string, slug: string, scenario
     steps,
     hash: exampleHash(scenario.name, steps),
     line: scenario.location.line,
-    novelty: "new",
+    change: "new",
   };
 }
 

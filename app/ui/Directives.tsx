@@ -17,7 +17,7 @@ import type { ProgressCardView } from "../model/cards.ts";
 import { lessonCardView, ruleCardView } from "../model/lesson-cards.ts";
 import type { LessonCardView, RuleCardView } from "../model/lesson-cards.ts";
 import { QUERY_KEYS } from "../state/app-state.ts";
-import { InlineText, NewDot, ReloadButton } from "./common.tsx";
+import { InlineText, ChangeBadge, ReloadButton } from "./common.tsx";
 import { AnnotatedExample } from "./Lesson.tsx";
 
 const RULE_GLYPHS = { passing: "✓", "not-yet": "!", pending: "○", focus: "●" } as const;
@@ -77,7 +77,7 @@ function LessonCard({ view }: { view: LessonCardView }) {
           <section key={feature.slug} aria-label={`Feature ${feature.name}`}>
             <p className="tp-section-label">
               {feature.name}
-              <NewDot novelty={feature.novelty} mixedLabel="changed" />
+              <ChangeBadge change={feature.change} mixedLabel="changed" />
               <span className="tp-lcard-count">{feature.count}</span>
             </p>
             <ul>
@@ -89,7 +89,7 @@ function LessonCard({ view }: { view: LessonCardView }) {
                     </span>
                     <span>
                       {rule.name}
-                      <NewDot novelty={rule.novelty} />
+                      <ChangeBadge change={rule.change} />
                     </span>
                   </>
                 );
@@ -166,7 +166,7 @@ function RuleCard({ view, anchorProps }: { view: RuleCardView; anchorProps: Reco
         <div className="tp-rcard-head">
           <div className="tp-ey">
             Now working on · {view.featureName}
-            <NewDot novelty={rule.novelty} />
+            <ChangeBadge change={rule.change} />
           </div>
           <h3 className="tp-tt">{rule.name}</h3>
         </div>

@@ -13,7 +13,7 @@ export interface CourseSource {
   /**
    * Reads the course at `coursePath` from disk: course.yaml when present,
    * otherwise the ledger table in docs/iterations/README.md. Returns a fully
-   * derived Course (Lesson 0 prepended; slugs, hashes, novelty,
+   * derived Course (Lesson 0 prepended; slugs, hashes, new/reworded changes,
    * suggestedRuleOrder, factoryDiff and lexicon filled in). Never caches:
    * callers decide when to re-read. Rejects with CourseLoadError when the path
    * is missing or holds neither a course.yaml nor a ledger; a malformed single

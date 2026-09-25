@@ -28,7 +28,7 @@ import { lessonLabel } from "../model/format.ts";
 import { buildOutline } from "../model/outline.ts";
 import type { LessonNode, OutlineRule, OutlineView, SideRow, ThreadRow } from "../model/outline.ts";
 import { outlineMountedStore, routeStore } from "../state/app-state.ts";
-import { NewDot, ReloadButton, coursePageHref, isPlainClick } from "./common.tsx";
+import { ChangeBadge, ReloadButton, coursePageHref, isPlainClick } from "./common.tsx";
 
 const RULE_GLYPHS = { passing: "✓", "not-yet": "!", pending: "○", focus: "●" } as const;
 const LESSON_GLYPHS = { done: "✓", current: "●", ahead: "○" } as const;
@@ -217,7 +217,7 @@ function LessonThreads({ lesson, go, onNavigate }: { lesson: LessonNode; go: Go;
               <div key={feature.slug} className="tp-rule-group">
                 <div className="tp-feat">
                   {feature.name}
-                  <NewDot novelty={feature.novelty === "new" ? "new" : "unchanged"} />
+                  <ChangeBadge change={feature.change === "new" ? "new" : "unchanged"} />
                 </div>
                 {feature.rules.map((rule) => (
                   <RuleRow
@@ -276,7 +276,7 @@ function RuleRow({ rule, href, onOpen }: { rule: OutlineRule; href: string; onOp
       </span>
       <span className="tp-rname">
         {rule.name}
-        <NewDot novelty={rule.novelty} />
+        <ChangeBadge change={rule.change} />
       </span>
     </>
   );

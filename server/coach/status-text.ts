@@ -39,7 +39,7 @@ export function statusText(state: CoachState): string {
     if (rule === undefined) continue;
     const ruleCounts = countExamples(rule.examples, progress);
     const marker = key === focus ? "●" : " ";
-    lines.push(`${marker} ${rule.key} — ${rule.name} [${ruleCounts.passing}/${ruleCounts.total}, ${rule.novelty}]`);
+    lines.push(`${marker} ${rule.key} — ${rule.name} [${ruleCounts.passing}/${ruleCounts.total}, ${rule.change}]`);
     for (const example of rule.examples) {
       const status = exampleStatus(example, progress);
       const note = status === "not-yet" ? progress[example.key]?.note : undefined;

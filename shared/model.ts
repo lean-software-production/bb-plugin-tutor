@@ -48,8 +48,8 @@ export type ExampleStatus = z.infer<typeof exampleStatusSchema>;
  * - Rule / FeatureFile: new when all its Examples are new, unchanged when all
  *   are unchanged, reworded otherwise.
  */
-export const noveltySchema = z.enum(["new", "reworded", "unchanged"]);
-export type Novelty = z.infer<typeof noveltySchema>;
+export const changeSchema = z.enum(["new", "reworded", "unchanged"]);
+export type Change = z.infer<typeof changeSchema>;
 
 // ---------------------------------------------------------------------------
 // Course content
@@ -76,7 +76,7 @@ export const exampleSchema = z.object({
   steps: z.array(stepSchema),
   hash: textHashSchema,
   line: z.number().int().nonnegative(),
-  novelty: noveltySchema,
+  change: changeSchema,
 });
 export type Example = z.infer<typeof exampleSchema>;
 
@@ -90,7 +90,7 @@ export const ruleSchema = z.object({
   background: z.array(stepSchema),
   examples: z.array(exampleSchema),
   line: z.number().int().nonnegative(),
-  novelty: noveltySchema,
+  change: changeSchema,
 });
 export type Rule = z.infer<typeof ruleSchema>;
 
@@ -103,7 +103,7 @@ export const featureFileSchema = z.object({
   tags: z.array(z.string()),
   background: z.array(stepSchema),
   rules: z.array(ruleSchema),
-  novelty: noveltySchema,
+  change: changeSchema,
 });
 export type FeatureFile = z.infer<typeof featureFileSchema>;
 
@@ -262,7 +262,7 @@ export const exampleCountsSchema = z.object({
   notYet: z.number().int().nonnegative(),
   skipped: z.number().int().nonnegative(),
   pending: z.number().int().nonnegative(),
-  /** Examples whose novelty is new or reworded. */
+  /** Examples that are new or reworded. */
   fresh: z.number().int().nonnegative(),
 });
 export type ExampleCounts = z.infer<typeof exampleCountsSchema>;

@@ -12,7 +12,7 @@ import type {
   FeatureFile,
   Lesson,
   LessonStatus,
-  Novelty,
+  Change,
   Rule,
   RuleStatus,
 } from "../../shared/model.ts";
@@ -44,7 +44,7 @@ export interface RuleView {
   key: string;
   name: string;
   description: string;
-  novelty: Novelty;
+  change: Change;
   status: RuleStatus;
   isFocus: boolean;
   isUpNext: boolean;
@@ -58,7 +58,7 @@ export interface FeatureView {
   name: string;
   file: string;
   description: string;
-  novelty: Novelty;
+  change: Change;
   count: string;
   background: GherkinLine[];
   rules: RuleView[];
@@ -171,8 +171,8 @@ export function marginNote(example: Example, progress: ProgressMap, now: number)
       if (example.tags.includes("real-agent")) {
         return { tone: "purple", label: "@real-agent", text: "Needs a real agent — slow and costs tokens.", evidence: null };
       }
-      if (example.novelty === "new") return { tone: "blue", label: "New", text: "New in this lesson.", evidence: null };
-      if (example.novelty === "reworded") {
+      if (example.change === "new") return { tone: "blue", label: "New", text: "New in this lesson.", evidence: null };
+      if (example.change === "reworded") {
         return { tone: "blue", label: "Reworded", text: "Reworded since the last lesson.", evidence: null };
       }
       return null;
@@ -233,17 +233,17 @@ function upNextKey(detail: LessonDetail, progress: ProgressMap, focusKey: string
 
 function compass(lesson: Lesson, previous: LessonSummary | null): LessonView["compass"] {
   const examples = lessonExamples(lesson);
-  if (lesson.builtin || examples.every((example) => example.novelty === "new")) return null;
+  if (lesson.builtin || examples.every((example) => example.change === "new")) return null;
   const items: CompassItem[] = [];
   for (const feature of lesson.features) {
-    if (feature.novelty === "unchanged") continue;
+    if (feature.change === "unchanged") continue;
     const file = fileName(feature.path);
-    if (feature.novelty === "new") {
+    if (feature.change === "new") {
       items.push({ file, text: firstSentence(feature.description) || `New: ${feature.name}.` });
       continue;
     }
-    const fresh = feature.rules.filter((rule) => rule.novelty !== "unchanged");
-    const added = fresh.filter((rule) => rule.novelty === "new").length;
+    const fresh = feature.rules.filter((rule) => rule.change !== "unchanged");
+    const added = fresh.filter((rule) => rule.change === "new").length;
     const reworded = fresh.length - added;
     const parts = [added > 0 ? plural(added, "new rule") : null, reworded > 0 ? `${reworded} reworded` : null].filter(
       (part): part is string => part !== null,
@@ -289,7 +289,7 @@ export function featureView(
     name: feature.name,
     file: fileName(feature.path),
     description: feature.description,
-    novelty: feature.novelty,
+    change: feature.change,
     count: `${counts.passing} / ${counts.total}`,
     background: backgroundLines(feature.background),
     rules: feature.rules.map((rule) => {
@@ -299,7 +299,7 @@ export function featureView(
         key: rule.key,
         name: rule.name,
         description: rule.description,
-        novelty: rule.novelty,
+        change: rule.change,
         status,
         isFocus: rule.key === focusKey,
         isUpNext,

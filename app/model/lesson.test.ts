@@ -153,7 +153,7 @@ test("margin notes carry the coach's words and the evidence", () => {
   const skipped = { [reworded.key]: { status: "skipped" as const, hash: reworded.hash, at: FIXTURE_NOW, note: "Out of scope." } };
   assert.deepEqual(marginNote(reworded, skipped, NOW), { tone: "muted", label: "Skipped", text: "Out of scope.", evidence: null });
 
-  const unchanged = { ...reworded, novelty: "unchanged" as const, tags: [] };
+  const unchanged = { ...reworded, change: "unchanged" as const, tags: [] };
   assert.equal(marginNote(unchanged, {}, NOW), null);
 });
 

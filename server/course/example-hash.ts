@@ -1,4 +1,4 @@
-// The Example text hash behind carry-over and novelty. The exact input is a
+// The Example text hash behind carry-over and the new/reworded badges. The exact input is a
 // contract (docs/tutor/IMPLEMENTATION.md "Example text hash"): changing it
 // would reset every student's passing Examples, so it is pinned by tests.
 import { createHash } from "node:crypto";

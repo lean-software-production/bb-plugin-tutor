@@ -19,8 +19,8 @@ function lesson(course: Course, id: string): Lesson {
   return found;
 }
 
-function noveltyByKey(hw: Lesson): Record<string, string> {
-  return Object.fromEntries(lessonExamples(hw).map((example) => [example.key, example.novelty]));
+function changeByKey(hw: Lesson): Record<string, string> {
+  return Object.fromEntries(lessonExamples(hw).map((example) => [example.key, example.change]));
 }
 
 /** A writable copy of a fixture course, removed after `body`. */
@@ -84,7 +84,7 @@ test("features are sorted by path and Examples keep file order under their Rules
     two.features.map((feature) => feature.path),
     ["features/gadgets.feature", "features/widgets.feature"],
   );
-  assert.deepEqual(Object.keys(noveltyByKey(two)), [
+  assert.deepEqual(Object.keys(changeByKey(two)), [
     "gadgets/a-gadget-has-a-button/pressing-the-button",
     "widgets/general/a-loose-example",
     "widgets/the-works-makes-a-widget/one-widget",
@@ -93,11 +93,11 @@ test("features are sorted by path and Examples keep file order under their Rules
   ]);
 });
 
-test("novelty compares each lesson with the one before it", async () => {
+test("change compares each lesson with the one before it", async () => {
   const course = await load(fixture("synthetic"));
-  assert.ok(lessonExamples(lesson(course, "010")).every((example) => example.novelty === "new"));
+  assert.ok(lessonExamples(lesson(course, "010")).every((example) => example.change === "new"));
   const two = lesson(course, "020");
-  assert.deepEqual(noveltyByKey(two), {
+  assert.deepEqual(changeByKey(two), {
     "gadgets/a-gadget-has-a-button/pressing-the-button": "new",
     "widgets/general/a-loose-example": "unchanged",
     "widgets/the-works-makes-a-widget/one-widget": "reworded",
@@ -107,7 +107,7 @@ test("novelty compares each lesson with the one before it", async () => {
     "widgets/widgets-can-be-counted/widgets-in-a-table": "unchanged",
   });
   assert.deepEqual(
-    two.features.map((feature) => [feature.slug, feature.novelty]),
+    two.features.map((feature) => [feature.slug, feature.change]),
     [
       ["gadgets", "new"],
       ["widgets", "reworded"],
@@ -151,7 +151,7 @@ test("without a course.yaml the ledger table is the course", async () => {
       ["002", "Second steps", null, join(root, "docs/iterations/002-second-steps")],
     ],
   );
-  assert.deepEqual(noveltyByKey(lesson(course, "002")), {
+  assert.deepEqual(changeByKey(lesson(course, "002")), {
     "steps/a-step-moves-you/one-step": "unchanged",
     "steps/a-step-moves-you/two-steps": "new",
   });
@@ -167,7 +167,7 @@ test("Lesson 0 ships with the plugin and teaches the interface", async () => {
   assert.ok(rules.length >= 3 && rules.length <= 5, `${rules.length} rules`);
   assert.equal(zero.suggestedRuleOrder.length, rules.length);
   const examples = lessonExamples(zero);
-  assert.ok(examples.every((example) => example.novelty === "new"));
+  assert.ok(examples.every((example) => example.change === "new"));
   assert.ok(examples.some((example) => /side chat/.test(example.name)));
 });
 
