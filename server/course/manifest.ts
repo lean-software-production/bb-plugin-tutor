@@ -1,9 +1,10 @@
 // What a course is made of before any homework is read: course.yaml when the
 // course has one, otherwise what ledger.ts works out from the ledger table.
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { resolve } from "node:path";
 import { z } from "zod";
 import { homeworkIdSchema } from "../../shared/model.ts";
 import { CourseLoadError } from "../../shared/ports.ts";
+import { isInside } from "../paths.ts";
 import { readYaml } from "./yaml-file.ts";
 
 export interface HomeworkEntry {
@@ -42,7 +43,8 @@ const courseYamlSchema = z.object({
 });
 
 /**
- * Parses course.yaml. Paths in it are relative to `root` and may not leave it.
+ * Parses course.yaml. Paths in it are relative to `root` and may not leave it
+ * as written; load-course.ts checks where symbolic links lead.
  * Every scalar is read as a string, so ids keep their leading zeros.
  */
 export function parseCourseYaml(source: string, root: string, displayPath: string): CourseManifest {
@@ -59,8 +61,7 @@ export function parseCourseYaml(source: string, root: string, displayPath: strin
   const course = parsed.data;
   const inside = (value: string, path: PropertyKey[]): string => {
     const absolute = resolve(root, value);
-    const rel = relative(root, absolute);
-    if (rel.split(sep)[0] === ".." || isAbsolute(rel)) {
+    if (!isInside(root, absolute)) {
       throw new CourseLoadError(
         `Could not read ${displayPath}, line ${lineOf(path)}: ${value} is outside the course folder.`,
       );

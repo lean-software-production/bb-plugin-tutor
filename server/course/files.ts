@@ -1,7 +1,8 @@
 // File reading for the course loader: absent files are null, and every other
 // failure becomes a CourseLoadError the student can read.
-import { readFile, readdir, stat } from "node:fs/promises";
+import { readFile, readdir, realpath, stat } from "node:fs/promises";
 import { CourseLoadError } from "../../shared/ports.ts";
+import { isInside, realPath } from "../paths.ts";
 
 function isMissing(error: unknown): boolean {
   const code = (error as { code?: unknown }).code;
@@ -47,4 +48,19 @@ export async function isDirectory(path: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * Refuses a path that exists but, once symbolic links are followed, is not
+ * inside the course folder. `where` names the file that pointed at it.
+ */
+export type PathGuard = (absolutePath: string, where?: string) => Promise<void>;
+
+export function guardWithin(root: string, display: (absolutePath: string) => string): PathGuard {
+  const realRoot = realPath(root);
+  return async (absolutePath, where) => {
+    const real = await realpath(absolutePath).catch(() => null);
+    if (real === null || isInside(await realRoot, real)) return;
+    throw new CourseLoadError(`${where === undefined ? "" : `${where}: `}${display(absolutePath)} leads outside the course folder.`);
+  };
 }

@@ -97,6 +97,8 @@ export async function makeTutorHost(
       threads: {
         spawn: async (args) => {
           const spawn = args as SpawnArgs;
+          // A real spawn is an HTTP round trip; let concurrent callers interleave around it.
+          await new Promise((resolve) => setTimeout(resolve, 5));
           return addThread({
             id: `thr_${threads.length + 1}`,
             projectId: spawn.projectId,

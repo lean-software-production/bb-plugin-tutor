@@ -1,9 +1,12 @@
 // Reads one homework folder: README.md, FACTORY.md, spec.md and features/*.feature.
+// README.md and at least one feature file are required: without them there is
+// nothing to coach, and adopting the homework would empty the student's spec/.
+// FACTORY.md and spec.md are optional; a homework without FACTORY.md has "".
 import { join } from "node:path";
 import type { FeatureFile, Homework } from "../../shared/model.ts";
 import { CourseLoadError } from "../../shared/ports.ts";
 import { parseFeatureFile } from "./feature.ts";
-import { listFilesIfPresent, readTextIfPresent } from "./files.ts";
+import { listFilesIfPresent, readTextIfPresent, type PathGuard } from "./files.ts";
 import type { HomeworkEntry } from "./manifest.ts";
 
 /** A homework before it is compared with the others in its course. */
@@ -18,14 +21,16 @@ export async function readHomework(
   entry: HomeworkEntry,
   builtin: boolean,
   display: DisplayPath,
+  guard: PathGuard,
 ): Promise<HomeworkContent> {
   const readmePath = join(entry.dir, "README.md");
+  const factoryPath = join(entry.dir, "FACTORY.md");
+  const seedPath = join(entry.dir, "spec.md");
+  for (const path of [readmePath, factoryPath, seedPath, join(entry.dir, FEATURES_DIR)]) await guard(path);
   const readme = await readTextIfPresent(readmePath, display(readmePath));
   if (readme === null) {
     throw new CourseLoadError(`Homework ${entry.id} has no README.md in ${display(entry.dir)}.`);
   }
-  const factoryPath = join(entry.dir, "FACTORY.md");
-  const seedPath = join(entry.dir, "spec.md");
   return {
     id: entry.id,
     title: entry.title,
@@ -46,6 +51,9 @@ async function readFeatures(entry: HomeworkEntry, display: DisplayPath): Promise
     .filter((name) => name.endsWith(".feature"))
     .map((name) => `${FEATURES_DIR}/${name}`)
     .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  if (paths.length === 0) {
+    throw new CourseLoadError(`Homework ${entry.id} has no feature files in ${display(featuresDir)}.`);
+  }
   const features: FeatureFile[] = [];
   for (const path of paths) {
     const absolute = join(entry.dir, path);

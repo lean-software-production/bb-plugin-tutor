@@ -6,6 +6,7 @@ import { findRule, homeworkStatus } from "../../shared/derive.ts";
 import type { Course, Homework, Rule } from "../../shared/model.ts";
 import { adoptionTargets } from "../coach/actions.ts";
 import { resolveFactory } from "../coach/binding.ts";
+import { mainThreadLockKey } from "../coach/lock-keys.ts";
 import type { FactoryLocation } from "../coach/threads.ts";
 import { mainThreadPrompt, redirectMessage, sideThreadPrompt, sideThreadTitle, type MainThreadStart } from "../coach/prompts.ts";
 import type { TutorRuntime } from "../coach/runtime.ts";
@@ -18,6 +19,7 @@ import {
   type TutorThreadRecord,
 } from "../coach/threads.ts";
 import type { World } from "../coach/world.ts";
+import { overlaps, realPath } from "../paths.ts";
 import { listCandidates } from "./candidates.ts";
 import { buildCompletion, buildLesson, buildOverview, publicThread, requireCourse, requireHomework } from "./views.ts";
 
@@ -69,6 +71,25 @@ export function registerRpc(rt: TutorRuntime): void {
     return threadId;
   }
 
+  /**
+   * The homework's main coach thread, spawned with `prompt` when there is none.
+   * One caller at a time per homework, re-listing once it has the lock, so two
+   * clicks (or two tabs) never spawn two main coaches.
+   */
+  async function findOrSpawnMain(
+    course: Course,
+    binding: BoundFactory,
+    homework: Homework,
+    prompt: () => string,
+  ): Promise<{ threadId: string; created: boolean }> {
+    return rt.locks.run(mainThreadLockKey(binding.projectId, course.id, homework.id), async () => {
+      const threads = await listTutorThreads(bb.sdk, bb.pluginId, binding.projectId);
+      const existing = findMainThread(threads, course.id, homework.id);
+      if (existing !== undefined) return { threadId: existing.id, created: false };
+      return { threadId: await spawnMain(course, binding, homework, prompt()), created: true };
+    });
+  }
+
   function startFor(world: World, course: Course, homework: Homework): MainThreadStart {
     const pointer = world.pointer;
     if (pointer === null || homeworkStatus(course, pointer, homework.id) === "done") return "revisit";
@@ -116,6 +137,11 @@ export function registerRpc(rt: TutorRuntime): void {
       if (binding.status !== "bound") {
         throw new Error("That project has no folder on this machine, so Tutor cannot coach in it.");
       }
+      // The coach writes spec/ and seeds/ into the factory, so it must never be the course checkout.
+      const { coursePath } = await rt.world.load();
+      if (overlaps(await realPath(binding.root), await realPath(coursePath))) {
+        throw new Error("That project's folder is, or shares a folder with, the course. Pick the repo you build your factory in.");
+      }
       // settings.onChange publishes the binding signal.
       await rt.settings.experimental_set({ factoryProject: projectId });
       return binding;
@@ -129,10 +155,7 @@ export function registerRpc(rt: TutorRuntime): void {
       if (world.pointer === null || homeworkStatus(course, world.pointer, homework.id) === "ahead") {
         throw new Error(`Homework ${homework.id} has not started yet.`);
       }
-      const existing = findMainThread(await threadsOf(world), course.id, homework.id);
-      if (existing !== undefined) return { threadId: existing.id, created: false };
-      const prompt = mainThreadPrompt(course, homework, startFor(world, course, homework));
-      return { threadId: await spawnMain(course, binding, homework, prompt), created: true };
+      return findOrSpawnMain(course, binding, homework, () => mainThreadPrompt(course, homework, startFor(world, course, homework)));
     },
 
     startNextHomework: async ({ homeworkId }) => {
@@ -143,9 +166,8 @@ export function registerRpc(rt: TutorRuntime): void {
       if (homework.builtin || world.pointer === null || !adoptionTargets(course, world.pointer).includes(homework.id)) {
         throw new Error(`Homework ${homework.id} cannot be started yet: finish the homework before it first.`);
       }
-      const existing = findMainThread(await threadsOf(world), course.id, homework.id);
-      if (existing !== undefined) return { threadId: existing.id };
-      return { threadId: await spawnMain(course, binding, homework, mainThreadPrompt(course, homework, "adopt")) };
+      const { threadId } = await findOrSpawnMain(course, binding, homework, () => mainThreadPrompt(course, homework, "adopt"));
+      return { threadId };
     },
 
     startSideThread: async ({ homeworkId, ruleKey, title }) => {
@@ -179,17 +201,16 @@ export function registerRpc(rt: TutorRuntime): void {
         throw new Error("You can only choose the next Rule in the homework you are on.");
       }
       const rule = requireRule(homework, ruleKey);
-      const main = findMainThread(await threadsOf(world), course.id, homework.id);
-      if (main === undefined) {
-        const prompt = mainThreadPrompt(course, homework, startFor(world, course, homework), rule);
-        return { threadId: await spawnMain(course, binding, homework, prompt) };
-      }
+      const main = await findOrSpawnMain(course, binding, homework, () =>
+        mainThreadPrompt(course, homework, startFor(world, course, homework), rule),
+      );
+      if (main.created) return { threadId: main.threadId };
       await bb.sdk.threads.send({
-        threadId: main.id,
+        threadId: main.threadId,
         input: [{ type: "text", text: redirectMessage(rule), mentions: [] }],
         mode: "queue-if-active",
       });
-      return { threadId: main.id };
+      return { threadId: main.threadId };
     },
   });
 }

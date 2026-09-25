@@ -2,6 +2,7 @@
 // docs/iterations/README.md, "| Iteration | Spec | Set after |".
 import { dirname, resolve } from "node:path";
 import { CourseLoadError } from "../../shared/ports.ts";
+import { isInside } from "../paths.ts";
 import type { HomeworkEntry } from "./manifest.ts";
 
 const COLUMNS = { id: "iteration", spec: "spec", set: "set after" } as const;
@@ -22,9 +23,9 @@ function isSeparator(line: string): boolean {
 /**
  * Reads the ledger table. A Spec link's target is a homework's README.md, or
  * its folder; either way the folder is the homework's `dir`, resolved against
- * `ledgerDir`.
+ * `ledgerDir`, and it may not leave `courseRoot` as written.
  */
-export function parseLedger(markdown: string, ledgerDir: string, displayPath: string): HomeworkEntry[] {
+export function parseLedger(markdown: string, ledgerDir: string, displayPath: string, courseRoot: string): HomeworkEntry[] {
   const lines = markdown.replace(/\r\n/g, "\n").split("\n");
   const headerIndex = lines.findIndex((line) => {
     if (!line.trim().startsWith("|")) return false;
@@ -57,6 +58,9 @@ export function parseLedger(markdown: string, ledgerDir: string, displayPath: st
     }
     const [, title = "", target = ""] = link;
     const targetPath = resolve(ledgerDir, target);
+    if (!isInside(courseRoot, targetPath)) {
+      throw new CourseLoadError(`${where}: ${target} is outside the course folder.`);
+    }
     homeworks.push({
       id,
       title: title.trim(),

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { test } from "node:test";
 import { makeSandbox } from "../../test/helpers/disk.ts";
@@ -46,6 +46,63 @@ test("copies the sample seed into seeds/ unless it is already there", async () =
     const second = await copyHomeworkSpec(sandbox.factoryRoot, homework);
     assert.equal(second.seedAlreadyThere, true);
     assert.equal(await readFile(join(sandbox.factoryRoot, "seeds/tetris.md"), "utf8"), "my own tetris\n");
+  } finally {
+    await sandbox.cleanup();
+  }
+});
+
+test("refuses a spec/ that is a symbolic link, and deletes nothing through it", async () => {
+  const sandbox = await makeSandbox();
+  try {
+    const src = join(sandbox.factoryRoot, "src");
+    await mkdir(src, { recursive: true });
+    await writeFile(join(src, "main.ts"), "the student's code\n");
+    await symlink("src", join(sandbox.factoryRoot, "spec"));
+    const homework = sandbox.course.homeworks[2];
+    assert.ok(homework !== undefined);
+
+    await assert.rejects(copyHomeworkSpec(sandbox.factoryRoot, homework), /spec\/ .*symbolic link/);
+    assert.deepEqual(await readdir(src), ["main.ts"]);
+  } finally {
+    await sandbox.cleanup();
+  }
+});
+
+test("refuses a seeds/ that is a symbolic link, and a seed that is one, writing nothing outside the factory", async () => {
+  const sandbox = await makeSandbox();
+  try {
+    const outside = join(sandbox.root, "outside");
+    await mkdir(outside, { recursive: true });
+    await symlink(outside, join(sandbox.factoryRoot, "seeds"));
+    const homework = sandbox.course.homeworks[1];
+    assert.ok(homework !== undefined && homework.seedSpec !== null);
+
+    await assert.rejects(copyHomeworkSpec(sandbox.factoryRoot, homework), /seeds\/ .*symbolic link/);
+    assert.deepEqual(await readdir(outside), []);
+    assert.equal(await readdir(join(sandbox.factoryRoot, "spec")).catch(() => null), null, "spec/ is untouched");
+
+    await rm(join(sandbox.factoryRoot, "seeds"));
+    await mkdir(join(sandbox.factoryRoot, "seeds"));
+    await symlink(join(outside, "tetris.md"), join(sandbox.factoryRoot, "seeds/tetris.md"));
+    const result = await copyHomeworkSpec(sandbox.factoryRoot, homework);
+    assert.equal(result.seedAlreadyThere, true);
+    assert.deepEqual(await readdir(outside), []);
+  } finally {
+    await sandbox.cleanup();
+  }
+});
+
+test("refuses a homework with no feature files, keeping the previous spec snapshot", async () => {
+  const sandbox = await makeSandbox();
+  try {
+    const first = sandbox.course.homeworks[1];
+    const second = sandbox.course.homeworks[2];
+    assert.ok(first !== undefined && second !== undefined);
+    await copyHomeworkSpec(sandbox.factoryRoot, first);
+    await rm(join(second.dir, "features"), { recursive: true });
+
+    await assert.rejects(copyHomeworkSpec(sandbox.factoryRoot, second), /no feature files/);
+    assert.deepEqual(await readdir(join(sandbox.factoryRoot, "spec/features")), ["planning.feature"]);
   } finally {
     await sandbox.cleanup();
   }

@@ -5,6 +5,7 @@ import { basename, join, resolve } from "node:path";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { COURSE_FILES, FACTORY_FILES } from "../../shared/constants.ts";
 import type { CandidateProject } from "../../shared/rpc.ts";
+import { overlaps } from "../paths.ts";
 import { parseIteration } from "../progress/iteration.ts";
 import { defaultSourcePath, pathExists, type ProjectWithSources } from "../coach/binding.ts";
 
@@ -31,6 +32,7 @@ export function describeCandidate(probe: ProjectProbe, context: CandidateContext
   const base = { projectId: probe.projectId, name: probe.name, root: probe.root };
   if (probe.root === null || !probe.rootExists) return { ...base, qualifies: false, detail: "no folder on this machine" };
   if (resolve(probe.root) === resolve(context.coursePath)) return { ...base, qualifies: false, detail: "the course itself" };
+  if (overlaps(probe.root, context.coursePath)) return { ...base, qualifies: false, detail: "shares a folder with the course" };
   if (probe.iterationText !== null) {
     const parsed = parseIteration(probe.iterationText);
     const state = "state" in parsed ? `${parsed.state.iteration} ${parsed.state.status}` : "unreadable";

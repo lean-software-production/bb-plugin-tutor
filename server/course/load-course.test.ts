@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cp, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -213,4 +213,64 @@ test("a coach or lexicon that course.yaml names must exist", async () => {
     await rm(join(root, ".agents/coach.md"));
     await rejectsWith(load(root), /^The course names \.agents\/coach\.md as its coach/);
   });
+});
+
+test("a symbolic link may not lead a homework, the coach or the lexicon out of the course folder", async () => {
+  const outside = await mkdtemp(join(tmpdir(), "tutor-outside-"));
+  try {
+    await withCopy("synthetic", async (root) => {
+      await rename(join(root, "homeworks/one"), join(outside, "one"));
+      await symlink(join(outside, "one"), join(root, "homeworks/one"));
+      await rejectsWith(load(root), /^course\.yaml: homeworks\/one leads outside the course folder\.$/);
+    });
+    await withCopy("synthetic", async (root) => {
+      await writeFile(join(outside, "coach.md"), "secret\n");
+      await rm(join(root, ".agents/coach.md"));
+      await symlink(join(outside, "coach.md"), join(root, ".agents/coach.md"));
+      await rejectsWith(load(root), /^course\.yaml: \.agents\/coach\.md leads outside the course folder\.$/);
+    });
+    await withCopy("synthetic", async (root) => {
+      await writeFile(join(outside, "lexicon.yaml"), "x: y\n");
+      await rm(join(root, "lexicon.yaml"));
+      await symlink(join(outside, "lexicon.yaml"), join(root, "lexicon.yaml"));
+      await rejectsWith(load(root), /^course\.yaml: lexicon\.yaml leads outside the course folder\.$/);
+    });
+    await withCopy("synthetic", async (root) => {
+      await writeFile(join(outside, "README.md"), "# Not the course\n");
+      await rm(join(root, "homeworks/two/README.md"));
+      await symlink(join(outside, "README.md"), join(root, "homeworks/two/README.md"));
+      await rejectsWith(load(root), /^homeworks\/two\/README\.md leads outside the course folder\.$/);
+    });
+    await withCopy("ledger", async (root) => {
+      const dir = join(root, "docs/iterations/002-second-steps");
+      await mkdir(join(outside, "ledger"), { recursive: true });
+      await rename(dir, join(outside, "ledger/002"));
+      await symlink(join(outside, "ledger/002"), dir);
+      await rejectsWith(load(root), /^docs\/iterations\/README\.md: docs\/iterations\/002-second-steps leads outside the course folder\.$/);
+    });
+  } finally {
+    await rm(outside, { recursive: true, force: true });
+  }
+});
+
+test("a symbolic link that stays inside the course folder is fine", async () => {
+  await withCopy("synthetic", async (root) => {
+    await rename(join(root, "homeworks/one"), join(root, "homeworks/one-real"));
+    await symlink("one-real", join(root, "homeworks/one"));
+    const course = await load(root);
+    assert.equal(homework(course, "010").title, "First widgets");
+  });
+});
+
+test("a homework without feature files is a readable error; FACTORY.md is optional", async () => {
+  await withCopy("ledger", async (root) => {
+    const features = join(root, "docs/iterations/002-second-steps/features");
+    await rm(join(features, "steps.feature"));
+    await writeFile(join(features, "notes.md"), "not a feature\n");
+    await rejectsWith(load(root), /^Homework 002 has no feature files in docs\/iterations\/002-second-steps\/features\.$/);
+    await rm(features, { recursive: true });
+    await rejectsWith(load(root), /^Homework 002 has no feature files in docs\/iterations\/002-second-steps\/features\.$/);
+  });
+  const course = await load(fixture("ledger"));
+  assert.equal(homework(course, "001").factoryMd, "");
 });

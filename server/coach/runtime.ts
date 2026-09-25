@@ -1,5 +1,6 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type { ProgressStore } from "../../shared/ports.ts";
+import type { KeyedLock } from "./keyed-lock.ts";
 import type { TutorSettings } from "./settings.ts";
 import type { StateSignals } from "./signals.ts";
 import type { WorldSource } from "./world.ts";
@@ -11,5 +12,7 @@ export interface TutorRuntime {
   world: WorldSource;
   store: ProgressStore;
   signals: StateSignals;
+  /** Serialises changes to one factory's files, and find-or-spawn of one homework's coach. */
+  locks: KeyedLock;
   now: () => Date;
 }

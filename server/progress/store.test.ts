@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fixtureStudent } from "../../shared/fixtures.ts";
@@ -49,4 +49,19 @@ test("malformed files become problems, never exceptions", async () => {
 
 test("refuses to write spec/ITERATION for Homework 0", async () => {
   await assert.rejects(store.writeIteration("/nonexistent", { iteration: "000", status: "WIP" }), /Homework 0/);
+});
+
+test("refuses to write through a spec/ that is a symbolic link", async () => {
+  const sandbox = await makeSandbox();
+  try {
+    await mkdir(join(sandbox.factoryRoot, "src"));
+    await symlink("src", join(sandbox.factoryRoot, "spec"));
+    const progress = fixtureStudent.progress;
+    assert.ok(progress !== null);
+    await assert.rejects(store.writeProgress(sandbox.factoryRoot, progress), /symbolic link/);
+    await assert.rejects(store.writeIteration(sandbox.factoryRoot, { iteration: "002", status: "WIP" }), /symbolic link/);
+    assert.deepEqual(await readdir(join(sandbox.factoryRoot, "src")), []);
+  } finally {
+    await sandbox.cleanup();
+  }
 });

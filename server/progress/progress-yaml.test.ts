@@ -129,3 +129,41 @@ test("unreadable files give no progress and one problem", () => {
   assert.equal(parseProgress("- a list").problems.length, 1);
   assert.match(parseProgress("examples: {}").problems[0] ?? "", /no valid iteration/);
 });
+
+test("a history entry whose examples are not a mapping is reported, and written back as it was", () => {
+  const text = [
+    'iteration: "003"',
+    "examples: {}",
+    "history:",
+    '  "001":',
+    "    summary: It plans.",
+    "    examples: lost in a merge",
+  ].join("\n");
+  const parsed = parseProgress(text);
+  assert.deepEqual(parsed.progress?.history, { "001": { summary: "It plans.", examples: {} } });
+  assert.deepEqual(parsed.problems, ["spec/PROGRESS.yaml: history.001.examples should be a mapping; none were read."]);
+  assert.ok(parsed.progress !== null);
+  const written = formatProgress(parsed.progress, text);
+  assert.match(written, /\n {2}"001":\n {4}summary: It plans\.\n {4}examples: lost in a merge\n/);
+});
+
+test("keeps unknown fields in history entries and their Examples", () => {
+  const previous = [
+    'iteration: "003"',
+    "examples: {}",
+    "history:",
+    "  1:",
+    "    reviewer: ana",
+    "    examples:",
+    "      a/b/c:",
+    "        status: passing",
+    `        hash: ${hash}`,
+    "        at: 2026-09-23T10:00:00Z",
+    "        ci: green",
+  ].join("\n");
+  const parsed = parseProgress(previous);
+  assert.ok(parsed.progress !== null);
+  const written = formatProgress(parsed.progress, previous);
+  assert.match(written, /\n {2}"001":\n {4}examples:\n {6}a\/b\/c:\n {8}status: passing\n[\s\S]* {8}at: .*\n {8}ci: green\n {4}reviewer: ana\n?$/);
+  assert.deepEqual(parseProgress(written).progress, parsed.progress);
+});

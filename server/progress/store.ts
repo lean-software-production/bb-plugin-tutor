@@ -6,6 +6,7 @@ import type { IterationState, ProgressFile, StudentState } from "../../shared/mo
 import type { ProgressStore } from "../../shared/ports.ts";
 import { writeFileAtomic } from "./atomic-write.ts";
 import { formatIteration, parseIteration } from "./iteration.ts";
+import { ownFolder } from "./own-folder.ts";
 import { formatProgress, parseProgress } from "./progress-yaml.ts";
 
 /** The file's text, or null when it does not exist. */
@@ -50,6 +51,7 @@ export function createProgressStore(): ProgressStore {
     },
 
     async writeProgress(factoryRoot: string, progress: ProgressFile): Promise<void> {
+      await ownFolder(factoryRoot, FACTORY_FILES.specDir);
       const path = join(factoryRoot, FACTORY_FILES.progress);
       await writeFileAtomic(path, formatProgress(progress, await readOptional(path)));
     },
@@ -58,6 +60,7 @@ export function createProgressStore(): ProgressStore {
       if (state.iteration === BUILTIN_HOMEWORK_ID) {
         throw new Error("Homework 0 is tracked in spec/PROGRESS.yaml only; spec/ITERATION is never written for it.");
       }
+      await ownFolder(factoryRoot, FACTORY_FILES.specDir);
       await writeFileAtomic(join(factoryRoot, FACTORY_FILES.iteration), formatIteration(state));
     },
   };

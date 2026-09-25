@@ -8,7 +8,7 @@ import type { Course, Homework, LexiconEntry } from "../../shared/model.ts";
 import { CourseLoadError } from "../../shared/ports.ts";
 import { BUILTIN_COURSE_ROOT } from "./builtin.ts";
 import { factoryDiff } from "./factory-diff.ts";
-import { isDirectory, isFile, readTextIfPresent } from "./files.ts";
+import { guardWithin, isDirectory, isFile, readTextIfPresent, type PathGuard } from "./files.ts";
 import { readHomework } from "./homework.ts";
 import type { DisplayPath, HomeworkContent } from "./homework.ts";
 import { parseLedger } from "./ledger.ts";
@@ -33,10 +33,12 @@ export async function loadCourse(coursePath: string): Promise<Course> {
   const display = displayWithin(root);
   const { manifest, source, displayPath } = await readManifest(root, display);
   checkHomeworkIds(manifest, displayPath);
+  const guard = guardWithin(root, display);
+  await checkManifestPaths(manifest, displayPath, guard);
 
   const builtin = await readBuiltinHomeworks();
   const contents = await Promise.all(
-    manifest.homeworks.map((entry) => readHomework(entry, false, display)),
+    manifest.homeworks.map((entry) => readHomework(entry, false, display, guard)),
   );
   return {
     id: manifest.id,
@@ -82,11 +84,17 @@ async function readManifest(root: string, display: DisplayPath): Promise<Located
       description: null,
       coachPath: await ifPresent(join(root, COURSE_FILES.defaultCoach)),
       lexiconPath: await ifPresent(join(root, COURSE_FILES.defaultLexicon)),
-      homeworks: parseLedger(ledger, dirname(ledgerPath), display(ledgerPath)),
+      homeworks: parseLedger(ledger, dirname(ledgerPath), display(ledgerPath), root),
     },
     source: "ledger",
     displayPath: display(ledgerPath),
   };
+}
+
+/** Where the manifest's paths lead once symbolic links are followed: inside the course only. */
+async function checkManifestPaths(manifest: CourseManifest, where: string, guard: PathGuard): Promise<void> {
+  const paths = [manifest.coachPath, manifest.lexiconPath, ...manifest.homeworks.map((entry) => entry.dir)];
+  for (const path of paths) if (path !== null) await guard(path, where);
 }
 
 function checkHomeworkIds(manifest: CourseManifest, where: string): void {
@@ -106,7 +114,8 @@ async function readBuiltinHomeworks(): Promise<HomeworkContent[]> {
   const yaml = await readTextIfPresent(yamlPath, display(yamlPath));
   if (yaml === null) throw new CourseLoadError(`Tutor's built-in Homework 0 is missing from ${BUILTIN_COURSE_ROOT}.`);
   const manifest = parseCourseYaml(yaml, BUILTIN_COURSE_ROOT, display(yamlPath));
-  return Promise.all(manifest.homeworks.map((entry) => readHomework(entry, true, display)));
+  const guard = guardWithin(BUILTIN_COURSE_ROOT, display);
+  return Promise.all(manifest.homeworks.map((entry) => readHomework(entry, true, display, guard)));
 }
 
 /**

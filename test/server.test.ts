@@ -2,7 +2,7 @@
 // tool authorisation, coach thread spawn-or-find, and the PROGRESS.yaml round
 // trip through the coach tools, including carry-over on adopt.
 import assert from "node:assert/strict";
-import { readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
 import {
@@ -296,4 +296,56 @@ test("first run: candidates, confirmation and a course that will not load", asyn
   assert.ok(host.harness.inspection.realtimeSignals.some((signal) => (signal.payload as { reason: string }).reason === "binding"));
   const bound = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
   assert.equal(bound.current?.iterationStatus, "not-started");
+});
+
+test("concurrent tool calls never lose each other's progress", async (t) => {
+  const { sandbox, host } = await setup(t);
+  const coach = (await openCoach(host, "000")).threadId;
+  await ok(host, "tutor_adopt_iteration", { iteration: "000" }, coach);
+  const homework0 = findHomework(sandbox.course, "000");
+  assert.ok(homework0 !== undefined);
+  const examples = homeworkExamples(homework0);
+  await Promise.all(
+    examples.map((example) => ok(host, "tutor_mark_example", { example: example.key, status: "skipped" }, coach)),
+  );
+  const lesson = (await host.harness.behavior.callRpc("getLesson", { homeworkId: "000" })) as Lesson;
+  assert.deepEqual(
+    examples.filter((example) => lesson.progress[example.key]?.status !== "skipped").map((example) => example.key),
+    [],
+  );
+});
+
+test("concurrent requests to open a homework's coach spawn one main thread", async (t) => {
+  const { host } = await setup(t);
+  const opened = await Promise.all([openCoach(host, "000"), openCoach(host, "000"), openCoach(host, "000")]);
+  assert.equal(host.harness.inspection.sdk.callsTo("threads.spawn").length, 1);
+  assert.equal(new Set(opened.map((result) => result.threadId)).size, 1);
+  assert.deepEqual(opened.map((result) => result.created).sort(), [false, false, true]);
+});
+
+test("concurrent starts of the next homework spawn one main thread", async (t) => {
+  const { host } = await setup(t);
+  const start = () => host.harness.behavior.callRpc("startNextHomework", { homeworkId: "001" }) as Promise<{ threadId: string }>;
+  const started = await Promise.all([start(), start()]);
+  assert.equal(host.harness.inspection.sdk.callsTo("threads.spawn").length, 1);
+  assert.equal(started[0]?.threadId, started[1]?.threadId);
+});
+
+test("confirmFactory refuses the course checkout, a folder inside it, or one holding it", async (t) => {
+  const sandbox = await makeSandbox();
+  t.after(() => sandbox.cleanup());
+  const inside = join(sandbox.course.root, "docs");
+  const linked = join(sandbox.root, "linked-course");
+  await symlink(sandbox.course.root, linked);
+  for (const root of [sandbox.course.root, inside, sandbox.root, linked]) {
+    const host = await makeTutorHost(sandbox.course, root, { coursePath: sandbox.course.root });
+    await assert.rejects(host.harness.behavior.callRpc("confirmFactory", { projectId: PROJECT_ID }), /course/, root);
+    assert.equal(host.harness.inspection.sdk.callsTo("threads.spawn").length, 0);
+    await host.harness.lifecycle.dispose();
+  }
+  const factory = join(sandbox.root, "tutorial-factory");
+  await mkdir(factory);
+  const host = await makeTutorHost(sandbox.course, factory, { coursePath: sandbox.course.root });
+  t.after(() => host.harness.lifecycle.dispose());
+  assert.equal(((await host.harness.behavior.callRpc("confirmFactory", { projectId: PROJECT_ID })) as { status: string }).status, "bound");
 });

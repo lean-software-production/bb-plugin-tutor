@@ -16,9 +16,11 @@ import {
   type Outcome,
 } from "./actions.ts";
 import { authorizeCaller, type Caller } from "./auth.ts";
+import { factoryLockKey } from "./lock-keys.ts";
 import type { TutorRuntime } from "./runtime.ts";
 import { statusText } from "./status-text.ts";
 import { spawnSideThread } from "./threads.ts";
+import type { World } from "./world.ts";
 
 type Action<Name extends ToolName> = (
   state: CoachState,
@@ -55,8 +57,7 @@ function register<Name extends ToolName>(rt: TutorRuntime, spec: ToolSpec<Name>)
     presentation: { label: spec.label },
     parameters: toolParameterSchemas[spec.name],
     async execute(input: ToolParameters<Name>, context: PluginAgentToolContext): Promise<PluginAgentToolResult> {
-      try {
-        const world = await rt.world.load();
+      const run = async (world: World): Promise<PluginAgentToolResult> => {
         const caller = await authorizeCaller(rt.bb.sdk, rt.bb.pluginId, context.threadId, world.binding);
         if ("error" in caller) return refusal(caller.error);
         const state = coachStateOf(world);
@@ -65,6 +66,12 @@ function register<Name extends ToolName>(rt: TutorRuntime, spec: ToolSpec<Name>)
         if ("error" in outcome) return refusal(outcome.error);
         await applyOutcome(rt, state.root, outcome);
         return outcome.text;
+      };
+      try {
+        const world = await rt.world.load();
+        if (world.binding.status !== "bound") return await run(world);
+        // Read-modify-write of the factory's files: re-read them once earlier calls have written.
+        return await rt.locks.run(factoryLockKey(world.binding.root), async () => run(await rt.world.load()));
       } catch (cause) {
         rt.bb.log.error(`[tutor] ${spec.name} failed: ${String(cause)}`);
         return refusal(`${spec.name} failed: ${cause instanceof Error ? cause.message : String(cause)}`);

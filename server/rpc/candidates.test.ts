@@ -31,6 +31,11 @@ test("a repo with spec/ITERATION or a coach-me AGENTS.md qualifies", () => {
 
 test("the course itself, folderless projects and plain repos do not", () => {
   assert.equal(describeCandidate(probe({ root: "/workspaces/tutorial/" }), context).detail, "the course itself");
+  for (const root of ["/workspaces/tutorial/docs", "/workspaces"]) {
+    const inside = describeCandidate(probe({ root, iterationText: "001 WIP\n" }), context);
+    assert.deepEqual([inside.qualifies, inside.detail], [false, "shares a folder with the course"]);
+  }
+  assert.equal(describeCandidate(probe({ root: "/workspaces/tutorial-factory", iterationText: "001 WIP\n" }), context).qualifies, true);
   assert.equal(describeCandidate(probe({ root: null, rootExists: false }), context).detail, "no folder on this machine");
   assert.deepEqual(
     [describeCandidate(probe({}), context).qualifies, describeCandidate(probe({}), context).detail],

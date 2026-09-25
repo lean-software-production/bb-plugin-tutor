@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { CourseLoadError } from "../../shared/ports.ts";
 import { parseLedger } from "./ledger.ts";
 
-const parse = (markdown: string) => parseLedger(markdown, "/course/docs/iterations", "ledger.md");
+const parse = (markdown: string) => parseLedger(markdown, "/course/docs/iterations", "ledger.md", "/course");
 
 test("each ledger row is a homework: id, title and folder from the link, and when it was set", () => {
   const markdown = `# Iterations
@@ -37,4 +37,14 @@ test("a missing table, a bad id or a Spec without a link is a readable error nam
   for (const [markdown, message] of cases) {
     assert.throws(() => parse(markdown), (error: unknown) => error instanceof CourseLoadError && message.test(error.message));
   }
+});
+
+test("a Spec link may not leave the course folder", () => {
+  const markdown = "| Iteration | Spec | Set after |\n|---|---|---|\n| 001 | [One](001/README.md) | |\n| 002 | [Two](../../../elsewhere/README.md) | |\n";
+  assert.throws(
+    () => parse(markdown),
+    (error: unknown) =>
+      error instanceof CourseLoadError &&
+      /^ledger\.md, line 4: \.\.\/\.\.\/\.\.\/elsewhere\/README\.md is outside the course folder\.$/.test(error.message),
+  );
 });

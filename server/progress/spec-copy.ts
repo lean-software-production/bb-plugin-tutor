@@ -2,11 +2,12 @@
 // spec/ holds only the homework's README.md, FACTORY.md and features/ (plus
 // Tutor's own ITERATION and PROGRESS.yaml), and a sample seed is copied into
 // seeds/ unless it is already there.
-import { access, copyFile, cp, mkdir, readdir, rm, writeFile } from "node:fs/promises";
+import { access, copyFile, cp, lstat, mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { FACTORY_FILES } from "../../shared/constants.ts";
 import { slugify } from "../../shared/keys.ts";
 import type { Homework } from "../../shared/model.ts";
+import { ownFolder } from "./own-folder.ts";
 
 const KEPT_IN_SPEC = new Set([basename(FACTORY_FILES.iteration), basename(FACTORY_FILES.progress)]);
 const SPEC_FILES = ["README.md", "FACTORY.md"];
@@ -18,6 +19,22 @@ async function exists(path: string): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+/** Whether anything is at `path`, a dangling symbolic link included. */
+async function occupied(path: string): Promise<boolean> {
+  return lstat(path).then(
+    () => true,
+    () => false,
+  );
+}
+
+/** Refuses a homework with nothing to coach before anything in spec/ is replaced. */
+async function requireFeatureFiles(homework: Homework): Promise<void> {
+  const names = await readdir(join(homework.dir, FEATURES_DIR)).catch(() => []);
+  if (!names.some((name) => name.endsWith(".feature"))) {
+    throw new Error(`Homework ${homework.id} has no feature files in ${homework.dir}, so it cannot be adopted.`);
   }
 }
 
@@ -36,7 +53,9 @@ export interface SpecCopyResult {
 }
 
 export async function copyHomeworkSpec(factoryRoot: string, homework: Homework): Promise<SpecCopyResult> {
-  const specDir = join(factoryRoot, FACTORY_FILES.specDir);
+  await requireFeatureFiles(homework);
+  const specDir = await ownFolder(factoryRoot, FACTORY_FILES.specDir);
+  const seedsDir = homework.seedSpec === null ? null : await ownFolder(factoryRoot, FACTORY_FILES.seedsDir);
   await mkdir(specDir, { recursive: true });
   for (const entry of await readdir(specDir)) {
     if (!KEPT_IN_SPEC.has(entry)) await rm(join(specDir, entry), { recursive: true, force: true });
@@ -49,17 +68,15 @@ export async function copyHomeworkSpec(factoryRoot: string, homework: Homework):
     await copyFile(source, join(specDir, file));
     written.push(`${FACTORY_FILES.specDir}/${file}`);
   }
-  const features = join(homework.dir, FEATURES_DIR);
-  if (await exists(features)) {
-    await cp(features, join(specDir, FEATURES_DIR), { recursive: true });
-    written.push(`${FACTORY_FILES.specDir}/${FEATURES_DIR}/`);
-  }
+  await cp(join(homework.dir, FEATURES_DIR), join(specDir, FEATURES_DIR), { recursive: true });
+  written.push(`${FACTORY_FILES.specDir}/${FEATURES_DIR}/`);
 
-  if (homework.seedSpec === null) return { written, seed: null, seedAlreadyThere: false };
+  if (homework.seedSpec === null || seedsDir === null) return { written, seed: null, seedAlreadyThere: false };
   const seed = `${FACTORY_FILES.seedsDir}/${seedFileName(homework.seedSpec, homework.id)}`;
   const seedPath = join(factoryRoot, seed);
-  if (await exists(seedPath)) return { written, seed, seedAlreadyThere: true };
-  await mkdir(join(factoryRoot, FACTORY_FILES.seedsDir), { recursive: true });
-  await writeFile(seedPath, homework.seedSpec, "utf8");
+  if (await occupied(seedPath)) return { written, seed, seedAlreadyThere: true };
+  await mkdir(seedsDir, { recursive: true });
+  // "wx" never follows a (dangling) symbolic link to create a file elsewhere.
+  await writeFile(seedPath, homework.seedSpec, { encoding: "utf8", flag: "wx" });
   return { written: [...written, seed], seed, seedAlreadyThere: false };
 }

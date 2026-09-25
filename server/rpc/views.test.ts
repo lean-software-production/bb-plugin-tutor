@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { findHomework, homeworkExamples } from "../../shared/derive.ts";
 import {
   fixtureCompletion,
+  fixtureCourse,
   fixtureFreshStudent,
   fixtureLesson,
   fixtureOverview,
@@ -66,4 +68,31 @@ test("completion describes the finished homework and what comes next", () => {
   assert.equal(completion.next?.id, "003");
   assert.equal(completion.next?.factoryDiff?.length, fixtureCompletion.next?.factoryDiff === null ? 0 : 4);
   assert.throws(() => buildCompletion(makeWorld(fixtureFreshStudent), "002", records), /not complete/);
+});
+
+test("a past homework's completion counts carry-over from what was passing in that homework", () => {
+  const one = findHomework(fixtureCourse, "001");
+  const two = findHomework(fixtureCourse, "002");
+  assert.ok(one !== undefined && two !== undefined);
+  const passedInOne = new Set(homeworkExamples(one).map((example) => example.hash));
+  const expected = homeworkExamples(two).filter((example) => passedInOne.has(example.hash)).length;
+  assert.ok(expected > 0, "the fixture carries something from 001 into 002");
+  const student: StudentState = {
+    iteration: { iteration: "003", status: "WIP" },
+    progress: {
+      iteration: "003",
+      examples: {},
+      history: {
+        "000": { examples: {} },
+        "001": {
+          examples: Object.fromEntries(
+            homeworkExamples(one).map((example) => [example.key, { status: "passing", hash: example.hash, at: "2026-09-23T10:00:00Z" }]),
+          ),
+        },
+        "002": { examples: {} },
+      },
+    },
+    problems: [],
+  };
+  assert.equal(buildCompletion(makeWorld(student), "001", records).next?.carryOver, expected);
 });

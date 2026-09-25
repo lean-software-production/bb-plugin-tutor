@@ -113,6 +113,9 @@ function parseHistory(history: RawMap, report: (problem: string) => void): Recor
   const parsed: Record<string, PastHomework> = {};
   for (const [rawId, value] of Object.entries(history)) {
     const id = homeworkIdSchema.safeParse(homeworkIdLike(rawId));
+    if (isMap(value) && value.examples !== undefined && !isMap(value.examples)) {
+      report(`${FILE}: history.${id.success ? id.data : rawId}.examples should be a mapping; none were read.`);
+    }
     const past = isMap(value)
       ? pastHomeworkSchema.safeParse({
           ...(value.adopted === undefined ? {} : { adopted: value.adopted }),
@@ -126,27 +129,48 @@ function parseHistory(history: RawMap, report: (problem: string) => void): Recor
   return parsed;
 }
 
-interface UnknownKeys {
+/** What the file being replaced holds that this version does not read, to carry it over. */
+interface Preserved {
   top: RawMap;
+  /** Unknown fields of each current Example entry, by key. */
   entries: Record<string, RawMap>;
+  /** Unknown keys of each history entry, by homework id. */
+  past: Record<string, RawMap>;
+  /** Unknown fields of each history Example entry, by homework id and key. */
+  pastEntries: Record<string, Record<string, RawMap>>;
+  /** A history entry's `examples` that is not a mapping, verbatim, by homework id. */
+  pastExamples: Record<string, unknown>;
 }
 
-function unknownKeys(previousText: string | null): UnknownKeys {
-  const result: UnknownKeys = { top: {}, entries: {} };
+function extraFields(map: RawMap, known: readonly string[]): RawMap {
+  return Object.fromEntries(Object.entries(map).filter(([field]) => !known.includes(field)));
+}
+
+function entryExtras(examples: unknown): Record<string, RawMap> {
+  const result: Record<string, RawMap> = {};
+  if (!isMap(examples)) return result;
+  for (const [key, entry] of Object.entries(examples)) {
+    const extra = isMap(entry) ? extraFields(entry, ENTRY_KEYS) : {};
+    if (Object.keys(extra).length > 0) result[key] = extra;
+  }
+  return result;
+}
+
+function preserved(previousText: string | null): Preserved {
+  const result: Preserved = { top: {}, entries: {}, past: {}, pastEntries: {}, pastExamples: {} };
   if (previousText === null) return result;
   const loaded = loadYaml(previousText);
   if ("problem" in loaded || !isMap(loaded.raw)) return result;
-  for (const [key, value] of Object.entries(loaded.raw)) {
-    if (!(TOP_KEYS as readonly string[]).includes(key)) result.top[key] = value;
-  }
-  const examples = loaded.raw.examples;
-  if (!isMap(examples)) return result;
-  for (const [key, entry] of Object.entries(examples)) {
-    if (!isMap(entry)) continue;
-    const extra = Object.fromEntries(
-      Object.entries(entry).filter(([field]) => !(ENTRY_KEYS as readonly string[]).includes(field)),
-    );
-    if (Object.keys(extra).length > 0) result.entries[key] = extra;
+  result.top = extraFields(loaded.raw, TOP_KEYS);
+  result.entries = entryExtras(loaded.raw.examples);
+  const history = loaded.raw.history;
+  if (!isMap(history)) return result;
+  for (const [rawId, value] of Object.entries(history)) {
+    if (!isMap(value)) continue;
+    const id = String(homeworkIdLike(rawId));
+    result.past[id] = extraFields(value, PAST_KEYS);
+    result.pastEntries[id] = entryExtras(value.examples);
+    if (value.examples !== undefined && !isMap(value.examples)) result.pastExamples[id] = value.examples;
   }
   return result;
 }
@@ -161,10 +185,12 @@ function orderedEntry(entry: ExampleProgress, extra: RawMap | undefined): RawMap
 
 /**
  * Canonical YAML for `progress`. `previousText` is the file being replaced:
- * keys it holds that this version does not know are carried into the output.
+ * keys it holds that this version does not know, at the top, in history
+ * entries and in Example entries, are carried into the output, and so is a
+ * history entry's unreadable `examples`.
  */
 export function formatProgress(progress: ProgressFile, previousText: string | null): string {
-  const extras = unknownKeys(previousText);
+  const extras = preserved(previousText);
   const ordered: RawMap = { iteration: progress.iteration };
   if (progress.focus !== undefined) ordered.focus = progress.focus;
   if (progress.adopted !== undefined) ordered.adopted = progress.adopted;
@@ -179,7 +205,7 @@ export function formatProgress(progress: ProgressFile, previousText: string | nu
     ordered.history = Object.fromEntries(
       Object.keys(history)
         .sort()
-        .map((id) => [id, orderedPast(history[id] as PastHomework)]),
+        .map((id) => [id, orderedPast(history[id] as PastHomework, id, extras)]),
     );
   }
   const doc = new YAML.Document({ ...ordered, ...extras.top });
@@ -191,20 +217,24 @@ export function formatProgress(progress: ProgressFile, previousText: string | nu
   return doc.toString({ lineWidth: 0 });
 }
 
-function orderedPast(past: PastHomework): RawMap {
+function orderedPast(past: PastHomework, id: string, extras: Preserved): RawMap {
   const ordered: RawMap = {};
   for (const field of PAST_KEYS) {
     if (field === "examples") {
-      ordered.examples = Object.fromEntries(
-        Object.keys(past.examples)
-          .sort()
-          .map((key) => [key, orderedEntry(past.examples[key] as ExampleProgress, undefined)]),
-      );
+      const unread = extras.pastExamples[id];
+      ordered.examples =
+        unread !== undefined && Object.keys(past.examples).length === 0
+          ? unread
+          : Object.fromEntries(
+              Object.keys(past.examples)
+                .sort()
+                .map((key) => [key, orderedEntry(past.examples[key] as ExampleProgress, extras.pastEntries[id]?.[key])]),
+            );
     } else if (past[field] !== undefined) {
       ordered[field] = past[field];
     }
   }
-  return ordered;
+  return { ...ordered, ...extras.past[id] };
 }
 
 function quote(node: unknown): void {

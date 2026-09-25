@@ -4,6 +4,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { registerRpc } from "../rpc/handlers.ts";
 import { coachConfiguration } from "./configure.ts";
 import { decideDispatch } from "./dispatch-guard.ts";
+import { createKeyedLock } from "./keyed-lock.ts";
 import type { TutorRuntime } from "./runtime.ts";
 import { defineTutorSettings } from "./settings.ts";
 import { createStateSignals } from "./signals.ts";
@@ -18,6 +19,7 @@ export async function registerTutor(bb: BbPluginApi, deps: WorldDeps): Promise<T
     world: createWorldSource(bb, settings, deps),
     store: deps.store,
     signals: createStateSignals(bb),
+    locks: createKeyedLock(),
     now: deps.now,
   };
 

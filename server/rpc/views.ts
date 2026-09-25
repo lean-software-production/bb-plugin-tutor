@@ -136,8 +136,9 @@ export function buildCompletion(world: World, homeworkId: string, threads: reado
     throw new Error(`Homework ${homework.id} is not complete yet.`);
   }
   const progress = recordedProgress(world.student, homework.id);
+  // Carry-over into the next homework comes from what passed in this one (its history entry once it is past).
   const passingHashes = new Set(
-    Object.values(world.student.progress?.examples ?? {})
+    Object.values(progress?.examples ?? {})
       .filter((entry) => entry.status === "passing")
       .map((entry) => entry.hash),
   );
