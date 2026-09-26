@@ -155,3 +155,22 @@ test("a lesson set to WIP outside Tutor, with no progress for it, is adopted aga
   const underWay = adoptAction(stateOf(), { iteration: "002" }, NOW);
   assert.ok("error" in underWay && /Nothing can be adopted now/.test(underWay.error));
 });
+
+test("a WIP lesson whose spec/PROGRESS.yaml is damaged is never adopted again: that would erase its marks", () => {
+  // ITERATION reads 002 WIP; spec/PROGRESS.yaml is there but doesn't parse (a conflict marker, a bad hand edit).
+  const damaged: StudentState = {
+    iteration: { iteration: "002", status: "WIP" },
+    progress: null,
+    progressUnreadable: true,
+    problems: ["spec/PROGRESS.yaml is not valid YAML (bad indentation)."],
+  };
+  const state = stateOf(damaged);
+  assert.equal(state.progress, null);
+  const refused = adoptAction(state, { iteration: "002" }, NOW);
+  assert.ok("error" in refused, "adopted over a damaged spec/PROGRESS.yaml");
+  assert.match(refused.error, /spec\/PROGRESS\.yaml could not be read/);
+  const marked = markAction(state, { example: planFromSeed.key, status: "passing", evidence: "$ ./factory" }, NOW);
+  assert.ok("error" in marked);
+  assert.doesNotMatch(marked.error, /tutor_adopt_iteration/, "the coach is not sent to adopt");
+  assert.match(marked.error, /spec\/PROGRESS\.yaml could not be read/);
+});

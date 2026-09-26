@@ -43,6 +43,23 @@ test("malformed files become problems, never exceptions", async () => {
     assert.equal(state.iteration, null);
     assert.equal(state.progress, null);
     assert.equal(state.problems.length, 2);
+    assert.equal(state.progressUnreadable, true, "a damaged spec/PROGRESS.yaml is not the same as none");
+  } finally {
+    await sandbox.cleanup();
+  }
+});
+
+test("a spec/PROGRESS.yaml that can't be read or has no lesson is unreadable; a missing one is not", async () => {
+  const sandbox = await makeSandbox();
+  try {
+    assert.equal((await store.read(sandbox.factoryRoot)).progressUnreadable, undefined);
+    await mkdir(join(sandbox.factoryRoot, "spec/PROGRESS.yaml"), { recursive: true });
+    assert.equal((await store.read(sandbox.factoryRoot)).progressUnreadable, true, "a folder in its place");
+    await rm(join(sandbox.factoryRoot, "spec/PROGRESS.yaml"), { recursive: true });
+    await writeFile(join(sandbox.factoryRoot, "spec/PROGRESS.yaml"), "examples: {}\n");
+    assert.equal((await store.read(sandbox.factoryRoot)).progressUnreadable, true, "no iteration");
+    await writeFile(join(sandbox.factoryRoot, "spec/PROGRESS.yaml"), 'iteration: "001"\nexamples: {}\n');
+    assert.equal((await store.read(sandbox.factoryRoot)).progressUnreadable, undefined);
   } finally {
     await sandbox.cleanup();
   }

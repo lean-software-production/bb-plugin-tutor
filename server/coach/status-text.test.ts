@@ -45,3 +45,24 @@ test("names the coaching method the world found, the starter's skill included", 
   assert.ok(!("error" in without));
   assert.match(statusText(without), /Coaching method: \(no coach file\)\./);
 });
+
+test("a WIP lesson with no progress says it needs adopting; with a damaged spec/PROGRESS.yaml, repairing", () => {
+  // fetch-iteration ran outside BB: ITERATION reads 003 WIP, spec/PROGRESS.yaml is still Lesson 002's.
+  const fetched = coachStateOf(makeWorld({ ...fixtureStudent, iteration: { iteration: "003", status: "WIP" } }));
+  assert.ok(!("error" in fetched));
+  assert.match(statusText(fetched), /^Not adopted in Tutor yet: call tutor_adopt_iteration for Lesson 003\.$/m);
+  const damaged = coachStateOf(makeWorld({
+    iteration: { iteration: "002", status: "WIP" },
+    progress: null,
+    progressUnreadable: true,
+    problems: ["spec/PROGRESS.yaml is not valid YAML (bad indentation)."],
+  }));
+  assert.ok(!("error" in damaged));
+  const text = statusText(damaged);
+  assert.doesNotMatch(text, /Not adopted/);
+  assert.match(text, /spec\/PROGRESS\.yaml could not be read, so Lesson 002's marks are unknown/);
+  // Adopted and under way: neither line.
+  const adopted = coachStateOf(makeWorld());
+  assert.ok(!("error" in adopted));
+  assert.doesNotMatch(statusText(adopted), /Not adopted|could not be read/);
+});

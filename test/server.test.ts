@@ -301,6 +301,39 @@ test("after fetch-iteration ran outside BB, the lesson's own coach adopts it aga
   assert.deepEqual((await readdir(join(root, "stand-ins"))).sort(), ["README.md", "plan-alpha-beta"]);
 });
 
+test("a WIP lesson with a damaged spec/PROGRESS.yaml is never adopted again, and the file is left as it was", async (t) => {
+  const { sandbox, host } = await setup(t);
+  const root = sandbox.factoryRoot;
+  const lesson1 = findLesson(sandbox.course, "001") ?? assert.fail("no 001");
+  const [example1] = lessonExamples(lesson1);
+  assert.ok(example1 !== undefined);
+  // Marks made mid-lesson, not yet committed, then a merge conflict in the file.
+  const damaged = [
+    'iteration: "001"',
+    "<<<<<<< HEAD",
+    "examples:",
+    `  ${example1.key}:`,
+    "    status: passing",
+    "=======",
+    "examples: {}",
+    ">>>>>>> theirs",
+    "",
+  ].join("\n");
+  await writeFile(join(root, "ITERATION"), "001 WIP\n");
+  await mkdir(join(root, "spec"));
+  await writeFile(join(root, "spec/PROGRESS.yaml"), damaged);
+
+  const coach1 = (await openCoach(host, "001")).threadId;
+  const status = await ok(host, "tutor_status", {}, coach1);
+  assert.match(status, /spec\/PROGRESS\.yaml could not be read/);
+  const marked = await tool(host, "tutor_mark_example", { example: example1.key, status: "passing", evidence: "$ ./factory" }, coach1);
+  assert.ok(isError(marked) && !/tutor_adopt_iteration/.test(text(marked)), text(marked));
+  const refused = await tool(host, "tutor_adopt_iteration", { iteration: "001" }, coach1);
+  assert.ok(isError(refused), `adopted over a damaged spec/PROGRESS.yaml: ${text(refused)}`);
+  assert.equal(await readFile(join(root, "spec/PROGRESS.yaml"), "utf8"), damaged, "spec/PROGRESS.yaml untouched");
+  assert.equal(await readFile(join(root, "ITERATION"), "utf8"), "001 WIP\n");
+});
+
 test("an older factory that is its repo's top folder keeps its progress readable but refuses adoption", async (t) => {
   const { sandbox, host } = await setup(t);
   const root = sandbox.factoryRoot;

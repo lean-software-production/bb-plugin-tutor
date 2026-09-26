@@ -2,7 +2,7 @@
 // on. Keys are listed because every other tool takes them.
 import { countExamples, exampleStatus, findRule, lessonExamples } from "../../shared/derive.ts";
 import type { ExampleStatus } from "../../shared/model.ts";
-import type { CoachState } from "./actions.ts";
+import { unrecorded, unreadableProgressText, type CoachState } from "./actions.ts";
 
 const MAX_CHARS = 6000;
 const MAX_NOTE = 140;
@@ -41,6 +41,10 @@ export function statusText(state: CoachState, caller: StatusCaller | null = null
       `${counts.passing}/${counts.total} passing, ${counts.notYet} not yet, ${counts.skipped} skipped, ${counts.pending} pending.`,
     `Focus: ${focus ?? "none"}.`,
   );
+  // A WIP lesson with no progress was set going outside Tutor (fetch-iteration), and needs adopting here.
+  if (pointer.iterationStatus === "WIP" && state.progress === null) {
+    lines.push(unrecorded(state) ? `Not adopted in Tutor yet: call tutor_adopt_iteration for Lesson ${lesson.id}.` : unreadableProgressText(lesson.id));
+  }
   const problems = state.student.problems;
   if (problems.length > 0) {
     const more = problems.length > MAX_PROBLEMS ? ` (and ${problems.length - MAX_PROBLEMS} more)` : "";

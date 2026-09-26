@@ -215,6 +215,11 @@ export type ProgressFile = z.infer<typeof progressFileSchema>;
 export interface StudentState {
   iteration: IterationState | null;
   progress: ProgressFile | null;
+  /**
+   * spec/PROGRESS.yaml is there but could not be read or parsed, so `progress`
+   * is unknown rather than absent. Unset otherwise.
+   */
+  progressUnreadable?: true;
   /** Human-readable problems found while reading (malformed YAML, unknown id, …). */
   problems: string[];
 }

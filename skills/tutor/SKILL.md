@@ -33,9 +33,11 @@ things about how you carry them out:
 - Never run fetch-iteration or `fetch.sh`, and never edit anything in `spec/`
   by hand, `ITERATION` or `spec/PROGRESS.yaml` included. The tools own those
   files.
-- If `ITERATION` already reads WIP for this lesson but `tutor_status` says it
-  has not been adopted (fetch-iteration ran outside BB), call
-  `tutor_adopt_iteration` for it anyway: that starts its progress.
+- If `tutor_status` says "Not adopted in Tutor yet" (`ITERATION` reads WIP
+  because fetch-iteration ran outside BB), call `tutor_adopt_iteration` for
+  this lesson anyway: that starts its progress. If it says
+  `spec/PROGRESS.yaml` could not be read, don't adopt: help the student
+  repair the file first, or its marks are lost.
 - The tools never commit. Commit when the coach file says to, and include
   `spec/PROGRESS.yaml` in those commits.
 - Everything else stays as the coach file says: baby steps, asking whether the

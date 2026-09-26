@@ -19,13 +19,22 @@ async function readOptional(path: string): Promise<string | null> {
   }
 }
 
-async function readSafely(path: string, label: string, problems: string[]): Promise<string | null> {
+/**
+ * spec/PROGRESS.yaml's progress. `unreadable`: the file is there but could not
+ * be read or parsed, which is not the same as having none (StudentState).
+ */
+async function readProgressFile(factoryRoot: string, problems: string[]): Promise<{ progress: ProgressFile | null; unreadable: boolean }> {
+  let text: string | null;
   try {
-    return await readOptional(path);
+    text = await readOptional(join(factoryRoot, FACTORY_FILES.progress));
   } catch (cause) {
-    problems.push(`${label} could not be read (${(cause as Error).message}).`);
-    return null;
+    problems.push(`${FACTORY_FILES.progress} could not be read (${(cause as Error).message}).`);
+    return { progress: null, unreadable: true };
   }
+  if (text === null) return { progress: null, unreadable: false };
+  const parsed = parseProgress(text);
+  problems.push(...parsed.problems);
+  return { progress: parsed.progress, unreadable: parsed.progress === null };
 }
 
 /**
@@ -67,21 +76,14 @@ export function createProgressStore(): ProgressStore {
     async read(factoryRoot: string): Promise<StudentState> {
       const problems: string[] = [];
       const iterationFile = await readIteration(factoryRoot, problems);
-      const progressText = await readSafely(join(factoryRoot, FACTORY_FILES.progress), FACTORY_FILES.progress, problems);
-
       let iteration: IterationState | null = null;
       if (iterationFile !== null) {
         const parsed = parseIteration(iterationFile.text, iterationFile.label);
         if ("state" in parsed) iteration = parsed.state;
         else problems.push(parsed.problem);
       }
-      let progress: ProgressFile | null = null;
-      if (progressText !== null) {
-        const parsed = parseProgress(progressText);
-        progress = parsed.progress;
-        problems.push(...parsed.problems);
-      }
-      return { iteration, progress, problems };
+      const { progress, unreadable } = await readProgressFile(factoryRoot, problems);
+      return unreadable ? { iteration, progress, progressUnreadable: true, problems } : { iteration, progress, problems };
     },
 
     async writeProgress(factoryRoot: string, progress: ProgressFile): Promise<void> {

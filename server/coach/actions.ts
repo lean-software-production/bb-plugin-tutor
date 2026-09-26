@@ -68,6 +68,24 @@ export function coachStateOf(world: World): CoachState | { error: string } {
   };
 }
 
+/**
+ * No progress is recorded for the current lesson: spec/PROGRESS.yaml is
+ * missing or about another lesson. A file that could not be read or parsed is
+ * not "none": its marks are unknown, and adopting again would overwrite them.
+ */
+export function unrecorded(state: CoachState): boolean {
+  return state.progress === null && state.student.progressUnreadable !== true;
+}
+
+/** Why nothing can change the lesson's progress while spec/PROGRESS.yaml is damaged. */
+export function unreadableProgressText(lessonId: string): string {
+  return (
+    `spec/PROGRESS.yaml could not be read, so Lesson ${lessonId}'s marks are unknown. ` +
+    "Help the student repair it (tutor_status names the problem; git may have a good copy). " +
+    "Don't adopt the lesson again: that would replace the file and lose its marks."
+  );
+}
+
 /** The lesson a calling thread coaches: its coach thread's, which its side chats inherit (auth.ts). */
 export interface CallerLesson {
   courseId: string;
@@ -85,7 +103,7 @@ export function otherLessonError(state: CoachState, caller: CallerLesson): strin
     return `This coach thread is for another course, but the student is on Lesson ${current} of "${state.course.title}". Open Lesson ${current}'s coach from the course outline.`;
   }
   if (caller.lessonId === current) return null;
-  if (adoptionTargets(state.course, state.pointer, state.progress === null).includes(caller.lessonId)) {
+  if (adoptionTargets(state.course, state.pointer, unrecorded(state)).includes(caller.lessonId)) {
     return `This coach thread is for Lesson ${caller.lessonId}, which hasn't been adopted yet: the student is still on Lesson ${current}. Call tutor_adopt_iteration with iteration "${caller.lessonId}" first.`;
   }
   return `This coach thread is for Lesson ${caller.lessonId}, but the student is on Lesson ${current}. Open Lesson ${current}'s coach from the course outline.`;
@@ -134,6 +152,7 @@ function sectionHeader(line: string): string {
 /** The progress to change, refusing when the lesson is not under way. */
 function underWay(state: CoachState): ProgressFile | { error: string } {
   const { lesson, pointer } = state;
+  if (state.progress === null && state.student.progressUnreadable === true) return { error: unreadableProgressText(lesson.id) };
   if (pointer.iterationStatus === "not-started" || state.progress === null) {
     return { error: `Lesson ${lesson.id} has not been adopted yet. Call tutor_adopt_iteration first.` };
   }
@@ -232,12 +251,13 @@ export function adoptionTargets(course: Course, pointer: CurrentPointer, unrecor
 }
 
 export function adoptAction(state: CoachState, input: ToolParameters<"tutor_adopt_iteration">, now: string): Outcome {
-  const targets = adoptionTargets(state.course, state.pointer, state.progress === null);
+  const targets = adoptionTargets(state.course, state.pointer, unrecorded(state));
   const lesson = findLesson(state.course, input.iteration);
   if (lesson === undefined || !targets.includes(input.iteration)) {
     const current = `The student is on lesson ${state.pointer.lessonId} (${state.pointer.iterationStatus}).`;
     const allowed = targets.length === 0 ? "Nothing can be adopted now." : `You can adopt: ${targets.join(", ")}.`;
-    return { error: `Lesson ${input.iteration} cannot be adopted now. ${current} ${allowed}` };
+    const damaged = state.student.progressUnreadable === true ? ` ${unreadableProgressText(state.pointer.lessonId)}` : "";
+    return { error: `Lesson ${input.iteration} cannot be adopted now. ${current} ${allowed}${damaged}` };
   }
   const progress = carryOver(state.student.progress, lesson, now);
   const carried = Object.keys(progress.examples).length;
