@@ -23,6 +23,8 @@ The harness never touches a BB running on the host.
 `relay.mjs` and `lib.sh` are internal: `relay.mjs` is the in-container TCP
 relay and `lib.sh` holds the shared config.
 
+The Feature-plus-plugin end-to-end walk lives in [`e2e/`](e2e/README.md).
+
 ## Quick start
 
 ```sh
