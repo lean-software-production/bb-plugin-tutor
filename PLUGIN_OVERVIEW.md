@@ -13,6 +13,6 @@ Turn a course codespace's BB into a coached course.
 ## How it works
 
 The course is a git repo of lesson specs (Gherkin feature files plus prose). Your progress lives
-in your factory repo, in `spec/ITERATION` and `spec/PROGRESS.yaml`, so it survives the codespace
+in your factory repo, in `ITERATION` and `spec/PROGRESS.yaml`, so it survives the codespace
 and still works if you carry on with a coding agent outside BB. The plugin never creates projects
 and never edits the course.
