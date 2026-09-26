@@ -53,7 +53,7 @@ test("a rule is passing when every example is passing or skipped", () => {
   assert.equal(ruleStatus(rule, all), "passing");
 });
 
-test("resolveCurrent trusts spec/ITERATION", () => {
+test("resolveCurrent trusts ITERATION", () => {
   const pointer = resolveCurrent(fixtureCourse, fixtureStudent);
   assert.deepEqual(pointer, { lessonId: "002", iterationStatus: "WIP" });
   assert.equal(lessonStatus(fixtureCourse, pointer, "000"), "done");
@@ -64,7 +64,7 @@ test("resolveCurrent trusts spec/ITERATION", () => {
   assert.equal(lessonStatus(fixtureCourse, done, "002"), "done");
 });
 
-test("with no spec/ITERATION the student starts on Lesson 0", () => {
+test("with no ITERATION the student starts on Lesson 0", () => {
   assert.deepEqual(resolveCurrent(fixtureCourse, fixtureFreshStudent), { lessonId: "000", iterationStatus: "not-started" });
   const builtin = lessonExamples(lesson("000"));
   const onZero = (statuses: ExampleProgress["status"][]) =>

@@ -284,6 +284,39 @@ test("a coach thread only changes its own lesson: an old coach can't touch the l
   await ok(host, "tutor_mark_example", { example: example1.key, status: "passing", evidence: "$ ./factory" }, coach1);
 });
 
+test("after fetch-iteration ran outside BB, the lesson's own coach adopts it again and keeps the student's seed", async (t) => {
+  const { sandbox, host } = await setup(t);
+  const root = sandbox.factoryRoot;
+  // What fetch.sh leaves: ITERATION reads 001 WIP, the seed is there (and edited), no spec/PROGRESS.yaml.
+  await writeFile(join(root, "ITERATION"), "001 WIP\n");
+  await mkdir(join(sandbox.codebaseRoot, "seeds"));
+  await writeFile(join(sandbox.codebaseRoot, "seeds/tetris.md"), "the student's own seed\n");
+
+  const coach1 = (await openCoach(host, "001")).threadId;
+  const adopted = await ok(host, "tutor_adopt_iteration", { iteration: "001" }, coach1);
+  assert.match(adopted, /Adopt spec for iteration 001/);
+  assert.equal(await readFile(join(root, "ITERATION"), "utf8"), "001 WIP\n");
+  assert.match(await readFile(join(root, "spec/PROGRESS.yaml"), "utf8"), /^iteration: "001"\n/);
+  assert.equal(await readFile(join(sandbox.codebaseRoot, "seeds/tetris.md"), "utf8"), "the student's own seed\n");
+  assert.deepEqual((await readdir(join(root, "stand-ins"))).sort(), ["README.md", "plan-alpha-beta"]);
+});
+
+test("an older factory that is its repo's top folder keeps its progress readable but refuses adoption", async (t) => {
+  const { sandbox, host } = await setup(t);
+  const root = sandbox.factoryRoot;
+  await mkdir(join(root, ".git"));
+  await writeFile(join(root, "ITERATION"), "001 Done\n");
+
+  const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.deepEqual([overview.current?.lessonId, overview.current?.iterationStatus], ["001", "Done"]);
+  const coach2 = ((await host.harness.behavior.callRpc("startNextLesson", { lessonId: "002" })) as { threadId: string }).threadId;
+  const refused = await tool(host, "tutor_adopt_iteration", { iteration: "002" }, coach2);
+  assert.ok(isError(refused), `adopted into an old-layout factory: ${text(refused)}`);
+  assert.match(text(refused), /its repo's top folder \(it holds \.git\)/);
+  assert.equal(await readFile(join(root, "ITERATION"), "utf8"), "001 Done\n", "ITERATION untouched");
+  assert.equal(await readdir(join(root, "spec")).catch(() => null), null, "no spec/ written");
+});
+
 test("coach discovery reads every page of Tutor's threads: many newer side chats don't hide the coach", async (t) => {
   const { host } = await setup(t);
   const coach = (await openCoach(host, "000")).threadId;
@@ -798,7 +831,7 @@ test("first run: candidates, confirmation and a course that will not load", asyn
   assert.deepEqual(projects.map((project) => project.projectId), [PROJECT_ID]);
   await assert.rejects(host.harness.behavior.callRpc("confirmFactory", { projectId: "prj_gone" }), /no folder/);
   const factoryProject = await host.harness.behavior.callRpc("confirmFactory", { projectId: PROJECT_ID });
-  assert.deepEqual(factoryProject, { status: "found", projectId: PROJECT_ID, projectName: "my-factory", root: sandbox.factoryRoot });
+  assert.deepEqual(factoryProject, { status: "found", projectId: PROJECT_ID, projectName: "tetris/.factory", root: sandbox.factoryRoot });
   assert.ok(host.harness.inspection.realtimeSignals.some((signal) => (signal.payload as { reason: string }).reason === "factoryProject"));
   const after = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
   assert.equal(after.current?.iterationStatus, "not-started");

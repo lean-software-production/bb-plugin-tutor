@@ -32,7 +32,7 @@ import type {
 } from "./rpc.ts";
 
 export const FIXTURE_COURSE_ROOT = "/workspaces/tutorial";
-export const FIXTURE_FACTORY_ROOT = "/workspaces/my-factory";
+export const FIXTURE_FACTORY_ROOT = "/workspaces/capstone-project-starter/tetris/.factory";
 export const FIXTURE_NOW = "2026-09-25T10:12:00Z";
 
 /** Stable fake "sha256:<64 hex>" digest: FNV-1a over the text with eight seeds. */
@@ -347,7 +347,7 @@ export const fixtureStudent: StudentState = {
     examples: Object.fromEntries([
       progressFor(planFromSeed, {
         status: "passing",
-        evidence: "$ ./factory --job t --seed seeds/tetris.md\nplan written: 4 tasks",
+        evidence: "$ ./factory --job t --seed ../seeds/tetris.md\nplan written: 4 tasks",
         at: "2026-09-22T15:00:00Z",
         carriedFrom: "001",
       }),
@@ -372,7 +372,7 @@ export const fixtureFreshStudent: StudentState = { iteration: null, progress: nu
 export const fixtureFactoryProject: FactoryProject = {
   status: "found",
   projectId: "prj_factory",
-  projectName: "my-factory",
+  projectName: "tetris/.factory",
   root: FIXTURE_FACTORY_ROOT,
 };
 
@@ -524,7 +524,7 @@ export const fixtureCompletion: Completion = {
 export const fixtureCandidates: CandidateProject[] = [
   {
     projectId: "prj_factory",
-    name: "my-factory",
+    name: "tetris/.factory",
     root: FIXTURE_FACTORY_ROOT,
     qualifies: true,
     detail: "ITERATION · 002 WIP",

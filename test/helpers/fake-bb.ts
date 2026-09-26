@@ -134,7 +134,7 @@ export async function makeTutorHost(
   };
   const project = {
     id: PROJECT_ID,
-    name: "my-factory",
+    name: "tetris/.factory",
     kind: "standard",
     gitRemoteUrl: null,
     createdAt: 1,

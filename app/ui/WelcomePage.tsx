@@ -84,12 +84,12 @@ function Picker({
           <p className="tp-section-label">Set one up</p>
           <ol>
             <li>
-              Open a terminal in the course checkout (usually <code>/workspaces/tutorial</code>) and start any coding agent.
+              Fork <code>capstone-project-starter</code> and clone your fork here, usually into{" "}
+              <code>/workspaces/capstone-project-starter</code>.
             </li>
             <li>
-              Say <b>coach me</b>. It creates your factory repo, for example <code>/workspaces/my-factory</code>.
+              Add its <code>tetris/.factory</code> folder to BB as a project, then come back here.
             </li>
-            <li>Add that repo to BB as a project, then come back here.</li>
           </ol>
           <button type="button" className="tp-btn tp-btn--ghost" onClick={() => queryCache.invalidate((key) => key === QUERY_KEYS.candidates)}>
             Check again

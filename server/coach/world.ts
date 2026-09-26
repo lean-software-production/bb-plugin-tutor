@@ -74,7 +74,7 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
         resolveFactory(bb.sdk, values.factoryProject),
       ]);
       // Re-checked on every load, not just at confirmFactory: a factory whose folder now
-      // leads into the course would have the coach write spec/ and seeds/ into the course.
+      // leads into the course would have the coach write spec/, stand-ins/ and ../seeds/ into the course.
       const { factoryProject, hostId } =
         factory.factoryProject.status === "found" && overlaps(await realPath(factory.factoryProject.root), await realPath(coursePath))
           ? { factoryProject: { status: "missing" as const, projectId: factory.factoryProject.projectId }, hostId: null }

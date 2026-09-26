@@ -210,7 +210,7 @@ export function registerRpc(rt: TutorRuntime): void {
       if (factoryProject.status !== "found") {
         throw new Error("That project has no folder on this machine, so Tutor cannot coach in it.");
       }
-      // The coach writes spec/ and seeds/ into the factory, so it must never be the course checkout.
+      // The coach writes spec/, stand-ins/ and ../seeds/ beside the factory, so it must never be the course checkout.
       const { coursePath } = await rt.world.load();
       if (overlaps(await realPath(factoryProject.root), await realPath(coursePath))) {
         throw new Error("That project's folder is, or shares a folder with, the course. Pick the repo you build your factory in.");
