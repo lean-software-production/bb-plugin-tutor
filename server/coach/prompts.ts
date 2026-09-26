@@ -9,21 +9,34 @@ export type CoachThreadStart = "adopt" | "resume" | "revisit";
 
 const MAX_QUESTION = 1500;
 
-function method(course: Course): string {
-  return course.coachPath === null
-    ? "The course has no coach file, so coach one small step at a time."
-    : `Your coaching method is the course's coach file, ${course.coachPath}: follow its Coaching process and Rules, ` +
-        "using the tutor_* tools wherever it tells you to adopt a spec or change spec/ITERATION.";
+/** The tutor_* tools own adoption and the progress files, whatever the coach file says. */
+const TOOLS_OWN_PROGRESS =
+  "Never run fetch-iteration or fetch.sh, and never edit ITERATION or spec/PROGRESS.yaml by hand: the tutor_* tools own them.";
+
+function method(coachPath: string | null): string {
+  const how =
+    coachPath === null
+      ? "There is no coach file, so coach one small step at a time."
+      : `Your coaching method is the coach file, ${coachPath}: follow its Coaching process and Rules, ` +
+        "using the tutor_* tools wherever it tells you to fetch an iteration or change ITERATION.";
+  return `${how} ${TOOLS_OWN_PROGRESS}`;
 }
 
 /**
- * The coach thread's first message. The lesson card line sits on its own
- * line, exactly as the coach must write it, so the lesson leads the thread.
+ * The coach thread's first message. `coachPath` is the coaching method's file
+ * (coach-file.ts). The lesson card line sits on its own line, exactly as the
+ * coach must write it, so the lesson leads the thread.
  */
-export function coachThreadPrompt(course: Course, lesson: Lesson, start: CoachThreadStart, focus: Rule | null = null): string {
+export function coachThreadPrompt(
+  course: Course,
+  coachPath: string | null,
+  lesson: Lesson,
+  start: CoachThreadStart,
+  focus: Rule | null = null,
+): string {
   const lines = [
     `You are the coach for Lesson ${lesson.id} "${lesson.title}" of the course "${course.title}".`,
-    `Load the \`${SKILL_ID}\` skill and follow it. ${method(course)}`,
+    `Load the \`${SKILL_ID}\` skill and follow it. ${method(coachPath)}`,
     "Start your first reply with this line, exactly as written and on a line of its own. BB draws it as the lesson card: the lesson and its Rules.",
     formatLessonRef({ lessonId: lesson.id }),
   ];
@@ -120,6 +133,6 @@ export function coachInstructions(metadata: unknown, facts: InstructionFacts, pl
     }
   }
   if (facts.coachPath !== null) lines.push(`Coaching method: ${facts.coachPath}.`);
-  lines.push("Never edit spec/PROGRESS.yaml or spec/ITERATION by hand: the tutor_* tools own them.");
+  lines.push(TOOLS_OWN_PROGRESS);
   return lines.join("\n");
 }

@@ -35,3 +35,13 @@ test("stays bounded however long the notes are", () => {
   assert.ok(text.length <= 6000);
   assert.match(text, /\(and 197 more\)/);
 });
+
+test("names the coaching method the world found, the starter's skill included", () => {
+  const skill = "/workspaces/capstone-project-starter/tetris/.agents/skills/coach-me/SKILL.md";
+  const withSkill = coachStateOf({ ...makeWorld(), coachPath: skill });
+  assert.ok(!("error" in withSkill));
+  assert.match(statusText(withSkill), /Coaching method: \/workspaces\/capstone-project-starter\/tetris\/\.agents\/skills\/coach-me\/SKILL\.md\./);
+  const without = coachStateOf({ ...makeWorld(), coachPath: null });
+  assert.ok(!("error" in without));
+  assert.match(statusText(without), /Coaching method: \(no coach file\)\./);
+});

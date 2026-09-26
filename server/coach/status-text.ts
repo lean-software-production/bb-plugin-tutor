@@ -23,7 +23,7 @@ export interface StatusCaller {
 }
 
 export function statusText(state: CoachState, caller: StatusCaller | null = null): string {
-  const { course, lesson, pointer } = state;
+  const { course, coachPath, lesson, pointer } = state;
   const progress = state.progress?.examples ?? {};
   const focus = state.progress?.focus ?? null;
   const counts = countExamples(lessonExamples(lesson), progress);
@@ -35,7 +35,7 @@ export function statusText(state: CoachState, caller: StatusCaller | null = null
     }
   }
   lines.push(
-    `Course: ${course.title}. Coaching method: ${course.coachPath ?? "(the course has no coach file)"}.`,
+    `Course: ${course.title}. Coaching method: ${coachPath ?? "(no coach file)"}.`,
     `Factory: ${state.root}.`,
     `Lesson ${lesson.id} "${lesson.title}": ${pointer.iterationStatus}. ` +
       `${counts.passing}/${counts.total} passing, ${counts.notYet} not yet, ${counts.skipped} skipped, ${counts.pending} pending.`,

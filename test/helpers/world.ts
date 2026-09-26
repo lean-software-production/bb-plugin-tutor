@@ -14,6 +14,7 @@ export function makeWorld(
     coursePath: course.root,
     course,
     courseError: null,
+    coachPath: course.coachPath,
     factoryProject,
     factoryHostId: factoryProject.status === "found" ? "host_1" : null,
     student: effective,

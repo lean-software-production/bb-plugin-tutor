@@ -7,6 +7,7 @@ import type { Course, StudentState } from "../../shared/model.ts";
 import type { CourseSource, ProgressStore } from "../../shared/ports.ts";
 import type { FactoryProject } from "../../shared/rpc.ts";
 import { overlaps, realPath } from "../paths.ts";
+import { resolveCoachFile } from "./coach-file.ts";
 import { resolveFactory } from "./factory-project.ts";
 import { readFeatureConfig, resolveCoursePath, resolveFactoryHint, type Env } from "./course-path.ts";
 import type { TutorSettings } from "./settings.ts";
@@ -18,6 +19,8 @@ export interface World {
   coursePath: string;
   course: Course | null;
   courseError: string | null;
+  /** The coaching method's file: the course's coach file, else the starter's coach-me skill (coach-file.ts). */
+  coachPath: string | null;
   factoryProject: FactoryProject;
   /** The machine holding the factory folder; null without a factory project. */
   factoryHostId: string | null;
@@ -38,8 +41,8 @@ export interface WorldDeps {
 
 export interface WorldSource {
   load(): Promise<World>;
-  /** The course from the most recent load, for synchronous callers (configure). */
-  lastCourse(): Course | null;
+  /** The coach file from the most recent load of the course, for synchronous callers (configure). */
+  lastCoachPath(): string | null;
 }
 
 const EMPTY_STUDENT: StudentState = { iteration: null, progress: null, problems: [] };
@@ -48,7 +51,7 @@ type CourseResult = { course: Course; error: null } | { course: null; error: str
 
 export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps: WorldDeps): WorldSource {
   let cached: { path: string; at: number; result: Promise<CourseResult> } | null = null;
-  let last: Course | null = null;
+  let lastCoach: string | null = null;
 
   function loadCourse(path: string): Promise<CourseResult> {
     const now = deps.now().getTime();
@@ -77,11 +80,16 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
           ? { factoryProject: { status: "missing" as const, projectId: factory.factoryProject.projectId }, hostId: null }
           : factory;
       const student = factoryProject.status === "found" ? await deps.store.read(factoryProject.root) : EMPTY_STUDENT;
-      if (courseResult.course !== null) last = courseResult.course;
+      const coachPath =
+        courseResult.course === null
+          ? null
+          : await resolveCoachFile(courseResult.course.coachPath, factoryProject.status === "found" ? factoryProject.root : null);
+      if (courseResult.course !== null) lastCoach = coachPath;
       return {
         coursePath,
         course: courseResult.course,
         courseError: courseResult.error,
+        coachPath,
         factoryProject,
         factoryHostId: hostId,
         student,
@@ -89,6 +97,6 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
         factoryHint: resolveFactoryHint(deps.env, config),
       };
     },
-    lastCourse: () => last,
+    lastCoachPath: () => lastCoach,
   };
 }
