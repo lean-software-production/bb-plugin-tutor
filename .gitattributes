@@ -1,0 +1,5 @@
+# Dev-only paths stay out of `git archive`, and so out of the release tarball
+# (bb-plugin-tutor-<version>.tgz) that the tutor Feature installs.
+/.github/ export-ignore
+/docs/ export-ignore
+/scripts/ export-ignore

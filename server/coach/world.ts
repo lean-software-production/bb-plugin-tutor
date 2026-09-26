@@ -69,8 +69,9 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
       const values = await settings.get();
       const config = await readFeatureConfig(deps.featureConfigFile);
       const coursePath = resolveCoursePath(values.coursePath, deps.env, config);
+      // A config this plugin can't read stops Tutor: no course, so every RPC and tool refuses with its message.
       const [courseResult, factory] = await Promise.all([
-        loadCourse(coursePath),
+        config.error === undefined ? loadCourse(coursePath) : Promise.resolve<CourseResult>({ course: null, error: config.error }),
         resolveFactory(bb.sdk, values.factoryProject),
       ]);
       // Re-checked on every load, not just at confirmFactory: a factory whose folder now

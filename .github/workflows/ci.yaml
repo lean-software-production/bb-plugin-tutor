@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  # The BB the plugin targets (package.json engines.bb). Its CLI builds the plugin.
+  BB_APP_VERSION: 0.43.4
+
+jobs:
+  test:
+    name: Typecheck, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      # `bb plugin build` needs only bb's JavaScript; the native-addon install
+      # scripts (node-pty, @parcel/watcher, better-sqlite3) are for running a
+      # BB server, so they are skipped.
+      - name: Install the BB CLI (bb-app ${{ env.BB_APP_VERSION }})
+        run: npm install --global --ignore-scripts "bb-app@${BB_APP_VERSION}"
+      - name: bb plugin build .
+        env:
+          BB_DATA_DIR: ${{ runner.temp }}/bb-data
+        run: |
+          bb plugin build .
+          for artifact in app.js app.css app.meta.json server.js; do
+            test -s "dist/$artifact" || { echo "::error::bb plugin build did not produce dist/$artifact"; exit 1; }
+          done
+
+  release-archive:
+    name: Release archive installs and builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Install the BB CLI (bb-app ${{ env.BB_APP_VERSION }})
+        run: npm install --global --ignore-scripts "bb-app@${BB_APP_VERSION}"
+      # The same scripts the release workflow runs, from HEAD instead of the tag.
+      - name: Build the release archive from HEAD
+        run: scripts/release-archive.sh HEAD "$RUNNER_TEMP/release"
+      - name: Extract, npm ci --omit=dev --ignore-scripts, bb plugin build
+        run: scripts/check-release-archive.sh "$RUNNER_TEMP"/release/bb-plugin-tutor-*.tgz

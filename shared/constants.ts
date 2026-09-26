@@ -82,8 +82,17 @@ export const ENV_VARS = {
   coursePath: "TUTOR_COURSE_PATH",
   factoryPath: "TUTOR_FACTORY_PATH",
 } as const;
-/** JSON `{ "course"?: string, "factory"?: string, "dataDir"?: string }`, written by the feature's install.sh. */
+/**
+ * JSON `{ "schemaVersion"?: 1, "course"?: string, "factory"?: string, "dataDir"?: string }`,
+ * written by the feature's install.sh.
+ */
 export const FEATURE_CONFIG_FILE = "/usr/local/etc/tutor/config.json";
+/**
+ * The config file layout this plugin understands. An absent `schemaVersion` is 1
+ * (Features written before it existed); any other value stops Tutor, since the
+ * Feature and the plugin are released separately.
+ */
+export const FEATURE_CONFIG_SCHEMA_VERSION = 1;
 export const DEFAULT_COURSE_PATH = "/workspaces/tutorial";
 
 /**

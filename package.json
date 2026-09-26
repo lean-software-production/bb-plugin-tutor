@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "description": "Tutor: a coached, Gherkin-driven course inside BB.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lean-software-production/bb-plugin-tutor.git"
+  },
   "type": "module",
   "engines": {
     "bb": ">=0.43.4",
