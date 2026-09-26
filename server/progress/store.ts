@@ -85,7 +85,7 @@ export function createProgressStore(): ProgressStore {
     },
 
     async writeProgress(factoryRoot: string, progress: ProgressFile): Promise<void> {
-      await ownFolder(factoryRoot, FACTORY_FILES.specDir);
+      await ownFolder(factoryRoot, FACTORY_FILES.specDir, "spec/ in the factory");
       const path = join(factoryRoot, FACTORY_FILES.progress);
       await writeFileAtomic(path, formatProgress(progress, await readOptional(path)));
     },

@@ -171,7 +171,9 @@ test("the coach tools round-trip progress through the factory repo and carry pas
   assert.match(adopted, /Adopt spec for iteration 001/);
   assert.equal(await readFile(join(root, "ITERATION"), "utf8"), "001 WIP\n");
   assert.deepEqual((await readdir(join(root, "spec/features"))).sort(), ["planning.feature"]);
-  assert.ok((await readdir(join(root, "seeds"))).includes("tetris.md"));
+  assert.equal(await readFile(join(sandbox.codebaseRoot, "seeds/tetris.md"), "utf8"), findLesson(course, "001")?.seedSpec);
+  assert.ok(!(await readdir(root)).includes("seeds"), "the seed goes to ../seeds, not the factory");
+  assert.deepEqual((await readdir(join(root, "stand-ins"))).sort(), ["README.md", "plan-alpha-beta"]);
 
   const lesson1 = findLesson(course, "001");
   assert.ok(lesson1 !== undefined);

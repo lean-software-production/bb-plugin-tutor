@@ -50,12 +50,13 @@ function refusal(text: string): PluginAgentToolResult {
   return { content: [{ type: "text", text }], isError: true };
 }
 
-async function applyOutcome(rt: TutorRuntime, root: string, outcome: Outcome, caller: Caller): Promise<void> {
+async function applyOutcome(rt: TutorRuntime, state: CoachState, outcome: Outcome, caller: Caller): Promise<void> {
   if ("error" in outcome) return;
   if (outcome.reached !== undefined) await recordReachedRule(rt.bb.sdk, caller.coachThreadId, outcome.reached);
-  if (outcome.adopt !== undefined) await copyLessonSpec(root, outcome.adopt);
-  if (outcome.iteration !== undefined) await rt.store.writeIteration(root, outcome.iteration);
-  if (outcome.progress !== undefined) await rt.store.writeProgress(root, outcome.progress);
+  // Adoption writes spec/, the seed and stand-ins/ before ITERATION, so ITERATION never names a lesson that isn't there.
+  if (outcome.adopt !== undefined) await copyLessonSpec(state.root, outcome.adopt, { courseRoot: state.course.root });
+  if (outcome.iteration !== undefined) await rt.store.writeIteration(state.root, outcome.iteration);
+  if (outcome.progress !== undefined) await rt.store.writeProgress(state.root, outcome.progress);
   if (outcome.iteration !== undefined || outcome.progress !== undefined) {
     rt.signals.publish(outcome.iteration === undefined ? "progress" : "iteration", outcome.progress?.iteration ?? null);
   }
@@ -77,7 +78,7 @@ function register<Name extends ToolName>(rt: TutorRuntime, spec: ToolSpec<Name>)
         if (otherLesson !== null) return refusal(otherLesson);
         const outcome = await spec.action(state, input, caller, isoSeconds(rt.now()));
         if ("error" in outcome) return refusal(outcome.error);
-        await applyOutcome(rt, state.root, outcome, caller);
+        await applyOutcome(rt, state, outcome, caller);
         return outcome.text;
       };
       try {
