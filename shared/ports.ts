@@ -23,10 +23,13 @@ export interface CourseSource {
 }
 
 export interface ProgressStore {
-  /** Reads spec/ITERATION and spec/PROGRESS.yaml under `factoryRoot`. Never throws for bad content. */
+  /**
+   * Reads ITERATION (falling back to an older factory's spec/ITERATION) and
+   * spec/PROGRESS.yaml under `factoryRoot`. Never throws for bad content.
+   */
   read(factoryRoot: string): Promise<StudentState>;
   /** Writes spec/PROGRESS.yaml atomically (temp file + rename). */
   writeProgress(factoryRoot: string, progress: ProgressFile): Promise<void>;
-  /** Writes spec/ITERATION as "<NNN> <WIP|Done>\n". Refuses Lesson 0. */
+  /** Writes ITERATION as "<NNN> <WIP|Done>\n", then removes any spec/ITERATION. Refuses Lesson 0. */
   writeIteration(factoryRoot: string, state: IterationState): Promise<void>;
 }

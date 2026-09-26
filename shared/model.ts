@@ -1,5 +1,5 @@
 // The Tutor domain model: course content (read-only, from the course repo)
-// and student state (spec/PROGRESS.yaml + spec/ITERATION in the factory repo).
+// and student state (spec/PROGRESS.yaml + ITERATION in the factory).
 //
 // Every type is inferred from a zod schema so the same definition validates
 // RPC payloads, tool input and the YAML read back from the student's repo.
@@ -166,7 +166,7 @@ export type Course = z.infer<typeof courseSchema>;
 // Student state (factory repo)
 // ---------------------------------------------------------------------------
 
-/** spec/ITERATION: one line, "<NNN> <WIP|Done>". Never written for Lesson 0. */
+/** ITERATION (or an older factory's spec/ITERATION): one line, "<NNN> <WIP|Done>". Never written for Lesson 0. */
 export const iterationStateSchema = z.object({
   iteration: lessonIdSchema,
   status: z.enum(["WIP", "Done"]),

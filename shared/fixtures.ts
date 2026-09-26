@@ -527,7 +527,7 @@ export const fixtureCandidates: CandidateProject[] = [
     name: "my-factory",
     root: FIXTURE_FACTORY_ROOT,
     qualifies: true,
-    detail: "spec/ITERATION · 002 WIP",
+    detail: "ITERATION · 002 WIP",
   },
   { projectId: "prj_tutorial", name: "tutorial", root: FIXTURE_COURSE_ROOT, qualifies: false, detail: "the course itself" },
 ];

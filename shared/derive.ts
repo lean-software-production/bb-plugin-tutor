@@ -90,7 +90,7 @@ export interface CurrentPointer {
 }
 
 /**
- * Where the student is. spec/ITERATION is canonical (decision 1) whenever it
+ * Where the student is. ITERATION is canonical (decision 1) whenever it
  * names a lesson of this course. Otherwise PROGRESS.yaml on Lesson 0 means
  * Lesson 0 is under way, and Done once every one of its Examples is passing
  * or skipped. Anything else means nothing has been adopted yet.

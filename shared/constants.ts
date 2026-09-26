@@ -94,12 +94,19 @@ export const DEFAULT_COURSE_PATH = "/workspaces/tutorial";
  */
 export const ACTIVITY_FILE = ".tutor-feature/activity";
 
-/** Paths inside the student's factory repo, relative to its root. */
+/**
+ * Paths inside the student's factory, relative to its folder (tetris/.factory
+ * in capstone-project-starter). `seedsDir` sits under the codebase folder, the
+ * factory's parent: ../seeds.
+ */
 export const FACTORY_FILES = {
   progress: "spec/PROGRESS.yaml",
-  iteration: "spec/ITERATION",
+  iteration: "ITERATION",
+  /** Where ITERATION lived before the starter layout: read when there is no root ITERATION, removed on the next write. */
+  legacyIteration: "spec/ITERATION",
   specDir: "spec",
   seedsDir: "seeds",
+  standInsDir: "stand-ins",
   agents: "AGENTS.md",
 } as const;
 
@@ -109,6 +116,7 @@ export const COURSE_FILES = {
   ledger: "docs/iterations/README.md",
   defaultCoach: ".agents/coach-me.md",
   defaultLexicon: "docs/lexicon.yaml",
+  standIns: "stand-ins",
 } as const;
 
 /** Lesson 0, "Using your tutor": shipped with the plugin, prepended to every course. */

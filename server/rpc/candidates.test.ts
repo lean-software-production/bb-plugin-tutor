@@ -2,7 +2,19 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { describeCandidate, rankCandidates, type ProjectProbe } from "./candidates.ts";
 
-const context = { coursePath: "/workspaces/tutorial", coachFileName: "coach-me.md" };
+const context = { coursePath: "/workspaces/tutorial", coachName: "coach-me" };
+
+// capstone-project-starter's tetris/.factory/AGENTS.md names the coach-me skill, not a file.
+const STARTER_AGENTS = `# Agent instructions
+
+- \`spec/\` holds the current homework iteration, fetched from the course. Don't edit it.
+- \`ITERATION\` holds the student's progress, e.g. \`001 WIP\`.
+
+Skills, in \`../.agents/skills/\`:
+
+- **fetch-iteration** — when the student says "fetch iteration", or there is no iteration in progress.
+- **coach-me** — when the student says "coach me", asks to be coached, or wants to work through their homework with guidance.
+`;
 
 function probe(overrides: Partial<ProjectProbe>): ProjectProbe {
   return {
@@ -16,17 +28,19 @@ function probe(overrides: Partial<ProjectProbe>): ProjectProbe {
   };
 }
 
-test("a repo with spec/ITERATION or a coach-me AGENTS.md qualifies", () => {
+test("a repo with an ITERATION or a coach-me AGENTS.md qualifies", () => {
   assert.deepEqual(describeCandidate(probe({ iterationText: "002 WIP\n" }), context), {
     projectId: "prj",
     name: "p",
     root: "/workspaces/p",
     qualifies: true,
-    detail: "spec/ITERATION · 002 WIP",
+    detail: "ITERATION · 002 WIP",
   });
   const agents = describeCandidate(probe({ agentsText: "read ../tutorial/.agents/coach-me.md" }), context);
   assert.equal(agents.qualifies, true);
-  assert.equal(describeCandidate(probe({ iterationText: "?" }), context).detail, "spec/ITERATION · unreadable");
+  const starter = describeCandidate(probe({ agentsText: STARTER_AGENTS }), context);
+  assert.deepEqual([starter.qualifies, starter.detail], [true, "AGENTS.md points at the course"]);
+  assert.equal(describeCandidate(probe({ iterationText: "?" }), context).detail, "ITERATION · unreadable");
 });
 
 test("the course itself, folderless projects and plain repos do not", () => {
@@ -39,7 +53,7 @@ test("the course itself, folderless projects and plain repos do not", () => {
   assert.equal(describeCandidate(probe({ root: null, rootExists: false }), context).detail, "no folder on this machine");
   assert.deepEqual(
     [describeCandidate(probe({}), context).qualifies, describeCandidate(probe({}), context).detail],
-    [false, "no spec/ITERATION"],
+    [false, "no ITERATION"],
   );
 });
 

@@ -188,9 +188,9 @@ export const candidateProjectSchema = z.object({
   projectId: z.string(),
   name: z.string(),
   root: z.string().nullable(),
-  /** Looks like a factory repo (has spec/ITERATION, or an AGENTS.md naming the course). */
+  /** Looks like a factory (has ITERATION or spec/ITERATION, or an AGENTS.md naming the coach). */
   qualifies: z.boolean(),
-  /** One line for the picker: "spec/ITERATION · 001 WIP", "no spec/ITERATION". */
+  /** One line for the picker: "ITERATION · 001 WIP", "no ITERATION". */
   detail: z.string(),
 });
 export type CandidateProject = z.infer<typeof candidateProjectSchema>;

@@ -169,7 +169,7 @@ test("the coach tools round-trip progress through the factory repo and carry pas
   assert.match(host.threads.find((thread) => thread.id === coach1)?.prompt ?? "", /tutor_adopt_iteration with iteration "001"/);
   const adopted = await ok(host, "tutor_adopt_iteration", { iteration: "001" }, coach1);
   assert.match(adopted, /Adopt spec for iteration 001/);
-  assert.equal(await readFile(join(root, "spec/ITERATION"), "utf8"), "001 WIP\n");
+  assert.equal(await readFile(join(root, "ITERATION"), "utf8"), "001 WIP\n");
   assert.deepEqual((await readdir(join(root, "spec/features"))).sort(), ["planning.feature"]);
   assert.ok((await readdir(join(root, "seeds"))).includes("tetris.md"));
 
@@ -192,7 +192,7 @@ test("the coach tools round-trip progress through the factory repo and carry pas
   assert.equal(detail.coachThreadId, coach1);
 
   await ok(host, "tutor_complete_iteration", { iteration: "001", summary: "It plans." }, coach1);
-  assert.equal(await readFile(join(root, "spec/ITERATION"), "utf8"), "001 Done\n");
+  assert.equal(await readFile(join(root, "ITERATION"), "utf8"), "001 Done\n");
 
   // Lesson 2: the unchanged Example carries over; the reworded one does not.
   const coach2 = ((await host.harness.behavior.callRpc("startNextLesson", { lessonId: "002" })) as { threadId: string }).threadId;
@@ -238,7 +238,7 @@ test("a coach thread only changes its own lesson: an old coach can't touch the l
   const stolen = await tool(host, "tutor_adopt_iteration", { iteration: "001" }, coach0);
   assert.ok(isError(stolen), `adopted from the old coach: ${text(stolen)}`);
   assert.match(text(stolen), /This coach thread is for Lesson 000/);
-  assert.equal(await readFile(join(root, "spec/ITERATION"), "utf8").catch(() => null), null, "nothing adopted");
+  assert.equal(await readFile(join(root, "ITERATION"), "utf8").catch(() => null), null, "nothing adopted");
 
   const coach1 = ((await host.harness.behavior.callRpc("startNextLesson", { lessonId: "001" })) as { threadId: string }).threadId;
   // Before adopting, the new coach is told to adopt its lesson rather than act on Lesson 000.
@@ -263,7 +263,7 @@ test("a coach thread only changes its own lesson: an old coach can't touch the l
     assert.match(text(result), /This coach thread is for Lesson 000, but the student is on Lesson 001\. Open Lesson 001's coach from the course outline\./);
   }
   assert.equal(await readFile(join(root, "spec/PROGRESS.yaml"), "utf8"), before, "Lesson 001's progress is untouched");
-  assert.equal(await readFile(join(root, "spec/ITERATION"), "utf8"), "001 WIP\n");
+  assert.equal(await readFile(join(root, "ITERATION"), "utf8"), "001 WIP\n");
   assert.deepEqual(host.threads.find((thread) => thread.id === coach0)?.metadata.reachedRules, undefined);
 
   // tutor_status still answers, naming the caller's lesson and flagging that it isn't current.
@@ -800,6 +800,26 @@ test("first run: candidates, confirmation and a course that will not load", asyn
   assert.ok(host.harness.inspection.realtimeSignals.some((signal) => (signal.payload as { reason: string }).reason === "factoryProject"));
   const after = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
   assert.equal(after.current?.iterationStatus, "not-started");
+});
+
+test("first run: a folder qualifies on ITERATION, an older spec/ITERATION, or the starter's AGENTS.md", async (t) => {
+  const { sandbox, host } = await setup(t, {});
+  const root = sandbox.factoryRoot;
+  const candidate = async () => {
+    const { projects } = (await host.harness.behavior.callRpc("listCandidateProjects", null)) as {
+      projects: { projectId: string; qualifies: boolean; detail: string }[];
+    };
+    const found = projects.find((project) => project.projectId === PROJECT_ID) ?? assert.fail("no factory project");
+    return [found.qualifies, found.detail];
+  };
+  assert.deepEqual(await candidate(), [false, "no ITERATION"]);
+  await writeFile(join(root, "AGENTS.md"), "Skills, in `../.agents/skills/`:\n\n- **coach-me** — when the student says \"coach me\".\n");
+  assert.deepEqual(await candidate(), [true, "AGENTS.md points at the course"]);
+  await mkdir(join(root, "spec"));
+  await writeFile(join(root, "spec/ITERATION"), "001 Done\n");
+  assert.deepEqual(await candidate(), [true, "ITERATION · 001 Done"]);
+  await writeFile(join(root, "ITERATION"), "002 WIP\n");
+  assert.deepEqual(await candidate(), [true, "ITERATION · 002 WIP"]);
 });
 
 test("concurrent tool calls never lose each other's progress", async (t) => {
