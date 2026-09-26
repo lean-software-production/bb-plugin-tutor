@@ -1,2 +1,5 @@
 dist/
 node_modules/
+# The tutor-dev harness's generated workspace and BB state, and the e2e walk's.
+/.tutor-dev/
+/.tutor-e2e/
