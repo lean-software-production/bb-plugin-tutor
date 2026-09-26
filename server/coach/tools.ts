@@ -157,7 +157,7 @@ export function registerCoachTools(rt: TutorRuntime): void {
   register(rt, {
     name: TOOL_NAMES.adoptIteration,
     description:
-      "Adopt this coach thread's lesson (an iteration, in the course repo's words) as coach-me does: copy its README.md, FACTORY.md and features/ into spec/, its sample seed into seeds/, write spec/ITERATION as WIP and start spec/PROGRESS.yaml, carrying over Examples already passing. Does not commit. A coach thread adopts only its own lesson.",
+      "Adopt this coach thread's lesson (an iteration, in the course repo's words) as fetch-iteration does, from the course on this machine: copy its README.md, FACTORY.md and features/ into spec/, its sample seed into ../seeds/ unless one is there, refresh stand-ins/, write ITERATION as WIP and start spec/PROGRESS.yaml, carrying over Examples already passing. Use it instead of fetch-iteration or fetch.sh. Does not commit. A coach thread adopts only its own lesson.",
     label: { pending: "Adopting the lesson", completed: "Adopted the lesson" },
     // Adopting makes the caller's lesson the current one, so it checks the lesson itself.
     lesson: "any",
@@ -169,7 +169,7 @@ export function registerCoachTools(rt: TutorRuntime): void {
   register(rt, {
     name: TOOL_NAMES.completeIteration,
     description:
-      "Finish the current lesson: write spec/ITERATION as Done and store your two- or three-sentence summary for the student. Returns a ::tutor-progress card to echo.",
+      "Finish the current lesson: write ITERATION as Done and store your two- or three-sentence summary for the student. Returns a ::tutor-progress card to echo.",
     label: { pending: "Completing the lesson", completed: "Completed the lesson" },
     lesson: "current",
     action: (state, input) => completeAction(state, input),

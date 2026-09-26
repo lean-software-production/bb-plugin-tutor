@@ -126,3 +126,10 @@ export const BUILTIN_LESSON_ID = "000";
 export function coachThreadTitle(lessonId: string): string {
   return `Coach · Lesson ${lessonId}`;
 }
+
+/**
+ * The capstone starter's coach-me skill, relative to the codebase folder that
+ * holds the factory (`tetris/` for `tetris/.factory`). It is the coaching
+ * method when the course has no coach file of its own.
+ */
+export const STARTER_COACH_SKILL = ".agents/skills/coach-me/SKILL.md";

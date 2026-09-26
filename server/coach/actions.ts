@@ -23,6 +23,8 @@ import type { World } from "./world.ts";
 
 export interface CoachState {
   course: Course;
+  /** The coaching method's file (coach-file.ts), or null. */
+  coachPath: string | null;
   projectId: string;
   root: string;
   hostId: string;
@@ -55,6 +57,7 @@ export function coachStateOf(world: World): CoachState | { error: string } {
   if (lesson === undefined) return { error: `Lesson ${world.pointer.lessonId} is not in this course.` };
   return {
     course: world.course,
+    coachPath: world.coachPath,
     projectId: world.factoryProject.projectId,
     root: world.factoryProject.root,
     hostId: world.factoryHostId,
@@ -82,7 +85,7 @@ export function otherLessonError(state: CoachState, caller: CallerLesson): strin
     return `This coach thread is for another course, but the student is on Lesson ${current} of "${state.course.title}". Open Lesson ${current}'s coach from the course outline.`;
   }
   if (caller.lessonId === current) return null;
-  if (adoptionTargets(state.course, state.pointer).includes(caller.lessonId)) {
+  if (adoptionTargets(state.course, state.pointer, state.progress === null).includes(caller.lessonId)) {
     return `This coach thread is for Lesson ${caller.lessonId}, which hasn't been adopted yet: the student is still on Lesson ${current}. Call tutor_adopt_iteration with iteration "${caller.lessonId}" first.`;
   }
   return `This coach thread is for Lesson ${caller.lessonId}, but the student is on Lesson ${current}. Open Lesson ${current}'s coach from the course outline.`;
@@ -211,20 +214,25 @@ export function markAction(state: CoachState, input: ToolParameters<"tutor_mark_
   return { text: `Marked ${example.key} as ${input.status}.\n${echo(line)}${hint}`, progress: { ...progress, examples } };
 }
 
-/** The lessons tutor_adopt_iteration accepts now. */
-export function adoptionTargets(course: Course, pointer: CurrentPointer): string[] {
+/**
+ * The lessons tutor_adopt_iteration accepts now. `unrecorded`: there is no
+ * progress for the current lesson. A WIP lesson without any was set going
+ * outside Tutor, as fetch-iteration does, and its own coach adopts it again;
+ * otherwise nothing could start its spec/PROGRESS.yaml.
+ */
+export function adoptionTargets(course: Course, pointer: CurrentPointer, unrecorded = false): string[] {
   const firstReal = course.lessons.find((lesson) => !lesson.builtin)?.id;
   if (pointer.lessonId === BUILTIN_LESSON_ID) {
     const targets = firstReal === undefined ? [] : [firstReal];
     return pointer.iterationStatus === "not-started" ? [BUILTIN_LESSON_ID, ...targets] : targets;
   }
-  if (pointer.iterationStatus !== "Done") return [];
+  if (pointer.iterationStatus !== "Done") return pointer.iterationStatus === "WIP" && unrecorded ? [pointer.lessonId] : [];
   const next = nextLesson(course, pointer.lessonId);
   return next === undefined ? [] : [next.id];
 }
 
 export function adoptAction(state: CoachState, input: ToolParameters<"tutor_adopt_iteration">, now: string): Outcome {
-  const targets = adoptionTargets(state.course, state.pointer);
+  const targets = adoptionTargets(state.course, state.pointer, state.progress === null);
   const lesson = findLesson(state.course, input.iteration);
   if (lesson === undefined || !targets.includes(input.iteration)) {
     const current = `The student is on lesson ${state.pointer.lessonId} (${state.pointer.iterationStatus}).`;
@@ -239,8 +247,9 @@ export function adoptAction(state: CoachState, input: ToolParameters<"tutor_adop
   return {
     text: [
       summary,
-      `spec/ now holds its README.md, FACTORY.md and features/, and spec/ITERATION reads "${lesson.id} WIP".`,
-      `Commit with the message "Adopt spec for iteration ${lesson.id}", then follow the coaching method:`,
+      "spec/ now holds its README.md, FACTORY.md and features/, and ../seeds/ its sample seed unless one was there already.",
+      `stand-ins/ is refreshed from the course, and ITERATION reads "${lesson.id} WIP".`,
+      `Commit spec/, ../seeds/ and ITERATION with the message "Adopt spec for iteration ${lesson.id}", then follow the coaching method:`,
       "show the student `git show --stat HEAD` and the diff of spec/FACTORY.md.",
     ].join("\n"),
     progress,
@@ -274,7 +283,7 @@ export function completeAction(state: CoachState, input: ToolParameters<"tutor_c
     lessonId: lesson.id,
   });
   const caveat = open > 0 ? `\nNote: ${open} examples are not marked passing or skipped.` : "";
-  const commit = lesson.builtin ? "" : `\nCommit the implementation and spec/ with the message "Implement homework ${lesson.id}".`;
+  const commit = lesson.builtin ? "" : `\nCommit the implementation, ITERATION and spec/PROGRESS.yaml with the message "Implement homework ${lesson.id}".`;
   const outcome: Outcome = {
     text: `Lesson ${lesson.id} is complete.${caveat}${commit}\n${echo(line)}`,
     progress: { ...progress, summary: input.summary },

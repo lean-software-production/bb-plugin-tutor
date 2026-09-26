@@ -12,6 +12,7 @@ import {
   completeAction,
   focusAction,
   markAction,
+  otherLessonError,
   type CoachState,
   type Outcome,
 } from "./actions.ts";
@@ -107,7 +108,9 @@ test("adopting a real lesson copies the spec and writes WIP; Lesson 0 writes pro
   assert.equal(outcome.adopt?.id, "003");
   assert.deepEqual(outcome.iteration, { iteration: "003", status: "WIP" });
   assert.equal(outcome.progress?.adopted, NOW);
-  assert.match(outcome.text, /Adopt spec for iteration 003/);
+  assert.match(outcome.text, /spec\/ now holds its README\.md, FACTORY\.md and features\/, and \.\.\/seeds\/ its sample seed unless one was there already\./);
+  assert.match(outcome.text, /stand-ins\/ is refreshed from the course, and ITERATION reads "003 WIP"\./);
+  assert.match(outcome.text, /Commit spec\/, \.\.\/seeds\/ and ITERATION with the message "Adopt spec for iteration 003"/);
 
   const builtin = adoptAction(stateOf(fixtureFreshStudent), { iteration: "000" }, NOW);
   assert.ok("progress" in builtin);
@@ -126,6 +129,7 @@ test("completing writes Done and the summary; Lesson 0 needs every Example to ho
   assert.equal(outcome.progress?.summary, "It checks its work.");
   assert.match(outcome.text, /3 examples are not marked/);
   assert.equal(cardIn(outcome)?.kind, "lesson-complete");
+  assert.match(outcome.text, /Commit the implementation, ITERATION and spec\/PROGRESS\.yaml with the message "Implement homework 002"\./);
 
   const wrong = completeAction(stateOf(), { iteration: "003", summary: "x" });
   assert.ok("error" in wrong);
@@ -133,4 +137,21 @@ test("completing writes Done and the summary; Lesson 0 needs every Example to ho
   const onZero: StudentState = { iteration: null, progress: { iteration: "000", examples: {} }, problems: [] };
   const zero = completeAction(stateOf(onZero), { iteration: "000", summary: "x" });
   assert.ok("error" in zero && /Lesson 0/.test(zero.error));
+});
+
+test("a lesson set to WIP outside Tutor, with no progress for it, is adopted again by its own coach", () => {
+  // fetch-iteration ran outside BB: ITERATION reads 003 WIP, spec/PROGRESS.yaml is still Lesson 002's.
+  const fetched: StudentState = { ...fixtureStudent, iteration: { iteration: "003", status: "WIP" } };
+  const state = stateOf(fetched);
+  assert.equal(state.progress, null);
+  assert.deepEqual(adoptionTargets(fixtureCourse, state.pointer, true), ["003"]);
+  assert.equal(otherLessonError(state, { courseId: fixtureCourse.id, lessonId: "003" }), null);
+  const outcome = adoptAction(state, { iteration: "003" }, NOW);
+  assert.ok("adopt" in outcome, "error" in outcome ? outcome.error : "");
+  assert.equal(outcome.adopt?.id, "003");
+  assert.deepEqual(outcome.iteration, { iteration: "003", status: "WIP" });
+  assert.equal(outcome.progress?.iteration, "003");
+  // With progress for it, a WIP lesson is under way and is not adopted again.
+  const underWay = adoptAction(stateOf(), { iteration: "002" }, NOW);
+  assert.ok("error" in underWay && /Nothing can be adopted now/.test(underWay.error));
 });

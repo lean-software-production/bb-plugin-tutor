@@ -40,7 +40,7 @@ export async function registerTutor(bb: BbPluginApi, deps: WorldDeps): Promise<T
   registerCoachTools(rt);
   bb.agents.configure((context) =>
     coachConfiguration(context, bb.pluginId, {
-      coachPath: rt.world.lastCourse()?.coachPath ?? null,
+      coachPath: rt.world.lastCoachPath(),
       coachLesson: (threadId) => rt.coaches.lessonOf(threadId),
     }),
   );
