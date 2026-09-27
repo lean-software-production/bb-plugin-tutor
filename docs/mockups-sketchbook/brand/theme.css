@@ -1,0 +1,126 @@
+@import url("https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap");
+
+/*
+ * Sketchbook: a bb app theme for the Lean Software Production brand.
+ * Warm cream paper, ink text, the teal accent and the highlighter swash.
+ *
+ * Colours come only from kit/tokens.json. Where a palette colour is too
+ * faint to read as text, it's darkened with ink (light mode) or lightened
+ * with paper (dark mode) using color-mix, never swapped for a new hue.
+ * Dark mode follows the brand (README.md): ink becomes the page and
+ * paper the text.
+ *
+ * Install: copy this folder to `bb theme dir`, then `bb theme set sketchbook`.
+ */
+
+:root,
+.light {
+  /* Brand palette (kit/tokens.json) */
+  --sk-mustard: #eea306;
+  --sk-teal: #039695;
+  --sk-forest: #4a7d4b;
+  --sk-coral: #f76c37;
+  --sk-blue: #1f78a8;
+  --sk-rust: #d6631c;
+  --sk-deep-teal: #094854;
+  --sk-highlighter: #ffeeb8;
+  --sk-paper: #fcf9f3;
+  --sk-ink: #2a2724;
+
+  /* Anchors: cream paper and warm ink */
+  --canvas: var(--sk-paper);
+  --ink: var(--sk-ink);
+
+  /* Accent: deep teal, with paper text on it */
+  --primary: var(--sk-deep-teal);
+  --primary-foreground: var(--sk-paper);
+
+  /* Selected rows get the highlighter swash */
+  --surface-selected: var(--sk-highlighter);
+  --surface-selected-border: var(--sk-mustard);
+
+  --muted-foreground: color-mix(in oklch, var(--ink) 70%, var(--canvas));
+  --subtle-foreground: color-mix(in oklch, var(--ink) 58%, var(--canvas));
+  --readback-foreground: color-mix(in oklch, var(--ink) 64%, var(--canvas));
+
+  /* Teal darkened just enough to read as file-path text */
+  --timeline-accent: color-mix(in oklch, var(--sk-teal) 80%, var(--sk-ink));
+  --file-accent: var(--timeline-accent);
+
+  --destructive: color-mix(in oklch, var(--sk-rust) 75%, var(--sk-ink));
+  --destructive-foreground: var(--sk-paper);
+  --destructive-text: var(--destructive);
+  --warning: var(--sk-mustard);
+  --warning-text: color-mix(in oklch, var(--sk-mustard) 55%, var(--sk-ink));
+  --attention: var(--sk-mustard);
+  --success: var(--sk-forest);
+  --diff-added: var(--sk-forest);
+  --diff-removed: var(--destructive);
+  /* --pr-merged keeps bb's purple: the brand has none, and merged means purple. */
+
+  /* Body text in the brand's handwriting; code stays monospaced */
+  --font-sans: "Patrick Hand", "Comic Sans MS", "Inter Variable", Inter, sans-serif;
+
+  /* Terminal: 0–8 are the palette (8 is ink and paper half-and-half);
+     9–14 are the same colours 70% + 30% paper. */
+  --ansi-0: #2a2724;
+  --ansi-1: #d6631c;
+  --ansi-2: #4a7d4b;
+  --ansi-3: #eea306;
+  --ansi-4: #1f78a8;
+  --ansi-5: #f76c37;
+  --ansi-6: #039695;
+  --ansi-7: #faeed3;
+  --ansi-8: #8c8884;
+  --ansi-9: #e69268;
+  --ansi-10: #7ca27c;
+  --ansi-11: #f4be6f;
+  --ansi-12: #679ec3;
+  --ansi-13: #fe9976;
+  --ansi-14: #69b4b3;
+  --ansi-15: #fcf9f3;
+  /* Readable text drawn on each ANSI background (black/white by contrast). */
+  --ansi-bg-fg-0: #ffffff;
+  --ansi-bg-fg-1: #000000;
+  --ansi-bg-fg-2: #ffffff;
+  --ansi-bg-fg-3: #000000;
+  --ansi-bg-fg-4: #ffffff;
+  --ansi-bg-fg-5: #000000;
+  --ansi-bg-fg-6: #000000;
+  --ansi-bg-fg-7: #000000;
+  --ansi-bg-fg-8: #000000;
+  --ansi-bg-fg-9: #000000;
+  --ansi-bg-fg-10: #000000;
+  --ansi-bg-fg-11: #000000;
+  --ansi-bg-fg-12: #000000;
+  --ansi-bg-fg-13: #000000;
+  --ansi-bg-fg-14: #000000;
+  --ansi-bg-fg-15: #000000;
+}
+
+.dark {
+  /* Anchors: an ink page with paper text */
+  --canvas: var(--sk-ink);
+  --ink: var(--sk-paper);
+
+  /* Accent: teal lightened with paper, with ink text on it */
+  --primary: color-mix(in oklch, var(--sk-teal) 80%, var(--sk-paper));
+  --primary-foreground: var(--sk-ink);
+
+  /* Selection falls back to bb's primary tint: highlighter glares on ink. */
+  --surface-selected: color-mix(in oklab, var(--primary) 16%, transparent);
+  --surface-selected-border: color-mix(in oklab, var(--primary) 35%, transparent);
+
+  --timeline-accent: var(--primary);
+  --file-accent: var(--timeline-accent);
+
+  --destructive: var(--sk-coral);
+  --destructive-foreground: var(--sk-ink);
+  --destructive-text: color-mix(in oklch, var(--sk-coral) 80%, var(--sk-paper));
+  --warning: var(--sk-mustard);
+  --warning-text: var(--sk-mustard);
+  --attention: var(--sk-mustard);
+  --success: color-mix(in oklch, var(--sk-forest) 70%, var(--sk-paper));
+  --diff-added: var(--success);
+  --diff-removed: var(--sk-coral);
+}
