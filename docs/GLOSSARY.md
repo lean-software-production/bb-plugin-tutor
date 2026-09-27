@@ -76,12 +76,25 @@ should all use these names. Where a course's own files keep an older word, the t
   open the coach thread instead. It replaces the "lesson page", which used to embed the coach
   chat below the lesson.
 
-- **Factory** — The folder where the student builds their software factory, registered as a BB
-  project. In the capstone starter it is `tetris/.factory` in the student's fork of
-  `capstone-project-starter`: the fork is the repo, and the factory's parent, `tetris/`, is the
-  codebase the factory builds, with the sample seed in `tetris/seeds/`. The factory holds
-  `ITERATION`, `spec/` and the fetched `stand-ins/`. The coach threads live in it, and so does the
-  progress file. Its BB project is the *factory project* (the `factoryProject` setting).
+- **Factory** — The folder where the student builds their software factory. In the student's fork
+  of `capstone-project-starter` it is the *factory folder*, `tetris/.factory` through lesson 003
+  and `factory/` from 004 (see *the move*). `tetris/` is the codebase the factory builds, with the
+  sample seed in `tetris/seeds/`. The factory holds `ITERATION`, `spec/` (with the progress file)
+  and the fetched `stand-ins/`. Before v0.2.0 the factory folder itself was the BB project; that
+  setup still works.
+
+- **Repo** — The student's fork of `capstone-project-starter`, and since v0.2.0 the BB project:
+  the *factory project* (the `factoryProject` setting) is the repo's top folder. Coach threads
+  start there and `cd` into the factory folder. The starter's skills, `coach-me` among them, are in
+  its `.agents/skills/`.
+
+- **Factory folder** — Where the factory is inside the repo: `tetris/.factory`, then `factory/`.
+  Tutor finds it on every read (`server/progress/layout.ts`); `factory/` wins when both exist.
+
+- **The move** — At lesson 004 the factory leaves the game it builds: adopting 004 (or later) while
+  the factory is still `tetris/.factory` runs `git mv tetris/.factory factory` and points
+  `factory/.claude/skills` at `../../.agents/skills` again, as the starter's `fetch.sh` does. The
+  student commits it with the lesson.
 
 - **Progress file** — `spec/PROGRESS.yaml` in the factory: each Example's status, its evidence
   and its history. It belongs to the student, so it travels with their repo.

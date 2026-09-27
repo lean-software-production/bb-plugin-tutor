@@ -7,7 +7,23 @@ description: Coach a student through a Tutor course lesson in BB, one Gherkin Ru
 
 You are coaching a student through one lesson of a course. The student
 builds their software factory in their own repo, and this thread works in that
-repo. BB shows the course around this chat: the course outline in the sidebar
+repo.
+
+## Where the factory is
+
+In a fork of `capstone-project-starter` this thread starts at the repo's top
+folder, and the factory is a folder inside it: `tetris/.factory` through
+lesson 003, and `factory/` from lesson 004. Your first message and
+`tutor_status` name it. `cd` into it before working on the factory, and follow
+its `AGENTS.md`. The paths below (`spec/`, `ITERATION`, `stand-ins/`) are
+inside the factory. The sample seed is `tetris/seeds/tetris.md`.
+
+Adopting lesson 004 with `tutor_adopt_iteration` moves the factory from
+`tetris/.factory` to `factory/`, as the starter's `fetch.sh` does:
+`git mv tetris/.factory factory`, with `factory/.claude/skills` linked to the
+repo's `.agents/skills` again. From then on, work in `factory/`. When the
+thread's folder is itself the factory (an older setup), there is nothing to
+`cd` into. BB shows the course around this chat: the course outline in the sidebar
 lists every lesson, this coach thread and its side chats, and the lesson's
 Rules. The lesson itself lives in this conversation, in the cards you write.
 Your tool calls keep all of it up to date.
@@ -19,14 +35,14 @@ In the course files a lesson is a "homework" or "iteration" (`ITERATION`,
 
 The coach file is the method: the course's own, when it has one
 (`.agents/coach-me.md` in the course repo by default), or else the starter's
-`coach-me` skill, `../.agents/skills/coach-me/SKILL.md` from the factory.
+`coach-me` skill, `.agents/skills/coach-me/SKILL.md` at the repo's top folder.
 Your first message gives its path, and `tutor_status` repeats it. Read it at
 the start and follow its Coaching process and Rules. Tutor changes only a few
 things about how you carry them out:
 
 | Where the coach file says… | In BB, do this |
 |---|---|
-| Follow the fetch-iteration skill, or run `fetch.sh` (adopt the next iteration's spec into `spec/`, copy the seed to `../seeds/`, refresh `stand-ins/`, write `ITERATION`) | Call `tutor_adopt_iteration` for this thread's lesson. It does what `fetch.sh` does, from the course on this machine. Then commit `spec/`, `../seeds/` and `ITERATION` with the message it returns, `Adopt spec for iteration NNN`, and show `git show --stat HEAD` and the `FACTORY.md` diff as usual. Each lesson has its own coach thread: when this lesson is done, don't adopt the next one here. Tell the student to start it from the course outline or the completion page. |
+| Follow the fetch-iteration skill, or run `fetch.sh` (adopt the next iteration's spec into `spec/`, copy the seed to `tetris/seeds/`, refresh `stand-ins/`, write `ITERATION`, and at 004 move the factory to `factory/`) | Call `tutor_adopt_iteration` for this thread's lesson. It does what `fetch.sh` does, from the course on this machine, the move at 004 included. Then commit what it names (the factory and `tetris/seeds/`; at 004 the old `tetris/.factory` too) with the message it returns, `Adopt spec for iteration NNN`, and show `git show --stat HEAD` and the `FACTORY.md` diff as usual. Each lesson has its own coach thread: when this lesson is done, don't adopt the next one here. Tell the student to start it from the course outline or the completion page. |
 | Change `ITERATION` to `Done` | Call `tutor_complete_iteration` with a short summary, then commit the implementation, `ITERATION` and `spec/PROGRESS.yaml` with the message it returns, `Implement homework NNN`. |
 | Walk through the feature files' Examples | Work one Rule at a time and record each Example with `tutor_mark_example` (see below). |
 
