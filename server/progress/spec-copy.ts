@@ -1,10 +1,13 @@
 // Adopting a lesson's spec, with the same result as the starter's
 // fetch-iteration (fetch.sh): spec/README.md, spec/FACTORY.md and
 // spec/features/ become the lesson's, leaving anything else in spec/ alone;
-// the lesson's sample seed is copied to ../seeds/<codebase>.md (tetris.md)
-// unless that file is already there; and stand-ins/ is refreshed wholesale
-// from the course's. Every check runs before anything is written, so a
-// refusal leaves the factory as it was. Tutor's tools write ITERATION last.
+// the lesson's sample seed is copied to <seeds>/<codebase>.md (tetris.md:
+// tetris/seeds/ in a starter clone, ../seeds for a factory that is its own
+// project; see layout.ts) unless that file is already there; and stand-ins/
+// is refreshed wholesale from the course's. Every check runs before anything
+// is written, so a refusal leaves the factory as it was (checkLessonSpec runs
+// them alone, for the factory move to go first). Tutor's tools write
+// ITERATION last.
 //
 // spec/ and stand-ins/ are each refreshed the same way: the new files are
 // staged inside the folder first and swapped in only once all of them copied,
@@ -105,30 +108,44 @@ async function requireCodebaseFolder(factoryRoot: string): Promise<void> {
   }
 }
 
+/** Where the lesson's sample seed goes (layout.ts works it out). */
+export interface SeedsLocation {
+  /** The seeds folder: tetris/seeds. */
+  dir: string;
+  /** The codebase folder's name, which names the seed: tetris → tetris.md. */
+  codebase: string;
+  /** The seeds folder as the student reads it: tetris/seeds, or ../seeds from the factory. */
+  shown: string;
+}
+
+/** A factory that is its own project: the seeds are ../seeds, beside it in the codebase folder, its real parent. */
+async function legacySeeds(factoryRoot: string): Promise<SeedsLocation> {
+  const codebaseRoot = dirname(await realpath(factoryRoot));
+  return { dir: join(codebaseRoot, FACTORY_FILES.seedsDir), codebase: basename(codebaseRoot), shown: `../${FACTORY_FILES.seedsDir}` };
+}
+
 interface SeedTarget {
-  /** ../seeds, as a real path. */
+  /** The seeds folder. */
   dir: string;
   path: string;
-  /** The seed's path relative to the factory root: ../seeds/tetris.md. */
+  /** The seed's path as the student reads it: tetris/seeds/tetris.md, or ../seeds/tetris.md. */
   shown: string;
   alreadyThere: boolean;
 }
 
 /**
- * Where the seed goes: seeds/ in the codebase folder, the factory's real
- * parent. That folder must be a real one apart from the course, and the seed
- * no symbolic link.
+ * Where the seed goes. The seeds folder must be a real one apart from the
+ * course, and the seed no symbolic link.
  */
-async function seedTarget(factoryRoot: string, courseRoot: string): Promise<SeedTarget> {
-  const codebaseRoot = dirname(await realpath(factoryRoot));
-  const seedsLabel = `${basename(codebaseRoot)}/${FACTORY_FILES.seedsDir}/`;
-  const dir = await ownFolder(codebaseRoot, FACTORY_FILES.seedsDir, seedsLabel);
-  if (overlaps(dir, await realPath(courseRoot))) {
+async function seedTarget(seeds: SeedsLocation, courseRoot: string): Promise<SeedTarget> {
+  const seedsLabel = `${seeds.codebase}/${basename(seeds.dir)}/`;
+  const dir = await ownFolder(dirname(seeds.dir), basename(seeds.dir), seedsLabel);
+  if (overlaps(await realPath(dir), await realPath(courseRoot))) {
     throw new Error(`${seedsLabel} is, or shares a folder with, the course, so Tutor will not write the seed there. Keep the course checkout apart from your repo.`);
   }
-  const name = seedFileName(codebaseRoot);
+  const name = `${seeds.codebase}.md`;
   const path = join(dir, name);
-  return { dir, path, shown: `../${FACTORY_FILES.seedsDir}/${name}`, alreadyThere: await seedPresent(path, `${seedsLabel}${name}`) };
+  return { dir, path, shown: `${seeds.shown}/${name}`, alreadyThere: await seedPresent(path, `${seedsLabel}${name}`) };
 }
 
 /** The course's stand-ins/, or null when it has none as a real folder. */
@@ -139,9 +156,9 @@ async function courseStandIns(courseRoot: string): Promise<string | null> {
 }
 
 export interface SpecCopyResult {
-  /** Paths written, relative to the factory root. */
+  /** Paths written, as the student reads them: relative to the factory, or to the repo with `factoryShown`. */
   written: string[];
-  /** The seed's path relative to the factory root (../seeds/tetris.md), or null when the lesson has none. */
+  /** The seed's path as the student reads it (tetris/seeds/tetris.md, ../seeds/tetris.md), or null when the lesson has none. */
   seed: string | null;
   seedAlreadyThere: boolean;
 }
@@ -297,11 +314,22 @@ async function refresh(folder: Refreshed, stage: (staging: string) => Promise<st
 export interface SpecCopyOptions {
   /** The course checkout, whose stand-ins/ is copied. */
   courseRoot: string;
+  /** Where the seed goes. Without it, ../seeds beside the factory's real folder, as for a factory that is its own project. */
+  seeds?: SeedsLocation;
+  /** The factory's folder relative to the repo (factory, tetris/.factory), prefixed to the paths written. */
+  factoryShown?: string;
   hooks?: SpecCopyHooks;
 }
 
-export async function copyLessonSpec(factoryRoot: string, lesson: Lesson, { courseRoot, hooks = {} }: SpecCopyOptions): Promise<SpecCopyResult> {
-  // Every check first: a refusal writes nothing.
+interface Prepared {
+  spec: Refreshed;
+  seed: SeedTarget | null;
+  standIns: Refreshed | null;
+  standInsSource: string | null;
+}
+
+/** Every check an adoption makes, before anything is written. */
+async function prepare(factoryRoot: string, lesson: Lesson, options: SpecCopyOptions): Promise<Prepared> {
   await requireFeatureFiles(lesson);
   await requireCodebaseFolder(factoryRoot);
   const spec: Refreshed = {
@@ -309,8 +337,8 @@ export async function copyLessonSpec(factoryRoot: string, lesson: Lesson, { cour
     shown: FACTORY_FILES.specDir,
     replaces: (entry) => REPLACED_IN_SPEC.has(entry),
   };
-  const seed = lesson.seedSpec === null ? null : await seedTarget(factoryRoot, courseRoot);
-  const standInsSource = await courseStandIns(courseRoot);
+  const seed = lesson.seedSpec === null ? null : await seedTarget(options.seeds ?? (await legacySeeds(factoryRoot)), options.courseRoot);
+  const standInsSource = await courseStandIns(options.courseRoot);
   const standIns: Refreshed | null =
     standInsSource === null
       ? null
@@ -319,9 +347,22 @@ export async function copyLessonSpec(factoryRoot: string, lesson: Lesson, { cour
           shown: FACTORY_FILES.standInsDir,
           replaces: () => true,
         };
+  return { spec, seed, standIns, standInsSource };
+}
+
+/** Runs every check copyLessonSpec makes, writing nothing: it throws what copyLessonSpec would refuse with. */
+export async function checkLessonSpec(factoryRoot: string, lesson: Lesson, options: SpecCopyOptions): Promise<void> {
+  await prepare(factoryRoot, lesson, options);
+}
+
+export async function copyLessonSpec(factoryRoot: string, lesson: Lesson, options: SpecCopyOptions): Promise<SpecCopyResult> {
+  // Every check first: a refusal writes nothing.
+  const { spec, seed, standIns, standInsSource } = await prepare(factoryRoot, lesson, options);
+  const hooks = options.hooks ?? {};
+  const inFactory = (path: string) => (options.factoryShown === undefined ? path : `${options.factoryShown}/${path}`);
 
   const names = await refresh(spec, (staging) => stageLesson(lesson, staging), hooks);
-  const written = names.map((name) => (name === FEATURES_DIR ? `${FACTORY_FILES.specDir}/${FEATURES_DIR}/` : `${FACTORY_FILES.specDir}/${name}`));
+  const written = names.map((name) => inFactory(name === FEATURES_DIR ? `${FACTORY_FILES.specDir}/${FEATURES_DIR}/` : `${FACTORY_FILES.specDir}/${name}`));
 
   if (lesson.seedSpec !== null && seed !== null && !seed.alreadyThere) {
     await mkdir(seed.dir, { recursive: true });
@@ -332,7 +373,7 @@ export async function copyLessonSpec(factoryRoot: string, lesson: Lesson, { cour
 
   if (standIns !== null && standInsSource !== null) {
     await refresh(standIns, (staging) => stageStandIns(standInsSource, staging), {});
-    written.push(`${FACTORY_FILES.standInsDir}/`);
+    written.push(inFactory(`${FACTORY_FILES.standInsDir}/`));
   }
   return { written, seed: seed?.shown ?? null, seedAlreadyThere: seed?.alreadyThere ?? false };
 }

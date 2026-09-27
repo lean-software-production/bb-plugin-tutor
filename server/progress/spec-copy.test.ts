@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { lstat, mkdir, readFile, readdir, readlink, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { test } from "node:test";
-import { makeSandbox } from "../../test/helpers/disk.ts";
+import { makeRepoSandbox, makeSandbox } from "../../test/helpers/disk.ts";
+import { resolveLayout } from "./layout.ts";
 import { copyLessonSpec, seedFileName } from "./spec-copy.ts";
 
 test("names the seed after the codebase folder, as fetch-iteration names tetris.md", () => {
@@ -71,6 +72,30 @@ test("copies the sample seed to ../seeds/tetris.md unless it is already there, n
     assert.equal(second.seedAlreadyThere, true);
     assert.ok(!second.written.includes("../seeds/tetris.md"));
     assert.equal(await readFile(seed, "utf8"), "my own tetris\n");
+  } finally {
+    await sandbox.cleanup();
+  }
+});
+
+test("in a starter clone whose factory moved to factory/, the seed lands in tetris/seeds/tetris.md, as fetch.sh puts it", async () => {
+  const sandbox = await makeRepoSandbox();
+  try {
+    await rename(sandbox.factoryRoot, join(sandbox.repoRoot, "factory"));
+    const layout = await resolveLayout(sandbox.repoRoot);
+    const lesson = sandbox.course.lessons[1];
+    assert.ok(lesson !== undefined && lesson.seedSpec !== null);
+    await rm(join(sandbox.codebaseRoot, "seeds/.gitkeep"));
+
+    const result = await copyLessonSpec(layout.factoryDir, lesson, {
+      courseRoot: sandbox.course.root,
+      seeds: { dir: layout.seedsDir, codebase: layout.codebase, shown: layout.seedsShown },
+      factoryShown: layout.factoryShown,
+    });
+    assert.equal(await readFile(join(sandbox.codebaseRoot, "seeds/tetris.md"), "utf8"), lesson.seedSpec);
+    assert.deepEqual(await readdir(join(sandbox.codebaseRoot, "seeds")), ["tetris.md"]);
+    assert.equal(await readdir(join(sandbox.repoRoot, "seeds")).catch(() => null), null, "no seeds/ beside factory/");
+    assert.equal(result.seed, "tetris/seeds/tetris.md");
+    assert.deepEqual(result.written, ["factory/spec/README.md", "factory/spec/FACTORY.md", "factory/spec/features/", "tetris/seeds/tetris.md", "factory/stand-ins/"]);
   } finally {
     await sandbox.cleanup();
   }
