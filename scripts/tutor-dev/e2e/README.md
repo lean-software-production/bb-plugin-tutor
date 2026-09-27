@@ -17,7 +17,10 @@ committed. It then drives BB with host-side Playwright chromium through about
   turns are deterministic and need no credentials;
 - the factory, then the walk (`walk.mjs`): the course outline, the coach in
   BB's thread view with its lesson and Rule cards, jumping to a Rule's section,
-  and side chats;
+  and side chats. When the project is a starter clone's top folder, the walk
+  goes on through lessons 001 to 003 and adopts 004, then checks that Tutor
+  moved the factory to `factory/` exactly as the starter's `fetch.sh` does in
+  a second clone;
 - the polish browser checks: theme screenshots, simple navigation, heartbeat
   and keep-alive, and the lost-connection notice.
 
@@ -74,7 +77,7 @@ both that name and the `tutor.e2e=tutor-e2e` label.
 | `TUTORIAL_REF`, `STARTER_REF` | default branches | Pin the course and the capstone-project-starter. They are cloned into the workspace before the Feature's bootstrap runs. |
 | `E2E_HOME` | `<repo>/.tutor-e2e` (git-ignored) | Workspace bind-mounted at `/workspaces`, `up.json` and `up.log`. |
 | `E2E_SHOTS` | `$E2E_HOME/shots` | Screenshots. |
-| `FACTORY` | from the checkout's `devcontainer.json` | Factory path. Normally left to `run-all.sh`. |
+| `PROJECT` | from the checkout's `devcontainer.json` | The BB project's folder: the tutor Feature's `starter` (the starter clone's top folder, plugin 0.2.0), else its legacy `factory`. Normally left to `run-all.sh`. `FACTORY` is still read when `PROJECT` is unset. |
 
 ## The pieces
 
@@ -84,7 +87,7 @@ both that name and the `tutor.e2e=tutor-e2e` label.
 | `up.sh [--purge]` | Builds or restarts `tutor-e2e` from `$DCF/.devcontainer/tutor`. It overrides only the ports, the `/workspaces` mount and the loopback publish (through `../relay.mjs`), plus the optional plugin version. |
 | `bb.sh <args…>` / `bb.sh --exec <cmd…>` | Runs the bb CLI, or any command, inside the container as the remote user. |
 | `hot-plugin.sh` | Swaps the working tree in over the installed plugin, then rebuilds and reloads it. Also useful on its own as a dev loop against a running `tutor-e2e`. |
-| `make-factory.sh` | Readies the factory at `$FACTORY` and runs the Feature's start-up hook. |
+| `make-factory.sh` | Readies the project at `$PROJECT` and runs the Feature's start-up hook. |
 | `walk.mjs [step-prefix…]`, `polish.mjs first-start\|restart\|ui` | The Playwright checks. Pass step prefixes to `walk.mjs`, or set `POLISH_ONLY`, to run part of a check against a container that is already up. |
 | `lib.mjs`, `env.sh` | Shared helpers and settings. |
 

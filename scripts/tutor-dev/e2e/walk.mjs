@@ -4,18 +4,25 @@
 // side chats (Tutor's "Ask a side question" and BB's "Reply in side chat").
 //   node walk.mjs [step-prefix…]
 // Screenshots: $E2E_SHOTS (default <repo>/.tutor-e2e/shots)/e2e-NN-*.png and tree-*.png. Exits non-zero on the first failed check.
-// FACTORY (set by run-all.sh from the checkout's devcontainer.json) picks the layout:
+// PROJECT (set by run-all.sh from the checkout's devcontainer.json; FACTORY before it) picks the layout:
 //   /workspaces/my-factory (default; tutor/mvp): spec/ITERATION, the factory is its own repo;
-//   <starter>/tetris/.factory (tutor/starter-layout): ITERATION at the factory root, the seed
-//   in ../seeds/tetris.md, stand-ins/ refreshed from the course.
+//   <starter>/tetris/.factory (tutor/starter-layout, plugin 0.1.0): ITERATION at the factory
+//   root, the seed in ../seeds/tetris.md, stand-ins/ refreshed from the course;
+//   <starter> (plugin 0.2.0): the clone's top folder is the project, the factory is
+//   tetris/.factory through lesson 003 and factory/ from 004 (step 16 walks there and checks
+//   the move against a second clone run through the starter's fetch.sh).
 import { execFileSync } from "node:child_process";
 import { dirname } from "node:path";
 import { BASE, SHOTS, bb, bbJson, openBrowser, sh, shot, sleep, until } from "./lib.mjs";
 
-const FACTORY = process.env.FACTORY || "/workspaces/my-factory";
-const STARTER_LAYOUT = FACTORY.endsWith("/.factory");
-const CODEBASE = dirname(FACTORY); // the starter's tetris/
-const PROJECT_NAME = STARTER_LAYOUT ? `${CODEBASE.split("/").pop()}/.factory` : FACTORY.split("/").pop();
+const PROJECT = process.env.PROJECT || process.env.FACTORY || "/workspaces/my-factory";
+/** The project is a starter clone's top folder (plugin 0.2.0), not a factory. */
+const REPO_LAYOUT = !PROJECT.endsWith("/.factory") && PROJECT !== "/workspaces/my-factory" && sh(`test -d '${PROJECT}/tetris/.factory' && echo yes || true`).trim() === "yes";
+/** Where the factory is: moves to factory/ when step 16 adopts lesson 004. */
+let FACTORY = REPO_LAYOUT ? `${PROJECT}/tetris/.factory` : PROJECT;
+const STARTER_LAYOUT = REPO_LAYOUT || PROJECT.endsWith("/.factory");
+const CODEBASE = REPO_LAYOUT ? `${PROJECT}/tetris` : dirname(FACTORY); // the starter's tetris/
+const PROJECT_NAME = REPO_LAYOUT ? PROJECT.split("/").pop() : STARTER_LAYOUT ? `${CODEBASE.split("/").pop()}/.factory` : FACTORY.split("/").pop();
 const COURSE = "/workspaces/tutorial";
 const BB_SH = new URL("./bb.sh", import.meta.url).pathname;
 const TURNS = "/workspaces/.bb-state/plugins/scripted-provider/bridge-data/turns.ndjson";
@@ -411,7 +418,7 @@ step("13 BB home's Continue opens the coach thread", async () => {
 });
 
 step("14 a non-Tutor thread cannot use Tutor tools", async () => {
-  const project = bbJson("project", "list").find((p) => (p.sources ?? []).some((s) => s.path === FACTORY));
+  const project = bbJson("project", "list").find((p) => (p.sources ?? []).some((s) => s.path === PROJECT));
   const progressBefore = readFactory("spec/PROGRESS.yaml");
   sh(`printf '%s\\n' 'FORCECALL tutor_mark_example {"example":"${ctx.keys.examples[0]}","status":"pending"}' 'FORCECALL tutor_status {}' > /tmp/forcecall.txt`);
   const spawned = JSON.parse(bb("thread", "spawn", "--project", project.id, "--provider", "scripted", "--title", "Ordinary thread", "--prompt-file", "/tmp/forcecall.txt", "--json"));
@@ -438,6 +445,90 @@ step("15 Lesson 0 stays truthful after moving on", async () => {
   await zero.locator(".tp-lesson-head").click();
   check((await zero.locator(`a.tp-rrow[data-rule-key="${ctx.ruleA}"]`).count()) === 1, "a done lesson's reached Rules still link to their sections");
   await shot(page, "e2e-15-after-moving-on");
+});
+
+/** Passes every Example of the coach's lesson, a few calls a turn, completes the lesson, and commits as the coach would. */
+async function finishLesson(coach, id) {
+  await turn(coach, ["CALL tutor_status {}"]);
+  const { examples } = keysFrom(lastToolResult(coach, "tutor_status"));
+  check(examples.length > 0, `tutor_status lists Lesson ${id}'s ${examples.length} Examples`);
+  for (let i = 0; i < examples.length; i += 8) {
+    const calls = examples.slice(i, i + 8).map((key) => `CALL tutor_mark_example {"example":"${key}","status":"passing","evidence":"$ ./factory\\nok"}`);
+    const t = await turn(coach, calls);
+    if (!t.toolReport.every((r) => r.includes(": ok →"))) throw new Error(`CHECK FAILED: marking Lesson ${id}'s Examples: ${t.toolReport.join(" | ")}`);
+  }
+  const done = await turn(coach, [`CALL tutor_complete_iteration {"iteration":"${id}","summary":"Done ${id}."}`]);
+  check(done.toolReport[0].includes(": ok →"), `tutor_complete_iteration ${id} succeeded`);
+  sh(`cd '${PROJECT}' && git add -A && git commit -qm 'Iteration ${id}'`);
+}
+
+/** Starts the lesson after `id` from its completion page, and has its new coach adopt it. */
+async function startAndAdopt(id, next) {
+  await page.goto(`${BASE}/plugins/tutor/course/complete/${id}`, { waitUntil: "load" });
+  const start = page.getByText(new RegExp(`Start lesson ${Number(next)} with your coach`)).first();
+  await start.waitFor({ timeout: 30000 });
+  await start.click();
+  const thread = await until(`coach thread for ${next}`, () => tutorThreads().find((t) => t.title === `Coach · Lesson ${next}`));
+  await until(`first ${next} turn`, () => turns(thread.id)[0], { timeout: 120000 });
+  waitIdle(thread.id);
+  const t = await turn(thread.id, [`CALL tutor_adopt_iteration {"iteration":"${next}"}`]);
+  check(t.toolReport[0].includes(": ok →"), `tutor_adopt_iteration ${next} succeeded`);
+  return thread.id;
+}
+
+step("16 lessons 001-003 in tetris/.factory, then adopting 004 moves the factory to factory/ as fetch.sh does", async () => {
+  if (!REPO_LAYOUT) {
+    console.log("  skip  the project is not a starter clone's top folder");
+    return;
+  }
+  const starterHead = sh(`git -C '${PROJECT}' rev-parse HEAD`).trim();
+  await finishLesson(ctx.coach1, "001");
+  const coach2 = await startAndAdopt("001", "002");
+  await finishLesson(coach2, "002");
+  const coach3 = await startAndAdopt("002", "003");
+  check(readFactory("ITERATION").trim() === "003 WIP", "tetris/.factory/ITERATION is 003 WIP");
+  check(!exists(`${PROJECT}/factory`), "no factory/ before 004");
+  await finishLesson(coach3, "003");
+  ctx.coach4 = await startAndAdopt("003", "004");
+  const early = FACTORY;
+  FACTORY = `${PROJECT}/factory`;
+  check(exists(FACTORY) && !exists(early), "factory/ exists and tetris/.factory is gone");
+  check(sh(`readlink '${FACTORY}/.claude/skills'`).trim() === "../../.agents/skills", "factory/.claude/skills links to ../../.agents/skills");
+  const porcelain = sh(`git -C '${PROJECT}' status --porcelain`);
+  check(/^R. tetris\/\.factory\/AGENTS\.md -> factory\/AGENTS\.md$/m.test(porcelain), "the factory's renames are staged");
+  check(readFactory("ITERATION").trim() === "004 WIP", "factory/ITERATION is 004 WIP");
+  check(sh(`diff -r ${COURSE}/docs/iterations/004-*/features ${FACTORY}/spec/features && echo same`).trim().endsWith("same"), "factory/spec/features matches the course's 004 features");
+  check(sh(`diff -r ${COURSE}/stand-ins ${FACTORY}/stand-ins && echo same`).trim().endsWith("same"), "factory/stand-ins matches the course's stand-ins");
+  check(exists(`${FACTORY}/stand-ins/acp`), "factory/stand-ins has acp/");
+  check(sh(`cmp ${COURSE}/docs/iterations/001-*/spec.md ${CODEBASE}/seeds/tetris.md && echo same`).trim().endsWith("same"), "tetris/seeds/tetris.md is still the course's 001 seed");
+
+  // A second clone of the starter, as it was before the walk, run through its own fetch.sh with the same course.
+  const clone = "/tmp/tutor-e2e-fetch";
+  const fetched = sh(`set -euo pipefail
+rm -rf ${clone} /tmp/tutor-e2e-bin && mkdir -p /tmp/tutor-e2e-bin
+printf '#!/usr/bin/env bash\\nexec tar -cz -C /workspaces --exclude=.git tutorial\\n' > /tmp/tutor-e2e-bin/curl && chmod +x /tmp/tutor-e2e-bin/curl
+git clone -q '${PROJECT}' ${clone} && git -C ${clone} checkout -q ${starterHead}
+git -C ${clone} config user.name "E2E Student" && git -C ${clone} config user.email student@example.invalid
+cd ${clone}/tetris/.factory
+for id in 001 002 003; do
+  PATH=/tmp/tutor-e2e-bin:$PATH bash ${clone}/.agents/skills/fetch-iteration/fetch.sh >/dev/null
+  echo "$id Done" > ITERATION && git -C ${clone} add -A && git -C ${clone} commit -qm "Iteration $id"
+done
+PATH=/tmp/tutor-e2e-bin:$PATH bash ${clone}/.agents/skills/fetch-iteration/fetch.sh`);
+  check(/moved the factory to factory\//.test(fetched), "fetch.sh moved the second clone's factory to factory/");
+  const same = sh(`diff -r --no-dereference --exclude=PROGRESS.yaml --exclude=ITERATION --exclude=jobs '${FACTORY}' ${clone}/factory && diff -r '${CODEBASE}/seeds' ${clone}/tetris/seeds && echo same`);
+  check(same.trim().endsWith("same"), "factory/ and tetris/seeds/ match the fetch.sh clone's");
+  const staged = (dir) => sh(`git -C '${dir}' status --porcelain --untracked-files=all | grep -v PROGRESS.yaml | sort || true`);
+  check(staged(PROJECT) === staged(clone), "the same changes are staged as in the fetch.sh clone");
+
+  const t4 = await turn(ctx.coach4, ["CALL tutor_status {}"]);
+  check(t4.toolReport[0].includes(": ok →"), "the 004 coach takes a turn");
+  check(/Factory: factory\//.test(lastToolResult(ctx.coach4, "tutor_status")), "tutor_status names factory/");
+  const t1 = await turn(ctx.coach1, ["CALL tutor_status {}"]);
+  check(t1.toolReport[0].includes(": ok →"), "the Lesson 001 coach still takes a turn");
+  check(/Factory: factory\//.test(lastToolResult(ctx.coach1, "tutor_status")), "the older coach's tutor_status names factory/ too");
+  await openThread(ctx.coach4);
+  await shot(page, "e2e-16-after-the-move");
 });
 
 let failed = false;

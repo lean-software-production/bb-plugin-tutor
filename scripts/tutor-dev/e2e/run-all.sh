@@ -13,10 +13,13 @@
 #   E2E_PLUGIN_VERSION / E2E_PLUGIN_SHA256   the tutor Feature's plugin options
 #   E2E_HOME=/path   workspace, logs and shots (default <repo>/.tutor-e2e)
 #   E2E_SHOTS=/path  where screenshots go (default $E2E_HOME/shots)
-# The factory path is the tutor Feature's `factory` option in the checkout's
-# .devcontainer/tutor/devcontainer.json: /workspaces/my-factory (tutor/mvp,
-# made by make-factory.sh) or the starter's tetris/.factory (cloned by the
-# Feature's bootstrap). walk.mjs and make-factory.sh follow $FACTORY.
+# The BB project comes from the tutor Feature's options in the checkout's
+# .devcontainer/tutor/devcontainer.json: its `starter` (Feature 0.6.0, plugin
+# 0.2.0: the capstone-project-starter clone's top folder, with the factory in
+# tetris/.factory and then factory/ from lesson 004), else its legacy `factory`:
+# /workspaces/my-factory (tutor/mvp, made by make-factory.sh) or the starter's
+# tetris/.factory (cloned by the Feature's bootstrap). walk.mjs and
+# make-factory.sh follow $PROJECT.
 set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 repo="$(e2e_dcf)"
@@ -26,13 +29,19 @@ case "$E2E_PLUGIN" in local|release) ;; *) e2e_die "E2E_PLUGIN must be local or 
 cd "$E2E_DIR"
 swap_plugin() { [ "$E2E_PLUGIN" = release ] || { echo "== plugin: swap in $E2E_PLUGIN_SRC"; ./hot-plugin.sh; }; }
 
-FACTORY="$(node -e '
+PROJECT="$(node -e '
 const fs = require("fs");
 const text = fs.readFileSync(process.argv[1], "utf8").split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
-process.stdout.write(JSON.parse(text).features["./features/tutor"].factory || "/workspaces/my-factory");
+const tutor = JSON.parse(text).features["./features/tutor"];
+process.stdout.write(tutor.starter || tutor.factory || "/workspaces/my-factory");
 ' "$repo/.devcontainer/tutor/devcontainer.json")"
-export FACTORY
-echo "== checkout $repo ($(git -C "$repo" rev-parse --abbrev-ref HEAD) $(git -C "$repo" rev-parse --short HEAD)); factory $FACTORY"
+case "$PROJECT" in
+    *'$'*) e2e_die "the tutor Feature's starter or factory option is '$PROJECT': set an absolute path for the e2e walk" ;;
+    /*) ;;
+    *) e2e_die "the tutor Feature's starter or factory option must be an absolute path; received '$PROJECT'" ;;
+esac
+export PROJECT FACTORY="$PROJECT"
+echo "== checkout $repo ($(git -C "$repo" rev-parse --abbrev-ref HEAD) $(git -C "$repo" rev-parse --short HEAD)); project $PROJECT"
 if [ "$E2E_PLUGIN" = local ]; then
     echo "== plugin: local $E2E_PLUGIN_SRC ($(git -C "$E2E_PLUGIN_SRC" describe --always --dirty 2>/dev/null || echo 'not a git checkout'))"
 else
@@ -47,8 +56,9 @@ swap_plugin
 echo "== feature checks"
 ./bb.sh --exec bb-feature-status
 ./bb.sh --exec git -C /workspaces/tutorial rev-parse --short HEAD
-case "$FACTORY" in
-    */.factory) ./bb.sh --exec bash -c 'cd "$1" && echo "starter $(git rev-parse --show-toplevel) at $(git rev-parse --short HEAD)"' _ "$FACTORY" ;;
+case "$PROJECT" in
+    /workspaces/my-factory) ;;
+    *) ./bb.sh --exec bash -c 'cd "$1" && echo "starter $(git rev-parse --show-toplevel) at $(git rev-parse --short HEAD)"' _ "$PROJECT" ;;
 esac
 ./bb.sh plugin list --json | node -e '
 let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => {
@@ -71,7 +81,7 @@ docker cp "$repo/test/tutor/fixtures/scripted-provider" tutor-e2e:/home/node/scr
 docker exec -u root tutor-e2e chown -R node:node /home/node/scripted-provider
 ./bb.sh --exec bash -c 'cd /home/node/scripted-provider && rm -rf node_modules && npm ci --omit=dev --no-audit --no-fund --loglevel=error && bb plugin install "$PWD" --yes && bb settings general defaultProviderId scripted'
 
-echo "== factory $FACTORY"
+echo "== project $PROJECT"
 ./make-factory.sh
 
 echo "== walk"
