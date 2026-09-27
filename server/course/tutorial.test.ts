@@ -27,11 +27,14 @@ describe("the tutorial course", { skip: coursePath === undefined && "TUTOR_TEST_
     assert.ok(course.source === "ledger" || course.source === "course.yaml", course.source);
     assert.deepEqual(
       course.lessons.map((hw) => hw.id),
-      ["000", "001", "002", "003", "004", "005", "006", "007"],
+      ["000", "001", "002", "003", "004", "005", "006", "007", "008"],
     );
     assert.equal(lesson("003").title, "The assembly line");
-    assert.equal(lesson("003").set, "Day 3");
-    assert.ok(course.coachPath?.endsWith(".agents/coach-me.md"));
+    assert.equal(lesson("004").title, "Jobs and targets");
+    // The ledger has no set column any more, and the course no longer ships a coach file:
+    // the coaching method is the starter's coach-me skill (coach-file.ts).
+    assert.equal(lesson("003").set, null);
+    assert.equal(course.coachPath, null);
     assert.ok(course.lexicon.some((entry) => entry.id === "assembly-line"));
   });
 
@@ -44,8 +47,9 @@ describe("the tutorial course", { skip: coursePath === undefined && "TUTOR_TEST_
           return [hw.id, [hw.features.length, rules.length, lessonExamples(hw).length]];
         }),
     );
-    assert.deepEqual(counts["001"], [3, 18, 24]);
-    assert.deepEqual(counts["007"], [10, 69, 83]);
+    assert.deepEqual(counts["001"], [3, 16, 22]);
+    assert.deepEqual(counts["004"], [5, 34, 45]);
+    assert.deepEqual(counts["008"], [10, 69, 86]);
   });
 
   test("assembly-line.feature is new in lesson 003", () => {
@@ -61,22 +65,24 @@ describe("the tutorial course", { skip: coursePath === undefined && "TUTOR_TEST_
   test("Examples that did not change keep their hash, so passing ones carry over", () => {
     for (const [previous, current] of [
       ["001", "002"],
-      ["006", "007"],
+      ["003", "004"],
+      ["007", "008"],
     ] as const) {
       const earlier = new Set(lessonExamples(lesson(previous)).map((example) => example.hash));
       const unchanged = lessonExamples(lesson(current)).filter((example) => example.change === "unchanged");
       assert.ok(unchanged.length > 0, `${current} has unchanged Examples`);
       for (const example of unchanged) assert.ok(earlier.has(example.hash), example.key);
     }
-    const planning = (id: string) =>
+    // assembly-line.feature did not change from 003 to 004: every Example carries over.
+    const assemblyLine = (id: string) =>
       lessonExamples(lesson(id))
-        .filter((example) => example.key.startsWith("planning/"))
+        .filter((example) => example.key.startsWith("assembly-line/"))
         .map((example) => [example.key, example.hash]);
-    assert.deepEqual(planning("002"), planning("001"));
+    assert.deepEqual(assemblyLine("004"), assemblyLine("003"));
   });
 
   test("the dek skips the instructions every README repeats", () => {
-    assert.match(lesson("003").dek, /^The factory does the same work it did for lesson 2\./);
+    assert.match(lesson("003").dek, /^The factory does the same work it did for homework 2\./);
     assert.match(lesson("001").dek, /^Build a \*\*Ralph loop\*\*/);
   });
 });
