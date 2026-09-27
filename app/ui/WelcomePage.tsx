@@ -88,7 +88,7 @@ function Picker({
               <code>/workspaces/capstone-project-starter</code>.
             </li>
             <li>
-              Add its <code>tetris/.factory</code> folder to BB as a project, then come back here.
+              Add the clone's folder to BB as a project, then come back here.
             </li>
           </ol>
           <button type="button" className="tp-btn tp-btn--ghost" onClick={() => queryCache.invalidate((key) => key === QUERY_KEYS.candidates)}>
