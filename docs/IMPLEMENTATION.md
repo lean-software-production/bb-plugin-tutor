@@ -127,8 +127,10 @@ imports only that file. `loadCourse(coursePath)` works as follows:
    course README's first `#` heading (or the id), `description` is null, `coach` is
    `.agents/coach-me.md` if it exists, and `lexicon` is `docs/lexicon.yaml` if it exists. A course
    with no coach file of its own (the tutorial dropped `.agents/coach-me.md`) is coached with the
-   capstone starter's skill instead: `server/coach/coach-file.ts` falls back to
-   `<realpath(factory)>/../.agents/skills/coach-me/SKILL.md` when that file exists.
+   capstone starter's skill instead: `server/coach/coach-file.ts` falls back to the first
+   `.agents/skills/coach-me/SKILL.md` it finds from the factory's real parent up to the repo's top
+   folder (the nearest holding `.git`), which is where the current starter keeps it. A factory that
+   is its own repo's top folder looks only in its parent, as before.
 3. **Lesson 0** ("Using your tutor", id `000`, set `Start here`, `builtin: true`) comes first. Its
    content lives in `server/course/builtin/`: a `course.yaml` naming `lesson-0/`, which holds
    `README.md`, `features/*.feature` and a short `FACTORY.md`. Find its directory from `import.meta.url`, not the working directory. Its
@@ -146,14 +148,18 @@ the real tutorial repo behind `TUTOR_TEST_COURSE=/path/to/tutorial`, and skip it
 - **Course path** is resolved in this order: the `coursePath` setting, then the
   `TUTOR_COURSE_PATH` env var, then `course` in `/usr/local/etc/tutor/config.json`, then
   `/workspaces/tutorial`.
-- **Factory hint:** the `TUTOR_FACTORY_PATH` env var, then `factory` in the config file. It is used
-  only to pre-select a candidate project whose default local source path matches.
+- **Project hint:** the `TUTOR_REPO_PATH` env var, then `repo` in the config file (the tutor
+  Feature's `starter`, from Feature 0.6.0), then the git top folder above the factory hint, then
+  the factory hint itself. The factory hint is the `TUTOR_FACTORY_PATH` env var, then `factory`
+  in the config file. The hint is used only to pre-select a candidate project whose default local
+  source path matches.
 - **The factory project** is always a BB project id, stored in the `factoryProject` setting (`type:
   "project"`), which `confirmFactory` writes with `settings.experimental_set`. The plugin never
   creates projects. When none is set, the factory project is `unset`; one that resolves is
   `found`. A stored id whose project, or whose local source, has gone is `missing`.
 - **The feature's `install.sh`** writes the config file as JSON
-  `{ "course": "…", "factory": "…", "dataDir": "…" }`, leaving out any key whose option is empty.
+  `{ "schemaVersion": 1, "course": "…", "repo": "…", "factory": "…", "dataDir": "…" }`, leaving out
+  any key whose option is empty (`repo` is new in Feature 0.6.0; older plugins ignore it).
   `dataDir` is the bb Feature's BB state directory (or `$_REMOTE_USER_HOME/.bb` when that option is
   empty), the last fallback for the heartbeat below. It also path-installs the plugin in a
   `postStartCommand` that runs after `bb-feature-autostart`, from a user-owned copy at
@@ -179,12 +185,31 @@ the real tutorial repo behind `TUTOR_TEST_COURSE=/path/to/tutorial`, and skip it
 ### Student state (BACKEND implements `ProgressStore` in `server/progress/`)
 
 The factory follows the layout of `lean-software-production/capstone-project-starter`: the
-student's fork is the Git repo, `tetris/` is the codebase the factory builds, and `tetris/.factory`
-is the factory, the coach's working folder and the BB project. The factory holds `ITERATION`,
-`spec/` (the adopted lesson and `PROGRESS.yaml`) and the fetched, gitignored `stand-ins/`; the
-sample seed lives beside it, in `tetris/seeds/tetris.md`. Tutor's adoption leaves the same files
-in the same places as the starter's `fetch-iteration` skill (`fetch.sh`), from the course checkout
-on this machine, so a student can move between the two.
+student's fork is the Git repo and, since v0.2.0, the BB project; coach threads spawn at its top
+folder. `tetris/` is the codebase the factory builds. The factory is `tetris/.factory` through
+lesson 003 and `factory/` from 004. It holds `ITERATION`, `spec/` (the adopted lesson and
+`PROGRESS.yaml`) and the fetched, gitignored `stand-ins/`; the sample seed is
+`tetris/seeds/tetris.md`. Tutor's adoption leaves the same files in the same places as the
+starter's `fetch-iteration` skill (`fetch.sh`), from the course checkout on this machine, so a
+student can move between the two. `test/starter.test.ts` checks this against a real clone.
+
+- **Layout** (`server/progress/layout.ts`) is worked out from the project's folder on every read.
+  *Repo mode*: the folder holds `factory/` or `tetris/.factory`, or holds `.git` without looking
+  like a factory itself. The factory is `factory/` when it is a folder (with a problem noted if
+  `tetris/.factory` is still there too), else `tetris/.factory`; the seeds are `tetris/seeds`. A
+  factory folder that is a symbolic link or a file, or no factory folder at all, blocks every
+  write with a message that says what to do. *Legacy mode*: the project's folder is the factory
+  (v0.1.0's `tetris/.factory` project, or a factory repo of its own), with the seeds in
+  `../seeds`, exactly as before. The World carries the layout; `tutor_status` names the factory
+  folder, and the coach prompts and `configure`'s instructions tell the agent to `cd` into it and
+  follow its `AGENTS.md`. The factory lock stays keyed on the project's folder, which never moves.
+- **The move at 004** (`server/progress/factory-move.ts`): in repo mode, adopting lesson 004 or
+  later while the factory is `tetris/.factory` first runs every check (the lesson's spec-copy
+  checks, `factory/` absent, and `git mv -n`), then `git mv tetris/.factory factory`, repoints
+  `factory/.claude/skills` at `../../.agents/skills` and stages it, as `fetch.sh` does, and only
+  then adopts into `factory/`. A refusal writes nothing. A real `.claude/skills` folder or file of
+  the student's is left alone and named in the adopt text. A copy that fails after the move leaves
+  `factory/` at `003 Done`, and a retry adopts there without moving again. Legacy mode never moves.
 
 - **`ITERATION`**, at the factory root, is one line, `NNN WIP` or `NNN Done`. It is canonical
   (decision 1) and is never written for Lesson 0. Factories from before the starter layout kept it
@@ -283,7 +308,7 @@ on this machine, so a student can move between the two.
   | `tutor_status` | Current lesson, focus, and each Rule's Examples with key, status and name | Compact text the coach can act on, listing keys |
   | `tutor_focus_rule` | Sets `focus` and records the Rule as reached. Coach thread only; side chats get `isError` | The Rule card, a `formatProgressCard({ kind: "focus", … })` line to put at the top of the next message |
   | `tutor_mark_example` | Sets one Example's status; `evidence` is required for passing and `note` for not-yet (the schema enforces this) | The matching `::tutor-progress` line: `rule-passing` when the Rule just went all-green, otherwise `example-passing` or `not-yet` |
-  | `tutor_adopt_iteration` | Only the caller's own lesson, and only the lesson after a Done one, or the first, or the current lesson when it is WIP with no progress recorded (set going by `fetch-iteration` outside BB; a `spec/PROGRESS.yaml` that can't be read or parsed is not "none", and is never adopted over). Does what `fetch.sh` does, from the local course. Every check runs first, so a refusal writes nothing: a factory that holds `.git` itself (an old-layout factory) is refused, as are a `spec/`, `stand-ins/`, `../seeds/` or seed that is a symbolic link and a `../seeds/` overlapping the course. Then it replaces only README.md, FACTORY.md and features/ in `spec/`, leaving its other files alone (staged in `spec/.tutor-adopting/` and swapped in only once all copied, the old ones moved aside into `spec/.tutor-previous/` meanwhile, so a lesson missing README.md or its features leaves the previous snapshot intact; the old files are deleted only once the swap finished or all are back, else kept there and named in the error; each adoption first moves back from those folders whatever is missing, never overwriting, and removes them, a symbolic link among them removed unread); copies `spec.md` to `../seeds/<codebase>.md` (`tetris/seeds/tetris.md`) only if that file is absent; refreshes `stand-ins/` wholesale from the course's `stand-ins/` the same staged way (its working folders inside `stand-ins/`, links copied as links; a course without one leaves it alone); then writes ITERATION `NNN WIP` and a fresh PROGRESS.yaml with carry-over. Lesson 0 writes only PROGRESS.yaml. **Does not commit**: the coach commits `spec/`, `../seeds/` and `ITERATION` as "Adopt spec for iteration NNN", as `fetch-iteration` does | Summary, the commit to make, and the `git show --stat` hint |
+  | `tutor_adopt_iteration` | Only the caller's own lesson, and only the lesson after a Done one, or the first, or the current lesson when it is WIP with no progress recorded (set going by `fetch-iteration` outside BB; a `spec/PROGRESS.yaml` that can't be read or parsed is not "none", and is never adopted over). Does what `fetch.sh` does, from the local course. Every check runs first, so a refusal writes nothing: a factory that holds `.git` itself (an old-layout factory) is refused, as are a `spec/`, `stand-ins/`, `../seeds/` or seed that is a symbolic link and a `../seeds/` overlapping the course. Then it replaces only README.md, FACTORY.md and features/ in `spec/`, leaving its other files alone (staged in `spec/.tutor-adopting/` and swapped in only once all copied, the old ones moved aside into `spec/.tutor-previous/` meanwhile, so a lesson missing README.md or its features leaves the previous snapshot intact; the old files are deleted only once the swap finished or all are back, else kept there and named in the error; each adoption first moves back from those folders whatever is missing, never overwriting, and removes them, a symbolic link among them removed unread); copies `spec.md` to `../seeds/<codebase>.md` (`tetris/seeds/tetris.md`) only if that file is absent; refreshes `stand-ins/` wholesale from the course's `stand-ins/` the same staged way (its working folders inside `stand-ins/`, links copied as links; a course without one leaves it alone); then writes ITERATION `NNN WIP` and a fresh PROGRESS.yaml with carry-over. Lesson 0 writes only PROGRESS.yaml. In repo mode the seed goes to `tetris/seeds/tetris.md`, and adopting 004 or later first moves the factory to `factory/` (see *The move at 004*); the written paths are named from the repo's top folder. **Does not commit**: the coach commits the factory's `spec/` and `ITERATION` and the seeds (at 004 the old `tetris/.factory` too, with `git add -A`) as "Adopt spec for iteration NNN", as `fetch-iteration` does | Summary, the commit to make, and the `git show --stat` hint |
   | `tutor_complete_iteration` | Writes ITERATION `NNN Done` and PROGRESS `summary`. Lesson 0 instead requires every Example to be passing or skipped | A `lesson-complete` card line, and the commit to make: the implementation, `ITERATION` and `spec/PROGRESS.yaml` as "Implement homework NNN" |
   | `tutor_side_chat` | Forks a side chat of the coach thread, with the question as its seed, and adds its tab (see above) | The new side chat's id, and where the student finds it |
 
@@ -374,7 +399,9 @@ not data.
   `codex` and `pi` agent CLIs, and `tutor`, cloning the public tutorial repo and the upstream
   `capstone-project-starter` (the `starter` / `starterRepo` options) at start-up, with `factory`
   set to the starter's `tetris/.factory`. The start-up hook registers a dot-folder factory as the
-  BB project `<parent>/<name>` ("tetris/.factory").
+  BB project `<parent>/<name>` ("tetris/.factory"). From Feature 0.6.0 (plugin 0.2.0) the
+  `starter` option is written to the config file as `repo`, and the hook registers the clone's top
+  folder as the project, named by its basename; `factory` is legacy.
   `sync-features.sh` copies every `./features/<id>` it names from `src/<id>`.
 
 ## Stubs to replace

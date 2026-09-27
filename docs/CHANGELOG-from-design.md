@@ -4,6 +4,48 @@ This log covers the MVP build, made while the owner was away. It records every p
 build diverges from [`DESIGN.md`](DESIGN.md) as reviewed in PR #4, and why. Entries are
 newest-first.
 
+## Repo-root project (v0.2.0, 2026-09-27)
+
+The starter changed again (01f63ed): its skills moved to `.agents/skills/` at the clone's top
+folder, and from lesson 004 the factory leaves the game it builds, `fetch.sh` moving
+`tetris/.factory` to `factory/`. A BB project at `tetris/.factory` would lose its folder at 004, so
+the project is now the clone's top folder. Every change from the entries below:
+
+- **The BB project is the starter clone's top folder**, and coach threads spawn there. The factory
+  is a folder inside it: `tetris/.factory` through lesson 003, `factory/` from 004
+  (`server/progress/layout.ts`, worked out on every read). The coach's first message, `configure`'s
+  instructions and `tutor_status` ("Factory: tetris/.factory/ (in <repo>). Work in it: cd
+  tetris/.factory and follow its AGENTS.md.") name it and tell the agent to `cd` into it. This
+  relies on BB spawning a thread in its project's local source folder.
+- **Tutor makes the move at 004, as `fetch.sh` does.** Adopting 004 or later while the factory is
+  `tetris/.factory` runs every check first (the spec checks, `factory/` absent, `git mv -n`), then
+  `git mv tetris/.factory factory`, repoints `factory/.claude/skills` at `../../.agents/skills` and
+  stages it, then adopts into `factory/`. It needs `git`. A refusal writes nothing, and a copy that
+  fails after the move can be retried without moving again. The adopt text says what moved and
+  asks the coach to commit `factory/`, `tetris/seeds/` and the old `tetris/.factory` with
+  `git add -A`. One divergence from the plan: a real `factory/.claude/skills` folder or file of the
+  student's is left alone and named in the adopt text, rather than refusing the move.
+- **The seed goes to `tetris/seeds/tetris.md`** in a starter clone, whichever factory folder is in
+  use; `../seeds/` from the factory stays for a factory that is its own project.
+- **The coach-me skill is found at the repo's top folder**: `coach-file.ts` looks for
+  `.agents/skills/coach-me/SKILL.md` from the factory's real parent up to the nearest folder holding
+  `.git`.
+- **Hints and candidates.** The Feature's config file gains an optional `repo` key (still
+  `schemaVersion` 1), and `TUTOR_REPO_PATH` overrides it; without either, the hint is the git top
+  folder above `factory`. A starter clone qualifies on the first-run page by its layout; its detail
+  reads "starter clone · factory in tetris/.factory · ITERATION · 004 WIP" (or "no factory folder
+  yet"). The welcome page now says "Add the clone's folder to BB as a project".
+- **Legacy projects keep working.** A project whose folder is the factory (v0.1.0's
+  `tetris/.factory`, or a factory repo of its own) is read and written exactly as before and never
+  moved. Moving such a project to the repo's top folder is not automated (the plan's D4, not done):
+  a student part-way through on v0.1.0 re-picks the clone as the project, or starts a fresh
+  Codespace.
+- **Tests.** `test/server-repo.test.ts` walks a starter-shaped repo through 000-004. The gated
+  `test/starter.test.ts` (`TUTOR_TEST_STARTER` and `TUTOR_TEST_COURSE`) adopts 001-004 through the
+  tools in one copy of a real starter clone and runs its real `fetch.sh` offline in another, and
+  compares the files and what is staged. The e2e walk goes on to 004 when the Feature's `starter`
+  option names the project.
+
 ## Plugin moved to its own repo (2026-09-26)
 
 2026-09-26: plugin moved to its own repo; the tutor Feature installs a pinned release.

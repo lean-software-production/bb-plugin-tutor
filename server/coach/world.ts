@@ -1,15 +1,16 @@
 // Everything a handler needs, re-derived from disk and BB on each call: the
-// course, the factory project, and the student's state. Nothing here comes
-// from thread metadata.
+// course, the factory project, where its factory is (layout.ts), and the
+// student's state. Nothing here comes from thread metadata.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { resolveCurrent, type CurrentPointer } from "../../shared/derive.ts";
 import type { Course, StudentState } from "../../shared/model.ts";
 import type { CourseSource, ProgressStore } from "../../shared/ports.ts";
 import type { FactoryProject } from "../../shared/rpc.ts";
 import { overlaps, realPath } from "../paths.ts";
+import { resolveLayout, type Layout } from "../progress/layout.ts";
 import { resolveCoachFile } from "./coach-file.ts";
 import { resolveFactory } from "./factory-project.ts";
-import { readFeatureConfig, resolveCoursePath, resolveFactoryHint, type Env } from "./course-path.ts";
+import { readFeatureConfig, resolveCoursePath, resolveProjectHint, type Env } from "./course-path.ts";
 import type { TutorSettings } from "./settings.ts";
 
 /** Page loads fire several calls at once; they share one course read. */
@@ -21,14 +22,18 @@ export interface World {
   courseError: string | null;
   /** The coaching method's file: the course's coach file, else the starter's coach-me skill (coach-file.ts). */
   coachPath: string | null;
+  /** The BB project Tutor coaches in: the student's repo, or (legacy) the factory folder itself. */
   factoryProject: FactoryProject;
-  /** The machine holding the factory folder; null without a factory project. */
+  /** The machine holding the project's folder; null without a factory project. */
   factoryHostId: string | null;
-  /** Empty state while there is no factory project. */
+  /** Where the factory, codebase and seeds are in the project's folder; null without a factory project. */
+  layout: Layout | null;
+  /** Read from layout.factoryDir, with the layout's problems. Empty state while there is no factory project. */
   student: StudentState;
   /** Null while the course is missing. */
   pointer: CurrentPointer | null;
-  factoryHint: string | null;
+  /** Pre-selects a candidate project on first run (resolveProjectHint). */
+  projectHint: string | null;
 }
 
 export interface WorldDeps {
@@ -43,6 +48,8 @@ export interface WorldSource {
   load(): Promise<World>;
   /** The coach file from the most recent load of the course, for synchronous callers (configure). */
   lastCoachPath(): string | null;
+  /** The layout from the most recent load, for synchronous callers (configure). */
+  lastLayout(): Layout | null;
 }
 
 const EMPTY_STUDENT: StudentState = { iteration: null, progress: null, problems: [] };
@@ -52,6 +59,7 @@ type CourseResult = { course: Course; error: null } | { course: null; error: str
 export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps: WorldDeps): WorldSource {
   let cached: { path: string; at: number; result: Promise<CourseResult> } | null = null;
   let lastCoach: string | null = null;
+  let lastLayout: Layout | null = null;
 
   function loadCourse(path: string): Promise<CourseResult> {
     const now = deps.now().getTime();
@@ -74,18 +82,19 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
         config.error === undefined ? loadCourse(coursePath) : Promise.resolve<CourseResult>({ course: null, error: config.error }),
         resolveFactory(bb.sdk, values.factoryProject),
       ]);
-      // Re-checked on every load, not just at confirmFactory: a factory whose folder now
-      // leads into the course would have the coach write spec/, stand-ins/ and ../seeds/ into the course.
+      // Re-checked on every load, not just at confirmFactory: a project whose folder now
+      // leads into the course would have the coach write spec/, stand-ins/ and the seed into the course.
       const { factoryProject, hostId } =
         factory.factoryProject.status === "found" && overlaps(await realPath(factory.factoryProject.root), await realPath(coursePath))
           ? { factoryProject: { status: "missing" as const, projectId: factory.factoryProject.projectId }, hostId: null }
           : factory;
-      const student = factoryProject.status === "found" ? await deps.store.read(factoryProject.root) : EMPTY_STUDENT;
+      const layout = factoryProject.status === "found" ? await resolveLayout(factoryProject.root) : null;
+      const read = layout === null ? EMPTY_STUDENT : await deps.store.read(layout.factoryDir);
+      const student = layout === null || layout.problems.length === 0 ? read : { ...read, problems: [...layout.problems, ...read.problems] };
       const coachPath =
-        courseResult.course === null
-          ? null
-          : await resolveCoachFile(courseResult.course.coachPath, factoryProject.status === "found" ? factoryProject.root : null);
+        courseResult.course === null ? null : await resolveCoachFile(courseResult.course.coachPath, layout?.factoryDir ?? null);
       if (courseResult.course !== null) lastCoach = coachPath;
+      lastLayout = layout;
       return {
         coursePath,
         course: courseResult.course,
@@ -93,11 +102,13 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
         coachPath,
         factoryProject,
         factoryHostId: hostId,
+        layout,
         student,
         pointer: courseResult.course === null ? null : resolveCurrent(courseResult.course, student),
-        factoryHint: resolveFactoryHint(deps.env, config),
+        projectHint: await resolveProjectHint(deps.env, config),
       };
     },
     lastCoachPath: () => lastCoach,
+    lastLayout: () => lastLayout,
   };
 }

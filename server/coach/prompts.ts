@@ -1,7 +1,7 @@
 // The words Tutor puts in front of the coach: first messages of new coach
 // threads, the context a side chat starts from, the student's "work on this
 // Rule" request, and configure's instructions.
-import { SKILL_ID, TOOL_NAMES } from "../../shared/constants.ts";
+import { SKILL_ID, STARTER_LAYOUT, TOOL_NAMES } from "../../shared/constants.ts";
 import { formatLessonRef } from "../../shared/directives.ts";
 import { coachThreadMetadataSchema, type Course, type Lesson, type Rule } from "../../shared/model.ts";
 
@@ -12,6 +12,35 @@ const MAX_QUESTION = 1500;
 /** The tutor_* tools own adoption and the progress files, whatever the coach file says. */
 const TOOLS_OWN_PROGRESS =
   "Never run fetch-iteration or fetch.sh, and never edit ITERATION or spec/PROGRESS.yaml by hand: the tutor_* tools own them.";
+
+/**
+ * Where the factory is, for a coach working from a starter clone's top folder:
+ * its folder in the repo. Null when the project's folder is the factory itself
+ * (legacy), where there is nothing to say.
+ */
+export interface FactoryWhere {
+  /** tetris/.factory through lesson 003, factory from 004. */
+  folder: string;
+}
+
+/** The layout's factory, as the coach needs to hear about it (null in legacy mode). */
+export function factoryWhere(layout: { mode: "repo" | "legacy"; factoryShown: string } | null): FactoryWhere | null {
+  return layout === null || layout.mode === "legacy" ? null : { folder: layout.factoryShown };
+}
+
+/** Coach threads start at the repo's top folder; the factory is a folder in it, which moves at lesson 004. */
+function factoryText(where: FactoryWhere): string {
+  const late = STARTER_LAYOUT.lateFactory;
+  const lesson = String(STARTER_LAYOUT.moveAtLesson).padStart(3, "0");
+  const here =
+    `The factory is ${where.folder}/ in this repo, the folder this thread starts in: ` +
+    `cd ${where.folder} before working on the factory, and follow its AGENTS.md.`;
+  const move =
+    where.folder === late
+      ? `It moved there from ${STARTER_LAYOUT.earlyFactory} at lesson ${lesson}.`
+      : `Adopting lesson ${lesson} with ${TOOL_NAMES.adoptIteration} moves it to ${late}/, as the starter's fetch.sh does; from then on the factory is ${late}/.`;
+  return `${here} ${move}`;
+}
 
 function method(coachPath: string | null): string {
   const how =
@@ -33,10 +62,12 @@ export function coachThreadPrompt(
   lesson: Lesson,
   start: CoachThreadStart,
   focus: Rule | null = null,
+  factory: FactoryWhere | null = null,
 ): string {
   const lines = [
     `You are the coach for Lesson ${lesson.id} "${lesson.title}" of the course "${course.title}".`,
     `Load the \`${SKILL_ID}\` skill and follow it. ${method(coachPath)}`,
+    ...(factory === null ? [] : [factoryText(factory)]),
     "Start your first reply with this line, exactly as written and on a line of its own. BB draws it as the lesson card: the lesson and its Rules.",
     formatLessonRef({ lessonId: lesson.id }),
   ];
@@ -97,6 +128,8 @@ export function sideChatTitle(rule: Rule | null): string {
 
 export interface InstructionFacts {
   coachPath: string | null;
+  /** Where the factory is in the repo the thread works in; null or absent when the project's folder is the factory. */
+  factory?: FactoryWhere | null;
 }
 
 /** Where the configured thread sits under its lesson, from BB's thread structure. */
@@ -133,6 +166,7 @@ export function coachInstructions(metadata: unknown, facts: InstructionFacts, pl
     }
   }
   if (facts.coachPath !== null) lines.push(`Coaching method: ${facts.coachPath}.`);
+  if (facts.factory !== undefined && facts.factory !== null) lines.push(factoryText(facts.factory));
   lines.push(TOOLS_OWN_PROGRESS);
   return lines.join("\n");
 }

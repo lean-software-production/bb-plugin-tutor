@@ -5,6 +5,7 @@ import { createActivityRecorder, resolveDataDir } from "../activity/heartbeat.ts
 import { registerRpc } from "../rpc/handlers.ts";
 import { createCoachRegistry } from "./coach-registry.ts";
 import { coachConfiguration } from "./configure.ts";
+import { factoryWhere } from "./prompts.ts";
 import { readFeatureConfig } from "./course-path.ts";
 import { decideDispatch } from "./dispatch-guard.ts";
 import { createKeyedLock } from "./keyed-lock.ts";
@@ -41,6 +42,7 @@ export async function registerTutor(bb: BbPluginApi, deps: WorldDeps): Promise<T
   bb.agents.configure((context) =>
     coachConfiguration(context, bb.pluginId, {
       coachPath: rt.world.lastCoachPath(),
+      factory: factoryWhere(rt.world.lastLayout()),
       coachLesson: (threadId) => rt.coaches.lessonOf(threadId),
     }),
   );

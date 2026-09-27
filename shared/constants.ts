@@ -75,16 +75,19 @@ export const SETTING_KEYS = {
  * How the `tutor` devcontainer feature tells the plugin where things are.
  * Course path precedence: `coursePath` setting > `TUTOR_COURSE_PATH` env >
  * `FEATURE_CONFIG_FILE.course` > `DEFAULT_COURSE_PATH`.
- * The factory path is only a hint for detecting the factory project; the
- * factory project itself is always a BB project id (`factoryProject` setting).
+ * The repo and factory paths are only hints for detecting the student's
+ * project, in this order: `TUTOR_REPO_PATH`, config `repo`, the git top folder
+ * above `TUTOR_FACTORY_PATH` / config `factory`, then that factory path
+ * itself. The project is always a BB project id (`factoryProject` setting).
  */
 export const ENV_VARS = {
   coursePath: "TUTOR_COURSE_PATH",
+  repoPath: "TUTOR_REPO_PATH",
   factoryPath: "TUTOR_FACTORY_PATH",
 } as const;
 /**
- * JSON `{ "schemaVersion"?: 1, "course"?: string, "factory"?: string, "dataDir"?: string }`,
- * written by the feature's install.sh.
+ * JSON `{ "schemaVersion"?: 1, "course"?: string, "repo"?: string, "factory"?: string, "dataDir"?: string }`,
+ * written by the feature's install.sh. Unknown keys are ignored.
  */
 export const FEATURE_CONFIG_FILE = "/usr/local/etc/tutor/config.json";
 /**
@@ -104,9 +107,10 @@ export const DEFAULT_COURSE_PATH = "/workspaces/tutorial";
 export const ACTIVITY_FILE = ".tutor-feature/activity";
 
 /**
- * Paths inside the student's factory, relative to its folder (tetris/.factory
- * in capstone-project-starter). `seedsDir` sits under the codebase folder, the
- * factory's parent: ../seeds.
+ * Paths inside the student's factory, relative to its folder (tetris/.factory,
+ * then factory/ from lesson 004, in capstone-project-starter). `seedsDir` sits
+ * under the codebase folder: tetris/seeds in a starter clone, ../seeds for a
+ * project whose folder is the factory itself (server/progress/layout.ts).
  */
 export const FACTORY_FILES = {
   progress: "spec/PROGRESS.yaml",
@@ -137,8 +141,30 @@ export function coachThreadTitle(lessonId: string): string {
 }
 
 /**
- * The capstone starter's coach-me skill, relative to the codebase folder that
- * holds the factory (`tetris/` for `tetris/.factory`). It is the coaching
- * method when the course has no coach file of its own.
+ * The layout of a capstone-project-starter clone, relative to the repo's top
+ * folder, the BB project's folder. The factory starts inside the codebase it
+ * builds, at `earlyFactory`, and moves beside it, to `lateFactory`, when
+ * lesson `moveAtLesson` is adopted: the starter's fetch.sh does
+ * `git mv tetris/.factory factory`, then points the factory's
+ * `claudeSkillsLink` at `linkTarget` again. Tutor does the same
+ * (server/progress/factory-move.ts). The rule belongs to the starter.
  */
-export const STARTER_COACH_SKILL = ".agents/skills/coach-me/SKILL.md";
+export const STARTER_LAYOUT = {
+  codebase: "tetris",
+  earlyFactory: "tetris/.factory",
+  lateFactory: "factory",
+  moveAtLesson: 4,
+  skillsDir: ".agents/skills",
+  /** Relative to the factory's folder. */
+  claudeSkillsLink: ".claude/skills",
+  /** The link's target, from factory/.claude/. */
+  linkTarget: "../../.agents/skills",
+} as const;
+
+/**
+ * The capstone starter's coach-me skill, relative to the repo's top folder.
+ * It is the coaching method when the course has no coach file of its own;
+ * Tutor looks for it from the factory's folder up to the repo's
+ * (server/coach/coach-file.ts).
+ */
+export const STARTER_COACH_SKILL = `${STARTER_LAYOUT.skillsDir}/coach-me/SKILL.md`;

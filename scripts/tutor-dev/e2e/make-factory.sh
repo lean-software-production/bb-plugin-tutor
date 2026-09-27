@@ -1,15 +1,21 @@
 #!/usr/bin/env bash
-# Inside the e2e container, readies the factory at $FACTORY (default
-# /workspaces/my-factory), then runs the feature's own start-up hook, which
+# Inside the e2e container, readies the BB project at $PROJECT (else $FACTORY,
+# else /workspaces/my-factory), then runs the feature's own start-up hook, which
 # registers it as a BB project if it is not one yet.
 #   - /workspaces/my-factory (tutor/mvp): coach-me's old "Setting up" (no
 #     spec/ITERATION: a student with no state starts on Homework 0).
-#   - <starter>/tetris/.factory (tutor/starter-layout): the Feature's bootstrap
-#     already cloned the starter; this only checks the factory is there and gives
-#     the clone a git identity, in case anything in the walk commits.
+#   - <starter>/tetris/.factory (tutor/starter-layout, plugin 0.1.0): the
+#     Feature's bootstrap already cloned the starter; this only checks the
+#     factory is there and gives the clone a git identity, as the walk commits.
+#   - <starter> (plugin 0.2.0): the clone's top folder is the project. The same
+#     checks, on the clone and its tetris/.factory.
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FACTORY="${FACTORY:-/workspaces/my-factory}"
+PROJECT="${PROJECT:-${FACTORY:-/workspaces/my-factory}}"
+FACTORY="$PROJECT"
+if [ "$PROJECT" != /workspaces/my-factory ] && "$here/bb.sh" --exec test -d "$PROJECT/tetris/.factory"; then
+    FACTORY="$PROJECT/tetris/.factory"
+fi
 case "$FACTORY" in
 */.factory)
     "$here/bb.sh" --exec bash -euo pipefail -c '

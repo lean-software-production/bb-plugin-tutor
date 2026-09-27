@@ -3,7 +3,9 @@
 Status: **built** (MVP on `tutor/mvp`). [`CHANGELOG-from-design.md`](CHANGELOG-from-design.md)
 logs every change since this design was approved, newest first; the "One tree (2026-09-25)" entry
 revises the sidebar, the lesson page (now the start page) and side threads (now side chats) described
-in the mockups. Terms follow [`GLOSSARY.md`](GLOSSARY.md). Open
+in the mockups, the "Starter layout (2026-09-26)" entry replaces decision 1's conventions with the
+capstone starter's, and "Repo-root project (v0.2.0, 2026-09-27)" makes the starter clone's top
+folder the BB project, with the factory in `tetris/.factory` and then `factory/` from lesson 004. Terms follow [`GLOSSARY.md`](GLOSSARY.md). Open
 [`mockups.html`](mockups.html) in a browser to see the screens this doc refers to.
 
 ## What it is
@@ -15,7 +17,8 @@ BB:
   thread, the coach thread's Rules and its side chats. It shows which lesson you are on, which
   Rule, and what has passed.
 - Each lesson gets its own coach thread in the student's *factory* project, the repo where they
-  build their software factory. It opens in BB's own thread view, led by the lesson card. The coach
+  build their software factory (since v0.2.0 the starter clone's top folder; the coach works in
+  its factory folder). It opens in BB's own thread view, led by the lesson card. The coach
   works one Gherkin Rule at a time, and each Rule's section of the thread starts at its Rule card.
 - Progress is recorded in the student's repo, so it survives the codespace and still works if
   the student drops BB and says "coach me" in any other agent harness.

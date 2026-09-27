@@ -45,3 +45,34 @@ test("with neither, or no factory yet, there is no coaching method file", async 
   await mkdir(skill, { recursive: true });
   assert.equal(await resolveCoachFile(null, factory), null);
 });
+
+/** The starter as it is now: .git and the skills at the clone's top folder, the factory at tetris/.factory or factory/. */
+async function currentStarter(t: TestContext, factoryAt: string): Promise<{ root: string; factory: string; skill: string }> {
+  const top = await realpath(await mkdtemp(join(tmpdir(), "tutor-coach-file-")));
+  t.after(() => rm(top, { recursive: true, force: true }));
+  const root = join(top, "capstone-project-starter");
+  const factory = join(root, factoryAt);
+  const skill = join(root, ".agents/skills/coach-me/SKILL.md");
+  await mkdir(join(root, ".git"), { recursive: true });
+  await mkdir(factory, { recursive: true });
+  await mkdir(join(skill, ".."), { recursive: true });
+  await writeFile(skill, "---\nname: coach-me\n---\n");
+  return { root, factory, skill };
+}
+
+test("in the current starter, the coach-me skill at the repo's top folder is found from tetris/.factory and from factory/", async (t) => {
+  for (const factoryAt of ["tetris/.factory", "factory"]) {
+    const { factory, skill } = await currentStarter(t, factoryAt);
+    assert.equal(await resolveCoachFile(null, factory), skill, factoryAt);
+  }
+});
+
+test("the search for the skill stops at the repo's top folder", async (t) => {
+  const { root, factory } = await currentStarter(t, "tetris/.factory");
+  // A nested repo inside the clone: the outer clone's skill is not its coach.
+  const inner = join(root, "tetris/inner");
+  await mkdir(join(inner, ".git"), { recursive: true });
+  await mkdir(join(inner, ".factory"), { recursive: true });
+  assert.equal(await resolveCoachFile(null, join(inner, ".factory")), null);
+  assert.ok(factory);
+});

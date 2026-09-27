@@ -1,7 +1,7 @@
 // What each coach tool does, as pure functions over the re-derived world.
 // They return the text for the coach and the files to write; tools.ts checks
 // the caller and performs the writes.
-import { BUILTIN_LESSON_ID } from "../../shared/constants.ts";
+import { BUILTIN_LESSON_ID, STARTER_LAYOUT } from "../../shared/constants.ts";
 import {
   countExamples,
   findExample,
@@ -19,14 +19,21 @@ import type { Course, ExampleProgress, Lesson, IterationState, ProgressFile, Rul
 import type { ToolParameters } from "../../shared/tools.ts";
 import { carryOver } from "../progress/carry-over.ts";
 import { progressFor } from "../progress/current.ts";
+import { needsFactoryMove } from "../progress/factory-move.ts";
+import type { Layout } from "../progress/layout.ts";
 import type { World } from "./world.ts";
+
+const LATE_FACTORY = STARTER_LAYOUT.lateFactory;
 
 export interface CoachState {
   course: Course;
   /** The coaching method's file (coach-file.ts), or null. */
   coachPath: string | null;
   projectId: string;
+  /** The BB project's folder, where coach threads work: the student's repo, or (legacy) the factory itself. */
   root: string;
+  /** Where the factory is in it: every file the tools write goes into layout.factoryDir. */
+  layout: Layout;
   hostId: string;
   lesson: Lesson;
   pointer: CurrentPointer;
@@ -50,7 +57,7 @@ export function coachStateOf(world: World): CoachState | { error: string } {
   if (world.course === null || world.pointer === null) {
     return { error: `The course could not be loaded: ${world.courseError ?? "unknown error"}` };
   }
-  if (world.factoryProject.status !== "found" || world.factoryHostId === null) {
+  if (world.factoryProject.status !== "found" || world.factoryHostId === null || world.layout === null) {
     return { error: "No factory project is set up yet. The student confirms it on the Course page." };
   }
   const lesson = findLesson(world.course, world.pointer.lessonId);
@@ -60,6 +67,7 @@ export function coachStateOf(world: World): CoachState | { error: string } {
     coachPath: world.coachPath,
     projectId: world.factoryProject.projectId,
     root: world.factoryProject.root,
+    layout: world.layout,
     hostId: world.factoryHostId,
     lesson,
     pointer: world.pointer,
@@ -259,23 +267,47 @@ export function adoptAction(state: CoachState, input: ToolParameters<"tutor_adop
     const damaged = state.student.progressUnreadable === true ? ` ${unreadableProgressText(state.pointer.lessonId)}` : "";
     return { error: `Lesson ${input.iteration} cannot be adopted now. ${current} ${allowed}${damaged}` };
   }
+  const { layout } = state;
+  if (layout.blocked !== null) return { error: `Lesson ${input.iteration} cannot be adopted: ${layout.blocked}` };
   const progress = carryOver(state.student.progress, lesson, now);
   const carried = Object.keys(progress.examples).length;
   const total = lessonExamples(lesson).length;
   const summary = `Adopted lesson ${lesson.id} "${lesson.title}": ${total} examples, ${carried} carried over as passing.`;
   if (lesson.builtin) return { text: `${summary}\nThis lesson lives in Tutor only: nothing was copied into spec/.`, progress };
-  return {
-    text: [
-      summary,
-      "spec/ now holds its README.md, FACTORY.md and features/, and ../seeds/ its sample seed unless one was there already.",
-      `stand-ins/ is refreshed from the course, and ITERATION reads "${lesson.id} WIP".`,
-      `Commit spec/, ../seeds/ and ITERATION with the message "Adopt spec for iteration ${lesson.id}", then follow the coaching method:`,
-      "show the student `git show --stat HEAD` and the diff of spec/FACTORY.md.",
-    ].join("\n"),
-    progress,
-    iteration: { iteration: lesson.id, status: "WIP" },
-    adopt: lesson,
-  };
+  const adopted = { progress, iteration: { iteration: lesson.id, status: "WIP" as const }, adopt: lesson };
+  if (layout.mode === "legacy") {
+    return {
+      text: [
+        summary,
+        "spec/ now holds its README.md, FACTORY.md and features/, and ../seeds/ its sample seed unless one was there already.",
+        `stand-ins/ is refreshed from the course, and ITERATION reads "${lesson.id} WIP".`,
+        `Commit spec/, ../seeds/ and ITERATION with the message "Adopt spec for iteration ${lesson.id}", then follow the coaching method:`,
+        "show the student `git show --stat HEAD` and the diff of spec/FACTORY.md.",
+      ].join("\n"),
+      ...adopted,
+    };
+  }
+  // A starter clone: paths from the repo's top folder, where the coach thread works.
+  const move = needsFactoryMove(layout, lesson);
+  const factory = move ? LATE_FACTORY : layout.factoryShown;
+  const seeds = layout.seedsShown;
+  const lines = [summary];
+  if (move) {
+    lines.push(
+      `Lesson ${lesson.id} gives the factory a codebase of its own, so Tutor moved it as the starter's fetch.sh does: ` +
+        `git mv ${layout.factoryShown} ${LATE_FACTORY}, with ${LATE_FACTORY}/.claude/skills linked to the repo's .agents/skills again, ` +
+        `so the factory now lives in ${LATE_FACTORY}/: cd there to work on it from now on, and follow its AGENTS.md.`,
+    );
+  }
+  lines.push(
+    `${factory}/spec/ now holds its README.md, FACTORY.md and features/, and ${seeds}/ its sample seed unless one was there already.`,
+    `${factory}/stand-ins/ is refreshed from the course, and ${factory}/ITERATION reads "${lesson.id} WIP".`,
+    move
+      ? `Commit ${factory}/, ${seeds}/ and the old ${layout.factoryShown} (git add -A ${factory} ${seeds} ${layout.factoryShown}) with the message "Adopt spec for iteration ${lesson.id}", then follow the coaching method:`
+      : `Commit ${factory}/ and ${seeds}/ with the message "Adopt spec for iteration ${lesson.id}", then follow the coaching method:`,
+    `show the student \`git show --stat HEAD\` and the diff of ${factory}/spec/FACTORY.md.`,
+  );
+  return { text: lines.join("\n"), ...adopted };
 }
 
 export function completeAction(state: CoachState, input: ToolParameters<"tutor_complete_iteration">): Outcome {
