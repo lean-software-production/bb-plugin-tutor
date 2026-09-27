@@ -11,6 +11,7 @@ import {
   fixtureCandidates,
   fixtureCompletion,
   fixtureCourse,
+  fixtureCourseTo004,
   fixtureLessonDetail,
   fixtureOverview,
   fixtureOverviewNoFactory,
@@ -19,6 +20,7 @@ import {
 
 test("fixtures satisfy their schemas", () => {
   courseSchema.parse(fixtureCourse);
+  courseSchema.parse(fixtureCourseTo004);
   progressFileSchema.parse(fixtureStudent.progress);
   overviewSchema.parse(fixtureOverview);
   overviewSchema.parse(fixtureOverviewNoFactory);
@@ -28,7 +30,7 @@ test("fixtures satisfy their schemas", () => {
 });
 
 test("fixture keys are unique within each lesson", () => {
-  for (const lesson of fixtureCourse.lessons) {
+  for (const lesson of fixtureCourseTo004.lessons) {
     const keys = lesson.features.flatMap((f) => f.rules.flatMap((r) => r.examples.map((e) => e.key)));
     assert.equal(new Set(keys).size, keys.length, lesson.id);
     assert.equal(new Set(lesson.suggestedRuleOrder).size, lesson.suggestedRuleOrder.length);

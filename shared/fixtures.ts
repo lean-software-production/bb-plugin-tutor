@@ -298,6 +298,55 @@ const lesson3 = lesson({
   ],
 });
 
+/** Lesson 004, where the starter's factory moves from tetris/.factory to factory/. Only in fixtureCourseTo004. */
+const lesson4 = lesson({
+  id: "004",
+  title: "Jobs and targets",
+  set: null,
+  dir: `${FIXTURE_COURSE_ROOT}/docs/iterations/004-jobs-and-targets`,
+  builtin: false,
+  readme: "# Homework 4 — Jobs and targets\n\nThe factory gets a codebase of its own.\n",
+  dek: "The factory gets a codebase of its own.",
+  factoryMd: "# The factory\n\nAn assembly line says what runs next.\nEach job builds a target.\n",
+  seedSpec: null,
+  features: [
+    feature("features/assembly-line.feature", "Assembly line", "The route is a graph the factory reads.", [
+      {
+        name: "The factory refuses an assembly line naming a machine it does not have",
+        examples: [
+          {
+            name: "A misspelt validator",
+            steps: steps(
+              'Given "validator" is misspelt "validater" throughout the assembly line',
+              "When the factory reads the assembly line",
+              "Then it refuses it",
+            ),
+            change: "unchanged",
+          },
+        ],
+      },
+    ]),
+    feature("features/jobs.feature", "Jobs", "Each job builds its own target.", [
+      {
+        name: "A job builds into its target",
+        examples: [
+          {
+            name: "Two jobs, two targets",
+            steps: steps("Given two jobs", "When the factory runs both", "Then each has its own target"),
+            change: "new",
+          },
+        ],
+      },
+    ]),
+  ],
+  factoryDiff: [
+    { kind: "ctx", text: "# The factory" },
+    { kind: "ctx", text: "" },
+    { kind: "ctx", text: "An assembly line says what runs next." },
+    { kind: "add", text: "Each job builds a target." },
+  ],
+});
+
 export const fixtureLexicon: LexiconEntry[] = [
   {
     id: "doer",
@@ -322,6 +371,9 @@ export const fixtureCourse: Course = {
   lexicon: fixtureLexicon,
   source: "ledger",
 };
+
+/** fixtureCourse with lesson 004 too, for the factory's move to factory/. */
+export const fixtureCourseTo004: Course = { ...fixtureCourse, lessons: [...fixtureCourse.lessons, lesson4] };
 
 function examplesOf(lessonId: string): Example[] {
   const found = fixtureCourse.lessons.find((h) => h.id === lessonId);

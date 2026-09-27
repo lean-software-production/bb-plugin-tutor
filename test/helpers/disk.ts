@@ -26,14 +26,14 @@ export interface Sandbox {
   cleanup(): Promise<void>;
 }
 
-/** fixtureCourse with every non-builtin lesson, and the course's stand-ins/, written to disk under `courseRoot`. */
-async function writeCourse(courseRoot: string): Promise<Course> {
+/** A fixture course (fixtureCourse unless given) with every lesson, and the course's stand-ins/, written to disk under `courseRoot`. */
+async function writeCourse(courseRoot: string, source: Course = fixtureCourse): Promise<Course> {
   await mkdir(join(courseRoot, "stand-ins"), { recursive: true });
   await writeFile(join(courseRoot, "stand-ins/README.md"), "# Stand-ins\n");
   await writeFile(join(courseRoot, "stand-ins/plan-alpha-beta"), "#!/bin/sh\necho alpha beta\n");
   await chmod(join(courseRoot, "stand-ins/plan-alpha-beta"), 0o755);
   const lessons = [];
-  for (const lesson of fixtureCourse.lessons) {
+  for (const lesson of source.lessons) {
     const dir = join(courseRoot, "docs/iterations", `${lesson.id}-${lesson.title.toLowerCase().replace(/\W+/g, "-")}`);
     await mkdir(join(dir, "features"), { recursive: true });
     await writeFile(join(dir, "README.md"), lesson.readme);
@@ -44,7 +44,7 @@ async function writeCourse(courseRoot: string): Promise<Course> {
     }
     lessons.push({ ...lesson, dir });
   }
-  return { ...fixtureCourse, root: courseRoot, coachPath: join(courseRoot, ".agents/coach-me.md"), lessons };
+  return { ...source, root: courseRoot, coachPath: join(courseRoot, ".agents/coach-me.md"), lessons };
 }
 
 /**
@@ -81,6 +81,8 @@ export function git(dir: string, ...args: string[]): string {
 export interface RepoSandboxOptions {
   /** A real git repo with the starter committed, instead of an empty .git folder. */
   git?: boolean;
+  /** The course to write: fixtureCourse unless given (fixtureCourseTo004 for the factory's move). */
+  course?: Course;
 }
 
 /**
@@ -109,6 +111,6 @@ export async function makeRepoSandbox(options: RepoSandboxOptions = {}): Promise
   } else {
     await mkdir(join(repoRoot, ".git"));
   }
-  const course = await writeCourse(join(root, "tutorial"));
+  const course = await writeCourse(join(root, "tutorial"), options.course);
   return { root, course, repoRoot, codebaseRoot, factoryRoot, cleanup: () => rm(root, { recursive: true, force: true }) };
 }
