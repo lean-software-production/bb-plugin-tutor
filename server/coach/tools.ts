@@ -4,7 +4,7 @@ import type { PluginAgentToolContext, PluginAgentToolResult, PluginRowLabels } f
 import { TOOL_NAMES, type ToolName } from "../../shared/constants.ts";
 import { findLesson, findRule } from "../../shared/derive.ts";
 import { toolParameterSchemas, type ToolParameters } from "../../shared/tools.ts";
-import { copyLessonSpec } from "../progress/spec-copy.ts";
+import { adoptLesson } from "../progress/factory-move.ts";
 import { isoSeconds } from "../progress/time.ts";
 import {
   adoptAction,
@@ -50,16 +50,28 @@ function refusal(text: string): PluginAgentToolResult {
   return { content: [{ type: "text", text }], isError: true };
 }
 
-async function applyOutcome(rt: TutorRuntime, state: CoachState, outcome: Outcome, caller: Caller): Promise<void> {
-  if ("error" in outcome) return;
+/** Performs the outcome's writes; returns a note to add to the tool's text, or null. */
+async function applyOutcome(rt: TutorRuntime, state: CoachState, outcome: Outcome, caller: Caller): Promise<string | null> {
+  if ("error" in outcome) return null;
+  const writes = outcome.adopt !== undefined || outcome.iteration !== undefined || outcome.progress !== undefined;
+  // A factory Tutor can't find (or won't use) gets nothing written into where it should be.
+  if (writes && state.layout.blocked !== null) throw new Error(state.layout.blocked);
   if (outcome.reached !== undefined) await recordReachedRule(rt.bb.sdk, caller.coachThreadId, outcome.reached);
+  let factoryDir = state.layout.factoryDir;
+  let note: string | null = null;
   // Adoption writes spec/, the seed and stand-ins/ before ITERATION, so ITERATION never names a lesson that isn't there.
-  if (outcome.adopt !== undefined) await copyLessonSpec(state.root, outcome.adopt, { courseRoot: state.course.root });
-  if (outcome.iteration !== undefined) await rt.store.writeIteration(state.root, outcome.iteration);
-  if (outcome.progress !== undefined) await rt.store.writeProgress(state.root, outcome.progress);
+  // From 004 in a starter clone it moves the factory to factory/ first (factory-move.ts), and the rest goes there.
+  if (outcome.adopt !== undefined) {
+    const adoption = await adoptLesson(state.layout, outcome.adopt, { courseRoot: state.course.root });
+    factoryDir = adoption.layout.factoryDir;
+    note = adoption.note;
+  }
+  if (outcome.iteration !== undefined) await rt.store.writeIteration(factoryDir, outcome.iteration);
+  if (outcome.progress !== undefined) await rt.store.writeProgress(factoryDir, outcome.progress);
   if (outcome.iteration !== undefined || outcome.progress !== undefined) {
     rt.signals.publish(outcome.iteration === undefined ? "progress" : "iteration", outcome.progress?.iteration ?? null);
   }
+  return note;
 }
 
 function register<Name extends ToolName>(rt: TutorRuntime, spec: ToolSpec<Name>): void {
@@ -78,13 +90,14 @@ function register<Name extends ToolName>(rt: TutorRuntime, spec: ToolSpec<Name>)
         if (otherLesson !== null) return refusal(otherLesson);
         const outcome = await spec.action(state, input, caller, isoSeconds(rt.now()));
         if ("error" in outcome) return refusal(outcome.error);
-        await applyOutcome(rt, state, outcome, caller);
-        return outcome.text;
+        const note = await applyOutcome(rt, state, outcome, caller);
+        return note === null ? outcome.text : `${outcome.text}\n${note}`;
       };
       try {
         const world = await rt.world.load();
         if (world.factoryProject.status !== "found") return await run(world);
         // Read-modify-write of the factory's files: re-read them once earlier calls have written.
+        // Keyed on the project's folder, which stays put when the factory moves to factory/.
         return await rt.locks.run(factoryLockKey(world.factoryProject.root), async () => run(await rt.world.load()));
       } catch (cause) {
         rt.bb.log.error(`[tutor] ${spec.name} failed: ${String(cause)}`);
@@ -157,7 +170,7 @@ export function registerCoachTools(rt: TutorRuntime): void {
   register(rt, {
     name: TOOL_NAMES.adoptIteration,
     description:
-      "Adopt this coach thread's lesson (an iteration, in the course repo's words) as fetch-iteration does, from the course on this machine: copy its README.md, FACTORY.md and features/ into spec/, its sample seed into ../seeds/ unless one is there, refresh stand-ins/, write ITERATION as WIP and start spec/PROGRESS.yaml, carrying over Examples already passing. Use it instead of fetch-iteration or fetch.sh. Does not commit. A coach thread adopts only its own lesson.",
+      "Adopt this coach thread's lesson (an iteration, in the course repo's words) as fetch-iteration does, from the course on this machine: copy its README.md, FACTORY.md and features/ into the factory's spec/, its sample seed into tetris/seeds/ (../seeds/ beside a factory that is its own project) unless one is there, refresh stand-ins/, write ITERATION as WIP and start spec/PROGRESS.yaml, carrying over Examples already passing. In a capstone-project-starter clone, adopting lesson 004 or later while the factory is still tetris/.factory first moves it to factory/, as fetch.sh does. Use it instead of fetch-iteration or fetch.sh. Does not commit. A coach thread adopts only its own lesson.",
     label: { pending: "Adopting the lesson", completed: "Adopted the lesson" },
     // Adopting makes the caller's lesson the current one, so it checks the lesson itself.
     lesson: "any",

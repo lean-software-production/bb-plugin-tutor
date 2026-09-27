@@ -30,6 +30,6 @@ export function coachConfiguration(
   return {
     tools: [...ALL_TOOL_NAMES],
     skills: [SKILL_ID],
-    instructions: coachInstructions(context.pluginMetadata, { coachPath: facts.coachPath }, place),
+    instructions: coachInstructions(context.pluginMetadata, { coachPath: facts.coachPath, factory: facts.factory ?? null }, place),
   };
 }

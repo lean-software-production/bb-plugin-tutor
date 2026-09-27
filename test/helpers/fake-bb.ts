@@ -94,7 +94,7 @@ export async function makeTutorHost(
   course: Course,
   factoryRoot: string,
   settings: Record<string, string | boolean> = { factoryProject: PROJECT_ID },
-  options: { dataDir?: string; env?: Record<string, string>; featureConfigFile?: string } = {},
+  options: { dataDir?: string; env?: Record<string, string>; featureConfigFile?: string; projectName?: string } = {},
 ): Promise<TutorHost> {
   const threads: FakeThread[] = [];
   const running = new Set<string>();
@@ -134,7 +134,7 @@ export async function makeTutorHost(
   };
   const project = {
     id: PROJECT_ID,
-    name: "tetris/.factory",
+    name: options.projectName ?? "tetris/.factory",
     kind: "standard",
     gitRemoteUrl: null,
     createdAt: 1,

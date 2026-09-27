@@ -16,6 +16,13 @@ function clip(text: string, max: number): string {
   return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
 }
 
+/** Where the factory is: in a starter clone, its folder in the repo (tetris/.factory, then factory/ from 004). */
+function factoryLine(state: CoachState): string {
+  const { layout } = state;
+  if (layout.mode === "legacy") return `Factory: ${state.root}.`;
+  return `Factory: ${layout.factoryShown}/ (in ${state.root}). Work in it: cd ${layout.factoryShown} and follow its AGENTS.md.`;
+}
+
 /** The calling thread's lesson, and why it may not change progress when that isn't the current lesson. */
 export interface StatusCaller {
   lessonId: string;
@@ -36,7 +43,7 @@ export function statusText(state: CoachState, caller: StatusCaller | null = null
   }
   lines.push(
     `Course: ${course.title}. Coaching method: ${coachPath ?? "(no coach file)"}.`,
-    `Factory: ${state.root}.`,
+    factoryLine(state),
     `Lesson ${lesson.id} "${lesson.title}": ${pointer.iterationStatus}. ` +
       `${counts.passing}/${counts.total} passing, ${counts.notYet} not yet, ${counts.skipped} skipped, ${counts.pending} pending.`,
     `Focus: ${focus ?? "none"}.`,
