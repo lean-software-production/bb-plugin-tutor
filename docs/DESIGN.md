@@ -1,5 +1,10 @@
 # Tutor: a BB plugin for coached, Gherkin-driven courses
 
+> **The look has changed.** Tutor is now drawn in the Sketchbook brand, not the workbook look
+> (grid paper, Spectral, Archivo) this doc and [`mockups.html`](mockups.html) describe. See
+> [`2026-09-27-sketchbook-brand.md`](2026-09-27-sketchbook-brand.md) and
+> [`mockups-sketchbook/`](mockups-sketchbook/index.html). The behaviour described here still holds.
+
 Status: **built** (MVP on `tutor/mvp`). [`CHANGELOG-from-design.md`](CHANGELOG-from-design.md)
 logs every change since this design was approved, newest first; the "One tree (2026-09-25)" entry
 revises the sidebar, the lesson page (now the start page) and side threads (now side chats) described

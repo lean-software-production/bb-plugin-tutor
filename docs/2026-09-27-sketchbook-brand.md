@@ -1,6 +1,7 @@
 # Tutor in the Sketchbook brand
 
-Status: **approved design** (2026-09-27), not built. This redraws Tutor, and the BB theme it
+Status: **built in 0.3.0 (unreleased)**; approved design 2026-09-27. See
+[What was built](#what-was-built) for the decisions taken and the mockup fixes. This redraws Tutor, and the BB theme it
 installs, in the Lean Software Production brand from
 [`lean-software-production/brand`](https://github.com/lean-software-production/brand). The brand is
 "warm, whimsical, wise": cream paper, wobbly ink, marker lettering, a teal accent, the highlighter
@@ -200,3 +201,36 @@ shows exactly this screen.
 1. Read `skills/tutor/SKILL.md`.
 2. Expect: a Voice section that matches the decided brand "Voice and tone" and leaves the
    coaching method to the course's coach file (human-verify for tone).
+
+## What was built
+
+Plugin 0.3.0 (unreleased) on `tutor/sketchbook`, with the brand pinned at `0df3eab`.
+
+**Mockup fixes.** The first mockup had three weak spots, fixed before any plugin code:
+
+- **Loop arrow.** The lesson-complete loop is drawn 1:1 from `loopPath()` in a band under the row,
+  not stretched. It leaves the stats, curls once, comes back under "What's next", and crosses no
+  text.
+- **Patches at the frame's edge.** The welcome waver sits 40px in from the frame, and the outline's
+  books patch moved in. Every patch is now at least 16px inside the frame.
+- **Chips.** A chip is a filled wash with the kit's 3px line. The old 2px line thinned to a hairline
+  where `sk-wobble` shifted it by a whole pixel.
+
+`shoot.mjs --check` now checks all three: patch margins, the loop clear of text, and the loop's end
+within 12px of "What's next".
+
+**Decisions taken** (numbered as in the build plan):
+
+- **D1.** The kit CSS is a generated copy scoped under `.tutor-sk`, not the kit verbatim.
+- **D2.** Fonts are Fontsource 5.3.0 Latin woff2 files, with their sha256 sums and licences.
+- **D3.** The meter's 1px steps at 1x come from `sk-wobble-line`'s whole-pixel displacement, and
+  the kit is unchanged. Tutor adds no filter of its own.
+- **D4.** The one contrast failure (light-mode subtle text, 4.23:1) was fixed in the brand repo and
+  re-pinned (4.76:1).
+- **D5.** The in-thread lesson-complete card fetches its own stats. While they load, or if they
+  fail, it shows the ribbon and the link, with no loop.
+- **D6.** Archivo, Spectral and JetBrains Mono are gone. Code uses BB's mono.
+- **D7.** The outline's brand mark is the kit's books icon.
+- **D8.** Step colours follow list position, so lesson 0 is mustard, as in the mockup.
+- **D10.** Tutor owns the tall loop's geometry and draws it with the kit's class, marker and filter.
+- **D9** (where the long e2e runs) is still open.

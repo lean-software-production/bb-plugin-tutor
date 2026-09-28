@@ -146,6 +146,16 @@ To build the same archive locally, run `scripts/release-archive.sh v<x.y.z> <out
   `npm run sync-brand -- <sha>` and `npm run build:assets`. A test checks the generated files are
   current, that the theme is the brand's byte for byte apart from the font, and that text keeps
   4.5:1 in both modes as BB actually paints it.
+- **Tutor's own surfaces.** The outline, cards, pages and Rule tab are drawn with the brand's
+  Sketchbook kit (`vendor/brand/kit/`), scoped under `.tutor-sk` at build time
+  (`app/sketch/kit.css`) so it can't restyle BB. `app/styles/*.css` sets only size and layout, and
+  paints with the `--tp-*` tokens; `app/styles/scope.test.ts` enforces both. Motion stops under
+  reduced motion. The UI copy follows the brand's voice (`vendor/brand/VOICE.md`), and
+  `app/voice.test.ts` fails on the words it avoids.
+- **Fonts.** Patrick Hand, Patrick Hand SC and Luckiest Guy are self-hosted from Fontsource 5.3.0
+  (`app/fonts/`, with sha256 sums in its README). Patrick Hand and Patrick Hand SC are under the
+  SIL Open Font License 1.1, Luckiest Guy under the Apache License 2.0; the licence texts are in
+  `app/fonts/LICENSES/`.
 - **Activity heartbeat.** GitHub does not count browser traffic through a forwarded port as
   Codespace activity. The `activity` content script (`app/activity.ts`, mounted once per window
   for as long as the plugin's frontend is active) calls the `heartbeat` RPC at most every 45 s
@@ -157,7 +167,7 @@ To build the same archive locally, run `scripts/release-archive.sh v<x.y.z> <out
   then `dataDir` in the feature's config file.
 - **Lost connection.** When an RPC fails without one of BB's JSON errors (the Codespaces proxy's
   empty 401 after an idle stop, a 502 page, a network error), `useTutorRpc` rejects with
-  `ConnectionLostError` and every Tutor error surface shows "Lost the connection to your
+  `ConnectionLostError` and every Tutor error surface shows "We lost the connection to your
   Codespace …" with a Reload button instead of `rpc "…" failed (HTTP 401)`
   (`app/model/rpc-errors.ts`). Tutor's and BB's own errors are unchanged.
 
@@ -177,7 +187,8 @@ thread (or side chat) changes only its own lesson's progress.
 | `server/course/` | Course loading: course.yaml or ledger, Gherkin, slugs, hashes, new/reworded changes, lexicon, Lesson 0 |
 | `server/progress/`, `server/coach/`, `server/rpc/` | Student state, coach tools and threads, RPC handlers |
 | `app/` | Course outline (`Outline.tsx`), start page, lesson and Rule cards and other directives, the jump to a Rule's section, rule tab, home section, sidebar navigation, activity reporter; `sketchbook.css`, the scoped kit (`sketch/`), fonts and the theme build |
-| `themes/` | The `paper` BB theme (generated CSS) and its light code theme |
+| `themes/` | The Sketchbook BB theme (generated from the vendored brand) and its light and dark code themes |
+| `vendor/brand/` | The brand at its pin (`PIN`): the bb theme, the kit and `VOICE.md`; refreshed by `npm run sync-brand` |
 | `skills/tutor/` | The coach's skill |
 | `components/`, `lib/`, `hooks/` | Vendored BB UI components (shadcn model) |
 
