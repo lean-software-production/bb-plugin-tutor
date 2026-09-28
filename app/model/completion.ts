@@ -81,6 +81,33 @@ export function completionView(completion: Completion, now: number): CompletionV
   };
 }
 
+export interface DoneRibbonView {
+  /** "Lesson 1 done." */
+  kicker: string;
+  /** "All 5 Examples hold.", or null before the stats have loaded. */
+  line: string | null;
+}
+
+/** The lesson-complete ribbon. The kicker needs only the lesson, so it shows while the stats load. */
+export function doneRibbon(lessonId: string, counts: Pick<Completion["counts"], "passing" | "total"> | null): DoneRibbonView {
+  const kicker = `${lessonLabel(lessonId)} done.`;
+  if (counts === null) return { kicker, line: null };
+  const all = counts.passing === counts.total;
+  return { kicker, line: all ? `All ${counts.total} Examples hold.` : `${counts.passing} of ${counts.total} Examples hold.` };
+}
+
+export interface WhatsNextView {
+  label: string;
+  /** "Lesson 2 · Checking the work", the end of the course, or null before the stats have loaded. */
+  detail: string | null;
+}
+
+export function whatsNext(view: CompletionView | null): WhatsNextView {
+  const label = "What's next →";
+  if (view === null) return { label, detail: null };
+  return { label, detail: view.next === null ? "That was the last lesson" : `${lessonLabel(view.next.id)} · ${view.next.title}` };
+}
+
 export interface ConfettiPiece {
   left: number;
   top: number;

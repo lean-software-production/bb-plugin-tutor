@@ -66,7 +66,7 @@ export function CompletionPage({ lessonId }: { lessonId: string }) {
         )}
       </div>
       {view.next === null ? (
-        <div className="tp-next">
+        <div className="tp-next-lesson">
           <p className="tp-eyebrow">That was the last lesson</p>
           <h1 className="tp-h1">You finished the course.</h1>
           <p className="tp-dek">Your factory, its spec and every conversation with your coach stay in your repo.</p>
@@ -90,7 +90,7 @@ function NextLesson({ next }: { next: NextLessonView }) {
     navigate.toThread(threadId);
   });
   return (
-    <div className="tp-next">
+    <div className="tp-next-lesson">
       <p className="tp-eyebrow">{next.eyebrow}</p>
       <h1 className="tp-h1">{next.title}</h1>
       {next.dek === "" ? null : (

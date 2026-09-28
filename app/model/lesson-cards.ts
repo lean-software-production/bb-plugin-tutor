@@ -6,7 +6,7 @@
 import { countExamples, lessonExamples, ruleStatus } from "../../shared/derive.ts";
 import type { Change } from "../../shared/model.ts";
 import type { LessonDetail } from "../../shared/rpc.ts";
-import { lessonEyebrow, percent, plural } from "./format.ts";
+import { lessonEyebrow, percent } from "./format.ts";
 import { featureView } from "./lesson.ts";
 import type { RuleView } from "./lesson.ts";
 import type { RuleGlyph } from "./outline.ts";
@@ -36,6 +36,10 @@ export interface LessonCardView {
   /** "3 of 9 examples hold". */
   tally: string;
   percent: number;
+  /** The tally's numbers, for the meter, and the words after them. */
+  passing: number;
+  total: number;
+  tallyUnit: string;
   features: LessonCardFeature[];
   coachThreadId: string | null;
 }
@@ -45,13 +49,17 @@ export function lessonCardView(detail: LessonDetail): LessonCardView {
   const counts = countExamples(lessonExamples(lesson), progress);
   const focus = detail.status === "current" ? detail.focus : null;
   const reached = new Set(detail.reachedRules);
+  const tallyUnit = counts.total === 1 ? "example holds" : "examples hold";
   return {
     lessonId: lesson.id,
     eyebrow: lessonEyebrow(lesson.id, lesson.set),
     title: lesson.title,
     dek: lesson.dek,
-    tally: `${counts.passing} of ${plural(counts.total, "example")} hold`,
+    tally: `${counts.passing} of ${counts.total} ${tallyUnit}`,
     percent: percent(counts.passing, counts.total),
+    passing: counts.passing,
+    total: counts.total,
+    tallyUnit,
     features: lesson.features.map((feature) => {
       const featureCounts = countExamples(
         feature.rules.flatMap((rule) => rule.examples),
@@ -83,6 +91,8 @@ export interface RuleCardView {
   featureName: string;
   featureChange: Change;
   rule: RuleView;
+  /** 1-based place of the Rule in the lesson, across Features: its step badge. */
+  number: number;
   passing: number;
   total: number;
   /** The lesson is the one under way, so side questions can go to its coach thread. */
@@ -92,6 +102,7 @@ export interface RuleCardView {
 
 /** Null when the lesson has no such Rule (a card from a stale message). */
 export function ruleCardView(detail: LessonDetail, ruleKey: string, now: number): RuleCardView | null {
+  const keys = detail.lesson.features.flatMap((feature) => feature.rules.map((rule) => rule.key));
   for (const feature of detail.lesson.features) {
     if (!feature.rules.some((rule) => rule.key === ruleKey)) continue;
     const focus = detail.status === "current" ? detail.focus : null;
@@ -107,6 +118,7 @@ export function ruleCardView(detail: LessonDetail, ruleKey: string, now: number)
       featureName: feature.name,
       featureChange: feature.change,
       rule,
+      number: keys.indexOf(ruleKey) + 1,
       passing: counts.passing,
       total: counts.total,
       current: detail.status === "current",

@@ -13,8 +13,8 @@ import {
   fixtureThreads,
 } from "../../shared/fixtures.ts";
 import type { Overview } from "../../shared/rpc.ts";
-import { progressCardView, termView } from "./cards.ts";
-import { completionView, confettiPieces } from "./completion.ts";
+import { CARD_KIT_TONES, progressCardView, termView } from "./cards.ts";
+import { completionView, confettiPieces, doneRibbon, whatsNext } from "./completion.ts";
 import { continueView, doneLessonsLabel, homeDecision } from "./home.ts";
 import { parseRuleTabParams, ruleTabTarget, ruleTabView } from "./rule-tab.ts";
 import { welcomeView } from "./welcome.ts";
@@ -41,6 +41,7 @@ test("a passing Rule card shows the tally, the next Rule and a way into the Rule
   assert.deepEqual(progressCardView(card), {
     kind: "rule-passing",
     tone: "green",
+    kitTone: "forest",
     mark: "✓",
     eyebrow: "Rule passing",
     title: "The factory accepts an assembly line it can run",
@@ -66,6 +67,7 @@ test("a not-yet card finds its Rule from the Example key and drops what did not 
   assert.ok(card !== null);
   const view = progressCardView(card);
   assert.equal(view.tone, "amber");
+  assert.equal(view.kitTone, "coral");
   assert.equal(view.ring, null, "passed > total is not shown");
   assert.equal(view.next, null);
   assert.equal(view.note, "Crashed in the doer loop.");
@@ -82,6 +84,11 @@ test("a lesson-complete card links to the completion page, focus cards are blue"
   assert.deepEqual([view.eyebrow, view.completedLessonId, view.rule], ["Lesson 3 complete", "003", null]);
   const focus = parseProgressCard({ kind: "focus", title: "Refuses an unknown machine" });
   assert.deepEqual(focus === null ? null : [progressCardView(focus).tone, progressCardView(focus).mark], ["blue", "●"]);
+  assert.equal(focus === null ? null : progressCardView(focus).kitTone, "blue");
+});
+
+test("card tones map to the kit's accents in one place", () => {
+  assert.deepEqual(CARD_KIT_TONES, { green: "forest", amber: "coral", blue: "blue" });
 });
 
 test("unusable directives parse to null so the source text shows instead", () => {
@@ -188,6 +195,24 @@ test("the completion page recaps the lesson and introduces the next", () => {
   assert.equal(sameDay.next?.diff, null);
   assert.equal(sameDay.stats.length, 3, "no adoption date, no 'since adopted'");
   assert.equal(completionView({ ...fixtureCompletion, next: null }, NOW).next, null);
+});
+
+test("the lesson-complete ribbon names the lesson and its tally", () => {
+  assert.deepEqual(doneRibbon("001", fixtureCompletion.counts), { kicker: "Lesson 1 done.", line: "All 2 Examples hold." });
+  assert.deepEqual(doneRibbon("001", { ...fixtureCompletion.counts, passing: 1 }), {
+    kicker: "Lesson 1 done.",
+    line: "1 of 2 Examples hold.",
+  });
+  assert.deepEqual(doneRibbon("001", null), { kicker: "Lesson 1 done.", line: null }, "no stats yet: no tally");
+});
+
+test("What's next names the next lesson, or the end of the course", () => {
+  assert.deepEqual(whatsNext(completionView(fixtureCompletion, NOW)), { label: "What's next →", detail: "Lesson 2 · Checking the work" });
+  assert.deepEqual(whatsNext(completionView({ ...fixtureCompletion, next: null }, NOW)), {
+    label: "What's next →",
+    detail: "That was the last lesson",
+  });
+  assert.deepEqual(whatsNext(null), { label: "What's next →", detail: null });
 });
 
 test("once the next lesson has started, the completion page continues it", () => {

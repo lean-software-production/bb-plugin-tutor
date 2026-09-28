@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loopPath, type Point } from "./loop-geometry.ts";
+import { loopPath, sideBySide, type Point } from "./loop-geometry.ts";
 
 type Cubic = [Point, Point, Point, Point];
 
@@ -105,4 +105,11 @@ test("with no room for a loop there is none, rather than one that crosses text",
   assert.equal(loopPath({ x: 150, y: 0 }, { x: 40, y: 0 }, 48), null, "too narrow");
   assert.equal(loopPath({ x: 600, y: 0 }, { x: 70, y: 0 }, 30), null, "too shallow");
   assert.equal(loopPath({ x: 70, y: 0 }, { x: 600, y: 0 }, 48), null, "target on the wrong side");
+});
+
+test("the loop is only drawn when the stats sit to the right of What's next, not wrapped under it", () => {
+  const next = { right: 220 };
+  assert.equal(sideBySide({ left: 260 }, next), true);
+  assert.equal(sideBySide({ left: 20 }, next), false, "wrapped onto the next line");
+  assert.equal(sideBySide({ left: 200 }, next), false, "overlapping");
 });

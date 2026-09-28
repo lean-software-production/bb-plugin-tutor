@@ -80,24 +80,35 @@
   white-space: nowrap;
 }
 
+/* A chip is a small filled wash with the kit's thin line, like a panel (mockup .tp-chip).
+   The wobble is on the line only, so the text stays crisp. */
 .tutor-sk .tp-chip {
-  padding: 5px 9px;
-  border: 1px solid var(--tp-rule);
-  border-radius: 999px;
-  background: var(--tp-page);
-  color: var(--tp-muted);
-  font-size: 0.72rem;
-  font-weight: 650;
+  --tp-chip-line: var(--tp-muted);
+  position: relative;
+  isolation: isolate;
+  display: inline-block;
+  padding: 3px 14px 2px;
+  color: var(--tp-text);
+  font-size: 16px;
+}
+.tutor-sk .tp-chip::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: var(--sk-line-thin) solid var(--tp-chip-line);
+  border-radius: 99px;
+  background: color-mix(in oklab, var(--tp-chip-line) var(--sk-wash-amount), var(--tp-page));
+  content: "";
+  filter: url(#tutor-sk-wobble);
 }
 .tutor-sk .tp-chip--green {
-  border-color: var(--tp-good-line);
-  background: var(--tp-good-wash);
+  --tp-chip-line: var(--tp-good-fill);
   color: var(--tp-good);
 }
-.tutor-sk .tp-chip--amber {
-  border-color: var(--tp-warn-line);
-  background: var(--tp-warn-wash);
-  color: var(--tp-warn);
+.tutor-sk .tp-chip--amber,
+.tutor-sk .tp-chip--new {
+  --tp-chip-line: var(--tp-new-fill);
+  color: var(--tp-new);
 }
 
 /* Example status pill: .tp-st.tp-st--{pending|passing|not-yet|skipped|real}. */

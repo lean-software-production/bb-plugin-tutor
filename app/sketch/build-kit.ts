@@ -197,6 +197,7 @@ export const TOKENS: readonly { comment: string; tokens: readonly [string, strin
       ["--tp-warn-wash", "color-mix(in oklab, var(--sk-rust) var(--sk-wash-amount), var(--sk-page))"],
       ["--tp-warn-line", "color-mix(in oklab, var(--sk-rust) 40%, var(--sk-page))"],
       ["--tp-new", "var(--sk-mustard-text)"],
+      ["--tp-new-fill", "var(--sk-mustard)"],
       ["--tp-bad", "var(--sk-coral-text)"],
       ["--tp-bad-wash", "color-mix(in oklab, var(--sk-coral) var(--sk-wash-amount), var(--sk-page))"],
       ["--tp-bad-line", "color-mix(in oklab, var(--sk-coral) 40%, var(--sk-page))"],

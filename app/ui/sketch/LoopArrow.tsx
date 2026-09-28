@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { loopPath, type Loop } from "../../sketch/loop-geometry.ts";
+import { loopPath, sideBySide, type Loop } from "../../sketch/loop-geometry.ts";
 import { cx } from "../../sketch/tone.ts";
 
 /** Under this width there is no room for the loop without crossing text, so it is not drawn. */
@@ -27,7 +27,8 @@ type LoopArrowProps = {
 
 /**
  * The lesson-complete loop back to "What's next" (app/sketch/loop-geometry.ts).
- * Renders the band it curls in, in flow below the row, and an <svg> drawn at
+ * Renders the band it curls in, in flow below the row (collapsed while no
+ * loop fits), and an <svg> drawn at
  * 1:1 in the measured gap between its two anchors, re-measured whenever
  * either anchor or the band resizes. Decoration only: aria-hidden.
  */
@@ -43,6 +44,7 @@ export function LoopArrow({ from, to, depth = 58, className }: LoopArrowProps) {
       if (origin.width < MIN_WIDTH) return setLoop(null);
       const stats = f.getBoundingClientRect();
       const next = t.getBoundingClientRect();
+      if (!sideBySide(stats, next)) return setLoop(null);
       setLoop(
         loopPath(
           { x: stats.right - FROM_INSET - origin.left, y: stats.bottom + FROM_GAP - origin.top },
@@ -58,7 +60,7 @@ export function LoopArrow({ from, to, depth = 58, className }: LoopArrowProps) {
   }, [from, to, depth]);
 
   return (
-    <div ref={band} className={cx("tp-loop", className)} style={{ height: depth }} aria-hidden="true">
+    <div ref={band} className={cx("tp-loop", className)} style={{ height: loop ? depth : 0 }} aria-hidden="true">
       {loop && (
         <svg
           className="sk-loop tp-loop-svg"

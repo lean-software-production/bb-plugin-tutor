@@ -11,6 +11,8 @@ test("the lesson card lists every Rule by Feature, with live status, and links o
   assert.equal(view.eyebrow, "Lesson 2 · Set after day 2");
   assert.equal(view.title, "Checking the work");
   assert.match(view.tally, /^\d+ of \d+ examples hold$/);
+  assert.equal(view.tally, `${view.passing} of ${view.total} examples hold`);
+  assert.ok(view.total > 0);
   const rules = view.features.flatMap((feature) => feature.rules);
   assert.equal(rules.length, fixtureLessonDetail.lesson.features.flatMap((feature) => feature.rules).length);
   assert.deepEqual(rules.filter((rule) => rule.reached).map((rule) => rule.key), [focus]);
@@ -32,5 +34,7 @@ test("the Rule card draws the Rule's Examples from the live lesson", () => {
   assert.equal(view.rule.examples.length, view.total);
   assert.ok(view.rule.examples.every((example) => example.lines.length > 0));
   assert.equal(view.current, true);
+  const keys = fixtureLessonDetail.lesson.features.flatMap((feature) => feature.rules.map((rule) => rule.key));
+  assert.equal(view.number, keys.indexOf(focus) + 1, "numbered by place in the lesson, across Features");
   assert.equal(ruleCardView(fixtureLessonDetail, "no-such/rule", NOW), null);
 });

@@ -103,3 +103,12 @@ export function loopPath(from: Point, to: Point, floor: number): Loop | null {
   const height = Math.ceil(Math.max(...ys) + PAD) - y;
   return { d, box: { x, y, width, height }, viewBox: `${x} ${y} ${width} ${height}` };
 }
+
+/**
+ * The loop runs from the stats back round to "What's next", so the stats must
+ * sit wholly to its right. When a narrow card wraps the stats under the link,
+ * the loop's rise would cross them: the caller draws nothing.
+ */
+export function sideBySide(stats: { left: number }, next: { right: number }): boolean {
+  return stats.left >= next.right;
+}

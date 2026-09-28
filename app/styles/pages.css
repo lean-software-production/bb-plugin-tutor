@@ -112,7 +112,7 @@
   font-size: 1.4rem;
   font-weight: 800;
 }
-.tutor-sk .tp-stats {
+.tutor-sk .tp-done-panel .tp-stats {
   display: flex;
   flex-wrap: wrap;
   gap: 26px;
@@ -120,7 +120,7 @@
   color: var(--tp-muted);
   font-size: 0.74rem;
 }
-.tutor-sk .tp-stats b {
+.tutor-sk .tp-done-panel .tp-stats b {
   display: block;
   margin-bottom: 3px;
   color: var(--tp-text);
@@ -131,10 +131,10 @@
   padding-top: 16px;
   border-top: 1px solid var(--tp-rule-soft);
 }
-.tutor-sk .tp-next {
+.tutor-sk .tp-next-lesson {
   margin-top: 4rem;
 }
-.tutor-sk .tp-next .tp-h1 {
+.tutor-sk .tp-next-lesson .tp-h1 {
   font-size: 3.2rem;
 }
 .tutor-sk .tp-diff {
