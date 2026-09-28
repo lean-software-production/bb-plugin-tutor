@@ -145,3 +145,44 @@
   --ansi-bg-fg-14: #000000;
   --ansi-bg-fg-15: #000000;
 }
+
+/*
+ * Bigger thread text. Patrick Hand is small for its size, so bb's 13-15px
+ * reads tiny. The thread (timeline and message box) gets bb's text sizes
+ * times --sk-thread-text-scale; the sidebar and header keep bb's.
+ *
+ * These are bb's own values written out: a size can't be defined from
+ * itself. Line heights bb gives as a ratio grow with the text already.
+ */
+[data-thread-window] {
+  --sk-thread-text-scale: 1.5;
+  --text-2xs: calc(0.625rem * var(--sk-thread-text-scale));
+  --text-2xs--line-height: calc(0.875rem * var(--sk-thread-text-scale));
+  --text-xs: calc(0.75rem * var(--sk-thread-text-scale));
+  --text-sm: calc(0.8125rem * var(--sk-thread-text-scale));
+  --text-base: calc(0.9375rem * var(--sk-thread-text-scale));
+  --text-base--line-height: calc(1.375rem * var(--sk-thread-text-scale));
+  --text-lg: calc(1.125rem * var(--sk-thread-text-scale));
+  --text-xl: calc(1.25rem * var(--sk-thread-text-scale));
+  --text-2xl: calc(1.5rem * var(--sk-thread-text-scale));
+}
+
+/* Bullets grow with the text, so the indent that holds them grows too.
+   Otherwise a message bubble cuts the bullets off. */
+[data-thread-window] :is(ul.list-disc, ol.list-decimal, .ProseMirror ul, .ProseMirror ol) {
+  padding-left: calc(1.25rem * var(--sk-thread-text-scale));
+}
+
+/* bb's sizes on a phone, times the same scale */
+@media (width <= 767px) and (pointer: coarse) {
+  [data-thread-window] {
+    --text-2xs: calc(0.6875rem * var(--sk-thread-text-scale));
+    --text-2xs--line-height: calc(0.9375rem * var(--sk-thread-text-scale));
+    --text-xs: calc(0.875rem * var(--sk-thread-text-scale));
+    --text-xs--line-height: calc(1.25rem * var(--sk-thread-text-scale));
+    --text-sm: calc(0.9375rem * var(--sk-thread-text-scale));
+    --text-sm--line-height: calc(1.375rem * var(--sk-thread-text-scale));
+    --text-base: calc(1rem * var(--sk-thread-text-scale));
+    --text-base--line-height: calc(1.5rem * var(--sk-thread-text-scale));
+  }
+}

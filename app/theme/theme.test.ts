@@ -65,16 +65,18 @@ test("the contrast model follows BB's cascade: BB light, BB dark (with .dark), t
 // Light mode only (docs/2026-09-27-sketchbook-brand.md, 2026-09-28). BB puts
 // a `dark` class on <html> when someone picks dark mode; the theme must keep
 // the page paper and ink regardless.
-test("light mode only: the theme's one block also covers .dark, and every BB token resolves the same with .dark", () => {
+test("light mode only: the theme's one colour block also covers .dark, and every BB token resolves the same with .dark", () => {
   const css = renderThemeCss();
   const rules: postcss.Rule[] = [];
   postcss.parse(css).walkRules((rule) => {
     if (rule.parent?.type === "root") rules.push(rule);
   });
-  // One block (the @font-face is an at-rule, not a rule), naming .dark, and no separate .dark block.
+  // One colour block (the @font-face is an at-rule, not a rule), naming .dark,
+  // and no separate .dark block. After it come only the thread-text rules
+  // (D13), which are scoped to BB's thread pane and set no colours.
   assert.deepEqual(
     rules.map((rule) => rule.selectors),
-    [[":root", ".light", ".dark"]],
+    [[":root", ".light", ".dark"], ...THREAD_TEXT_SELECTORS],
   );
   const block = rules[0];
   assert.ok(block);
@@ -118,6 +120,81 @@ test("light mode only: the theme's one block also covers .dark, and every BB tok
   const declared = new Set(block.nodes.flatMap((node) => (node.type === "decl" ? [node.prop] : [])));
   const unpinned = BB_DARK_MODE_CHANGES.filter((name) => !declared.has(name) && !/^--(lightningcss-|diffs-dark)/.test(name));
   assert.deepEqual(unpinned, []);
+});
+
+// Bigger thread text (D13). Patrick Hand is small for its size, so the
+// thread pane gets BB's text sizes times --sk-thread-text-scale. These are
+// bb-app 0.43.4's sizes (app/dist/assets/index-*.css): the Tailwind theme's
+// :root, and the `(width<=767px) and (pointer:coarse)` phone block that
+// overrides some of them. Line heights BB gives as a ratio are left alone:
+// they grow with the text. Re-check on each bb bump.
+const THREAD = "[data-thread-window]";
+const THREAD_LISTS = `${THREAD} :is(ul.list-disc, ol.list-decimal, .ProseMirror ul, .ProseMirror ol)`;
+const THREAD_TEXT_SELECTORS = [[THREAD], [THREAD_LISTS]];
+const THREAD_TEXT_SCALE = "1.5";
+const PHONE = "(width <= 767px) and (pointer: coarse)";
+const BB_TEXT_REM = {
+  desktop: {
+    "--text-2xs": 0.625,
+    "--text-2xs--line-height": 0.875,
+    "--text-xs": 0.75,
+    "--text-sm": 0.8125,
+    "--text-base": 0.9375,
+    "--text-base--line-height": 1.375,
+    "--text-lg": 1.125,
+    "--text-xl": 1.25,
+    "--text-2xl": 1.5,
+  },
+  phone: {
+    "--text-2xs": 0.6875,
+    "--text-2xs--line-height": 0.9375,
+    "--text-xs": 0.875,
+    "--text-xs--line-height": 1.25,
+    "--text-sm": 0.9375,
+    "--text-sm--line-height": 1.375,
+    "--text-base": 1,
+    "--text-base--line-height": 1.5,
+  },
+};
+const scaled = (sizes: Record<string, number>) =>
+  Object.fromEntries(Object.entries(sizes).map(([name, rem]) => [name, `calc(${rem}rem * var(--sk-thread-text-scale))`]));
+const declarations = (rule: postcss.Rule) =>
+  Object.fromEntries(rule.nodes.flatMap((node) => (node.type === "decl" ? [[node.prop, node.value] as const] : [])));
+
+test("thread text is BB's sizes times 1.5, in the thread pane only, on desktop and on phones (D13)", () => {
+  const root = postcss.parse(renderThemeCss());
+  const top = root.nodes.filter((node): node is postcss.Rule => node.type === "rule");
+  const thread = top.find((rule) => rule.selector === THREAD);
+  assert.ok(thread, "a top-level [data-thread-window] rule");
+  assert.deepEqual(declarations(thread), { "--sk-thread-text-scale": THREAD_TEXT_SCALE, ...scaled(BB_TEXT_REM.desktop) });
+  // BB's 13px thread text becomes 19.5px.
+  assert.equal(BB_TEXT_REM.desktop["--text-sm"] * 16 * Number(THREAD_TEXT_SCALE), 19.5);
+
+  // BB's phone sizes, mirrored inside the same media query BB uses.
+  const media = root.nodes.filter((node): node is postcss.AtRule => node.type === "atrule" && node.name === "media");
+  assert.deepEqual(
+    media.map((rule) => rule.params),
+    [PHONE],
+  );
+  const phoneRules = (media[0]?.nodes ?? []).filter((node): node is postcss.Rule => node.type === "rule");
+  assert.deepEqual(
+    phoneRules.map((rule) => rule.selector),
+    [THREAD],
+  );
+  assert.deepEqual(declarations(phoneRules[0] as postcss.Rule), scaled(BB_TEXT_REM.phone));
+
+  // List indents (BB's pl-5) grow by the same scale, so bullets stay inside a message bubble.
+  const lists = top.find((rule) => rule.selector === THREAD_LISTS);
+  assert.ok(lists, "a thread list rule");
+  assert.deepEqual(declarations(lists), { "padding-left": "calc(1.25rem * var(--sk-thread-text-scale))" });
+
+  // The sidebar and header keep BB's sizes: only the thread pane sets --text-*.
+  const outside: string[] = [];
+  root.walkDecls(/^--(text-|sk-thread-text-scale)/, (decl) => {
+    const rule = decl.parent as postcss.Rule;
+    if (rule.selector !== THREAD) outside.push(`${rule.selector} { ${decl.prop} }`);
+  });
+  assert.deepEqual(outside, []);
 });
 
 // Between two near-greys, Chromium's oklch mix loses the hue and renders it as

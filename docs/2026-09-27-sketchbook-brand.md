@@ -218,8 +218,8 @@ expect paper-coloured text on the ink page, every icon and character on a paper 
 
 ## What was built
 
-Plugin 0.3.0 (unreleased) on `tutor/sketchbook`, with the brand pinned at `ef29ca3` (it was
-`2824384` until D12).
+Plugin 0.3.0 (unreleased) on `tutor/sketchbook`, with the brand pinned at `71944a2` (it was
+`2824384` until D12, `ef29ca3` until D13).
 
 **Mockup fixes.** The first mockup had three weak spots, fixed before any plugin code:
 
@@ -269,3 +269,20 @@ of text, and the loop's end within 12px of "What's next".
   - `theme.test.ts` checks that the built theme has that one block and no separate `.dark` one,
     and that every BB grey and role resolves to the same colour with `.dark` as without it. The
     warm-grey tests stay. The mockup and the e2e scripts lost their dark screens.
+- **D13. Bigger thread text (2026-09-28).** Patrick Hand is small for its size, so BB's 13-15px
+  thread text read tiny. The brand theme (brand `71944a2`) now makes the thread 1.5 times bigger.
+  - A second rule on `[data-thread-window]` (BB's thread pane: the timeline and the message box,
+    not the sidebar or the thread's header) sets BB's `--text-*` sizes to BB's own values times
+    `--sk-thread-text-scale: 1.5`. BB's phone sizes (`(width <= 767px) and (pointer: coarse)`)
+    are mirrored the same way. A size can't be defined from itself, so BB's values are written
+    out; line heights BB gives as a ratio grow with the text.
+  - List indents in the thread grow by the same scale. Without that, a user message's bubble cut
+    the bigger bullets off.
+  - 1.5 is the low end of what was asked (150-200%). 1.75 and 2 were tried: both work, but at 2
+    code blocks scroll sideways sooner and BB's fixed-height rows (the tool rows, the project and
+    branch row under the message box) are tight.
+  - No CSS `zoom`: the variables grow the text alone, and the timeline, which measures its rows,
+    scrolls as before. Not scaled: BB's few fixed px sizes, and Tutor's own cards in the thread,
+    which keep their px sizes and now read smaller than the text around them.
+  - `theme.test.ts` allows the thread rules after the one colour block, pins the sizes against
+    BB 0.43.4's, and checks nothing outside the thread pane sets `--text-*`.
