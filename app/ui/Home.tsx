@@ -56,7 +56,7 @@ export function ContinueSection(_props: PluginHomepageSectionProps) {
             <p>
               {view.missing
                 ? "The factory project you chose has gone. Pick it again to carry on."
-                : "Pick the project your factory lives in, and your coach can start."}
+                : "Pick the project your factory lives in. Then your coach can start."}
             </p>
             <Button onClick={() => goCourse({ kind: "welcome" })}>Set up the course →</Button>
           </div>
@@ -111,13 +111,13 @@ export function ContinueSection(_props: PluginHomepageSectionProps) {
             {view.passing}
             <span> / {view.total}</span>
           </div>
-          <span className="tp-hs-unit">examples hold</span>
+          <span className="tp-hs-unit">Examples hold</span>
           {/* The count is in words just above, so the meter's own count is hidden (pages.css). */}
-          <Meter className="tp-hs-meter" value={view.passing} max={view.total} label="Examples that hold" unit="examples hold" />
+          <Meter className="tp-hs-meter" value={view.passing} max={view.total} label="Examples that hold" unit="Examples hold" />
           {view.freshRules === 0 ? null : (
             <div className="tp-hs-now">
               <b>New in this lesson</b>
-              {view.freshRules} {view.freshRules === 1 ? "rule" : "rules"} · {view.freshRulesPassing} done
+              {view.freshRules} {view.freshRules === 1 ? "Rule" : "Rules"} · {view.freshRulesPassing} done
             </div>
           )}
           {view.doneLabel === null ? null : <div className="tp-hs-done">{view.doneLabel}</div>}

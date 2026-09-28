@@ -86,7 +86,7 @@ export function Lesson({ view, openRules, openFeatures, onToggleRule, onToggleFe
             <Fold
               name="Later in this feature"
               file={null}
-              count={plural(view.laterRules.length, "rule")}
+              count={plural(view.laterRules.length, "Rule")}
               open={openFeatures.has(laterFoldId(focusFeature.slug))}
               onToggle={() => onToggleFeature(laterFoldId(focusFeature.slug))}
             >

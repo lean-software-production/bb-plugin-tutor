@@ -120,7 +120,7 @@ function statusOf(input: OutlineInput): OutlineStatus {
     return input.overviewError === null ? { kind: "loading" } : { kind: "error", message: input.overviewError };
   }
   if (overview.course === null) {
-    return { kind: "error", message: overview.courseError ?? "The course could not be loaded." };
+    return { kind: "error", message: overview.courseError ?? "We couldn't load the course." };
   }
   if (overview.factoryProject.status !== "found") {
     return { kind: "unset", missing: overview.factoryProject.status === "missing" };

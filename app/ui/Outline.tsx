@@ -138,7 +138,7 @@ function LessonBranch({ lesson, position, go, onNavigate }: { lesson: LessonNode
         className="tp-lesson-head"
         aria-expanded={open}
         aria-controls={childrenId}
-        aria-label={`${lessonLabel(lesson.id)}, ${lesson.title}, ${lesson.status}, ${lesson.count} examples hold`}
+        aria-label={`${lessonLabel(lesson.id)}, ${lesson.title}, ${lesson.status}, ${lesson.count} Examples hold`}
         onClick={() => setOpen(!open)}
       >
         <StepBadge position={position} label={Number(lesson.id)} className="tp-n" />
@@ -385,7 +385,7 @@ function OtherThreads({
       </div>
       {total === 0 ? (
         <p className="tp-outline-note">
-          {status === "loading" ? "Loading threads…" : status === "error" ? "Threads could not be loaded." : "No other threads."}
+          {status === "loading" ? "Loading threads…" : status === "error" ? "We couldn't load your threads." : "No other threads."}
         </p>
       ) : null}
       {outline.others.map((group) => {

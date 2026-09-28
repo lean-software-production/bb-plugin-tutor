@@ -144,7 +144,7 @@ export function marginNote(example: Example, progress: ProgressMap, now: number)
     return {
       tone: "muted",
       label: "Reworded",
-      text: "The wording changed after your coach marked it, so it is pending again.",
+      text: "The wording changed after your coach checked it, so it's pending again.",
       evidence: null,
     };
   }
@@ -171,7 +171,7 @@ export function marginNote(example: Example, progress: ProgressMap, now: number)
       return { tone: "muted", label: "Skipped", text: entry?.note ?? null, evidence: null };
     case "pending":
       if (example.tags.includes("real-agent")) {
-        return { tone: "purple", label: "@real-agent", text: "Needs a real agent — slow and costs tokens.", evidence: null };
+        return { tone: "purple", label: "@real-agent", text: "This one needs a real agent, which is slow and costs tokens.", evidence: null };
       }
       if (example.change === "new") return { tone: "blue", label: "New", text: "New in this lesson.", evidence: null };
       if (example.change === "reworded") {
@@ -264,11 +264,11 @@ function chips(status: LessonStatus, counts: ExampleCounts, lesson: Lesson): Chi
   if (status === "ahead") {
     const rules = lesson.features.reduce((sum, feature) => sum + feature.rules.length, 0);
     return [
-      { text: `${plural(rules, "rule")} · ${plural(counts.total, "example")}`, tone: "plain" },
+      { text: `${plural(rules, "Rule")} · ${plural(counts.total, "Example")}`, tone: "plain" },
       { text: "Preview", tone: "plain" },
     ];
   }
-  const holding = { text: `${counts.passing} of ${plural(counts.total, "example")} hold`, tone: "plain" } as Chip;
+  const holding = { text: `${counts.passing} of ${plural(counts.total, "Example")} hold`, tone: "plain" } as Chip;
   if (status === "done") return [{ ...holding, tone: "green" }, { text: "Complete ✓", tone: "green" }];
   const result: Chip[] = [{ ...holding, tone: counts.total > 0 && counts.passing === counts.total ? "green" : "plain" }];
   if (counts.fresh > 0) result.push({ text: `${counts.fresh} new or reworded`, tone: "amber" });

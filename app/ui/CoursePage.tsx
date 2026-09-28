@@ -57,12 +57,12 @@ function CourseHome() {
     return (
       <SketchPage>
         <p className="tp-eyebrow">Tutor</p>
-        <h1 className="sk-title tp-page-title">The course could not be loaded</h1>
+        <h1 className="sk-title tp-page-title">We couldn't load the course</h1>
         <ErrorNotice message={decision.message} />
         <p className="tp-prose">
-          Tutor reads the course from the <code>coursePath</code> setting, then <code>TUTOR_COURSE_PATH</code>, then the
-          tutor feature's config, then <code>/workspaces/tutorial</code>. Check that the course is checked out there, or set
-          the path under Settings → Plugins → Tutor.
+          Check that the course is checked out, or set its path under Settings → Plugins → Tutor. Tutor looks in the{" "}
+          <code>coursePath</code> setting first, then <code>TUTOR_COURSE_PATH</code>, then the tutor feature's config,
+          then <code>/workspaces/tutorial</code>.
         </p>
       </SketchPage>
     );

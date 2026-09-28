@@ -44,8 +44,8 @@ export function completionView(completion: Completion, now: number): CompletionV
   const { lesson, counts, next } = completion;
   const since = daysSince(completion.adoptedAt, now);
   const stats: Stat[] = [
-    { value: `${counts.passing}/${counts.total}`, label: "examples hold" },
-    { value: String(completion.freshRules), label: completion.freshRules === 1 ? "new or reworded rule" : "new or reworded rules" },
+    { value: `${counts.passing}/${counts.total}`, label: "Examples hold" },
+    { value: String(completion.freshRules), label: completion.freshRules === 1 ? "new or reworded Rule" : "new or reworded Rules" },
     { value: String(completion.sideChats), label: completion.sideChats === 1 ? "side chat" : "side chats" },
   ];
   if (since !== null) stats.push({ value: since, label: since === "today" ? "adopted" : "since adopted" });
@@ -63,8 +63,8 @@ export function completionView(completion: Completion, now: number): CompletionV
             title: next.title,
             dek: next.dek,
             chips: [
-              { text: `${plural(next.rules, "rule")} · ${plural(next.examples, "example")}`, tone: "plain" },
-              ...(next.carryOver > 0 ? [{ text: `${next.carryOver} carry over as passing`, tone: "green" as const }] : []),
+              { text: `${plural(next.rules, "Rule")} · ${plural(next.examples, "Example")}`, tone: "plain" },
+              ...(next.carryOver > 0 ? [{ text: `${next.carryOver} already passing`, tone: "green" as const }] : []),
               ...(next.fresh > 0 ? [{ text: `${next.fresh} new or reworded`, tone: "amber" as const }] : []),
             ],
             diff:

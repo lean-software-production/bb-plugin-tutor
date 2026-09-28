@@ -123,6 +123,10 @@ test("the course root sends the student where they are", () => {
     kind: "error",
     message: "No course.yaml or ledger.",
   });
+  assert.deepEqual(homeDecision({ ...fixtureOverview, course: null, courseError: null }), {
+    kind: "error",
+    message: "We couldn't load the course.",
+  });
   assert.deepEqual(homeDecision({ ...fixtureOverview, current: null }), {
     kind: "redirect",
     route: { kind: "start", lessonId: "000" },
@@ -165,16 +169,16 @@ test("the completion page recaps the lesson and introduces the next", () => {
   const view = completionView(fixtureCompletion, NOW);
   assert.equal(view.eyebrow, "Lesson 1 complete");
   assert.deepEqual(view.stats, [
-    { value: "2/2", label: "examples hold" },
-    { value: "1", label: "new or reworded rule" },
+    { value: "2/2", label: "Examples hold" },
+    { value: "1", label: "new or reworded Rule" },
     { value: "0", label: "side chats" },
     { value: "3 days", label: "since adopted" },
   ]);
   assert.equal(view.summary, fixtureCompletion.summary);
   assert.equal(view.next?.eyebrow, "Lesson 2 · Set after day 2");
   assert.deepEqual(view.next?.chips, [
-    { text: "3 rules · 5 examples", tone: "plain" },
-    { text: "1 carry over as passing", tone: "green" },
+    { text: "3 Rules · 5 Examples", tone: "plain" },
+    { text: "1 already passing", tone: "green" },
     { text: "4 new or reworded", tone: "amber" },
   ]);
   assert.equal(view.next?.diff?.title, "FACTORY.md — what changed since lesson 1");

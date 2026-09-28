@@ -10,8 +10,8 @@ test("the lesson card lists every Rule by Feature, with live status, and links o
   const view = lessonCardView(fixtureLessonDetail);
   assert.equal(view.eyebrow, "Lesson 2 · Set after day 2");
   assert.equal(view.title, "Checking the work");
-  assert.match(view.tally, /^\d+ of \d+ examples hold$/);
-  assert.equal(view.tally, `${view.passing} of ${view.total} examples hold`);
+  assert.match(view.tally, /^\d+ of \d+ Examples hold$/);
+  assert.equal(view.tally, `${view.passing} of ${view.total} Examples hold`);
   assert.ok(view.total > 0);
   const rules = view.features.flatMap((feature) => feature.rules);
   assert.equal(rules.length, fixtureLessonDetail.lesson.features.flatMap((feature) => feature.rules).length);

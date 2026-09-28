@@ -21,7 +21,7 @@ export function RuleTab({ threadId, params }: PluginThreadPanelProps) {
   const openRule = useOpenRule();
   const redirect = useAction(async (lessonId: string, ruleKey: string) => {
     await rpc.call("redirectFocus", { lessonId, ruleKey });
-    toast.success("Asked your coach to move to this Rule.");
+    toast.success("We've asked your coach to work on this Rule next.");
   });
   const context = useQuery(QUERY_KEYS.threadContext(threadId), () => rpc.call("getThreadContext", { threadId }));
   const thread = context.data?.thread ?? null;
@@ -66,7 +66,7 @@ export function RuleTab({ threadId, params }: PluginThreadPanelProps) {
           value={view.passing}
           max={view.total}
           label="Examples that hold"
-          unit={view.total === 1 ? "example holds" : "examples hold"}
+          unit={view.total === 1 ? "Example holds" : "Examples hold"}
         />
         <Panel tone={stepTone(view.number - 1)} className="tp-now">
           <p className="tp-eyebrow">{view.examples.length === 1 ? "Example" : "Examples"}</p>

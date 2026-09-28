@@ -8,7 +8,7 @@ export type HomeDecision = { kind: "error"; message: string } | { kind: "redirec
 
 export function homeDecision(overview: Overview): HomeDecision {
   if (overview.course === null) {
-    return { kind: "error", message: overview.courseError ?? "The course could not be loaded." };
+    return { kind: "error", message: overview.courseError ?? "We couldn't load the course." };
   }
   if (overview.factoryProject.status !== "found") return { kind: "redirect", route: { kind: "welcome" } };
   const current = overview.current;
@@ -61,7 +61,7 @@ export function doneLessonsLabel(ids: readonly string[]): string | null {
 
 export function continueView(overview: Overview): ContinueView {
   if (overview.course === null) {
-    return { kind: "error", message: overview.courseError ?? "The course could not be loaded." };
+    return { kind: "error", message: overview.courseError ?? "We couldn't load the course." };
   }
   const current = overview.current;
   if (overview.factoryProject.status !== "found" || current === null) {

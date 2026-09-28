@@ -22,7 +22,7 @@ const DEEP_TEAL = brandColour("deep-teal"); // --primary in light mode
 // The feature's default disablePlugins list (devcontainer-features src/tutor/devcontainer-feature.json).
 const DISABLE = "automations,workflows,tasks,scheduled-send,github,browser-automation,agent-annotations,connect,plugin-api-docs,plugin-api-tester,theme-preview,keep-awake,account-pool,environment-modal-sandbox".split(",");
 const REENABLE = "automations";
-const LOST = "Lost the connection to your Codespace";
+const LOST = "We lost the connection to your Codespace";
 
 function check(cond, what, detail = "") {
   if (!cond) throw new Error(`CHECK FAILED: ${what}${detail ? ` — ${detail}` : ""}`);

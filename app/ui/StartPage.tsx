@@ -141,7 +141,7 @@ function StartPageBody({
           value={view.counts.passing}
           max={view.counts.total}
           label="Examples that hold"
-          unit={view.counts.total === 1 ? "example holds" : "examples hold"}
+          unit={view.counts.total === 1 ? "Example holds" : "Examples hold"}
         />
       </header>
       <div className="tp-lt-body">
@@ -224,7 +224,7 @@ function StartCoach({
         <div className="tp-start">
           <p className="tp-prose">
             {start === "start"
-              ? "Your coach works through this lesson with you, one Rule at a time, in your factory repo. The conversation opens in its own thread, led by this lesson."
+              ? "Your coach works through this lesson with you, one Rule at a time, in your factory repo. The conversation opens in its own thread, with this lesson at the top."
               : "You finished this lesson. Open a coach thread to look back at how it went."}
           </p>
           <Button disabled={pending} onClick={onStart}>

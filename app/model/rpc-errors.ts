@@ -10,7 +10,7 @@
 // has lost BB, and the student can only reload.
 
 export const CONNECTION_LOST_MESSAGE =
-  "Lost the connection to your Codespace — it may have stopped after being idle. Reload this page (and restart the Codespace if needed).";
+  "We lost the connection to your Codespace. It may have stopped after sitting idle. Reload this page, and restart the Codespace if it has stopped.";
 
 export class ConnectionLostError extends Error {
   readonly kind = "connection-lost";

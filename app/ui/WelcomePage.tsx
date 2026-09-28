@@ -10,7 +10,7 @@ import { ErrorNotice, Loading, Notice, SketchPage } from "./common.tsx";
 import { Button, Character, Highlight, Panel, Tick } from "./sketch/index.ts";
 
 const COURSE_METHOD =
-  "Each lesson is a spec written in Gherkin; your coach works through it with you, one rule at a time, in the repo where your factory lives.";
+  "Each lesson is a spec: a plain description of what your factory should do next. Your coach works through it with you, one Rule at a time, in the repo where your factory lives.";
 
 export function WelcomePage() {
   const rpc = useTutorRpc();
@@ -77,12 +77,12 @@ function Picker({
   return (
     <>
       {view.missingProjectId === null ? null : (
-        <Notice>The factory project you chose before has gone, or has no local checkout. Pick it again or choose another.</Notice>
+        <Notice>We can't find the factory project you chose before, or it isn't checked out here. Pick it again, or choose another.</Notice>
       )}
       <p className="tp-dek">
         {view.mode === "confirm"
           ? `${description === null ? "" : `${description} `}${COURSE_METHOD}`
-          : "Your coach needs a factory repo to work in, and none of this codespace's projects has one yet."}
+          : "Your coach needs a factory repo to work in. None of the projects in this Codespace has one yet."}
       </p>
       {view.mode === "setup" ? (
         <Panel dashed wash={false} className="tp-howto">

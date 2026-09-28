@@ -33,7 +33,7 @@ export interface LessonCardView {
   eyebrow: string;
   title: string;
   dek: string;
-  /** "3 of 9 examples hold". */
+  /** "3 of 9 Examples hold". */
   tally: string;
   percent: number;
   /** The tally's numbers, for the meter, and the words after them. */
@@ -49,7 +49,7 @@ export function lessonCardView(detail: LessonDetail): LessonCardView {
   const counts = countExamples(lessonExamples(lesson), progress);
   const focus = detail.status === "current" ? detail.focus : null;
   const reached = new Set(detail.reachedRules);
-  const tallyUnit = counts.total === 1 ? "example holds" : "examples hold";
+  const tallyUnit = counts.total === 1 ? "Example holds" : "Examples hold";
   return {
     lessonId: lesson.id,
     eyebrow: lessonEyebrow(lesson.id, lesson.set),
