@@ -10,7 +10,7 @@ function faces(css: string): string[] {
   return css.split("@font-face").slice(1);
 }
 
-test("fonts.css is up to date with the .woff2 files (npm run fonts)", () => {
+test("fonts.css is up to date with the .woff2 files (npm run build:assets)", () => {
   assert.equal(readFileSync(FONTS_CSS, "utf8"), renderFontsCss());
 });
 

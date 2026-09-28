@@ -25,10 +25,11 @@
       {
         "id": "paper",
         "name": "Tutor paper",
-        "description": "The course workbook's paper, ink and blue, with Archivo type.",
-        "css": "./themes/paper.css",
+        "description": "The Sketchbook brand: cream paper, ink, deep teal and handwriting.",
+        "css": "./themes/sketchbook.css",
         "codeTheme": {
-          "light": "./themes/paper-code.json"
+          "light": "./themes/sketchbook-code-light.json",
+          "dark": "./themes/sketchbook-code-dark.json"
         }
       }
     ]
@@ -38,7 +39,8 @@
     "test": "node --experimental-strip-types --no-warnings=ExperimentalWarning --test \"shared/**/*.test.ts\" \"server/**/*.test.ts\" \"app/**/*.test.ts\" \"test/**/*.test.ts\" \"scripts/*.test.ts\"",
     "build": "bb plugin build .",
     "sync-brand": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/sync-brand.ts",
-    "fonts": "node --experimental-strip-types --no-warnings=ExperimentalWarning app/fonts/embed.ts && node --experimental-strip-types --no-warnings=ExperimentalWarning app/theme/build.ts"
+    "build:assets": "node --experimental-strip-types --no-warnings=ExperimentalWarning app/fonts/embed.ts && node --experimental-strip-types --no-warnings=ExperimentalWarning app/theme/build.ts",
+    "fonts": "npm run build:assets"
   },
   "dependencies": {
     "@cucumber/gherkin": "^42.0.1",

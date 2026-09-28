@@ -1,6 +1,6 @@
 // Generates fonts.css: the @font-face rules with the woff2 files inlined as
 // data URLs, because `bb plugin build` has no loader for font files.
-// Regenerate after changing a font: npm run fonts
+// Regenerate after changing a font: npm run build:assets
 //
 // The three Sketchbook families (kit/tokens.json `font`), each a Fontsource
 // 5.3.0 Latin 400 file. They are registered as "Tutor …" so they can never

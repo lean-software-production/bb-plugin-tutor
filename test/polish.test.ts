@@ -61,7 +61,7 @@ test("the manifest contributes the paper theme with a light code theme", async (
   const theme = manifest.bb.themes?.find((entry) => entry.id === THEME_ID);
   assert.ok(theme, "bb.themes has the paper theme");
   assert.equal(theme.name, "Tutor paper");
-  assert.equal(theme.css, "./themes/paper.css");
+  assert.equal(theme.css, "./themes/sketchbook.css");
   assert.equal(typeof theme.codeTheme?.light, "string");
   await stat(new URL(`../${theme.css}`, import.meta.url));
 });
