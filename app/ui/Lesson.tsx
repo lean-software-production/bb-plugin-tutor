@@ -1,15 +1,18 @@
-// The paper lesson on a lesson's start page (mockup 2A) with Examples as
-// annotated Gherkin (mockup 6B). Pure presentation over LessonView; the page
-// owns data and open/closed state.
+// The lesson on a lesson's start page (Sketchbook mockup "outline"), with
+// Examples as annotated Gherkin. The title sits on the highlighter, each
+// feature is a kit section heading, an open Rule is a panel in its step colour
+// (dashed while it is the focus) and a closed Rule is a numbered row. Pure
+// presentation over LessonView; the page owns data and open/closed state.
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { clipLines, plural } from "../model/format.ts";
 import { laterFoldId } from "../model/lesson.ts";
 import type { ExampleView, FeatureView, LessonView, MarginNote, RuleView } from "../model/lesson.ts";
+import { stepTone } from "../sketch/step-colour.ts";
 import { Chips, GherkinLines, GherkinRow, InlineText, ChangeBadge } from "./common.tsx";
+import { Highlight, Panel, StepBadge, Tick } from "./sketch/index.ts";
 
 const GUTTER_GLYPHS = { passing: "✓", "not-yet": "!", pending: "○", skipped: "–" } as const;
-const RULE_GLYPHS = { passing: "✓", "not-yet": "!", pending: "○" } as const;
 const EVIDENCE_LINES = 4;
 
 export interface LessonProps {
@@ -32,7 +35,9 @@ export function Lesson({ view, openRules, openFeatures, onToggleRule, onToggleFe
     <article className="tp-lesson" aria-label={view.barTitle}>
       {banner}
       <p className="tp-eyebrow">{view.eyebrow}</p>
-      <h1 className="tp-h1">{view.title}</h1>
+      <h1 className="sk-title tp-page-title tp-lesson-title">
+        <Highlight>{view.title}</Highlight>
+      </h1>
       {view.dek === "" ? null : (
         <p className="tp-dek">
           <InlineText text={view.dek} />
@@ -81,7 +86,7 @@ export function Lesson({ view, openRules, openFeatures, onToggleRule, onToggleFe
             <Fold
               name="Later in this feature"
               file={null}
-              count={plural(view.laterRules.length, "rule")}
+              count={plural(view.laterRules.length, "Rule")}
               open={openFeatures.has(laterFoldId(focusFeature.slug))}
               onToggle={() => onToggleFeature(laterFoldId(focusFeature.slug))}
             >
@@ -110,7 +115,7 @@ function FeatureSection({ feature, focusLabel, children }: { feature: FeatureVie
           <ChangeBadge change={feature.change} mixedLabel="changed" />
         </p>
         <div className="tp-row">
-          <h2 className="tp-h2">{feature.name}</h2>
+          <h2 className="sk-section tp-feature-name">{feature.name}</h2>
           <span className="tp-cnt">{feature.count}</span>
         </div>
         {focusLabel === null || feature.description === "" ? null : (
@@ -191,13 +196,18 @@ function RuleList({
             aria-expanded={false}
             onClick={() => onToggleRule(rule.key)}
           >
-            <span className={`tp-g tp-g--${rule.status}`} aria-hidden>
-              {RULE_GLYPHS[rule.status]}
-            </span>
+            <StepBadge position={rule.number - 1} label={rule.number} className="tp-n" />
             <span className="tp-rule-name">
               {rule.name}
               <ChangeBadge change={rule.change} />
             </span>
+            {rule.status === "passing" ? (
+              <Tick label="passed" className="tp-g" />
+            ) : rule.status === "not-yet" ? (
+              <span className="tp-g tp-g--not-yet" role="img" aria-label="not yet">
+                !
+              </span>
+            ) : null}
             <span className="tp-x">{rule.summary}</span>
           </button>
         ),
@@ -216,8 +226,15 @@ function RuleOpen({
   onCollapse: (() => void) | null;
 }) {
   return (
-    <section className={rule.isFocus ? "tp-rule tp-rule--focus" : "tp-rule"} data-rule-key={rule.key} aria-label={`Rule ${rule.name}`}>
-      <p className="tp-section-label">
+    <Panel
+      as="section"
+      tone={stepTone(rule.number - 1)}
+      dashed={rule.isFocus}
+      className={rule.isFocus ? "tp-rule tp-rule--focus" : "tp-rule"}
+      data-rule-key={rule.key}
+      aria-label={`Rule ${rule.name}`}
+    >
+      <p className="tp-eyebrow tp-rule-label">
         {label}
         <ChangeBadge change={rule.change} />
         {onCollapse === null ? null : (
@@ -226,7 +243,10 @@ function RuleOpen({
           </button>
         )}
       </p>
-      <h2 className="tp-h2">{rule.name}</h2>
+      <h2 className="sk-step tp-rulehead">
+        <StepBadge position={rule.number - 1} label={rule.number} />
+        <span className="sk-label tp-tt">{rule.name}</span>
+      </h2>
       {rule.description === "" ? null : (
         <p className="tp-prose">
           <InlineText text={rule.description} />
@@ -237,7 +257,7 @@ function RuleOpen({
           <AnnotatedExample key={example.key} example={example} />
         ))}
       </div>
-    </section>
+    </Panel>
   );
 }
 

@@ -1,5 +1,10 @@
 # Tutor: a BB plugin for coached, Gherkin-driven courses
 
+> **The look has changed.** Tutor is now drawn in the Sketchbook brand, not the workbook look
+> (grid paper, Spectral, Archivo) this doc and [`mockups.html`](mockups.html) describe. See
+> [`2026-09-27-sketchbook-brand.md`](2026-09-27-sketchbook-brand.md) and
+> [`mockups-sketchbook/`](mockups-sketchbook/index.html). The behaviour described here still holds.
+
 Status: **built** (MVP on `tutor/mvp`). [`CHANGELOG-from-design.md`](CHANGELOG-from-design.md)
 logs every change since this design was approved, newest first; the "One tree (2026-09-25)" entry
 revises the sidebar, the lesson page (now the start page) and side threads (now side chats) described
@@ -188,7 +193,7 @@ authorisation. Tools re-derive everything from the repo.
 | An optional Rule tab in the right panel | `threadPanelAction` | 2C, 4 |
 | Progress cards and lexicon pop-ups inside chat | `messageDirective` (`::tutor-progress`, `::term`) | 3A |
 | "Continue" section on BB's home page | `homepageSection` | 5 |
-| Between lessons: summary, confetti, `FACTORY.md` diff, "Start lesson N" | `navPanel` | 7 |
+| Between lessons: summary, the lesson-complete ribbon, `FACTORY.md` diff, "Start lesson N" | `navPanel` | 7 |
 | First run: confirm the detected factory project, or the fallback picker | `navPanel` and a `project` setting | 8 |
 
 Paper CSS is scoped to plugin-owned elements. In `mockups.html`, turn on **Show BB / plugin

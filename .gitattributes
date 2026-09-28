@@ -3,3 +3,10 @@
 /.github/ export-ignore
 /docs/ export-ignore
 /scripts/ export-ignore
+# The vendored brand only feeds generated, committed files (themes/, app/fonts/),
+# so nothing in the plugin reads it at run time.
+/vendor/ export-ignore
+
+# The brand repo's files, vendored byte for byte (scripts/sync-brand.ts --check
+# compares bytes), so git never rewrites their line endings.
+/vendor/brand/** -text

@@ -1,0 +1,188 @@
+@import url("https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap");
+
+/*
+ * Sketchbook: a bb app theme for the Lean Software Production brand.
+ * Warm cream paper, ink text, the teal accent and the highlighter swash.
+ *
+ * Colours come only from kit/tokens.json. Where a palette colour is too
+ * faint to read as text, it's mixed with ink using color-mix, never
+ * swapped for a new hue.
+ *
+ * The brand is light mode only (README.md). bb puts a `dark` class on
+ * <html> when someone picks dark mode, so this block covers .dark too
+ * and the page stays paper with ink text.
+ *
+ * Install: copy this folder to `bb theme dir`, then `bb theme set sketchbook`.
+ */
+
+:root,
+.light,
+.dark {
+  color-scheme: light;
+
+  /* Brand palette (kit/tokens.json) */
+  --sk-mustard: #eea306;
+  --sk-teal: #039695;
+  --sk-forest: #4a7d4b;
+  --sk-coral: #f76c37;
+  --sk-blue: #1f78a8;
+  --sk-rust: #d6631c;
+  --sk-deep-teal: #094854;
+  --sk-highlighter: #ffeeb8;
+  --sk-paper: #fcf9f3;
+  --sk-ink: #2a2724;
+
+  /* Anchors: cream paper and warm ink */
+  --canvas: var(--sk-paper);
+  --ink: var(--sk-ink);
+
+  /* Accent: deep teal, with paper text on it */
+  --primary: var(--sk-deep-teal);
+  --primary-foreground: var(--sk-paper);
+
+  /* Selected rows get the highlighter swash */
+  --surface-selected: var(--sk-highlighter);
+  --surface-selected-border: var(--sk-mustard);
+
+  /* Quieter text, still at least 4.5:1 on the canvas and on bb's sidebar */
+  --muted-foreground: color-mix(in oklab, var(--ink) 70%, var(--canvas));
+  --subtle-foreground: color-mix(in oklab, var(--ink) 62%, var(--canvas));
+  --readback-foreground: color-mix(in oklab, var(--ink) 64%, var(--canvas));
+
+  /* bb's greys, at bb's own mixes. bb mixes them in oklch, and between two
+     near-greys Chrome loses the hue and they turn pink. oklab keeps them
+     warm at the same lightness. */
+  --sidebar: color-mix(in oklab, var(--ink) 2.2%, var(--canvas));
+  --sidebar-accent: color-mix(in oklab, var(--ink) 8%, var(--canvas));
+  --sidebar-border: color-mix(in oklab, var(--ink) 14%, var(--canvas));
+  --secondary: color-mix(in oklab, var(--ink) 8%, var(--canvas));
+  --accent: color-mix(in oklab, var(--ink) 8%, var(--canvas));
+  --muted: color-mix(in oklab, var(--ink) 11%, var(--canvas));
+  --border: color-mix(in oklab, var(--ink) 14%, var(--canvas));
+  --border-hairline: color-mix(in oklab, var(--ink) 14.7%, var(--canvas));
+  --border-seam: color-mix(in oklab, var(--ink) 9.5%, var(--canvas));
+  --input: color-mix(in oklab, var(--ink) 29.5%, var(--canvas));
+  --pill-surface: linear-gradient(to bottom, color-mix(in oklab, var(--ink) 4.4%, var(--canvas)), color-mix(in oklab, var(--ink) 4.7%, var(--canvas)));
+  --pill-surface-selected: linear-gradient(to bottom, color-mix(in oklab, var(--ink) 11.8%, var(--canvas)), color-mix(in oklab, var(--ink) 13%, var(--canvas)));
+  --pill-surface-selected-border: color-mix(in oklab, var(--ink) 19.2%, var(--canvas));
+  --surface-recessed-soft-solid: color-mix(in oklab, var(--ink) 4.2%, var(--canvas));
+  --version-upgrade: color-mix(in oklab, var(--ink) 96%, var(--canvas));
+
+  /* bb's dark mode changes these too. Pin them to bb's light values. */
+  --state-hover: color-mix(in oklab, var(--ink) 5.9%, transparent);
+  --state-active: color-mix(in oklab, var(--ink) 11.8%, transparent);
+  --surface-destructive: color-mix(in oklab, var(--destructive) 6%, transparent);
+  --surface-destructive-border: color-mix(in oklab, var(--destructive) 25%, transparent);
+  --surface-attention: color-mix(in oklab, var(--attention) 14%, transparent);
+  --sidebar-search-match: color-mix(in oklab, oklch(0.8 0.13 88), var(--canvas) 76%);
+  --sidebar-search-match-border: color-mix(in oklab, oklch(0.8 0.13 88), var(--canvas) 60%);
+  --pill-shadow: 0 1px 1px 0 oklch(0.2 0 0 / 0.02);
+  --shadow-opacity: 0.15;
+  --shadow-color: hsl(0 0% 20% / 0.1);
+  --shadow-2xs: 0px 2px 0px 0px hsl(0 0% 20% / 0.07);
+  --shadow-xs: 0px 2px 0px 0px hsl(0 0% 20% / 0.07);
+  --shadow-sm: 0px 2px 0px 0px hsl(0 0% 20% / 0.15), 0px 1px 2px -1px hsl(0 0% 20% / 0.15);
+  --shadow: 0px 2px 0px 0px hsl(0 0% 20% / 0.15), 0px 1px 2px -1px hsl(0 0% 20% / 0.15);
+  --shadow-md: 0px 2px 0px 0px hsl(0 0% 20% / 0.15), 0px 2px 4px -1px hsl(0 0% 20% / 0.15);
+  --shadow-lift: 0px -4px 12px -4px hsl(0 0% 20% / 0.07);
+  --shadow-lg: 0px 2px 0px 0px hsl(0 0% 20% / 0.15), 0px 4px 6px -1px hsl(0 0% 20% / 0.15);
+  --shadow-xl: 0px 2px 0px 0px hsl(0 0% 20% / 0.15), 0px 8px 10px -1px hsl(0 0% 20% / 0.15);
+  --shadow-2xl: 0px 2px 0px 0px hsl(0 0% 20% / 0.38);
+
+  /* Teal darkened just enough to read as file-path text */
+  --timeline-accent: color-mix(in oklch, var(--sk-teal) 80%, var(--sk-ink));
+  --file-accent: var(--timeline-accent);
+
+  --destructive: color-mix(in oklch, var(--sk-rust) 75%, var(--sk-ink));
+  --destructive-foreground: var(--sk-paper);
+  --destructive-text: var(--destructive);
+  --warning: var(--sk-mustard);
+  --warning-text: color-mix(in oklch, var(--sk-mustard) 55%, var(--sk-ink));
+  --attention: var(--sk-mustard);
+  --success: var(--sk-forest);
+  --diff-added: var(--sk-forest);
+  --diff-removed: var(--destructive);
+  /* --pr-merged keeps bb's purple: the brand has none, and merged means purple. */
+  --pr-merged: oklch(0.53 0.2 295);
+  --brand-discord: oklch(0.5774 0.2091 273.85);
+
+  /* Body text in the brand's handwriting; code stays monospaced */
+  --font-sans: "Patrick Hand", "Comic Sans MS", "Inter Variable", Inter, sans-serif;
+
+  /* Terminal: 0–8 are the palette (8 is ink and paper half-and-half);
+     9–14 are the same colours 70% + 30% paper. */
+  --ansi-0: #2a2724;
+  --ansi-1: #d6631c;
+  --ansi-2: #4a7d4b;
+  --ansi-3: #eea306;
+  --ansi-4: #1f78a8;
+  --ansi-5: #f76c37;
+  --ansi-6: #039695;
+  --ansi-7: #faeed3;
+  --ansi-8: #8c8884;
+  --ansi-9: #e69268;
+  --ansi-10: #7ca27c;
+  --ansi-11: #f4be6f;
+  --ansi-12: #679ec3;
+  --ansi-13: #fe9976;
+  --ansi-14: #69b4b3;
+  --ansi-15: #fcf9f3;
+  /* Readable text drawn on each ANSI background (black/white by contrast). */
+  --ansi-bg-fg-0: #ffffff;
+  --ansi-bg-fg-1: #000000;
+  --ansi-bg-fg-2: #ffffff;
+  --ansi-bg-fg-3: #000000;
+  --ansi-bg-fg-4: #ffffff;
+  --ansi-bg-fg-5: #000000;
+  --ansi-bg-fg-6: #000000;
+  --ansi-bg-fg-7: #000000;
+  --ansi-bg-fg-8: #000000;
+  --ansi-bg-fg-9: #000000;
+  --ansi-bg-fg-10: #000000;
+  --ansi-bg-fg-11: #000000;
+  --ansi-bg-fg-12: #000000;
+  --ansi-bg-fg-13: #000000;
+  --ansi-bg-fg-14: #000000;
+  --ansi-bg-fg-15: #000000;
+}
+
+/*
+ * Bigger thread text. Patrick Hand is small for its size, so bb's 13-15px
+ * reads tiny. The thread (timeline and message box) gets bb's text sizes
+ * times --sk-thread-text-scale; the sidebar and header keep bb's.
+ *
+ * These are bb's own values written out: a size can't be defined from
+ * itself. Line heights bb gives as a ratio grow with the text already.
+ */
+[data-thread-window] {
+  --sk-thread-text-scale: 1.5;
+  --text-2xs: calc(0.625rem * var(--sk-thread-text-scale));
+  --text-2xs--line-height: calc(0.875rem * var(--sk-thread-text-scale));
+  --text-xs: calc(0.75rem * var(--sk-thread-text-scale));
+  --text-sm: calc(0.8125rem * var(--sk-thread-text-scale));
+  --text-base: calc(0.9375rem * var(--sk-thread-text-scale));
+  --text-base--line-height: calc(1.375rem * var(--sk-thread-text-scale));
+  --text-lg: calc(1.125rem * var(--sk-thread-text-scale));
+  --text-xl: calc(1.25rem * var(--sk-thread-text-scale));
+  --text-2xl: calc(1.5rem * var(--sk-thread-text-scale));
+}
+
+/* Bullets grow with the text, so the indent that holds them grows too.
+   Otherwise a message bubble cuts the bullets off. */
+[data-thread-window] :is(ul.list-disc, ol.list-decimal, .ProseMirror ul, .ProseMirror ol) {
+  padding-left: calc(1.25rem * var(--sk-thread-text-scale));
+}
+
+/* bb's sizes on a phone, times the same scale */
+@media (width <= 767px) and (pointer: coarse) {
+  [data-thread-window] {
+    --text-2xs: calc(0.6875rem * var(--sk-thread-text-scale));
+    --text-2xs--line-height: calc(0.9375rem * var(--sk-thread-text-scale));
+    --text-xs: calc(0.875rem * var(--sk-thread-text-scale));
+    --text-xs--line-height: calc(1.25rem * var(--sk-thread-text-scale));
+    --text-sm: calc(0.9375rem * var(--sk-thread-text-scale));
+    --text-sm--line-height: calc(1.375rem * var(--sk-thread-text-scale));
+    --text-base: calc(1rem * var(--sk-thread-text-scale));
+    --text-base--line-height: calc(1.5rem * var(--sk-thread-text-scale));
+  }
+}

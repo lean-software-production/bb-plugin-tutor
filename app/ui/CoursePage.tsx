@@ -9,7 +9,7 @@ import { useCourseNavigate, useLiveRefresh, useOverview } from "../hooks.ts";
 import { parseCoursePath } from "../model/course-route.ts";
 import { homeDecision } from "../model/home.ts";
 import { routeStore } from "../state/app-state.ts";
-import { ErrorNotice, Loading, PaperPage } from "./common.tsx";
+import { ErrorNotice, Loading, SketchPage } from "./common.tsx";
 import { CompletionPage } from "./CompletionPage.tsx";
 import { StartPage } from "./StartPage.tsx";
 import { WelcomePage } from "./WelcomePage.tsx";
@@ -48,28 +48,28 @@ function CourseHome() {
 
   if (overview.status === "error" && overview.data === null) {
     return (
-      <PaperPage>
+      <SketchPage>
         <ErrorNotice message={overview.error} />
-      </PaperPage>
+      </SketchPage>
     );
   }
   if (decision?.kind === "error") {
     return (
-      <PaperPage>
+      <SketchPage>
         <p className="tp-eyebrow">Tutor</p>
-        <h1 className="tp-h1">The course could not be loaded</h1>
+        <h1 className="sk-title tp-page-title">We couldn't load the course</h1>
         <ErrorNotice message={decision.message} />
         <p className="tp-prose">
-          Tutor reads the course from the <code>coursePath</code> setting, then <code>TUTOR_COURSE_PATH</code>, then the
-          tutor feature's config, then <code>/workspaces/tutorial</code>. Check that the course is checked out there, or set
-          the path under Settings → Plugins → Tutor.
+          Check that the course is checked out, or set its path under Settings → Plugins → Tutor. Tutor looks in the{" "}
+          <code>coursePath</code> setting first, then <code>TUTOR_COURSE_PATH</code>, then the tutor feature's config,
+          then <code>/workspaces/tutorial</code>.
         </p>
-      </PaperPage>
+      </SketchPage>
     );
   }
   return (
-    <PaperPage>
+    <SketchPage>
       <Loading label="Opening your course…" />
-    </PaperPage>
+    </SketchPage>
   );
 }

@@ -7,7 +7,8 @@ import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import type { PluginHomepageSectionProps } from "@get-bb/plugin-sdk/app";
 import { refreshAll, useAction, useCourseNavigate, useLiveRefresh, useOverview, useTutorRpc } from "../hooks.ts";
 import { continueView } from "../model/home.ts";
-import { Bar, ErrorNotice, InlineText } from "./common.tsx";
+import { ErrorNotice, InlineText } from "./common.tsx";
+import { Button, Character, Highlight, Meter, Panel } from "./sketch/index.ts";
 
 export function ContinueSection(_props: PluginHomepageSectionProps) {
   useLiveRefresh();
@@ -31,90 +32,98 @@ export function ContinueSection(_props: PluginHomepageSectionProps) {
 
   if (view === null) {
     return overview.status === "error" ? (
-      <div className="tutor-paper">
+      <div className="tutor-sk">
         <ErrorNotice message={overview.error} />
       </div>
     ) : null;
   }
   if (view.kind === "error") {
     return (
-      <div className="tutor-paper">
+      <div className="tutor-sk">
         <ErrorNotice message={view.message} />
       </div>
     );
   }
   if (view.kind === "setup") {
     return (
-      <div className="tutor-paper tutor-grid tp-hs tp-hs--setup">
-        <div className="tp-hs-l">
-          <div className="tp-ey">Your course</div>
-          <h2>{view.courseTitle}</h2>
-          <p>
-            {view.missing
-              ? "The factory project you chose has gone. Pick it again to carry on."
-              : "Pick the project your factory lives in, and your coach can start."}
-          </p>
-          <button type="button" className="tp-hs-btn" onClick={() => goCourse({ kind: "welcome" })}>
-            Set up the course →
-          </button>
-        </div>
+      <div className="tutor-sk tp-hs-wrap">
+        <Panel tone="teal" className="tp-hs tp-hs--setup">
+          <div className="tp-hs-l">
+            <p className="tp-eyebrow">Your course</p>
+            <h2 className="sk-title tp-hs-title">
+              <Highlight>{view.courseTitle}</Highlight>
+            </h2>
+            <p>
+              {view.missing
+                ? "The factory project you chose has gone. Pick it again to carry on."
+                : "Pick the project your factory lives in. Then your coach can start."}
+            </p>
+            <Button onClick={() => goCourse({ kind: "welcome" })}>Set up the course →</Button>
+          </div>
+        </Panel>
       </div>
     );
   }
   return (
-    <div className="tutor-paper tutor-grid tp-hs">
-      <div className="tp-hs-l">
-        <div className="tp-ey">{view.eyebrow}</div>
-        <h2>{view.title}</h2>
-        <p>
-          {view.complete ? (
-            "You finished this lesson. The next one is ready when you are."
-          ) : (
-            <>
-              {view.focusRuleName === null ? null : (
-                <>
-                  You're on <b>{view.focusRuleName}</b>.{" "}
-                </>
-              )}
-              {view.lastNote === null ? null : (
-                <>
-                  Last time, <i>{view.lastNote.exampleName}</i>: <InlineText text={view.lastNote.note} />
-                </>
-              )}
-            </>
-          )}
-        </p>
-        {view.complete ? (
-          <button type="button" className="tp-hs-btn" onClick={() => goCourse({ kind: "complete", lessonId: view.lessonId })}>
-            See what's next →
-          </button>
-        ) : (
-          <button type="button" className="tp-hs-btn" disabled={toCoach.pending} onClick={() => void toCoach.run()}>
-            Continue with your coach →
-          </button>
-        )}
-        {view.coachThreadId === null ? (
-          <button type="button" className="tp-hs-btn tp-hs-btn--ghost" onClick={() => goCourse({ kind: "start", lessonId: view.lessonId })}>
-            Open the start page
-          </button>
-        ) : null}
-        {toCoach.error === null ? null : <ErrorNotice message={toCoach.error} />}
-      </div>
-      <div className="tp-hs-r">
-        <div className="tp-hs-big">
-          {view.passing}
-          <span> / {view.total}</span>
-        </div>
-        examples hold
-        <Bar percent={view.percent} label={`${view.passing} of ${view.total} examples hold`} />
-        {view.freshRules === 0 ? null : (
-          <div className="tp-hs-now">
-            <b>New in this lesson</b>
-            {view.freshRules} {view.freshRules === 1 ? "rule" : "rules"} · {view.freshRulesPassing} done
+    <div className="tutor-sk tp-hs-wrap">
+      <Panel tone="teal" className="tp-hs">
+        <div className="tp-hs-l">
+          <p className="tp-eyebrow">{view.eyebrow}</p>
+          <h2 className="sk-title tp-hs-title">
+            <Highlight>{view.title}</Highlight>
+          </h2>
+          <p>
+            {view.complete ? (
+              "You finished this lesson. The next one is ready when you are."
+            ) : (
+              <>
+                {view.focusRuleName === null ? null : (
+                  <>
+                    You're on <b>{view.focusRuleName}</b>.{" "}
+                  </>
+                )}
+                {view.lastNote === null ? null : (
+                  <>
+                    Last time, <i>{view.lastNote.exampleName}</i>: <InlineText text={view.lastNote.note} />
+                  </>
+                )}
+              </>
+            )}
+          </p>
+          <div className="tp-hs-acts">
+            {view.complete ? (
+              <Button onClick={() => goCourse({ kind: "complete", lessonId: view.lessonId })}>See what's next →</Button>
+            ) : (
+              <Button disabled={toCoach.pending} onClick={() => void toCoach.run()}>
+                Continue with your coach →
+              </Button>
+            )}
+            {view.coachThreadId === null ? (
+              <Button secondary onClick={() => goCourse({ kind: "start", lessonId: view.lessonId })}>
+                Open the start page
+              </Button>
+            ) : null}
           </div>
-        )}
-        {view.doneLabel === null ? null : <div className="tp-hs-done">{view.doneLabel}</div>}
-      </div>
+          {toCoach.error === null ? null : <ErrorNotice message={toCoach.error} />}
+        </div>
+        <div className="tp-hs-r">
+          <div className="tp-hs-big">
+            {view.passing}
+            <span> / {view.total}</span>
+          </div>
+          <span className="tp-hs-unit">Examples hold</span>
+          {/* The count is in words just above, so the meter's own count is hidden (pages.css). */}
+          <Meter className="tp-hs-meter" value={view.passing} max={view.total} label="Examples that hold" unit="Examples hold" />
+          {view.freshRules === 0 ? null : (
+            <div className="tp-hs-now">
+              <b>New in this lesson</b>
+              {view.freshRules} {view.freshRules === 1 ? "Rule" : "Rules"} · {view.freshRulesPassing} done
+            </div>
+          )}
+          {view.doneLabel === null ? null : <div className="tp-hs-done">{view.doneLabel}</div>}
+        </div>
+      </Panel>
+      <Character name="explainer" className="tp-edge tp-edge--explainer" />
     </div>
   );
 }
@@ -126,7 +135,7 @@ export function CourseAccessory() {
   const current = overview.data?.current ?? null;
   if (current === null) return null;
   return (
-    <span className="tutor-paper tp-accessory">
+    <span className="tutor-sk tp-accessory">
       <i>{current.lessonId}</i> · {current.counts.passing}/{current.counts.total}
     </span>
   );

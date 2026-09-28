@@ -10,7 +10,6 @@
 //   --size <W>x<H>          viewport (default 1440x900)
 //   --full-page             capture the full scrollable page
 //   --timeout <ms>          navigation / selector timeout (default 30000)
-//   --dark                  prefers-color-scheme: dark (default light)
 //   --verbose               also echo the expected host-daemon probe failures
 //
 // Env: TUTOR_DEV_PORT (default 47886), PLAYWRIGHT_MODULE (path to the
@@ -27,13 +26,13 @@ import { homedir } from "node:os";
 
 function usage(msg) {
   if (msg) console.error(`shot.mjs: ${msg}`);
-  console.error("usage: shot.mjs <route> <out.png> [--wait-for <selector>] [--settle ms] [--size WxH] [--full-page] [--timeout ms] [--dark]");
+  console.error("usage: shot.mjs <route> <out.png> [--wait-for <selector>] [--settle ms] [--size WxH] [--full-page] [--timeout ms]");
   process.exit(2);
 }
 
 const args = process.argv.slice(2);
 const positional = [];
-const opts = { waitFor: null, settle: 1500, width: 1440, height: 900, fullPage: false, timeout: 30000, dark: false, verbose: false };
+const opts = { waitFor: null, settle: 1500, width: 1440, height: 900, fullPage: false, timeout: 30000, verbose: false };
 for (let i = 0; i < args.length; i++) {
   const a = args[i];
   const next = () => { if (i + 1 >= args.length) usage(`${a} needs a value`); return args[++i]; };
@@ -41,7 +40,6 @@ for (let i = 0; i < args.length; i++) {
   else if (a === "--settle") opts.settle = Number(next());
   else if (a === "--timeout") opts.timeout = Number(next());
   else if (a === "--full-page") opts.fullPage = true;
-  else if (a === "--dark") opts.dark = true;
   else if (a === "--verbose") opts.verbose = true;
   else if (a === "--size") {
     const m = /^(\d+)x(\d+)$/.exec(next());
@@ -91,7 +89,7 @@ let failed = false;
 try {
   const context = await browser.newContext({
     viewport: { width: opts.width, height: opts.height },
-    colorScheme: opts.dark ? "dark" : "light",
+    colorScheme: "light",
   });
   const page = await context.newPage();
   page.on("console", (m) => {

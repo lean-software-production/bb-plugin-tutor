@@ -39,11 +39,11 @@ test("plural and percent", () => {
 });
 
 test("relative times", () => {
-  assert.equal(relativeTime("2026-09-25T10:11:30Z", NOW), "just now");
+  assert.equal(relativeTime("2026-09-25T10:11:30Z", NOW), "a moment ago");
   assert.equal(relativeTime("2026-09-25T10:06:00Z", NOW), "6m ago");
   assert.equal(relativeTime("2026-09-25T07:00:00Z", NOW), "3h ago");
   assert.equal(relativeTime("2026-09-23T09:00:00Z", NOW), "2d ago");
-  assert.equal(relativeTime("2026-09-26T00:00:00Z", NOW), "just now", "future times clamp");
+  assert.equal(relativeTime("2026-09-26T00:00:00Z", NOW), "a moment ago", "future times clamp");
   assert.equal(relativeTime(null, NOW), null);
   assert.equal(relativeTime("not a date", NOW), null);
 });

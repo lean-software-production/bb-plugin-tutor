@@ -5,7 +5,7 @@
 #
 # - the .sha256 beside it matches, in sha256sum format;
 # - one top-level directory bb-plugin-tutor-<version>/ holding package.json and
-#   package-lock.json, and no docs/, scripts/, .github/, dist/ or node_modules/;
+#   package-lock.json, and no docs/, scripts/, .github/, vendor/, dist/ or node_modules/;
 # - extracted to a temp dir, `npm ci --omit=dev --ignore-scripts` and
 #   `bb plugin build .` succeed and write dist/app.js, dist/app.css and
 #   dist/app.meta.json.
@@ -36,7 +36,7 @@ tops="$(printf '%s\n' "$listing" | cut -d/ -f1 | sort -u)"
 for required in package.json package-lock.json server.ts app.tsx; do
     printf '%s\n' "$listing" | grep -qx "$top/$required" || fail "$top/$required is missing"
 done
-forbidden="$(printf '%s\n' "$listing" | grep -E "^$top/(docs|scripts|\.github|dist|node_modules)/" || true)"
+forbidden="$(printf '%s\n' "$listing" | grep -E "^$top/(docs|scripts|\.github|vendor|dist|node_modules)/" || true)"
 [ -z "$forbidden" ] || fail "dev-only or build paths in the archive: $(printf '%s\n' "$forbidden" | head -n 5 | tr '\n' ' ')"
 package_version="$(tar -xzOf "$tgz" "$top/package.json" | node -e '
 let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => process.stdout.write(String(JSON.parse(s).version)));')"

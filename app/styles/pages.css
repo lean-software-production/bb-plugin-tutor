@@ -1,27 +1,82 @@
-/* Plain paper pages: between lessons (mockup 7), first run (8), course errors. */
+/*
+ * Whole pages in the Sketchbook kit (mockup "first-run", the completion page,
+ * course errors) and BB home's Continue section (mockup "home"). The kit draws
+ * the titles, highlighter, panels, buttons, meter and characters; this file
+ * only sets their size and layout.
+ */
 
-.tutor-grid.tp-page {
+.tutor-sk.tp-page {
   height: 100%;
   min-height: 0;
   overflow: auto;
 }
-.tutor-paper.tp-page-col {
-  width: min(740px, calc(100% - 96px));
+.tutor-sk .tp-page-in {
+  position: relative;
   min-height: 100%;
+}
+/* Room under the column for the character standing at the page's edge. */
+.tutor-sk .tp-page-in--edge {
+  padding-bottom: 240px;
+}
+.tutor-sk .tp-page-col {
+  position: relative;
+  width: min(760px, calc(100% - 96px));
   margin: 0 auto;
   padding: 2.4rem 0 120px;
 }
-.tutor-paper.tp-page-col--roomy {
-  padding-top: 4.5rem;
+.tutor-sk .tp-page-in--edge .tp-page-col {
+  padding-bottom: 0;
 }
-.tutor-paper .tp-eyebrow--green {
+.tutor-sk .tp-page-col--roomy {
+  padding-top: 56px;
+}
+.tutor-sk .tp-page-title {
+  margin: 6px 0 14px -8px;
+  font-size: 56px;
+  text-align: left;
+}
+
+/* A character at the page's edge: decoration, never in the way. */
+.tutor-sk .tp-edge {
+  position: absolute;
+  pointer-events: none;
+}
+.tutor-sk .tp-edge--waver {
+  right: 40px;
+  bottom: 40px;
+}
+.tutor-sk .tp-edge--waver img {
+  width: auto;
+  height: 170px;
+}
+@media (max-width: 640px) {
+  .tutor-sk .tp-page-in--edge {
+    padding-bottom: 160px;
+  }
+  /* These keep the drawing 24px inside the page (edge.test.ts). */
+  .tutor-sk .tp-edge--waver {
+    right: 34px;
+    bottom: 32px;
+  }
+  .tutor-sk .tp-edge--waver img {
+    height: 120px;
+  }
+  .tutor-sk .tp-page-col {
+    width: calc(100% - 40px);
+  }
+  .tutor-sk .tp-page-title {
+    font-size: 40px;
+  }
+}
+
+.tutor-sk .tp-eyebrow--green {
   margin: 0 0 4px;
-  color: var(--tp-green);
+  color: var(--tp-good);
 }
-.tutor-paper .tp-muted {
+.tutor-sk .tp-muted {
   color: var(--tp-muted);
 }
-.tutor-paper .tp-sr-only {
+.tutor-sk .tp-sr-only {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -29,239 +84,335 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
-.tutor-paper .tp-notice {
+
+/* A note: a kit panel with a drawn icon beside the words. */
+.tutor-sk .tp-notice {
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+  max-width: 640px;
   margin: 14px 0;
-  padding: 10px 14px;
-  border: 1px solid #c9daf6;
-  border-radius: 10px;
-  background: var(--tp-blue-pale);
-  color: #1b3f75;
-  font-size: 0.82rem;
-  line-height: 1.45;
+  padding: 12px 18px;
+  color: var(--tp-text);
+  font-size: 17px;
+  line-height: 1.4;
 }
-.tutor-paper .tp-notice--error {
-  border-color: #efc9c9;
-  background: #fbeaea;
-  color: #7a2a2a;
+/* The kit sizes a panel's own drawing to 42% of it; a note's icon keeps its size. */
+.tutor-sk .tp-notice-icon {
+  flex: none;
+  width: auto;
+  align-self: auto;
+}
+.tutor-sk .tp-notice-icon img {
+  width: 40px;
+  height: 40px;
+}
+.tutor-sk .tp-notice-body {
+  flex: 1;
+  min-width: 0;
 }
 /* Reload after a lost-connection message, on its own line wherever the message sits. */
-.tutor-paper .tp-reload {
+.tutor-sk .tp-reload {
   display: flex;
   width: fit-content;
-  margin-top: 8px;
-  padding: 5px 12px;
-  font-size: 0.76rem;
+  margin-top: 10px;
 }
-.tutor-paper .tp-loading {
+.tutor-sk .tp-loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin: 1.4rem 0;
   color: var(--tp-muted);
-  font: italic 1rem var(--tp-font-display);
+  font: italic 17px var(--tp-font-body);
 }
-.tutor-paper .tp-tip {
+.tutor-sk .tp-loading-icon img {
+  width: 36px;
+  height: 36px;
+}
+.tutor-sk .tp-tip {
   margin-top: 3rem;
   color: var(--tp-muted);
-  font-size: 0.78rem;
+  font-size: 15px;
+}
+.tutor-sk button:disabled {
+  cursor: default;
+  opacity: 0.6;
 }
 
 /* ---- completion ---- */
-.tutor-paper .tp-done-panel {
-  position: relative;
+.tutor-sk .tp-done-panel {
   margin-top: 0.5rem;
-  padding: 30px 30px 26px;
-  overflow: hidden;
-  border: 1px solid #bfe0d2;
-  border-radius: 16px;
-  background: #fff;
-  box-shadow: var(--tp-shadow);
 }
-.tutor-paper .tp-done-panel > :not(.tp-confetti) {
-  position: relative;
-  z-index: 1;
-}
-.tutor-paper .tp-confetti {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-}
-.tutor-paper .tp-confetti i {
-  position: absolute;
-  width: 7px;
-  height: 12px;
-  border-radius: 2px;
-  opacity: 0.55;
-}
-.tutor-paper .tp-big {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-.tutor-paper .tp-big .tp-h2 {
-  margin: 0;
-}
-.tutor-paper .tp-tick {
-  display: grid;
-  flex: none;
-  width: 46px;
-  height: 46px;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--tp-green);
-  color: #fff;
-  font-size: 1.4rem;
-  font-weight: 800;
-}
-.tutor-paper .tp-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 26px;
-  margin-top: 18px;
-  color: var(--tp-muted);
-  font-size: 0.74rem;
-}
-.tutor-paper .tp-stats b {
-  display: block;
-  margin-bottom: 3px;
-  color: var(--tp-ink);
-  font: 500 1.6rem/1 var(--tp-font-display);
-}
-.tutor-paper .tp-sum {
-  margin: 18px 0 0;
-  padding-top: 16px;
-  border-top: 1px solid var(--tp-line-soft);
-}
-.tutor-paper .tp-next {
+.tutor-sk .tp-next-lesson {
   margin-top: 4rem;
+  scroll-margin-top: 24px;
 }
-.tutor-paper .tp-next .tp-h1 {
-  font-size: 3.2rem;
+.tutor-sk .tp-next-lesson:focus {
+  outline: none;
 }
-.tutor-paper .tp-diff {
-  margin-top: 14px;
+.tutor-sk .tp-next-lesson:focus-visible {
+  outline: 2px dashed var(--tp-heading);
+  outline-offset: 8px;
+}
+.tutor-sk .tp-diff {
+  margin-top: 18px;
   overflow: hidden;
-  border: 1px solid var(--tp-line);
+  border: 1px solid var(--tp-rule);
   border-radius: 12px;
-  background: #fff;
-  font: 0.76rem/1.7 var(--tp-font-mono);
+  background: var(--tp-page);
+  font: 13.5px/1.7 var(--tp-font-mono);
 }
-.tutor-paper .tp-diff .tp-fh {
+.tutor-sk .tp-diff .tp-fh {
   padding: 7px 12px;
-  border-bottom: 1px solid var(--tp-line);
-  background: #f3f1ea;
+  border-bottom: 1px solid var(--tp-rule);
+  background: var(--tp-code-bg);
   color: var(--tp-muted);
-  font-size: 0.72rem;
+  font-size: 13px;
 }
-.tutor-paper .tp-diff .tp-l {
+.tutor-sk .tp-diff .tp-l {
   padding: 0 12px;
   white-space: pre-wrap;
 }
-.tutor-paper .tp-l--add {
-  background: #e8f5ee;
-  color: #18503f;
+.tutor-sk .tp-l--add {
+  background: var(--tp-good-wash);
+  color: var(--tp-good);
 }
-.tutor-paper .tp-l--del {
-  background: #fbeaea;
-  color: #8a2c2c;
+.tutor-sk .tp-l--del {
+  background: var(--tp-bad-wash);
+  color: var(--tp-bad);
   text-decoration: line-through;
-  text-decoration-color: rgb(138 44 44 / 0.4);
+  text-decoration-color: color-mix(in oklab, var(--tp-bad) 40%, transparent);
 }
-.tutor-paper .tp-l--ctx {
-  color: #7b858e;
+.tutor-sk .tp-l--ctx {
+  color: var(--tp-muted);
 }
-.tutor-paper .tp-continue {
+.tutor-sk .tp-continue {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 14px;
-  margin-top: 1.6rem;
+  margin-top: 24px;
 }
 
 /* ---- first run ---- */
-.tutor-paper .tp-picker {
-  max-width: 620px;
-  margin-top: 2.4rem;
-  overflow: hidden;
-  border: 1px solid var(--tp-line);
-  border-radius: 14px;
-  background: #fff;
-  box-shadow: var(--tp-shadow);
-}
-.tutor-paper .tp-pick-label {
-  margin-top: 2rem;
-}
-.tutor-paper .tp-pick-label + .tp-picker {
-  margin-top: 0.6rem;
-}
-.tutor-paper .tp-pk {
+.tutor-sk .tp-picker {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) auto;
   gap: 12px;
+  max-width: 640px;
+}
+.tutor-sk .tp-pick-label {
+  margin: 28px 0 10px;
+}
+.tutor-sk .tp-pk {
+  min-width: 0;
+  padding: 0;
+}
+.tutor-sk .tp-pk-hit {
+  display: flex;
   align-items: center;
+  gap: 16px;
   width: 100%;
-  padding: 14px 18px;
+  padding: 16px 20px;
   border: 0;
-  border-top: 1px solid var(--tp-line-soft);
-  background: #fff;
-  color: var(--tp-ink);
+  border-radius: 12px;
+  background: none;
+  color: var(--tp-text);
+  font: inherit;
   text-align: left;
+  cursor: pointer;
 }
-.tutor-paper .tp-pk:first-child {
-  border-top: 0;
+.tutor-sk .tp-pk-hit:focus-visible {
+  outline: 2px dashed var(--tp-heading);
+  outline-offset: 2px;
 }
-.tutor-paper .tp-pk--sel {
-  background: #f5f8fe;
-}
-.tutor-paper .tp-pk--dis:not(.tp-pk--sel) {
+.tutor-sk .tp-pk--dis:not(.tp-pk--sel) {
   opacity: 0.6;
 }
-.tutor-paper .tp-pk .tp-r {
-  width: 16px;
-  height: 16px;
-  border: 1.5px solid #c9c5b8;
+/* The radio: a hand-drawn ring, filled once chosen. */
+.tutor-sk .tp-pk .tp-r {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 2.5px solid var(--tp-heading);
   border-radius: 50%;
+  filter: url(#tutor-sk-wobble);
 }
-.tutor-paper .tp-pk--sel .tp-r {
-  border: 5px solid var(--tp-blue);
+.tutor-sk .tp-pk--sel .tp-r::after {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--tp-heading);
+  content: "";
 }
-.tutor-paper .tp-pk .tp-nm {
+.tutor-sk .tp-pk-text {
+  flex: 1;
+  min-width: 0;
+}
+.tutor-sk .tp-pk .tp-nm {
   display: block;
-  font-size: 0.9rem;
-  font-weight: 700;
+  font-size: 19px;
 }
-.tutor-paper .tp-pk .tp-pth {
+.tutor-sk .tp-pk .tp-pth {
   display: block;
+  overflow: hidden;
   color: var(--tp-muted);
-  font: 0.72rem var(--tp-font-mono);
+  font: 13px var(--tp-font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.tutor-paper .tp-pk .tp-v {
-  color: #8d8b82;
-  font-size: 0.72rem;
-  font-weight: 700;
+.tutor-sk .tp-pk .tp-v {
+  flex: none;
+  max-width: 45%;
+  color: var(--tp-muted);
+  font-size: 16px;
+  text-align: right;
 }
-.tutor-paper .tp-pk .tp-v--ok {
-  color: var(--tp-green);
+.tutor-sk .tp-pk .tp-v--ok {
+  color: var(--tp-good);
 }
-.tutor-paper .tp-howto {
-  max-width: 620px;
-  margin-top: 2.4rem;
-  padding: 16px 20px;
-  border: 1px dashed #cfcabb;
-  border-radius: 12px;
-  background: rgb(255 255 255 / 0.6);
+@media (max-width: 640px) {
+  .tutor-sk .tp-pk-hit {
+    flex-wrap: wrap;
+  }
+  /* On its own line under the name, past the radio: it wraps inside the row (picker.test.ts). */
+  .tutor-sk .tp-pk .tp-v {
+    max-width: calc(100% - 36px);
+    margin-left: 36px;
+    text-align: left;
+  }
 }
-.tutor-paper .tp-howto .tp-section-label {
+.tutor-sk .tp-pk .tp-v-tick {
+  margin-right: 4px;
+}
+.tutor-sk .tp-howto {
+  max-width: 640px;
+  margin-top: 28px;
+  align-items: flex-start;
+}
+.tutor-sk .tp-howto ol {
   margin: 0;
-}
-.tutor-paper .tp-howto ol {
-  margin: 6px 0 14px;
   padding-left: 1.2rem;
-  color: #34414c;
-  font: 1rem/1.7 var(--tp-font-display);
+  color: var(--tp-text);
+  font: 17px/1.6 var(--tp-font-body);
   list-style: decimal;
 }
-.tutor-paper .tp-howto code {
+.tutor-sk .tp-howto code,
+.tutor-sk .tp-dek code {
   padding: 1px 4px;
   border-radius: 3px;
-  background: #f3f2ed;
+  background: var(--tp-code-bg);
   font-size: 0.8em;
+}
+
+/* ---- BB home: the Continue section ---- */
+.tutor-sk.tp-hs-wrap {
+  position: relative;
+  max-width: 728px;
+  margin: 0 auto;
+}
+.tutor-sk .tp-hs {
+  flex-direction: row;
+  gap: 26px;
+  padding: 22px 26px 24px;
+}
+.tutor-sk .tp-hs-l {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+.tutor-sk .tp-hs-title {
+  margin: 0 0 0 -6px;
+  font-size: 34px;
+  text-align: left;
+}
+.tutor-sk .tp-hs-l p {
+  margin: 0 0 4px;
+  font-size: 17px;
+  line-height: 1.4;
+}
+.tutor-sk .tp-hs-l .tp-eyebrow {
+  margin: 0;
+}
+.tutor-sk .tp-hs-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.tutor-sk .tp-hs-r {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 8px;
+  width: 210px;
+  padding-left: 22px;
+  border-left: 2px dashed color-mix(in oklab, var(--sk-accent) 45%, var(--tp-page));
+  color: var(--tp-muted);
+  font-size: 16px;
+}
+.tutor-sk .tp-hs-big {
+  color: var(--tp-text);
+  font-family: var(--tp-font-title);
+  font-size: 40px;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+.tutor-sk .tp-hs-big span {
+  color: var(--tp-muted);
+  font-size: 22px;
+}
+/* The count is in words just above the meter, so its own count stays hidden. */
+.tutor-sk .tp-hs-meter .tp-meter-count {
+  display: none;
+}
+.tutor-sk .tp-hs-now {
+  margin-top: 6px;
+  color: var(--tp-text);
+}
+.tutor-sk .tp-hs-now b {
+  display: block;
+  color: var(--tp-heading);
+  font-family: var(--tp-font-label);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+}
+/* The explainer leans on the panel's right edge where BB's page column has room
+   for it, 16px inside the column (edge.test.ts). The column's width
+   depends on BB's sidebar, so this asks BB's page container, not the viewport;
+   without that container the explainer stays hidden. */
+.tutor-sk .tp-edge--explainer {
+  display: none;
+  right: -104px;
+  bottom: -2px;
+}
+.tutor-sk .tp-edge--explainer img {
+  width: auto;
+  height: 150px;
+}
+@container page (min-width: 984px) {
+  .tutor-sk .tp-edge--explainer {
+    display: inline-block;
+  }
+}
+@media (max-width: 640px) {
+  .tutor-sk .tp-hs {
+    flex-direction: column;
+  }
+  .tutor-sk .tp-hs-r {
+    width: auto;
+    padding: 14px 0 0;
+    border-top: 2px dashed color-mix(in oklab, var(--sk-accent) 45%, var(--tp-page));
+    border-left: 0;
+  }
+}
+
+/* Rows of buttons space themselves with gap, not the kit's margin between neighbours. */
+.tutor-sk .tp-continue > button,
+.tutor-sk .tp-hs-acts > button,
+.tutor-sk .tp-acts > button {
+  margin: 0;
 }

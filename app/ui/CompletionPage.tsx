@@ -1,80 +1,64 @@
-// Between lessons (mockup 7): the recap, the next lesson's introduction and
-// "Start lesson N", which spawns its coach thread (the first turn adopts the
-// spec) and opens it, or "Continue lesson N" once it has started.
+// Between lessons: the lesson-complete panel the coach thread shows too
+// (LessonComplete.tsx), then the next lesson's introduction and "Start lesson
+// N", which spawns its coach thread (the first turn adopts the spec) and opens
+// it, or "Continue lesson N" once it has started.
+import { useRef } from "react";
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { refreshAll, useAction, useCourseNavigate, useQuery, useTutorRpc } from "../hooks.ts";
-import { completionView, confettiPieces } from "../model/completion.ts";
+import { completionView } from "../model/completion.ts";
 import type { NextLessonView } from "../model/completion.ts";
 import { QUERY_KEYS } from "../state/app-state.ts";
-import { Chips, ErrorNotice, InlineText, Loading, PaperPage } from "./common.tsx";
-
-const CONFETTI = confettiPieces();
+import { Chips, ErrorNotice, InlineText, Loading, SketchPage } from "./common.tsx";
+import { LessonDone } from "./LessonComplete.tsx";
+import { Button, Highlight } from "./sketch/index.ts";
 
 export function CompletionPage({ lessonId }: { lessonId: string }) {
   const rpc = useTutorRpc();
   const goCourse = useCourseNavigate();
+  const nextRef = useRef<HTMLDivElement>(null);
   const completion = useQuery(QUERY_KEYS.completion(lessonId), () => rpc.call("getCompletion", { lessonId }));
   if (completion.data === null) {
     return (
-      <PaperPage>
+      <SketchPage>
         {completion.status === "error" ? (
           <>
             <ErrorNotice message={completion.error} />
-            <button type="button" className="tp-btn tp-btn--ghost" onClick={() => goCourse({ kind: "start", lessonId })}>
+            <Button secondary onClick={() => goCourse({ kind: "start", lessonId })}>
               Back to the lesson
-            </button>
+            </Button>
           </>
         ) : (
           <Loading label="Loading…" />
         )}
-      </PaperPage>
+      </SketchPage>
     );
   }
   const view = completionView(completion.data, Date.now());
+  // "What's next" here is the section under the panel: go to it and hand it the focus.
+  const toNext = () => {
+    const section = nextRef.current;
+    section?.scrollIntoView({ block: "start" });
+    section?.focus({ preventScroll: true });
+  };
   return (
-    <PaperPage>
+    <SketchPage>
       <div className="tp-done-panel">
-        <div className="tp-confetti" aria-hidden>
-          {CONFETTI.map((piece, index) => (
-            <i
-              key={index}
-              style={{ left: `${piece.left}%`, top: `${piece.top}%`, background: piece.color, transform: `rotate(${piece.rotate}deg)` }}
-            />
-          ))}
-        </div>
-        <div className="tp-big">
-          <span className="tp-tick" aria-hidden>
-            ✓
-          </span>
-          <div>
-            <p className="tp-eyebrow tp-eyebrow--green">{view.eyebrow}</p>
-            <h2 className="tp-h2">{view.title}</h2>
-          </div>
-        </div>
-        <div className="tp-stats">
-          {view.stats.map((stat) => (
-            <div key={stat.label}>
-              <b>{stat.value}</b>
-              {stat.label}
-            </div>
-          ))}
-        </div>
-        {view.summary === null ? null : (
-          <p className="tp-prose tp-sum">
-            <InlineText text={view.summary} /> <span className="tp-muted">— coach's summary</span>
-          </p>
+        <LessonDone lessonId={lessonId} completion={completion.data} view={view} onNext={toNext} />
+      </div>
+      <div ref={nextRef} tabIndex={-1} className="tp-next-lesson">
+        {view.next === null ? (
+          <>
+            <p className="tp-eyebrow">That was the last lesson</p>
+            <h1 className="sk-title tp-page-title">
+              <Highlight>You finished the course.</Highlight>
+            </h1>
+            <p className="tp-dek">Your factory, its spec and every conversation with your coach stay in your repo.</p>
+          </>
+        ) : (
+          <NextLesson next={view.next} />
         )}
       </div>
-      {view.next === null ? (
-        <div className="tp-next">
-          <p className="tp-eyebrow">That was the last lesson</p>
-          <h1 className="tp-h1">You finished the course.</h1>
-          <p className="tp-dek">Your factory, its spec and every conversation with your coach stay in your repo.</p>
-        </div>
-      ) : (
-        <NextLesson next={view.next} />
-      )}
-    </PaperPage>
+    </SketchPage>
   );
 }
 
@@ -90,9 +74,11 @@ function NextLesson({ next }: { next: NextLessonView }) {
     navigate.toThread(threadId);
   });
   return (
-    <div className="tp-next">
+    <>
       <p className="tp-eyebrow">{next.eyebrow}</p>
-      <h1 className="tp-h1">{next.title}</h1>
+      <h1 className="sk-title tp-page-title">
+        <Highlight>{next.title}</Highlight>
+      </h1>
       {next.dek === "" ? null : (
         <p className="tp-dek">
           <InlineText text={next.dek} />
@@ -111,14 +97,14 @@ function NextLesson({ next }: { next: NextLessonView }) {
         </div>
       )}
       <div className="tp-continue">
-        <button type="button" className="tp-btn tp-btn--big" disabled={start.pending} onClick={() => void start.run()}>
+        <Button disabled={start.pending} onClick={() => void start.run()}>
           {start.pending ? "Starting…" : next.startLabel}
-        </button>
-        <button type="button" className="tp-btn tp-btn--ghost" onClick={() => goCourse({ kind: "start", lessonId: next.id })}>
+        </Button>
+        <Button secondary onClick={() => goCourse({ kind: "start", lessonId: next.id })}>
           Read the features first
-        </button>
+        </Button>
       </div>
       {start.error === null ? null : <ErrorNotice message={start.error} />}
-    </div>
+    </>
   );
 }

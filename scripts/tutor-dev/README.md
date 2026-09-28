@@ -16,7 +16,7 @@ The harness never touches a BB running on the host.
 | `down.sh [--rm \| --purge]` | Stops the container. `--rm` removes it and keeps BB state. `--purge` also deletes the generated workspace and the BB state. |
 | `bb.sh <args…>` | Runs `bb <args…>` inside the container against the harness BB, for example `bb.sh status` or `bb.sh plugin logs tutor`. `bb.sh --exec <cmd…>` runs any other command, for example `bb.sh --exec bash`. |
 | `install-plugin.sh <dir> [--copy] [--no-build] [--npm-install]` | Installs the plugin on first run. Every later run rebuilds it and reloads it. It then prints the plugin's status and exits non-zero if the status is not `running` or `degraded`. |
-| `shot.mjs <route> <out.png> [--wait-for <sel>] [--settle ms] [--size WxH] [--full-page] [--dark] [--verbose]` | Screenshots `http://127.0.0.1:$TUTOR_DEV_PORT<route>` with headless chromium. Browser console errors, failed requests and HTTP 4xx/5xx responses are echoed to stderr. |
+| `shot.mjs <route> <out.png> [--wait-for <sel>] [--settle ms] [--size WxH] [--full-page] [--verbose]` | Screenshots `http://127.0.0.1:$TUTOR_DEV_PORT<route>` with headless chromium. Browser console errors, failed requests and HTTP 4xx/5xx responses are echoed to stderr. |
 
 | `plugins-at-start.sh <plugin-dir>…` | Runs **inside** the container as a `postStartCommand` (set `TUTOR_DEV_POST_START`). Waits for `bb plugin list` to answer, then path-installs each directory that is not already installed from that path. Idempotent across restarts; logs timings to `$BB_DATA_DIR/.tutor-dev-plugins-at-start.log`. |
 

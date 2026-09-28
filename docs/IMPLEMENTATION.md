@@ -358,9 +358,11 @@ not data.
 | `experimental_sidebarNavigation` `simple-nav` | BB's own navigation rows minus Plugins and Skills, activated through BB; renders BB's original while the `simpleNavigation` setting (boolean, default true) is off or loading | `useSettings` |
 | content script `activity` | none: reports activity for the keep-alive (see "Where things are") | `heartbeat` |
 
-- **Theme:** `bb.themes` contributes `paper` (`THEME_ID`; BB lists it as `plugin:tutor:paper`), a
-  light and dark mapping of the workbook palette onto BB's tokens, with Archivo inlined.
-  `themes/paper.css` is generated from `app/theme/paper.palette.css` by `npm run fonts`.
+- **Theme:** `bb.themes` contributes `paper` (`THEME_ID`; BB lists it as `plugin:tutor:paper`).
+  `themes/sketchbook.css` is the brand's bb theme (`vendor/brand/bb-theme/sketchbook/theme.css`)
+  with Patrick Hand inlined in place of its Google Fonts `@import`, and
+  `themes/sketchbook-code-light.json` is built from the kit tokens (named for both of BB's modes:
+  the brand is light mode only). `npm run build:assets` generates both (`app/theme/build.ts`, `app/theme/code-theme.ts`).
 - **Jumping to a Rule's section** (`app/model/rule-jump.ts`, pure and tested; DOM hooks in
   `app/rule-jump.ts`): open the coach thread, then look for the anchor in the scroller holding the
   thread's timeline rows (`[data-timeline-row-id^="<thread>:"]` and their scrollable ancestor, never
@@ -374,13 +376,14 @@ not data.
   `ConnectionLostError` (`app/model/rpc-errors.ts`); every error surface then says the connection
   to the Codespace was lost and offers Reload, never a raw "HTTP 401".
 
-- **CSS:** `app/paper.css` holds the fonts and tokens. Wrap plugin-owned markup in
-  `.tutor-paper`. Use `.tutor-grid` for grid-paper backgrounds that may contain BB components; it
-  sets nothing that inherits. `.tutor-nav` is a third root, for the simple navigation, which uses
+- **CSS:** `app/sketchbook.css` imports the fonts, the scoped Sketchbook kit (`app/sketch/kit.css`,
+  generated from the vendored brand kit by `app/sketch/build-kit.ts`) and Tutor's `--tp-*` tokens
+  (`app/sketch/tokens.css`, aliases of the kit's roles). Wrap plugin-owned markup in `.tutor-sk`; it
+  sets typography. `.tutor-nav` is a second root, for the simple navigation, which uses
   BB's tokens and no paper typography. Classes are `tp-*` and tokens are `--tp-*`: BB's theme uses unprefixed
   names such as `--ink`, and a bare token would leak into BB's own components. Never style BB's
   chat. Light mode only.
-- **Fonts:** `app/fonts/fonts.css` is generated (`npm run fonts`), because `bb plugin build` has no
+- **Fonts:** `app/fonts/fonts.css` is generated (`npm run build:assets`), because `bb plugin build` has no
   loader for `.woff2`. A test checks that it is current.
 - **Directives are leaf directives:** each one sits on its own line and renders as a block. So
   `::term` is a small chip that pops up the definition. It cannot be an inline word in a sentence

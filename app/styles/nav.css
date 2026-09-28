@@ -1,8 +1,8 @@
 /*
  * Tutor's sidebar navigation (app/ui/SimpleNavigation.tsx). It stands in for
- * BB's own rows, so it is drawn with BB's tokens, not the paper ones, and
+ * BB's own rows, so it is drawn with BB's tokens, not the kit's, and
  * follows whichever BB theme is active. Row metrics match BB's navigation.
- * .tutor-nav is its root: BB tokens, no paper typography.
+ * .tutor-nav is its root: BB tokens, no kit typography.
  */
 .tutor-nav {
   display: flex;

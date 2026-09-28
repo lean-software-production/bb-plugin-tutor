@@ -17,10 +17,15 @@ import type { ProgressCardView } from "../model/cards.ts";
 import { lessonCardView, ruleCardView } from "../model/lesson-cards.ts";
 import type { LessonCardView, RuleCardView } from "../model/lesson-cards.ts";
 import { QUERY_KEYS } from "../state/app-state.ts";
+import { stepTone } from "../sketch/step-colour.ts";
+import { cx, toneClass } from "../sketch/tone.ts";
 import { InlineText, ChangeBadge, ReloadButton } from "./common.tsx";
 import { AnnotatedExample } from "./Lesson.tsx";
+import { LessonComplete } from "./LessonComplete.tsx";
+import { Bubble, Highlight, KitIcon, Meter, Panel, StepBadge, Tick } from "./sketch/index.ts";
 
-const RULE_GLYPHS = { passing: "✓", "not-yet": "!", pending: "○", focus: "●" } as const;
+/** Passing Rules get the kit's tick instead. */
+const RULE_GLYPHS = { "not-yet": "!", pending: "○", focus: "●" } as const;
 const NOT_REACHED_HINT = "Your coach hasn't reached this Rule yet";
 
 function SourceFallback({ source }: { source: string }) {
@@ -44,7 +49,7 @@ export function LessonCardDirective({ attributes, source }: PluginMessageDirecti
     return detail.status === "error" ? (
       <SourceFallback source={source} />
     ) : (
-      <div className="tutor-paper tp-lcard tp-lcard--loading" role="status">
+      <div className="tutor-sk tp-cardwrap tp-lcard--loading" role="status">
         Loading the lesson…
       </div>
     );
@@ -56,67 +61,67 @@ function LessonCard({ view }: { view: LessonCardView }) {
   const openRule = useOpenRule();
   const coachThreadId = view.coachThreadId;
   return (
-    <article className="tutor-paper tp-lcard" aria-label={`${view.eyebrow}: ${view.title}`} data-tutor-lesson={view.lessonId}>
-      <div className="tp-lcard-top">
+    <div className="tutor-sk tp-cardwrap">
+      <Panel as="article" tone="mustard" className="tp-lcard" aria-label={`${view.eyebrow}: ${view.title}`} data-tutor-lesson={view.lessonId}>
         <p className="tp-eyebrow">{view.eyebrow}</p>
-        <h2 className="tp-h2">{view.title}</h2>
+        <h2 className="sk-title tp-lcard-title">
+          <Highlight>{view.title}</Highlight>
+        </h2>
         {view.dek === "" ? null : (
-          <p className="tp-prose tp-lcard-dek">
+          <p className="tp-lcard-dek">
             <InlineText text={view.dek} />
           </p>
         )}
-        <div className="tp-lcard-tally">
-          <div className="tp-bar" role="progressbar" aria-label={view.tally} aria-valuemin={0} aria-valuemax={100} aria-valuenow={view.percent}>
-            <i style={{ width: `${view.percent}%` }} />
+        <Meter className="tp-tally" value={view.passing} max={view.total} label="Examples that hold" unit={view.tallyUnit} />
+        <div className="tp-checklist">
+          <KitIcon name="checklist" className="tp-checklist-icon" />
+          <div className="tp-checklist-body">
+            {view.features.map((feature) => (
+              <section key={feature.slug} className="tp-lcard-feature" aria-label={`Feature ${feature.name}`}>
+                <p className="tp-checklist-hd">
+                  {feature.name}
+                  <ChangeBadge change={feature.change} mixedLabel="changed" />
+                  <span className="tp-lcard-count">{feature.count}</span>
+                </p>
+                <ul>
+                  {feature.rules.map((rule) => {
+                    const body = (
+                      <>
+                        <span className={`tp-g tp-g--${rule.glyph}`} aria-hidden>
+                          {rule.glyph === "passing" ? <Tick /> : RULE_GLYPHS[rule.glyph]}
+                        </span>
+                        <span>
+                          {rule.glyph === "focus" ? <Highlight>{rule.name}</Highlight> : rule.name}
+                          <ChangeBadge change={rule.change} />
+                        </span>
+                      </>
+                    );
+                    return (
+                      <li key={rule.key}>
+                        {rule.reached && coachThreadId !== null ? (
+                          <button
+                            type="button"
+                            className="tp-lcard-rule"
+                            title="Show where your coach started this Rule"
+                            onClick={() => openRule({ coachThreadId, lessonId: view.lessonId, ruleKey: rule.key })}
+                          >
+                            {body}
+                          </button>
+                        ) : (
+                          <span className="tp-lcard-rule tp-lcard-rule--unreached" title={NOT_REACHED_HINT}>
+                            {body}
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ))}
           </div>
-          <span>{view.tally}</span>
         </div>
-      </div>
-      <div className="tp-lcard-rules">
-        {view.features.map((feature) => (
-          <section key={feature.slug} aria-label={`Feature ${feature.name}`}>
-            <p className="tp-section-label">
-              {feature.name}
-              <ChangeBadge change={feature.change} mixedLabel="changed" />
-              <span className="tp-lcard-count">{feature.count}</span>
-            </p>
-            <ul>
-              {feature.rules.map((rule) => {
-                const body = (
-                  <>
-                    <span className={`tp-g tp-g--${rule.glyph}`} aria-hidden>
-                      {RULE_GLYPHS[rule.glyph]}
-                    </span>
-                    <span>
-                      {rule.name}
-                      <ChangeBadge change={rule.change} />
-                    </span>
-                  </>
-                );
-                return (
-                  <li key={rule.key}>
-                    {rule.reached && coachThreadId !== null ? (
-                      <button
-                        type="button"
-                        className="tp-lcard-rule"
-                        title="Show where your coach started this Rule"
-                        onClick={() => openRule({ coachThreadId, lessonId: view.lessonId, ruleKey: rule.key })}
-                      >
-                        {body}
-                      </button>
-                    ) : (
-                      <span className="tp-lcard-rule tp-lcard-rule--unreached" title={NOT_REACHED_HINT}>
-                        {body}
-                      </span>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        ))}
-      </div>
-    </article>
+      </Panel>
+    </div>
   );
 }
 
@@ -127,6 +132,7 @@ export function ProgressCardDirective({ attributes, source, message }: PluginMes
   if (card.kind === "focus" && view.rule !== null) {
     return <RuleCardDirective card={view} rule={view.rule} threadId={message.threadId} />;
   }
+  if (view.completedLessonId !== null) return <LessonComplete lessonId={view.completedLessonId} />;
   return <ProgressCard view={view} />;
 }
 
@@ -157,55 +163,56 @@ function RuleCard({ view, anchorProps }: { view: RuleCardView; anchorProps: Reco
   const [open, setOpen] = useState(true);
   const askSide = useAskSideQuestion();
   const { rule } = view;
+  const position = view.number - 1;
   return (
-    <article className="tutor-paper tp-rcard" aria-label={`Rule: ${rule.name}`} {...anchorProps}>
-      <div className="tp-rcard-top">
-        <span className="tp-mk tp-mk--blue" aria-hidden>
-          ●
-        </span>
-        <div className="tp-rcard-head">
-          <div className="tp-ey">
-            Now working on · {view.featureName}
-            <ChangeBadge change={rule.change} />
-          </div>
-          <h3 className="tp-tt">{rule.name}</h3>
-        </div>
-        <div className="tp-ring">
-          <b>
-            {view.passing}/{view.total}
-          </b>
-          examples
-        </div>
-      </div>
-      {rule.description === "" ? null : (
-        <p className="tp-prose tp-rcard-desc">
-          <InlineText text={rule.description} />
+    <div className="tutor-sk tp-cardwrap" {...anchorProps}>
+      <Panel as="article" tone={stepTone(position)} className="tp-rcard" aria-label={`Rule: ${rule.name}`}>
+        <p className="tp-eyebrow">
+          Now working on · {view.featureName}
+          <ChangeBadge change={rule.change} />
         </p>
-      )}
-      <button type="button" className="tp-rcard-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
-        {open ? "▾" : "▸"} {rule.examples.length === 1 ? "Example" : `Examples (${rule.examples.length})`}
-      </button>
-      {open ? (
-        <div className="tp-gutterwrap tp-rcard-examples">
-          {rule.examples.map((example) => (
-            <AnnotatedExample key={example.key} example={example} />
-          ))}
+        <div className="tp-rulehead">
+          <h3 className="sk-step tp-rcard-step">
+            <StepBadge position={position} label={view.number} />
+            <span className="sk-label tp-tt">{rule.name}</span>
+          </h3>
+          <div className="tp-ring">
+            <b>
+              {view.passing}/{view.total}
+            </b>
+            examples
+          </div>
         </div>
-      ) : null}
-      {view.current && view.coachThreadId !== null ? (
-        <div className="tp-pcard-ft">
-          <button type="button" className="tp-link-button" disabled={askSide.pending} onClick={() => void askSide.run(view.lessonId, rule.key)}>
-            {askSide.pending ? "Opening a side chat…" : "Ask a side question ↗"}
-          </button>
-          {askSide.error === null ? null : (
-            <span className="tp-inline-error" role="alert">
-              {askSide.error}
-              <ReloadButton message={askSide.error} />
-            </span>
-          )}
-        </div>
-      ) : null}
-    </article>
+        {rule.description === "" ? null : (
+          <p className="tp-rcard-desc">
+            <InlineText text={rule.description} />
+          </p>
+        )}
+        <button type="button" className="tp-rcard-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
+          {open ? "▾" : "▸"} {rule.examples.length === 1 ? "Example" : `Examples (${rule.examples.length})`}
+        </button>
+        {open ? (
+          <div className="tp-gutterwrap tp-rcard-examples">
+            {rule.examples.map((example) => (
+              <AnnotatedExample key={example.key} example={example} />
+            ))}
+          </div>
+        ) : null}
+        {view.current && view.coachThreadId !== null ? (
+          <div className="tp-pcard-ft">
+            <button type="button" className="tp-link" disabled={askSide.pending} onClick={() => void askSide.run(view.lessonId, rule.key)}>
+              {askSide.pending ? "Opening a side chat…" : "Ask a side question ↗"}
+            </button>
+            {askSide.error === null ? null : (
+              <span className="tp-inline-error" role="alert">
+                {askSide.error}
+                <ReloadButton message={askSide.error} />
+              </span>
+            )}
+          </div>
+        ) : null}
+      </Panel>
+    </div>
   );
 }
 
@@ -229,53 +236,45 @@ function ProgressCard({ view, anchorProps = {} }: { view: ProgressCardView; anch
     const opened = navigate.openThreadPanel({ actionId: SLOT_IDS.ruleTab, title: "Rule", params: rule });
     if (!opened) goCourse({ kind: "start", lessonId: rule.lessonId }, { ruleKey: rule.ruleKey });
   };
-  const completed = view.completedLessonId;
+  const ruleLink =
+    rule === null || view.kind === "focus" ? null : (
+      <button type="button" className="tp-link" onClick={openRule}>
+        Open the Rule ›
+      </button>
+    );
   return (
-    <div className={`tutor-paper tp-pcard tp-pcard--${view.kind}`} role="group" aria-label={`${view.eyebrow}: ${view.title}`} {...anchorProps}>
-      <div className="tp-pcard-top">
-        <span className={`tp-mk tp-mk--${view.tone}`} aria-hidden>
-          {view.mark}
-        </span>
-        <div>
-          <div className="tp-ey">{view.eyebrow}</div>
-          <div className="tp-tt">{view.title}</div>
+    <div className="tutor-sk tp-cardwrap" {...anchorProps}>
+      <Panel tone={view.kitTone} className={`tp-pcard tp-pcard--${view.kind}`} role="group" aria-label={`${view.eyebrow}: ${view.title}`}>
+        <div className="tp-pcard-top">
+          <span className={cx("sk-num", toneClass(view.kitTone), "tp-mk")} aria-hidden>
+            {view.mark}
+          </span>
+          <div className="tp-pcard-head">
+            <p className="tp-eyebrow">{view.eyebrow}</p>
+            <div className="tp-tt">{view.kind === "rule-passing" ? <Highlight sweep>{view.title}</Highlight> : view.title}</div>
+          </div>
+          {view.ring === null ? null : (
+            <div className="tp-ring">
+              <b>{view.ring}</b>examples
+            </div>
+          )}
         </div>
-        {view.ring === null ? null : (
-          <div className="tp-ring">
-            <b>{view.ring}</b>examples
+        {view.next === null ? null : (
+          <div className="tp-pcard-next">
+            <span className="tp-lab">Now</span>
+            <span>{view.next}</span>
           </div>
         )}
-      </div>
-      {view.next === null ? null : (
-        <div className="tp-pcard-next">
-          <span className="tp-lab">Now</span>
-          <b>{view.next}</b>
-        </div>
-      )}
-      {view.note === null ? null : (
-        <div className="tp-pcard-rows">
-          <div>
-            <span className={view.tone === "amber" ? "tp-a" : "tp-g"} aria-hidden>
-              {view.tone === "amber" ? "!" : "✓"}
-            </span>
-            <span>{view.note}</span>
+        {view.note === null ? (
+          ruleLink === null ? null : <div className="tp-pcard-ft">{ruleLink}</div>
+        ) : (
+          <div className="tp-speaker">
+            <KitIcon name="robot" className="tp-speaker-icon" />
+            <Bubble className="tp-pcard-note">{view.note}</Bubble>
+            {ruleLink}
           </div>
-        </div>
-      )}
-      {(rule === null || view.kind === "focus") && completed === null ? null : (
-        <div className="tp-pcard-ft">
-          {rule === null || view.kind === "focus" ? null : (
-            <button type="button" className="tp-link-button" onClick={openRule}>
-              Open the Rule ›
-            </button>
-          )}
-          {completed === null ? null : (
-            <button type="button" className="tp-link-button" onClick={() => goCourse({ kind: "complete", lessonId: completed })}>
-              What's next →
-            </button>
-          )}
-        </div>
-      )}
+        )}
+      </Panel>
     </div>
   );
 }
@@ -293,7 +292,7 @@ export function TermDirective({ attributes, source }: PluginMessageDirectiveProp
     return lexicon.status === "error" ? (
       <SourceFallback source={source} />
     ) : (
-      <div className="tutor-paper tp-term-line">
+      <div className="tutor-sk tp-term-line">
         <span className="tp-term tp-term--loading">{ref.label ?? ref.id}</span>
       </div>
     );
@@ -301,7 +300,7 @@ export function TermDirective({ attributes, source }: PluginMessageDirectiveProp
   const term = termView(ref, lexicon.data.entries);
   if (term === null) return <SourceFallback source={source} />;
   return (
-    <div className="tutor-paper tp-term-line">
+    <div className="tutor-sk tp-term-line">
       <Popover.Root open={open} onOpenChange={(next) => setOpen(next || hovering.current)}>
         <Popover.Trigger asChild>
           <button
@@ -324,7 +323,7 @@ export function TermDirective({ attributes, source }: PluginMessageDirectiveProp
         <Popover.Portal>
           <Popover.Content
             {...portalScope}
-            className="tutor-paper tp-termpop"
+            className="tutor-sk tp-termpop"
             side="top"
             align="start"
             sideOffset={6}

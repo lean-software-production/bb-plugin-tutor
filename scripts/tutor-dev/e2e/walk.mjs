@@ -4,6 +4,10 @@
 // side chats (Tutor's "Ask a side question" and BB's "Reply in side chat").
 //   node walk.mjs [step-prefix…]
 // Screenshots: $E2E_SHOTS (default <repo>/.tutor-e2e/shots)/e2e-NN-*.png and tree-*.png. Exits non-zero on the first failed check.
+// The Rule card (05), the outline (09) and lesson complete (11) also get the Sketchbook geometry
+// checks; 05 and 09 check the kit's wobble outlines draw. The brand is light mode only: no dark copies.
+// E2E_BROWSER=firefox runs the walk in Firefox (shots carry -firefox). 11b checks that a page
+// asking for less motion (reducedMotion: "reduce") sees a passed Rule's swash and the ribbon still.
 // PROJECT (set by run-all.sh from the checkout's devcontainer.json; FACTORY before it) picks the layout:
 //   /workspaces/my-factory (default; tutor/mvp): spec/ITERATION, the factory is its own repo;
 //   <starter>/tetris/.factory (tutor/starter-layout, plugin 0.1.0): ITERATION at the factory
@@ -13,7 +17,8 @@
 //   the move against a second clone run through the starter's fetch.sh).
 import { execFileSync } from "node:child_process";
 import { dirname } from "node:path";
-import { BASE, SHOTS, bb, bbJson, openBrowser, sh, shot, sleep, until } from "./lib.mjs";
+import { BASE, BROWSER, SHOTS, bb, bbJson, openBrowser, sh, shot, sleep, until } from "./lib.mjs";
+import { outlineReportInPage, sketchReport } from "./sketch-check.mjs";
 
 const PROJECT = process.env.PROJECT || process.env.FACTORY || "/workspaces/my-factory";
 /** The project is a starter clone's top folder (plugin 0.2.0), not a factory. */
@@ -96,13 +101,26 @@ function keysFrom(status) {
   const examples = [...status.matchAll(/^ {4}\S (\S+\/\S+\/\S+) — /gm)].map((m) => m[1]);
   return { rules, examples };
 }
+/**
+ * The factory's stand-ins/ is refreshed from the course's, when the course has
+ * one (server/progress/spec-copy.ts). The course dropped its stand-ins in
+ * 1b36b1b ("students write their own doubles"); then the factory gets none.
+ */
+function checkStandIns() {
+  if (exists(`${COURSE}/stand-ins`)) {
+    check(exists(`${FACTORY}/stand-ins`), "the factory has stand-ins/");
+    check(sh(`diff -r ${COURSE}/stand-ins ${FACTORY}/stand-ins && echo same`).trim().endsWith("same"), "stand-ins/ matches the course's stand-ins/ exactly (diff -r is empty)");
+  } else {
+    check(!exists(`${FACTORY}/stand-ins`), "the course has no stand-ins/, so the factory gets none");
+  }
+}
 const anchorOf = (coach, rule) => `${coach}|000/${rule}`;
 const anchorSelector = (coach, rule) => `[data-tutor-rule-anchor="${anchorOf(coach, rule)}"]`;
 
 const { browser, context, page, errors } = await openBrowser();
 const steps = [];
 const outline = () => page.locator("nav.tp-outline");
-const lessonRow = (id) => outline().locator("li.tp-lesson").filter({ has: page.locator(`.tp-n`, { hasText: id }) });
+const lessonRow = (id) => outline().locator(`li.tp-lesson[data-lesson-id="${id}"]`);
 async function openThread(threadId) {
   if (!page.url().endsWith(`/threads/${threadId}`)) {
     await page.goto(`${BASE}/threads/${threadId}`, { waitUntil: "load" });
@@ -132,8 +150,38 @@ async function inViewport(selector) {
     return r.bottom > 0 && r.top < window.innerHeight;
   }, selector);
 }
+/** Another page on the same browser, e.g. with reduced motion. */
+async function otherPage(options) {
+  const other = await browser.newContext({ viewport: page.viewportSize(), ...options });
+  return other.newPage();
+}
+/** Opens a thread on another page and waits for its outline and timeline. */
+async function openOn(other, threadId) {
+  await other.goto(`${BASE}/threads/${threadId}`, { waitUntil: "load" });
+  await other.locator("nav.tp-outline").waitFor({ timeout: 30000 });
+  await other.locator(`[data-timeline-row-id^="${threadId}:"]`).first().waitFor({ timeout: 30000 });
+  await sleep(1500);
+}
+/** The kit's wobble outlines draw: the filters are mounted, and `selector`'s ::before is a filtered, non-empty box. */
+async function checkOutlines(p, where, selector) {
+  const fail = await p.evaluate(outlineReportInPage, selector);
+  check(fail.length === 0, `${where}: the wobble filters are mounted and ${selector}::before draws a filtered box${fail.length ? ` (${fail.join("; ")})` : ""}`);
+}
+/** The Sketchbook geometry checks (sketch-check.mjs) hold on a page. */
+async function checkSketch(p, where) {
+  const fail = await sketchReport(p);
+  check(fail.length === 0, `${where}: the Sketchbook geometry holds${fail.length ? ` (${fail.join("; ")})` : ""}`);
+}
+/** Scrolls a page's timeline to its newest message. */
+async function showLatestOn(p) {
+  const latest = p.getByRole("button", { name: "Scroll to latest event" });
+  if (await latest.isVisible().catch(() => false)) await latest.click();
+  await sleep(1200);
+}
 const step = (name, fn) => steps.push({ name, fn });
 const ctx = JSON.parse(process.env.E2E_CTX ?? "{}");
+/** The reduced-motion page step 11 opens for 11b. */
+let stillPage;
 
 step("01 first run asks to confirm the detected factory", async () => {
   await page.goto(`${BASE}/plugins/tutor/course`, { waitUntil: "load" });
@@ -151,7 +199,9 @@ step("02 confirm lands on Lesson 0's start page; the outline is one tree of less
   const config = JSON.parse(bb("plugin", "config", "tutor", "--json"));
   check(/^proj_/.test(config.values.factoryProject ?? ""), `factoryProject is set (${config.values.factoryProject})`);
   await outline().locator("li.tp-lesson").first().waitFor({ timeout: 30000 });
-  const ids = await outline().locator("li.tp-lesson .tp-lesson-title .tp-n").allInnerTexts();
+  const ids = await outline().locator("li.tp-lesson").evaluateAll((rows) => rows.map((row) => row.getAttribute("data-lesson-id")));
+  const badges = await outline().locator("li.tp-lesson .tp-lesson-head .tp-n").allInnerTexts();
+  check(badges[0] === "0", `each lesson's step badge shows its number (${badges.join(" ")})`);
   check(["000", "001", "002", "003", "007"].every((id) => ids.includes(id)), `the outline lists every lesson as a row (${ids.join(" ")})`);
   const zero = lessonRow("000");
   check((await zero.locator(".tp-lesson-head").getAttribute("aria-expanded")) === "true", "the lesson you are on is expanded");
@@ -177,7 +227,7 @@ step("03 Start with your coach opens the coach thread in BB's own thread view, l
   check(first.directives[0] === '::tutor-lesson{lesson="000"}', "the first reply opens with the lesson card line");
   const card = page.locator('[data-tutor-lesson="000"]');
   await card.waitFor({ timeout: 30000 });
-  check((await card.innerText()).includes("Using your tutor"), "the lesson card renders in the first coach reply");
+  check((await card.textContent()).includes("Using your tutor"), "the lesson card renders in the first coach reply");
   check((await card.locator(".tp-lcard-rule").count()) === 5, "the lesson card lists Lesson 0's five Rules");
   const coachRow = lessonRow("000").locator("a.tp-th--coach");
   await coachRow.waitFor({ timeout: 20000 });
@@ -234,6 +284,8 @@ step("05 the coach reaches the first Rule: its Rule card starts its section, and
   await until("the outline to count 1/10", async () => (await lessonRow("000").innerText()).includes("1/10"), { timeout: 20000 });
   check(true, "the outline counts 1/10, live");
   await showLatest();
+  await checkOutlines(page, "the Rule card", `${anchorSelector(ctx.coach0, ctx.ruleA)} .tp-rcard`);
+  await checkSketch(page, "e2e-05-rule-card");
   await shot(page, "e2e-05-rule-card");
 });
 
@@ -286,7 +338,7 @@ step("08 Ask a side question makes a hidden fork and puts BB's Side chat tab in 
   check(await page.getByText(/A side question about the Rule/).first().isVisible(), "the Side chat tab renders the side chat, replying to the Rule");
   const side = lessonRow("000").locator(`a[data-side-kind="side-chat"]`);
   await side.first().waitFor({ timeout: 20000 });
-  check((await side.first().innerText()).includes("from: "), "the side chat is listed under the lesson, from its Rule");
+  check((await side.first().textContent()).includes("from: "), "the side chat is listed under the lesson, from its Rule");
   await shot(page, "e2e-08-side-chat-tab");
 });
 
@@ -316,8 +368,11 @@ step("09 BB's own Reply in side chat also lands in the outline", async () => {
   check(t.toolReport[0]?.includes(": ok →"), "a side chat BB made of the coach thread can use Tutor's tools");
   await sleep(1000);
   await shot(page, "tree-desktop-thread");
-  await page.locator("nav.tp-outline").screenshot({ path: `${SHOTS}/tree-desktop.png` });
-  console.log("  shot tree-desktop.png");
+  await checkOutlines(page, "the outline", "nav.tp-outline .sk-num");
+  await checkSketch(page, "tree-desktop-thread");
+  const tree = `tree-desktop${BROWSER === "chromium" ? "" : `-${BROWSER}`}.png`;
+  await page.locator("nav.tp-outline").screenshot({ path: `${SHOTS}/${tree}` });
+  console.log(`  shot ${tree}`);
 });
 
 step("09b closing a side chat's tab and choosing it in the outline puts the tab back", async () => {
@@ -349,6 +404,10 @@ step("10 narrow screen: the outline in BB's drawer", async () => {
 });
 
 step("11 every Example passes; the coach completes Lesson 0", async () => {
+  // A page that asks for less motion watches the Rules pass (checked in 11b).
+  const still = await otherPage({ reducedMotion: "reduce" });
+  await openOn(still, ctx.coach0);
+  stillPage = still;
   for (const [i, key] of ctx.keys.examples.entries()) {
     if (i === 0) continue;
     const t = await turn(ctx.coach0, [`CALL tutor_mark_example {"example":"${key}","status":"passing","evidence":"Student reported what they saw for example ${i + 1}."}`]);
@@ -360,14 +419,51 @@ step("11 every Example passes; the coach completes Lesson 0", async () => {
   check(t.toolReport[0].includes(": ok →"), "tutor_complete_iteration succeeded");
   await openThread(ctx.coach0);
   await showLatest();
+  await page.locator(".tp-done").waitFor({ timeout: 20000 });
+  await checkSketch(page, "e2e-11-lesson-complete");
   await shot(page, "e2e-11-lesson-complete");
+});
+
+step("11b reduced motion: a passed Rule's swash and the lesson-complete ribbon hold still", async () => {
+  const still = stillPage ?? (await otherPage({ reducedMotion: "reduce" }));
+  try {
+    if (stillPage === undefined) await openOn(still, ctx.coach0);
+    await showLatestOn(still);
+    check(await still.evaluate(() => matchMedia("(prefers-reduced-motion: reduce)").matches), "the page asks for less motion");
+    const animations = (p, selector) =>
+      p.evaluate((sel) => [...document.querySelectorAll(sel)].map((el) => el.getAnimations().map((a) => ({ name: a.animationName, state: a.playState }))), selector);
+    const swash = ".tp-pcard--rule-passing .sk-hl.sk-sweep";
+    await still.locator(swash).last().waitFor({ timeout: 20000 });
+    const swashes = await animations(still, swash);
+    check(swashes.length > 0 && swashes.every((list) => list.length === 0), `every passed Rule's swash (${swashes.length}) has no animation`);
+    await still.locator(".tp-done .tp-ribbon").waitFor({ timeout: 20000 });
+    const ribbons = await animations(still, ".tp-done .tp-ribbon");
+    check(ribbons.every((list) => !list.some((a) => a.state === "running")), `the ribbon has no running animation (${JSON.stringify(ribbons)})`);
+    // Freshly loaded without the ask, the same swash does sweep in (the kit's
+    // scoped keyframes are tutor-sk-sweep), so the checks above can fail.
+    const moving = await otherPage({ reducedMotion: "no-preference" });
+    try {
+      await openOn(moving, ctx.coach0);
+      await moving.locator(swash).last().waitFor({ timeout: 20000 });
+      const swept = await animations(moving, swash);
+      check(swept.some((list) => list.some((a) => /sk-sweep$/.test(a.name))), `without the ask, a passed Rule's swash sweeps in (${JSON.stringify(swept.flat())})`);
+    } finally {
+      await moving.context().close();
+    }
+    await still.locator(swash).last().evaluate((el) => el.scrollIntoView({ block: "center" }));
+    await sleep(500);
+    await shot(still, "e2e-11b-reduced-motion");
+  } finally {
+    await still.context().close();
+    stillPage = undefined;
+  }
 });
 
 step("12 the completion page starts Lesson 1, which opens its coach thread", async () => {
   await page.goto(`${BASE}/plugins/tutor/course/complete/000`, { waitUntil: "load" });
   const start = page.getByText(/Start lesson 1 with your coach/).first();
   await start.waitFor({ timeout: 30000 });
-  const text = await page.locator(".tp-done-panel").innerText();
+  const text = await page.locator(".tp-done-panel").textContent();
   const sideChats = sideChatsOf(ctx.coach0).length;
   check(text.includes("10/10") && new RegExp(`${sideChats}\\s*side chats`).test(text), `the completion page counts 10/10 and the ${sideChats} side chats, BB's included`);
   await shot(page, "e2e-12-between-lessons");
@@ -393,8 +489,7 @@ step("12 the completion page starts Lesson 1, which opens its coach thread", asy
     check(exists(seed), `the seed ${seed} exists`);
     check(sh(`cmp ${COURSE}/docs/iterations/001-*/spec.md ${seed} && echo same`).trim().endsWith("same"), "the seed is the course's 001 spec.md");
     check(!exists(`${FACTORY}/seeds`), `${FACTORY}/seeds does not exist`);
-    check(exists(`${FACTORY}/stand-ins`), "the factory has stand-ins/");
-    check(sh(`diff -r ${COURSE}/stand-ins ${FACTORY}/stand-ins && echo same`).trim().endsWith("same"), "stand-ins/ matches the course's stand-ins/ exactly (diff -r is empty)");
+    checkStandIns();
     const spec = sh(`ls -A ${FACTORY}/spec`).trim().split("\n");
     check(["README.md", "FACTORY.md", "features"].every((n) => spec.includes(n)), `spec/ holds README.md, FACTORY.md and features/ (${spec.join(" ")})`);
     check(sh(`cd ${FACTORY}/spec && for f in README.md FACTORY.md; do cmp ${COURSE}/docs/iterations/001-*/$f $f || exit 1; done && echo same`).trim().endsWith("same"), "spec/README.md and spec/FACTORY.md are the course's 001 files");
@@ -431,7 +526,7 @@ step("14 a non-Tutor thread cannot use Tutor tools", async () => {
   check(readFactory("spec/PROGRESS.yaml") === progressBefore, "spec/PROGRESS.yaml is unchanged by the forced calls");
   await page.goto(`${BASE}/threads/${ctx.plain}`, { waitUntil: "load" });
   await sleep(2500);
-  check((await outline().locator(".tp-other-group").innerText()).includes("Ordinary thread"), "the ordinary thread is under Other threads");
+  check((await outline().locator(".tp-other-group").textContent()).includes("Ordinary thread"), "the ordinary thread is under Other threads");
 });
 
 step("15 Lesson 0 stays truthful after moving on", async () => {
@@ -498,8 +593,7 @@ step("16 lessons 001-003 in tetris/.factory, then adopting 004 moves the factory
   check(/^R. tetris\/\.factory\/AGENTS\.md -> factory\/AGENTS\.md$/m.test(porcelain), "the factory's renames are staged");
   check(readFactory("ITERATION").trim() === "004 WIP", "factory/ITERATION is 004 WIP");
   check(sh(`diff -r ${COURSE}/docs/iterations/004-*/features ${FACTORY}/spec/features && echo same`).trim().endsWith("same"), "factory/spec/features matches the course's 004 features");
-  check(sh(`diff -r ${COURSE}/stand-ins ${FACTORY}/stand-ins && echo same`).trim().endsWith("same"), "factory/stand-ins matches the course's stand-ins");
-  check(exists(`${FACTORY}/stand-ins/acp`), "factory/stand-ins has acp/");
+  checkStandIns();
   check(sh(`cmp ${COURSE}/docs/iterations/001-*/spec.md ${CODEBASE}/seeds/tetris.md && echo same`).trim().endsWith("same"), "tetris/seeds/tetris.md is still the course's 001 seed");
 
   // A second clone of the starter, as it was before the walk, run through its own fetch.sh with the same course.

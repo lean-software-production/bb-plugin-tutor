@@ -3,13 +3,19 @@
 import { ruleKeyOfExample } from "../../shared/keys.ts";
 import type { ProgressCard, ProgressKind, TermRef } from "../../shared/directives.ts";
 import type { LexiconEntry } from "../../shared/model.ts";
+import type { Tone } from "../sketch/tone.ts";
 import { lessonLabel } from "./format.ts";
 
 export type CardTone = "green" | "amber" | "blue";
 
+/** The kit accent each card tone is drawn in: the panel's outline, wash and mark. */
+export const CARD_KIT_TONES: Readonly<Record<CardTone, Tone>> = { green: "forest", amber: "coral", blue: "blue" };
+
 export interface ProgressCardView {
   kind: ProgressKind;
   tone: CardTone;
+  /** The kit accent for the card's panel and mark (CARD_KIT_TONES). */
+  kitTone: Tone;
   mark: string;
   eyebrow: string;
   title: string;
@@ -39,6 +45,7 @@ export function progressCardView(card: ProgressCard): ProgressCardView {
   return {
     kind: card.kind,
     tone: look.tone,
+    kitTone: CARD_KIT_TONES[look.tone],
     mark: look.mark,
     eyebrow: isComplete && card.lessonId !== null ? `${lessonLabel(card.lessonId)} complete` : look.eyebrow,
     title: card.title,

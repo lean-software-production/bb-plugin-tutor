@@ -48,6 +48,8 @@ export interface RuleView {
   status: RuleStatus;
   isFocus: boolean;
   isUpNext: boolean;
+  /** 1-based place among all the lesson's Rules, in file order: the number on its step badge. */
+  number: number;
   /** Right-hand text of the collapsed row: "2/2 · 6m ago", "up next". */
   summary: string;
   examples: ExampleView[];
@@ -142,7 +144,7 @@ export function marginNote(example: Example, progress: ProgressMap, now: number)
     return {
       tone: "muted",
       label: "Reworded",
-      text: "The wording changed after your coach marked it, so it is pending again.",
+      text: "The wording changed after your coach checked it, so it's pending again.",
       evidence: null,
     };
   }
@@ -169,7 +171,7 @@ export function marginNote(example: Example, progress: ProgressMap, now: number)
       return { tone: "muted", label: "Skipped", text: entry?.note ?? null, evidence: null };
     case "pending":
       if (example.tags.includes("real-agent")) {
-        return { tone: "purple", label: "@real-agent", text: "Needs a real agent — slow and costs tokens.", evidence: null };
+        return { tone: "purple", label: "@real-agent", text: "This one needs a real agent, which is slow and costs tokens.", evidence: null };
       }
       if (example.change === "new") return { tone: "blue", label: "New", text: "New in this lesson.", evidence: null };
       if (example.change === "reworded") {
@@ -262,11 +264,11 @@ function chips(status: LessonStatus, counts: ExampleCounts, lesson: Lesson): Chi
   if (status === "ahead") {
     const rules = lesson.features.reduce((sum, feature) => sum + feature.rules.length, 0);
     return [
-      { text: `${plural(rules, "rule")} · ${plural(counts.total, "example")}`, tone: "plain" },
+      { text: `${plural(rules, "Rule")} · ${plural(counts.total, "Example")}`, tone: "plain" },
       { text: "Preview", tone: "plain" },
     ];
   }
-  const holding = { text: `${counts.passing} of ${plural(counts.total, "example")} hold`, tone: "plain" } as Chip;
+  const holding = { text: `${counts.passing} of ${plural(counts.total, "Example")} hold`, tone: "plain" } as Chip;
   if (status === "done") return [{ ...holding, tone: "green" }, { text: "Complete ✓", tone: "green" }];
   const result: Chip[] = [{ ...holding, tone: counts.total > 0 && counts.passing === counts.total ? "green" : "plain" }];
   if (counts.fresh > 0) result.push({ text: `${counts.fresh} new or reworded`, tone: "amber" });
@@ -279,6 +281,7 @@ export function featureView(
   focusKey: string | null,
   upNext: string | null,
   now: number,
+  numbers: ReadonlyMap<string, number>,
 ): FeatureView {
   const counts = countExamples(
     feature.rules.flatMap((rule) => rule.examples),
@@ -303,11 +306,18 @@ export function featureView(
         status,
         isFocus: rule.key === focusKey,
         isUpNext,
+        number: numbers.get(rule.key) ?? 0,
         summary: ruleSummary(rule, status, isUpNext, progress, now),
         examples: rule.examples.map((example) => exampleView(example, progress, now)),
       };
     }),
   };
+}
+
+/** Each Rule's 1-based place among all the lesson's Rules, in file order. */
+export function ruleNumbers(lesson: Lesson): Map<string, number> {
+  const keys = lesson.features.flatMap((feature) => feature.rules.map((rule) => rule.key));
+  return new Map(keys.map((key, index) => [key, index + 1]));
 }
 
 /** `lessons` is the course order from getOverview, used to name the previous lesson. */
@@ -316,8 +326,9 @@ export function buildLesson(detail: LessonDetail, lessons: readonly LessonSummar
   const counts = countExamples(lessonExamples(lesson), progress);
   const focus = resolveFocus(detail, progress);
   const upNext = upNextKey(detail, progress, focus?.ruleKey ?? null);
+  const numbers = ruleNumbers(lesson);
   const features = lesson.features.map((feature) =>
-    featureView(feature, progress, focus?.ruleKey ?? null, upNext, now),
+    featureView(feature, progress, focus?.ruleKey ?? null, upNext, now, numbers),
   );
   const holder = features.find((feature) => feature.rules.some((rule) => rule.key === focus?.ruleKey)) ?? null;
   const focusIndex = holder?.rules.findIndex((rule) => rule.isFocus) ?? -1;

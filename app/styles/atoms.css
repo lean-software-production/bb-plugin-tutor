@@ -1,0 +1,126 @@
+/*
+ * Tutor's shared atoms: type, the change badge, chips, the meter's count and
+ * the lesson-complete loop's band. They paint with the --tp-* tokens
+ * (app/sketch/tokens.css), which alias the Sketchbook kit's roles.
+ */
+
+/* ---- a drawing (KitIcon, Character): the whole vendored file, never
+   recoloured. The wrapper sizes like an inline image; :where() keeps it at
+   one class, so a component's own rule for the drawing wins. ---- */
+:where(.tutor-sk) .tp-drawing {
+  display: inline-block;
+  line-height: 0;
+  vertical-align: middle;
+}
+:where(.tutor-sk) .tp-drawing > img {
+  display: block;
+  max-width: 100%;
+}
+
+/* ---- type (mockup .tp-eyebrow, .tp-dek) ---- */
+.tutor-sk .tp-eyebrow,
+.tutor-sk .tp-section-label {
+  margin: 0 0 10px;
+  color: var(--tp-heading);
+  font-family: var(--tp-font-label);
+  font-size: 17px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+.tutor-sk .tp-section-label {
+  margin-bottom: 8px;
+  color: var(--tp-muted);
+  font-size: 15px;
+}
+.tutor-sk .tp-dek {
+  max-width: 700px;
+  margin: 0 0 24px;
+  color: var(--tp-text);
+  font: 21px/1.45 var(--tp-font-body);
+}
+.tutor-sk .tp-prose {
+  max-width: 700px;
+  margin: 0 0 18px;
+  color: var(--tp-text);
+  font: 18px/1.5 var(--tp-font-body);
+}
+.tutor-sk code,
+.tutor-sk .tp-mono {
+  font-family: var(--tp-font-mono);
+}
+.tutor-sk .tp-prose code {
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--tp-code-bg);
+  font-size: 0.84em;
+}
+
+/* ---- atoms ---- */
+/* "new" / "reworded": a word in the label hand, in the new-colour (mockup .tp-new). */
+.tutor-sk .tp-change-badge {
+  margin-left: 6px;
+  color: var(--tp-new);
+  font-family: var(--tp-font-label);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+/* A chip is a small filled wash with the kit's thin line, like a panel (mockup .tp-chip).
+   The wobble is on the line only, so the text stays crisp. */
+.tutor-sk .tp-chip {
+  --tp-chip-line: var(--tp-muted);
+  position: relative;
+  isolation: isolate;
+  display: inline-block;
+  padding: 3px 14px 2px;
+  color: var(--tp-text);
+  font-size: 16px;
+}
+.tutor-sk .tp-chip::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: var(--sk-line-thin) solid var(--tp-chip-line);
+  border-radius: 99px;
+  background: color-mix(in oklab, var(--tp-chip-line) var(--sk-wash-amount), var(--tp-page));
+  content: "";
+  filter: url(#tutor-sk-wobble);
+}
+.tutor-sk .tp-chip--green {
+  --tp-chip-line: var(--tp-good-fill);
+  color: var(--tp-good);
+}
+.tutor-sk .tp-chip--amber,
+.tutor-sk .tp-chip--new {
+  --tp-chip-line: var(--tp-new-fill);
+  color: var(--tp-new);
+}
+
+/* The kit meter with its count in words (app/ui/sketch/Meter.tsx). */
+.tutor-sk .tp-meter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tutor-sk .tp-meter-bar {
+  flex: 1;
+}
+.tutor-sk .tp-meter-count {
+  flex: none;
+  color: var(--tp-muted);
+  white-space: nowrap;
+}
+
+/* The lesson-complete loop's band; its svg is placed at the measured gap (app/ui/sketch/LoopArrow.tsx). */
+.tutor-sk .tp-loop {
+  position: relative;
+}
+.tutor-sk .tp-loop-svg {
+  position: absolute;
+  overflow: visible;
+  pointer-events: none;
+}

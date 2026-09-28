@@ -29,9 +29,9 @@ import { buildOutline } from "../model/outline.ts";
 import type { LessonNode, OutlineRule, OutlineView, SideRow, ThreadRow } from "../model/outline.ts";
 import { outlineMountedStore, routeStore } from "../state/app-state.ts";
 import { ChangeBadge, ReloadButton, coursePageHref, isPlainClick } from "./common.tsx";
+import { Highlight, KitIcon, StepBadge, Tick } from "./sketch/index.ts";
 
-const RULE_GLYPHS = { passing: "✓", "not-yet": "!", pending: "○", focus: "●" } as const;
-const LESSON_GLYPHS = { done: "✓", current: "●", ahead: "○" } as const;
+const RULE_GLYPHS = { "not-yet": "!", pending: "○", focus: "●" } as const;
 const OTHER_THREADS_SHOWN = 40;
 export const NOT_REACHED_HINT = "Your coach hasn't reached this Rule yet";
 
@@ -64,11 +64,9 @@ export function CourseOutline({ activeThreadId, activeProjectId, onNavigate }: P
   const factoryProjectId = overview.data?.factoryProject.status === "found" ? overview.data.factoryProject.projectId : null;
 
   return (
-    <nav className="tutor-paper tp-outline" aria-label="Course outline">
+    <nav className="tutor-sk tp-outline" aria-label="Course outline">
       <a className="tp-outline-brand" href={coursePageHref("")} onClick={(event) => go(event, { kind: "home" })}>
-        <span className="tp-brand-mark" aria-hidden>
-          ⚙
-        </span>
+        <KitIcon name="books" className="tp-brand-mark" />
         {outline.brand}
       </a>
       <OutlineBody outline={outline} go={go} onNavigate={onNavigate} />
@@ -98,18 +96,17 @@ function OutlineBody({ outline, go, onNavigate }: { outline: OutlineView; go: Go
     case "unset":
       return (
         <>
-          {outline.lessons.map((lesson) => (
+          {outline.lessons.map((lesson, position) => (
             <a
               key={lesson.id}
               className="tp-lesson-row tp-lesson-row--ahead"
               href={coursePageHref(lesson.startPath)}
+              aria-label={`${lessonLabel(lesson.id)}, ${lesson.title}`}
+              data-lesson-id={lesson.id}
               onClick={(event) => go(event, { kind: "start", lessonId: lesson.id })}
             >
-              <span className="tp-gl-mark" aria-hidden>
-                ○
-              </span>
-              <span className="tp-n">{lesson.id}</span>
-              {lesson.title}
+              <StepBadge position={position} label={Number(lesson.id)} className="tp-n" />
+              <span className="tp-ltitle">{lesson.title}</span>
             </a>
           ))}
           <a className="tp-setup-card" href={coursePageHref("welcome")} onClick={(event) => go(event, { kind: "welcome" })}>
@@ -120,47 +117,36 @@ function OutlineBody({ outline, go, onNavigate }: { outline: OutlineView; go: Go
     case "ready":
       return (
         <ul className="tp-tree" aria-label="Lessons">
-          {outline.lessons.map((lesson) => (
-            <LessonBranch key={lesson.id} lesson={lesson} go={go} onNavigate={onNavigate} />
+          {outline.lessons.map((lesson, position) => (
+            <LessonBranch key={lesson.id} lesson={lesson} position={position} go={go} onNavigate={onNavigate} />
           ))}
         </ul>
       );
   }
 }
 
-function LessonBranch({ lesson, go, onNavigate }: { lesson: LessonNode; go: Go; onNavigate: () => void }) {
+function LessonBranch({ lesson, position, go, onNavigate }: { lesson: LessonNode; position: number; go: Go; onNavigate: () => void }) {
   const [open, setOpen] = useState(lesson.expandedByDefault);
   useEffect(() => {
     if (lesson.expandedByDefault) setOpen(true);
   }, [lesson.expandedByDefault]);
   const childrenId = `tp-lesson-${lesson.id}`;
   return (
-    <li className={`tp-lesson tp-lesson--${lesson.status}${lesson.isViewed ? " tp-lesson--viewed" : ""}`}>
+    <li className={`tp-lesson tp-lesson--${lesson.status}${lesson.isViewed ? " tp-lesson--viewed" : ""}`} data-lesson-id={lesson.id}>
       <button
         type="button"
         className="tp-lesson-head"
         aria-expanded={open}
         aria-controls={childrenId}
-        aria-label={`${lessonLabel(lesson.id)}, ${lesson.title}, ${lesson.status}, ${lesson.count} examples hold`}
+        aria-label={`${lessonLabel(lesson.id)}, ${lesson.title}, ${lesson.status}, ${lesson.count} Examples hold`}
         onClick={() => setOpen(!open)}
       >
-        <span className="tp-caret" aria-hidden>
-          {open ? "▾" : "▸"}
+        <StepBadge position={position} label={Number(lesson.id)} className="tp-n" />
+        <span className="tp-lesson-title tp-ltitle">
+          {lesson.status === "current" ? <Highlight>{lesson.title}</Highlight> : lesson.title}
+          {lesson.status === "done" ? <Tick className="tp-ltick" /> : null}
         </span>
-        <span className="tp-lesson-mark" aria-hidden>
-          {LESSON_GLYPHS[lesson.status]}
-        </span>
-        <span className="tp-lesson-text">
-          <span className="tp-lesson-title">
-            <span className="tp-n">{lesson.id}</span> {lesson.title}
-          </span>
-          <span className="tp-lesson-meter" aria-hidden>
-            <span className="tp-lesson-bar">
-              <i style={{ width: `${lesson.percent}%` }} />
-            </span>
-            <span className="tp-lesson-count">{lesson.count}</span>
-          </span>
-        </span>
+        <span className="tp-lesson-count tp-lcount">{lesson.count}</span>
       </button>
       {open ? (
         <div id={childrenId} className="tp-lesson-body">
@@ -192,9 +178,7 @@ function LessonThreads({ lesson, go, onNavigate }: { lesson: LessonNode; go: Go;
       {coach === null ? (
         lesson.canStartCoach ? (
           <button type="button" className="tp-th tp-th--coach tp-th--start" disabled={startCoach.pending} onClick={() => void startCoach.run()}>
-            <span className="tp-ic" aria-hidden>
-              ✦
-            </span>
+            <KitIcon name="chat" className="tp-ic" />
             <span className="tp-t">{startCoach.pending ? "Starting your coach…" : "Start with your coach"}</span>
           </button>
         ) : (
@@ -272,10 +256,10 @@ function RuleRow({ rule, href, onOpen }: { rule: OutlineRule; href: string; onOp
   const body = (
     <>
       <span className="tp-g" aria-hidden>
-        {RULE_GLYPHS[rule.glyph]}
+        {rule.glyph === "passing" ? <Tick /> : RULE_GLYPHS[rule.glyph]}
       </span>
       <span className="tp-rname">
-        {rule.name}
+        {rule.isFocus ? <Highlight>{rule.name}</Highlight> : rule.name}
         <ChangeBadge change={rule.change} />
       </span>
     </>
@@ -344,7 +328,11 @@ function ThreadLink({ row, onNavigate }: { row: ThreadRow; onNavigate: () => voi
   const classes = ["tp-th", `tp-th--${row.kind}`];
   if (row.nested) classes.push("tp-th--nest");
   if (row.isActive) classes.push("tp-th--on");
-  const icon = row.kind === "coach" ? "✦" : row.kind === "sideChat" ? "↳" : "·";
+  const icon = row.kind === "coach" ? <KitIcon name="chat" className="tp-ic" /> : (
+    <span className="tp-ic" aria-hidden>
+      {row.kind === "sideChat" ? "↳" : "·"}
+    </span>
+  );
   return (
     <a
       className={classes.join(" ")}
@@ -356,9 +344,7 @@ function ThreadLink({ row, onNavigate }: { row: ThreadRow; onNavigate: () => voi
       // BB routes a plain click on `href` itself; the outline only closes the mobile drawer.
       onClick={() => onNavigate()}
     >
-      <span className="tp-ic" aria-hidden>
-        {icon}
-      </span>
+      {icon}
       <span className="tp-t">{row.title}</span>
       {row.indicator.tone === "none" ? null : <span className={`tp-ind tp-ind--${row.indicator.tone}`} aria-hidden />}
     </a>
@@ -399,7 +385,7 @@ function OtherThreads({
       </div>
       {total === 0 ? (
         <p className="tp-outline-note">
-          {status === "loading" ? "Loading threads…" : status === "error" ? "Threads could not be loaded." : "No other threads."}
+          {status === "loading" ? "Loading threads…" : status === "error" ? "We couldn't load your threads." : "No other threads."}
         </p>
       ) : null}
       {outline.others.map((group) => {

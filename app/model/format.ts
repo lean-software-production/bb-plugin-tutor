@@ -43,12 +43,12 @@ function parseTime(iso: string | null | undefined): number | null {
   return Number.isNaN(time) ? null : time;
 }
 
-/** "just now", "6m ago", "3h ago", "2d ago"; null for a missing or unreadable time. */
+/** "a moment ago", "6m ago", "3h ago", "2d ago"; null for a missing or unreadable time. */
 export function relativeTime(iso: string | null | undefined, now: number): string | null {
   const time = parseTime(iso);
   if (time === null) return null;
   const elapsed = Math.max(0, now - time);
-  if (elapsed < MINUTE) return "just now";
+  if (elapsed < MINUTE) return "a moment ago";
   if (elapsed < HOUR) return `${Math.floor(elapsed / MINUTE)}m ago`;
   if (elapsed < DAY) return `${Math.floor(elapsed / HOUR)}h ago`;
   return `${Math.floor(elapsed / DAY)}d ago`;

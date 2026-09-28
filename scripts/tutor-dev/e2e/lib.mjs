@@ -27,8 +27,11 @@ export function sh(script) {
   return execFileSync(BB_SH, ["--exec", "bash", "-c", script], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 }
 
+/** The browser the walk drives: $E2E_BROWSER (chromium, the default, or firefox). */
+export const BROWSER = process.env.E2E_BROWSER || "chromium";
+
 export async function openBrowser({ width = 1440, height = 900 } = {}) {
-  const browser = await pw.chromium.launch({ headless: true });
+  const browser = await pw[BROWSER].launch({ headless: true });
   const context = await browser.newContext({ viewport: { width, height } });
   const page = await context.newPage();
   const errors = [];
@@ -42,8 +45,9 @@ export async function openBrowser({ width = 1440, height = 900 } = {}) {
   return { browser, context, page, errors };
 }
 
+/** Saves a screenshot; a non-Chromium walk's shots carry the browser's name. */
 export async function shot(page, name) {
-  const path = `${SHOTS}/${name}.png`;
+  const path = `${SHOTS}/${name}${BROWSER === "chromium" ? "" : `-${BROWSER}`}.png`;
   await page.screenshot({ path });
   console.log(`  shot ${path}`);
   return path;

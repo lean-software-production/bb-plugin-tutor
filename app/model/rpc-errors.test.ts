@@ -22,6 +22,13 @@ test("a response without a BB JSON error body means the proxy in front of BB ans
   }
 });
 
+test("the lost-connection message says what happened, then what to do", () => {
+  assert.equal(
+    CONNECTION_LOST_MESSAGE,
+    "We lost the connection to your Codespace. It may have stopped after sitting idle. Reload this page, and restart the Codespace if it has stopped.",
+  );
+});
+
 test("fetch's network TypeError (Chrome, Firefox, Safari wording) is a lost connection", () => {
   for (const message of ["Failed to fetch", "NetworkError when attempting to fetch resource.", "Load failed"]) {
     assert.ok(classifyRpcFailure(new TypeError(message)) instanceof ConnectionLostError, message);

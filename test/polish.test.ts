@@ -1,12 +1,12 @@
 // The Codespace polish surfaces end to end: the heartbeat RPC writing the
-// feature's activity file, the simpleNavigation setting, and the paper theme
-// declared in the manifest.
+// feature's activity file and the simpleNavigation setting. The themes the
+// manifest declares are checked in app/theme/manifest.test.ts.
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
-import { ACTIVITY_FILE, THEME_ID } from "../shared/constants.ts";
+import { ACTIVITY_FILE } from "../shared/constants.ts";
 import { makeSandbox } from "./helpers/disk.ts";
 import { makeTutorHost, NOW, PROJECT_ID } from "./helpers/fake-bb.ts";
 
@@ -52,16 +52,4 @@ test("the heartbeat falls back to the feature config's dataDir when BB's data di
 test("simpleNavigation defaults to on", async (t) => {
   const tutor = await host(t, {});
   assert.equal((await tutor.rt.settings.get()).simpleNavigation, true);
-});
-
-test("the manifest contributes the paper theme with a light code theme", async () => {
-  const manifest = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8")) as {
-    bb: { themes?: { id: string; name: string; css: string; codeTheme?: { light?: string } }[] };
-  };
-  const theme = manifest.bb.themes?.find((entry) => entry.id === THEME_ID);
-  assert.ok(theme, "bb.themes has the paper theme");
-  assert.equal(theme.name, "Tutor paper");
-  assert.equal(theme.css, "./themes/paper.css");
-  assert.equal(typeof theme.codeTheme?.light, "string");
-  await stat(new URL(`../${theme.css}`, import.meta.url));
 });

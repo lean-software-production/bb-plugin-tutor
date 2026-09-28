@@ -13,8 +13,8 @@ import {
   fixtureThreads,
 } from "../../shared/fixtures.ts";
 import type { Overview } from "../../shared/rpc.ts";
-import { progressCardView, termView } from "./cards.ts";
-import { completionView, confettiPieces } from "./completion.ts";
+import { CARD_KIT_TONES, progressCardView, termView } from "./cards.ts";
+import { completionView, doneRibbon, whatsNext } from "./completion.ts";
 import { continueView, doneLessonsLabel, homeDecision } from "./home.ts";
 import { parseRuleTabParams, ruleTabTarget, ruleTabView } from "./rule-tab.ts";
 import { welcomeView } from "./welcome.ts";
@@ -41,6 +41,7 @@ test("a passing Rule card shows the tally, the next Rule and a way into the Rule
   assert.deepEqual(progressCardView(card), {
     kind: "rule-passing",
     tone: "green",
+    kitTone: "forest",
     mark: "✓",
     eyebrow: "Rule passing",
     title: "The factory accepts an assembly line it can run",
@@ -66,6 +67,7 @@ test("a not-yet card finds its Rule from the Example key and drops what did not 
   assert.ok(card !== null);
   const view = progressCardView(card);
   assert.equal(view.tone, "amber");
+  assert.equal(view.kitTone, "coral");
   assert.equal(view.ring, null, "passed > total is not shown");
   assert.equal(view.next, null);
   assert.equal(view.note, "Crashed in the doer loop.");
@@ -82,6 +84,11 @@ test("a lesson-complete card links to the completion page, focus cards are blue"
   assert.deepEqual([view.eyebrow, view.completedLessonId, view.rule], ["Lesson 3 complete", "003", null]);
   const focus = parseProgressCard({ kind: "focus", title: "Refuses an unknown machine" });
   assert.deepEqual(focus === null ? null : [progressCardView(focus).tone, progressCardView(focus).mark], ["blue", "●"]);
+  assert.equal(focus === null ? null : progressCardView(focus).kitTone, "blue");
+});
+
+test("card tones map to the kit's accents in one place", () => {
+  assert.deepEqual(CARD_KIT_TONES, { green: "forest", amber: "coral", blue: "blue" });
 });
 
 test("unusable directives parse to null so the source text shows instead", () => {
@@ -115,6 +122,10 @@ test("the course root sends the student where they are", () => {
   assert.deepEqual(homeDecision({ ...fixtureOverview, course: null, courseError: "No course.yaml or ledger." }), {
     kind: "error",
     message: "No course.yaml or ledger.",
+  });
+  assert.deepEqual(homeDecision({ ...fixtureOverview, course: null, courseError: null }), {
+    kind: "error",
+    message: "We couldn't load the course.",
   });
   assert.deepEqual(homeDecision({ ...fixtureOverview, current: null }), {
     kind: "redirect",
@@ -158,16 +169,16 @@ test("the completion page recaps the lesson and introduces the next", () => {
   const view = completionView(fixtureCompletion, NOW);
   assert.equal(view.eyebrow, "Lesson 1 complete");
   assert.deepEqual(view.stats, [
-    { value: "2/2", label: "examples hold" },
-    { value: "1", label: "new or reworded rule" },
+    { value: "2/2", label: "Examples hold" },
+    { value: "1", label: "new or reworded Rule" },
     { value: "0", label: "side chats" },
     { value: "3 days", label: "since adopted" },
   ]);
   assert.equal(view.summary, fixtureCompletion.summary);
   assert.equal(view.next?.eyebrow, "Lesson 2 · Set after day 2");
   assert.deepEqual(view.next?.chips, [
-    { text: "3 rules · 5 examples", tone: "plain" },
-    { text: "1 carry over as passing", tone: "green" },
+    { text: "3 Rules · 5 Examples", tone: "plain" },
+    { text: "1 already passing", tone: "green" },
     { text: "4 new or reworded", tone: "amber" },
   ]);
   assert.equal(view.next?.diff?.title, "FACTORY.md — what changed since lesson 1");
@@ -190,19 +201,30 @@ test("the completion page recaps the lesson and introduces the next", () => {
   assert.equal(completionView({ ...fixtureCompletion, next: null }, NOW).next, null);
 });
 
+test("the lesson-complete ribbon names the lesson and its tally", () => {
+  assert.deepEqual(doneRibbon("001", fixtureCompletion.counts), { kicker: "Lesson 1 done.", line: "All 2 Examples hold." });
+  assert.deepEqual(doneRibbon("001", { ...fixtureCompletion.counts, passing: 1 }), {
+    kicker: "Lesson 1 done.",
+    line: "1 of 2 Examples hold.",
+  });
+  assert.deepEqual(doneRibbon("001", null), { kicker: "Lesson 1 done.", line: null }, "no stats yet: no tally");
+});
+
+test("What's next names the next lesson, or the end of the course", () => {
+  assert.deepEqual(whatsNext(completionView(fixtureCompletion, NOW)), { label: "What's next →", detail: "Lesson 2 · Checking the work" });
+  assert.deepEqual(whatsNext(completionView({ ...fixtureCompletion, next: null }, NOW)), {
+    label: "What's next →",
+    detail: "That was the last lesson",
+  });
+  assert.deepEqual(whatsNext(null), { label: "What's next →", detail: null });
+});
+
 test("once the next lesson has started, the completion page continues it", () => {
   const next = fixtureCompletion.next;
   assert.ok(next !== null);
   const view = completionView({ ...fixtureCompletion, next: { ...next, status: "current" } }, NOW);
   assert.equal(view.next?.started, true);
   assert.equal(view.next?.startLabel, "Continue lesson 2 with your coach →");
-});
-
-test("confetti is deterministic and stays in the top right", () => {
-  const pieces = confettiPieces();
-  assert.equal(pieces.length, 46);
-  assert.ok(pieces.every((piece) => piece.left >= 55 && piece.left < 100 && piece.top <= 36));
-  assert.deepEqual(confettiPieces(), pieces);
 });
 
 test("first run confirms a detected factory, or explains how to set one up", () => {
@@ -251,10 +273,13 @@ test("the rule tab shows the Rule and its Examples", () => {
     ["Passing", "Not yet — Crashed in the doer loop instead of retrying when the validator said no."],
   );
   assert.equal(view.startPath, "start/002");
+  const keys = fixtureLessonDetail.lesson.features.flatMap((feature) => feature.rules.map((rule) => rule.key));
+  assert.equal(view.number, keys.indexOf(FOCUS) + 1, "the Rule's number across the lesson, for its step badge");
 
   const spun = ruleTabView(fixtureLessonDetail, { lessonId: "002", ruleKey: "planning/the-planner-writes-a-plan" }, true);
   assert.equal(spun.kind === "rule" ? spun.eyebrow : null, "Spun off from · Planning");
   assert.equal(spun.kind === "rule" ? spun.examples[0]?.detail : null, "Passing · carried over");
+  assert.equal(spun.kind === "rule" ? spun.number : null, 1);
   assert.deepEqual(ruleTabView({ ...fixtureLessonDetail, focus: null }, { lessonId: "002", ruleKey: null }, false), {
     kind: "no-rule",
     startPath: "start/002",

@@ -95,11 +95,21 @@ test("the current lesson ends at the Rule in focus, other features collapsed ahe
   const planning = view.otherFeatures[0]?.rules[0];
   assert.deepEqual([planning?.isUpNext, planning?.summary], [true, "up next"], "suggested order puts reworded Rules first");
   assert.deepEqual(view.chips, [
-    { text: "2 of 5 examples hold", tone: "plain" },
+    { text: "2 of 5 Examples hold", tone: "plain" },
     { text: "4 new or reworded", tone: "amber" },
   ]);
   assert.equal(view.percent, 40);
   assert.equal(view.readyToComplete, false);
+});
+
+test("every Rule carries its number across the whole lesson, for its step badge", () => {
+  const view = buildLesson(fixtureLessonDetail, lessons, NOW);
+  const keys = fixtureLessonDetail.lesson.features.flatMap((feature) => feature.rules.map((rule) => rule.key));
+  const shown = [...view.otherFeatures, ...(view.focusFeature === null ? [] : [view.focusFeature])]
+    .flatMap((feature) => feature.rules)
+    .concat(view.laterRules);
+  assert.equal(shown.length, keys.length);
+  for (const rule of shown) assert.equal(rule.number, keys.indexOf(rule.key) + 1, rule.name);
 });
 
 test("opening a Rule unfolds whatever hides it", () => {
@@ -139,16 +149,18 @@ test("margin notes carry the coach's words and the evidence", () => {
   const notYet = marginNote(exampleOf(fixtureLessonDetail, "The work is wrong first time"), progress, NOW);
   assert.deepEqual(
     [notYet?.tone, notYet?.label, notYet?.text],
-    ["amber", "Coach · not yet · just now", "Crashed in the doer loop instead of retrying when the validator said no."],
+    ["amber", "Coach · not yet · a moment ago", "Crashed in the doer loop instead of retrying when the validator said no."],
   );
 
   const realAgent = marginNote(exampleOf(fixtureLessonDetail, "A stand-in that is never satisfied"), progress, NOW);
   assert.equal(realAgent?.tone, "purple");
+  assert.equal(realAgent?.text, "This one needs a real agent, which is slow and costs tokens.");
 
   const reworded = exampleOf(fixtureLessonDetail, "An existing plan is kept");
   assert.equal(marginNote(reworded, progress, NOW)?.label, "Reworded");
   const stale = { [reworded.key]: { status: "passing" as const, hash: `sha256:${"0".repeat(64)}`, at: FIXTURE_NOW, evidence: "x" } };
   assert.deepEqual(marginNote(reworded, stale, NOW)?.tone, "muted", "a hash mismatch reads as pending again");
+  assert.equal(marginNote(reworded, stale, NOW)?.text, "The wording changed after your coach checked it, so it's pending again.");
 
   const skipped = { [reworded.key]: { status: "skipped" as const, hash: reworded.hash, at: FIXTURE_NOW, note: "Out of scope." } };
   assert.deepEqual(marginNote(reworded, skipped, NOW), { tone: "muted", label: "Skipped", text: "Out of scope.", evidence: null });
@@ -176,7 +188,7 @@ test("previews and finished lessons have no focus and open every feature", () =>
   assert.equal(preview.focusFeature, null);
   assert.equal(preview.otherFeatures.length, 1);
   assert.deepEqual(preview.chips, [
-    { text: "1 rule · 1 example", tone: "plain" },
+    { text: "1 Rule · 1 Example", tone: "plain" },
     { text: "Preview", tone: "plain" },
   ]);
   assert.equal(preview.compass, null, "fixture lesson 3 is all new");

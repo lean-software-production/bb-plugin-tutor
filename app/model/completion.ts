@@ -44,8 +44,8 @@ export function completionView(completion: Completion, now: number): CompletionV
   const { lesson, counts, next } = completion;
   const since = daysSince(completion.adoptedAt, now);
   const stats: Stat[] = [
-    { value: `${counts.passing}/${counts.total}`, label: "examples hold" },
-    { value: String(completion.freshRules), label: completion.freshRules === 1 ? "new or reworded rule" : "new or reworded rules" },
+    { value: `${counts.passing}/${counts.total}`, label: "Examples hold" },
+    { value: String(completion.freshRules), label: completion.freshRules === 1 ? "new or reworded Rule" : "new or reworded Rules" },
     { value: String(completion.sideChats), label: completion.sideChats === 1 ? "side chat" : "side chats" },
   ];
   if (since !== null) stats.push({ value: since, label: since === "today" ? "adopted" : "since adopted" });
@@ -63,8 +63,8 @@ export function completionView(completion: Completion, now: number): CompletionV
             title: next.title,
             dek: next.dek,
             chips: [
-              { text: `${plural(next.rules, "rule")} · ${plural(next.examples, "example")}`, tone: "plain" },
-              ...(next.carryOver > 0 ? [{ text: `${next.carryOver} carry over as passing`, tone: "green" as const }] : []),
+              { text: `${plural(next.rules, "Rule")} · ${plural(next.examples, "Example")}`, tone: "plain" },
+              ...(next.carryOver > 0 ? [{ text: `${next.carryOver} already passing`, tone: "green" as const }] : []),
               ...(next.fresh > 0 ? [{ text: `${next.fresh} new or reworded`, tone: "amber" as const }] : []),
             ],
             diff:
@@ -81,21 +81,29 @@ export function completionView(completion: Completion, now: number): CompletionV
   };
 }
 
-export interface ConfettiPiece {
-  left: number;
-  top: number;
-  rotate: number;
-  color: string;
+export interface DoneRibbonView {
+  /** "Lesson 1 done." */
+  kicker: string;
+  /** "All 5 Examples hold.", or null before the stats have loaded. */
+  line: string | null;
 }
 
-const CONFETTI_COLOURS = ["#2459a8", "#1f735b", "#e3b341", "#b43b3b", "#7c5cc4", "#2a9d8f"] as const;
+/** The lesson-complete ribbon. The kicker needs only the lesson, so it shows while the stats load. */
+export function doneRibbon(lessonId: string, counts: Pick<Completion["counts"], "passing" | "total"> | null): DoneRibbonView {
+  const kicker = `${lessonLabel(lessonId)} done.`;
+  if (counts === null) return { kicker, line: null };
+  const all = counts.passing === counts.total;
+  return { kicker, line: all ? `All ${counts.total} Examples hold.` : `${counts.passing} of ${counts.total} Examples hold.` };
+}
 
-/** The mockup's deterministic scatter, kept to the top right so the heading and summary stay clear. */
-export function confettiPieces(count = 46): ConfettiPiece[] {
-  return Array.from({ length: count }, (_, i) => ({
-    left: 55 + ((i * 37) % 45),
-    top: Math.round(((i * 53) % 90) * 0.4),
-    rotate: (i * 47) % 360,
-    color: CONFETTI_COLOURS[i % CONFETTI_COLOURS.length] ?? "#2459a8",
-  }));
+export interface WhatsNextView {
+  label: string;
+  /** "Lesson 2 · Checking the work", the end of the course, or null before the stats have loaded. */
+  detail: string | null;
+}
+
+export function whatsNext(view: CompletionView | null): WhatsNextView {
+  const label = "What's next →";
+  if (view === null) return { label, detail: null };
+  return { label, detail: view.next === null ? "That was the last lesson" : `${lessonLabel(view.next.id)} · ${view.next.title}` };
 }

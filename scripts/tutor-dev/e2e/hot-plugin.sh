@@ -10,8 +10,12 @@ dir="$("$E2E_DIR/bb.sh" plugin list --json | node -e 'let s="";process.stdin.on(
     || e2e_die "the tutor plugin is not installed in tutor-e2e"
 case "$dir" in /?*/?*) ;; *) e2e_die "refusing to replace the plugin at an unexpected rootDir '$dir'" ;; esac
 docker exec -u root tutor-e2e find "$dir" -mindepth 1 -maxdepth 1 ! -name node_modules -exec rm -rf {} +
+# Feature 0.6 links the plugin's node_modules to a root-owned shared copy
+# (/usr/local/share/tutor/plugin/node_modules); drop the link, not its target,
+# so npm ci below installs a private node_modules the node user owns.
+docker exec -u root tutor-e2e sh -c '[ ! -L "$1/node_modules" ] || rm "$1/node_modules"' _ "$dir"
 tar -C "$E2E_PLUGIN_SRC" --exclude=./node_modules --exclude=./dist --exclude=./.git \
-    --exclude=./.tutor-dev --exclude=./.tutor-e2e --exclude=./docs --exclude=./scripts --exclude=./.github \
+    --exclude=./.tutor-dev --exclude=./.tutor-e2e --exclude=./docs --exclude=./scripts --exclude=./.github --exclude=./.claude --exclude=./.mcp.json \
     -cf - . | docker exec -i -u root tutor-e2e tar -C "$dir" -xf -
 docker exec -u root tutor-e2e chown -R node:node "$dir"
 "$E2E_DIR/bb.sh" --exec sh -c 'cd "$1" && npm ci --omit=dev --ignore-scripts --no-audit --no-fund --loglevel=error' _ "$dir"
