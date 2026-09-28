@@ -55,8 +55,14 @@ export const SLOT_IDS = {
   activity: "activity",
 } as const;
 
-/** `bb.themes` id in package.json; BB lists it as `plugin:tutor:paper`. */
-export const THEME_ID = "paper";
+/** `bb.themes` id in package.json; BB lists it as `plugin:tutor:sketchbook`. */
+export const THEME_ID = "sketchbook";
+/**
+ * The old theme id, kept as an alias of Sketchbook for one release: Feature
+ * 0.6 and earlier default to `plugin:tutor:paper`, and a student may have
+ * picked it. Goes away in the next release.
+ */
+export const LEGACY_THEME_ID = "paper";
 
 /** The single navPanel lives at `/plugins/tutor/<NAV_PANEL_PATH>/<subPath>`; see shared/routes.ts. */
 export const NAV_PANEL_PATH = "course";

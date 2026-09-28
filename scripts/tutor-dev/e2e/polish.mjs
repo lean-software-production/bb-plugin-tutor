@@ -3,10 +3,22 @@
 //   node polish.mjs restart       after a container stop + up.sh: the hand re-enable and the theme survive
 //   node polish.mjs ui            theme screenshots, simple navigation on/off, heartbeat + keep-alive, lost connection
 // Exits non-zero on the first failed check.
+import { readFileSync } from "node:fs";
 import { BASE, bb, bbJson, openBrowser, sh, shot, sleep, until } from "./lib.mjs";
 
 const STATE = "/workspaces/.bb-state/.tutor-feature";
+// Feature 0.6 and earlier still default to the old id, which the manifest keeps as an alias of Sketchbook.
 const THEME = "plugin:tutor:paper";
+const SKETCHBOOK = "plugin:tutor:sketchbook";
+// What the theme paints in light mode, read from the vendored brand theme rather than copied by hand.
+const BRAND_THEME = readFileSync(new URL("../../../vendor/brand/bb-theme/sketchbook/theme.css", import.meta.url), "utf8");
+const brandColour = (name) => {
+  const value = BRAND_THEME.match(new RegExp(`^\\s*--sk-${name}:\\s*(#[0-9a-fA-F]{6});`, "m"))?.[1];
+  if (!value) throw new Error(`no --sk-${name} in the vendored brand theme`);
+  return value.toLowerCase();
+};
+const PAPER = brandColour("paper"); // --canvas in light mode
+const DEEP_TEAL = brandColour("deep-teal"); // --primary in light mode
 // The feature's default disablePlugins list (devcontainer-features src/tutor/devcontainer-feature.json).
 const DISABLE = "automations,workflows,tasks,scheduled-send,github,browser-automation,agent-annotations,connect,plugin-api-docs,plugin-api-tester,theme-preview,keep-awake,account-pool,environment-modal-sandbox".split(",");
 const REENABLE = "automations";
@@ -72,7 +84,7 @@ async function ui() {
   const { browser, page, errors } = await openBrowser();
   try {
     if (only("b")) {
-    console.log("POLISH b: the paper theme in the browser");
+    console.log("POLISH b: the Sketchbook theme in the browser");
     await page.goto(`${BASE}/`);
     await page.getByText("Continue your course").waitFor({ timeout: 30000 });
     await sleep(1500);
@@ -80,8 +92,19 @@ async function ui() {
       const root = getComputedStyle(document.documentElement);
       return { canvas: root.getPropertyValue("--canvas").trim(), primary: root.getPropertyValue("--primary").trim(), font: getComputedStyle(document.body).fontFamily };
     });
-    check(look.canvas.toLowerCase() === "#fbfaf6" && look.primary.toLowerCase() === "#2459a8", "BB's tokens are the paper palette", JSON.stringify(look));
-    check(/Tutor Archivo/.test(look.font), "BB's UI font is Tutor Archivo", look.font);
+    check(look.canvas.toLowerCase() === PAPER && look.primary.toLowerCase() === DEEP_TEAL, `BB's tokens are Sketchbook's paper (${PAPER}) and deep teal (${DEEP_TEAL})`, JSON.stringify(look));
+    check(/Tutor Patrick Hand/.test(look.font), "BB's UI font is Tutor Patrick Hand", look.font);
+    let resolveError = "";
+    try {
+      bb("theme", "show", SKETCHBOOK);
+    } catch (error) {
+      resolveError = String(error.stderr || error.message).trim();
+    }
+    check(resolveError === "", `bb resolves ${SKETCHBOOK}`, resolveError);
+    await page.goto(`${BASE}/settings/appearance`);
+    await page.getByText("Sketchbook", { exact: true }).first().waitFor({ timeout: 30000 });
+    check(await page.getByText("Tutor paper (now Sketchbook)", { exact: true }).count() > 0, "Settings › Appearance offers Sketchbook and the Tutor paper alias");
+    await shot(page, "polish-e2e-theme-settings");
     await shot(page, "polish-e2e-theme-home");
     await page.goto(`${BASE}/threads/${coach.id}`);
     await page.waitForLoadState("networkidle").catch(() => {});
