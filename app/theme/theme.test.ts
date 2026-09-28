@@ -3,15 +3,15 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { PALETTE_CSS, THEME_CSS, contrast, paletteBlock, renderThemeCss } from "./build.ts";
 
-test("themes/paper.css is up to date with the palette and the Archivo font (npm run fonts)", () => {
+test("themes/paper.css is up to date with the palette and the Patrick Hand font (npm run fonts)", () => {
   assert.equal(readFileSync(THEME_CSS, "utf8"), renderThemeCss());
 });
 
-test("the theme is under BB's 256 KB theme cap and embeds Archivo as the UI font, keeping BB's mono", () => {
+test("the theme is under BB's 256 KB theme cap and embeds Patrick Hand as the UI font, keeping BB's mono", () => {
   const css = renderThemeCss();
   assert.ok(Buffer.byteLength(css) < 200 * 1024, `${Buffer.byteLength(css)} bytes`);
-  assert.match(css, /@font-face \{\n {2}font-family: "Tutor Archivo";\n {2}src: url\("data:font\/woff2;base64,/);
-  assert.match(css, /--font-sans: "Tutor Archivo", /);
+  assert.match(css, /@font-face \{\n {2}font-family: "Tutor Patrick Hand";\n {2}src: url\("data:font\/woff2;base64,/);
+  assert.match(css, /--font-sans: "Tutor Patrick Hand", /);
   assert.doesNotMatch(css, /--font-mono/);
   // Only an @import may come before other rules, and a theme has none.
   assert.doesNotMatch(css, /@import/);

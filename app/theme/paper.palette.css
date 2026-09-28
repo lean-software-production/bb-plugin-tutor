@@ -49,9 +49,8 @@
   --diff-removed: #b43b3b;
   --pr-merged: #6b46a8;
 
-  /* type: Archivo for the UI (inlined above); code keeps BB's mono. Word
-     spaces come from the next family, as in app/fonts/embed.ts. */
-  --font-sans: "Tutor Archivo", "Helvetica Neue", Helvetica, Arial, Inter, sans-serif;
+  /* type: the brand's Patrick Hand for the UI (inlined above); code keeps BB's mono. */
+  --font-sans: "Tutor Patrick Hand", "Patrick Hand", "Comic Sans MS", "Inter Variable", Inter, sans-serif;
 }
 
 .dark {

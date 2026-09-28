@@ -1,55 +1,47 @@
 // Generates fonts.css: the @font-face rules with the woff2 files inlined as
 // data URLs, because `bb plugin build` has no loader for font files.
 // Regenerate after changing a font: npm run fonts
+//
+// The three Sketchbook families (kit/tokens.json `font`), each a Fontsource
+// 5.3.0 Latin 400 file. They are registered as "Tutor …" so they can never
+// shadow a font BB or another plugin loads. Code and diffs use BB's
+// var(--font-mono), so there is no monospaced face here.
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-interface Face {
+export interface Face {
   family: string;
   file: string;
-  weight: string;
-  format: "woff2" | "woff2-variations";
-  unicodeRange?: string;
 }
 
-// Archivo's word space is only 0.2em (0.19em at 800). At the outline's and the
-// margin notes' small sizes, with whole-pixel glyph positioning, words then
-// visibly run together ("Noother threads"). Leaving U+0020 and U+00A0 out of
-// the face makes the browser take spaces from the next family in
-// --tp-font-core (Helvetica Neue / Helvetica / Arial, about 0.28em), which
-// sets words apart without touching the letterforms or monospace text.
-const ALL_BUT_SPACES = "U+0-1F, U+21-9F, U+A1-10FFFF";
+/** Fontsource's `latin` subset (unicode.json and 400.css of each package; the same for all three). */
+export const LATIN =
+  "U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD";
 
-const FACES: readonly Face[] = [
-  {
-    family: "Tutor Archivo",
-    file: "archivo-variable.woff2",
-    weight: "300 800",
-    format: "woff2-variations",
-    unicodeRange: ALL_BUT_SPACES,
-  },
-  { family: "Tutor JetBrains Mono", file: "jetbrains-mono-variable.woff2", weight: "100 800", format: "woff2-variations" },
-  { family: "Tutor Spectral", file: "spectral-400.woff2", weight: "400", format: "woff2" },
-  { family: "Tutor Spectral", file: "spectral-500.woff2", weight: "500", format: "woff2" },
-  { family: "Tutor Spectral", file: "spectral-600.woff2", weight: "600", format: "woff2" },
+export const FACES: readonly Face[] = [
+  { family: "Tutor Luckiest Guy", file: "luckiest-guy-latin-400-normal.woff2" },
+  { family: "Tutor Patrick Hand", file: "patrick-hand-latin-400-normal.woff2" },
+  { family: "Tutor Patrick Hand SC", file: "patrick-hand-sc-latin-400-normal.woff2" },
 ];
 
 const DIR = fileURLToPath(new URL(".", import.meta.url));
 export const FONTS_CSS = `${DIR}fonts.css`;
 
-/** One inlined @font-face rule for `family` (the theme build reuses it for Archivo). */
+/** The inlined @font-face rule for `family` (the theme build reuses it for Patrick Hand). */
 export function renderFontFaces(family: string): string {
-  return FACES.filter((face) => face.family === family)
+  const faces = FACES.filter((face) => face.family === family);
+  if (faces.length === 0) throw new Error(`no font face for ${JSON.stringify(family)}`);
+  return faces
     .map((face) => {
       const data = readFileSync(`${DIR}${face.file}`).toString("base64");
       return [
         "@font-face {",
         `  font-family: "${face.family}";`,
-        `  src: url("data:font/woff2;base64,${data}") format("${face.format}");`,
-        `  font-weight: ${face.weight};`,
+        `  src: url("data:font/woff2;base64,${data}") format("woff2");`,
+        "  font-weight: 400;",
         "  font-style: normal;",
         "  font-display: swap;",
-        ...(face.unicodeRange === undefined ? [] : [`  unicode-range: ${face.unicodeRange};`]),
+        `  unicode-range: ${LATIN};`,
         "}",
       ].join("\n");
     })

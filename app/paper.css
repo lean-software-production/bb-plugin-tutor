@@ -42,9 +42,10 @@
   --tp-grid-line: rgb(151 178 192 / 0.18);
   --tp-margin-rule: rgb(191 93 93 / 0.34);
   --tp-shadow: 0 1px 2px rgb(28 33 38 / 0.06), 0 10px 30px rgb(28 33 38 / 0.05);
-  --tp-font-display: "Tutor Spectral", Georgia, "Times New Roman", serif;
-  --tp-font-core: "Tutor Archivo", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --tp-font-mono: "Tutor JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Until the Sketchbook kit lands here: the brand's body hand for both, BB's mono for code. */
+  --tp-font-display: "Tutor Patrick Hand", "Patrick Hand", "Comic Sans MS", cursive;
+  --tp-font-core: "Tutor Patrick Hand", "Patrick Hand", "Comic Sans MS", cursive;
+  --tp-font-mono: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
 }
 
 .tutor-paper {
