@@ -88,18 +88,22 @@ export async function sketchReport(page, opts) {
   return page.evaluate(sketchReportInPage, opts);
 }
 
-/** Runs in the page: whether the kit's wobble outlines draw (Firefox drops an element whose filter is missing). */
-export function outlineReportInPage() {
+/**
+ * Runs in the page: whether the kit's wobble outlines draw (Firefox drops an
+ * element whose filter is missing). `selector` picks a kit element whose
+ * ::before is the wobbled outline: a panel by default, `.sk-num` in the outline.
+ */
+export function outlineReportInPage(selector = ".tutor-sk .sk-panel") {
   const fail = [];
   if (!document.getElementById("tutor-sk-wobble")) fail.push("the tutor-sk-wobble filter is missing");
-  const panel = document.querySelector(".tutor-sk .sk-panel");
-  if (!panel) return [...fail, "no .sk-panel on the page"];
-  const b = getComputedStyle(panel, "::before");
-  if (!b.filter || b.filter === "none") fail.push(`.sk-panel::before has no filter (${b.filter})`);
-  const r = panel.getBoundingClientRect();
+  const el = document.querySelector(selector);
+  if (!el) return [...fail, `no ${selector} on the page`];
+  const b = getComputedStyle(el, "::before");
+  if (!b.filter || b.filter === "none") fail.push(`${selector}::before has no filter (${b.filter})`);
+  const r = el.getBoundingClientRect();
   const w = r.width - (parseFloat(b.left) || 0) - (parseFloat(b.right) || 0);
   const h = r.height - (parseFloat(b.top) || 0) - (parseFloat(b.bottom) || 0);
-  if (!(w > 0 && h > 0) || b.content === "none") fail.push(`.sk-panel::before draws no box (${w}x${h}, content ${b.content})`);
+  if (!(w > 0 && h > 0) || b.content === "none") fail.push(`${selector}::before draws no box (${w}x${h}, content ${b.content})`);
   return fail;
 }
 
@@ -221,9 +225,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     },
     appearance: async (page) => {
       await page.goto(`${BASE}/settings/appearance`, { waitUntil: "load" });
-      await page.getByText("Tutor paper (now Sketchbook)", { exact: true }).first().waitFor({ timeout: 30000 });
-      await page.getByText("Sketchbook", { exact: true }).first().evaluate((e) => e.scrollIntoView({ block: "center" }));
-      await sleep(1500);
+      // The Palette menu button names the active palette; open it to show Sketchbook and the paper alias.
+      await page.locator("button", { hasText: /Sketchbook/ }).first().click({ timeout: 30000 });
+      await page.getByRole("menuitem").filter({ hasText: /^Tutor paper \(now Sketchbook\)/ }).first().waitFor({ timeout: 30000 });
+      await sleep(1000);
     },
   };
   const list = opts.surfaces.length ? opts.surfaces : Object.keys(SURFACES);

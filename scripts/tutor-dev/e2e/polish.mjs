@@ -102,8 +102,11 @@ async function ui() {
     }
     check(resolveError === "", `bb resolves ${SKETCHBOOK}`, resolveError);
     await page.goto(`${BASE}/settings/appearance`);
-    await page.getByText("Sketchbook", { exact: true }).first().waitFor({ timeout: 30000 });
-    check(await page.getByText("Tutor paper (now Sketchbook)", { exact: true }).count() > 0, "Settings › Appearance offers Sketchbook and the Tutor paper alias");
+    // BB's Palette setting is a menu button naming the active palette; the menu lists the plugin themes.
+    await page.locator("button", { hasText: /Sketchbook/ }).first().click({ timeout: 30000 });
+    const palettes = page.getByRole("menuitem");
+    await palettes.filter({ hasText: /^Sketchbook/ }).first().waitFor({ timeout: 30000 });
+    check(await palettes.filter({ hasText: /^Tutor paper \(now Sketchbook\)/ }).count() > 0, "Settings › Appearance offers Sketchbook and the Tutor paper alias");
     await shot(page, "polish-e2e-theme-settings");
     await shot(page, "polish-e2e-theme-home");
     await page.goto(`${BASE}/threads/${coach.id}`);
