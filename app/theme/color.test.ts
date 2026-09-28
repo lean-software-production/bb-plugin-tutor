@@ -75,10 +75,12 @@ test("BB's base tokens cover both modes and every derived token the contrast tes
     for (const name of ["--sidebar", "--secondary", "--muted", "--sidebar-accent", "--muted-foreground", "--surface-selected", "--sidebar-foreground", "--foreground"]) {
       assert.ok(BB_BASE_TOKENS[mode][name], `${mode} ${name}`);
     }
-    // Every base token resolves once BB's own anchors are in place.
-    for (const name of Object.keys(BB_BASE_TOKENS[mode])) {
+    // Every base token resolves once BB's own anchors are in place; a pill surface is a gradient, so each of its stops does.
+    for (const [name, value] of Object.entries(BB_BASE_TOKENS[mode])) {
       if (name === "--surface-selected") continue; // translucent; composited over the canvas by its users
-      assert.doesNotThrow(() => resolveColor(`var(${name})`, BB_BASE_TOKENS[mode]), `${mode} ${name}`);
+      const stops = value.startsWith("linear-gradient(") ? (value.match(/color-mix\([^()]*(?:\([^()]*\)[^()]*)*\)/g) ?? []) : [`var(${name})`];
+      assert.ok(stops.length > 0, `${mode} ${name}`);
+      for (const stop of stops) assert.doesNotThrow(() => resolveColor(stop, BB_BASE_TOKENS[mode]), `${mode} ${name}`);
     }
   }
 });

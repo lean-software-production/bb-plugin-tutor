@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { BRAND_PIN, CODE_THEME_FILES, THEME_CSS, VENDORED_THEME, modeTokens, renderThemeCss, stripImport, themeBlock } from "./build.ts";
 import { renderCodeTheme, type CodeTheme } from "./code-theme.ts";
 import { BB_BASE_TOKENS } from "./bb-base-tokens.ts";
-import { contrast, over, resolveColor, type Tokens } from "./color.ts";
+import { contrast, over, resolveColor, toBytes, type Tokens } from "./color.ts";
 
 const vendored = readFileSync(VENDORED_THEME, "utf8");
 const MODES = ["light", "dark"] as const;
@@ -55,8 +55,8 @@ test("the contrast model follows BB's cascade: BB light, BB dark, the theme's :r
   const light = modeTokens(vendored, "light");
   const darkTokens = modeTokens(vendored, "dark");
   // BB derives what the theme leaves unset.
-  assert.equal(light["--sidebar"], BB_BASE_TOKENS.light["--sidebar"]);
-  assert.equal(darkTokens["--sidebar"], BB_BASE_TOKENS.dark["--sidebar"]);
+  assert.equal(light["--sidebar-foreground"], BB_BASE_TOKENS.light["--sidebar-foreground"]);
+  assert.equal(darkTokens["--sidebar-foreground"], BB_BASE_TOKENS.dark["--sidebar-foreground"]);
   // The theme's :root is injected after BB's .dark with equal specificity, so it wins in dark mode too...
   assert.equal(darkTokens["--muted-foreground"], root["--muted-foreground"]);
   assert.notEqual(darkTokens["--muted-foreground"], BB_BASE_TOKENS.dark["--muted-foreground"]);
@@ -64,6 +64,56 @@ test("the contrast model follows BB's cascade: BB light, BB dark, the theme's :r
   assert.equal(darkTokens["--canvas"], dark["--canvas"]);
   // Comments are not declarations.
   assert.equal(root["--pr-merged"], undefined);
+});
+
+// Between two near-greys, Chromium's oklch mix loses the hue and renders it as
+// 0, so a grey mixed from the warm ink and paper in oklch comes out pink.
+const NEUTRAL_ANCHORS = new Set(["--ink", "--canvas", "--sk-ink", "--sk-paper"]);
+const oklchInkMix = /color-mix\(in oklch, var\(--ink\) [\d.]+%, var\(--canvas\)\)/;
+/** The tokens BB mixes from --ink and --canvas in oklch in `mode`. */
+const bbOklchGreys = (mode: (typeof MODES)[number]) =>
+  Object.entries(BB_BASE_TOKENS[mode])
+    .filter(([, value]) => oklchInkMix.test(value))
+    .map(([name]) => name);
+
+test("the theme re-mixes each of BB's oklch greys in that mode's own block, so none keeps BB's pink mix", () => {
+  const css = readFileSync(THEME_CSS, "utf8");
+  const blocks = { light: themeBlock(css, ":root,\n.light"), dark: themeBlock(css, ".dark") };
+  assert.ok(bbOklchGreys("light").includes("--pill-surface-selected"));
+  const missing: string[] = [];
+  for (const mode of MODES) {
+    for (const name of bbOklchGreys(mode)) {
+      const value = blocks[mode][name];
+      if (value === undefined || value.includes("in oklch")) missing.push(`${mode}: ${name} = ${value ?? "BB's " + BB_BASE_TOKENS[mode][name]}`);
+    }
+  }
+  assert.deepEqual(missing, []);
+});
+
+test("the theme mixes no two neutral anchors (--ink, --canvas, --sk-ink, --sk-paper) in oklch", () => {
+  const css = readFileSync(THEME_CSS, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  const mixes = [...css.matchAll(/color-mix\(in oklch,\s*var\((--[\w-]+)\)[^,]*,\s*var\((--[\w-]+)\)[^)]*\)/g)];
+  assert.ok(mixes.length > 0, "the theme still has its oklch mixes with a brand colour");
+  const neutral = mixes.filter(([, a, b]) => NEUTRAL_ANCHORS.has(a ?? "") && NEUTRAL_ANCHORS.has(b ?? "")).map(([mix]) => mix);
+  assert.deepEqual(neutral, []);
+});
+
+test("every grey BB mixes from ink and paper renders warm (red >= green >= blue), in both modes", () => {
+  const css = readFileSync(THEME_CSS, "utf8");
+  const pink: string[] = [];
+  for (const mode of MODES) {
+    const tokens = modeTokens(css, mode);
+    for (const name of [...bbOklchGreys(mode), "--muted-foreground", "--subtle-foreground", "--readback-foreground"]) {
+      // A pill surface is a gradient: check each of its stops.
+      const stops = (tokens[name] ?? "").match(/color-mix\([^()]*(?:\([^()]*\)[^()]*)*\)/g) ?? [];
+      assert.ok(stops.length > 0, `${mode}: ${name} is a mix`);
+      for (const stop of stops) {
+        const [r, g, b] = toBytes(resolveColor(stop, tokens)).map(Math.round) as [number, number, number];
+        if (!(r >= g && g >= b)) pink.push(`${mode}: ${name} ${stop} renders ${r},${g},${b}`);
+      }
+    }
+  }
+  assert.deepEqual(pink, []);
 });
 
 const colour = (tokens: Tokens, name: string) => {

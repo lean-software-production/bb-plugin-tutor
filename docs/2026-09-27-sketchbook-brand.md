@@ -50,8 +50,9 @@ and loading the kit live from GitHub Pages (breaks offline codespaces and pinnin
   families. A light and a dark code theme (`themes/sketchbook-code*.json`) are built from
   `tokens.json`.
 - `package.json` contributes `sketchbook` ("Sketchbook"). `theme.test.ts` checks text-tier
-  contrast in both modes against the built CSS. A failure is fixed in the brand repo and re-pinned,
-  not patched here.
+  contrast in both modes against the built CSS, and that each grey BB mixes from ink and paper in
+  oklch is re-mixed in oklab (see D11). A failure is fixed in the brand repo and re-pinned, not
+  patched here.
 - **Retiring Paper.** For one release, `paper` stays registered with the Sketchbook CSS and the
   name "Tutor paper (now Sketchbook)", so a student who selected it, and a codespace on Feature
   ≤0.6 whose default is `plugin:tutor:paper`, see Sketchbook without breaking. The release after
@@ -204,7 +205,7 @@ shows exactly this screen.
 
 ## What was built
 
-Plugin 0.3.0 (unreleased) on `tutor/sketchbook`, with the brand pinned at `0df3eab`.
+Plugin 0.3.0 (unreleased) on `tutor/sketchbook`, with the brand pinned at `2824384`.
 
 **Mockup fixes.** The first mockup had three weak spots, fixed before any plugin code:
 
@@ -233,4 +234,9 @@ within 12px of "What's next".
 - **D7.** The outline's brand mark is the kit's books icon.
 - **D8.** Step colours follow list position, so lesson 0 is mustard, as in the mockup.
 - **D10.** Tutor owns the tall loop's geometry and draws it with the kit's class, marker and filter.
+- **D11.** BB mixes its greys (sidebar, borders, muted, pills) from ink and paper in oklch. Between
+  two near-greys Chrome drops the hue and renders it as 0, so they came out pink. The brand theme
+  now re-mixes each of them in oklab at BB's own percentages (brand `2824384`); lightness, and so
+  contrast, is unchanged. **Known gap:** BB's open-in-split sidebar row keeps a faint pink tint. It
+  is an oklch mix BB sets on its own class, which the theme can't reach through tokens.
 - **D9** (where the long e2e runs) is still open.

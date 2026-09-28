@@ -1,7 +1,9 @@
 // BB's own values for the tokens a theme's contrast depends on, per mode, so
 // the theme test can resolve what BB paints when a theme leaves a token unset
 // (--sidebar, --secondary, --muted, --sidebar-accent and --surface-selected
-// are derived from the theme's --ink, --canvas and --primary).
+// are derived from the theme's --ink, --canvas and --primary). It also holds
+// every other grey BB mixes from --ink and --canvas in oklch, so the theme
+// test can check the theme re-mixes each one (see theme.test.ts).
 //
 // Copied from bb-app 0.44.0's app/dist/assets/index-*.css: the `:root,.light`
 // and `.dark` blocks, taking the `@supports (color: color-mix(…))` value where
@@ -39,6 +41,19 @@ export const BB_BASE_TOKENS: { light: Tokens; dark: Tokens } = {
     "--success": "oklch(70% .15 155)",
     "--timeline-accent": "oklch(55% .1 250)",
     "--file-accent": "var(--timeline-accent)",
+    // The rest of BB's ink-into-canvas oklch greys.
+    "--sidebar-border": "color-mix(in oklch, var(--ink) 14%, var(--canvas))",
+    "--accent": "color-mix(in oklch, var(--ink) 8%, var(--canvas))",
+    "--border": "color-mix(in oklch, var(--ink) 14%, var(--canvas))",
+    "--border-hairline": "color-mix(in oklch, var(--ink) 14.7%, var(--canvas))",
+    "--border-seam": "color-mix(in oklch, var(--ink) 9.5%, var(--canvas))",
+    "--input": "color-mix(in oklch, var(--ink) 29.5%, var(--canvas))",
+    "--pill-surface": "linear-gradient(to bottom, color-mix(in oklch, var(--ink) 4.4%, var(--canvas)), color-mix(in oklch, var(--ink) 4.7%, var(--canvas)))",
+    "--pill-surface-selected":
+      "linear-gradient(to bottom, color-mix(in oklch, var(--ink) 11.8%, var(--canvas)), color-mix(in oklch, var(--ink) 13%, var(--canvas)))",
+    "--pill-surface-selected-border": "color-mix(in oklch, var(--ink) 19.2%, var(--canvas))",
+    "--surface-recessed-soft-solid": "color-mix(in oklch, var(--ink) 4.2%, var(--canvas))",
+    "--version-upgrade": "color-mix(in oklch, var(--ink) 96%, var(--canvas))",
   },
   dark: {
     "--canvas": "oklch(19.5% 0 0)",
@@ -61,5 +76,18 @@ export const BB_BASE_TOKENS: { light: Tokens; dark: Tokens } = {
     "--success": "oklch(74% .15 155)",
     "--timeline-accent": "oklch(72% .09 250)",
     "--file-accent": "var(--timeline-accent)",
+    // The rest of BB's ink-into-canvas oklch greys.
+    "--sidebar-border": "color-mix(in oklch, var(--ink) 18.1%, var(--canvas))",
+    "--accent": "color-mix(in oklch, var(--ink) 13%, var(--canvas))",
+    "--border": "color-mix(in oklch, var(--ink) 19.4%, var(--canvas))",
+    "--border-hairline": "color-mix(in oklch, var(--ink) 21%, var(--canvas))",
+    "--border-seam": "color-mix(in oklch, var(--ink) 11%, var(--canvas))",
+    "--input": "color-mix(in oklch, var(--ink) 32.6%, var(--canvas))",
+    "--pill-surface": "linear-gradient(to bottom, color-mix(in oklch, var(--ink) 13%, var(--canvas)), color-mix(in oklch, var(--ink) 11.9%, var(--canvas)))",
+    "--pill-surface-selected":
+      "linear-gradient(to bottom, color-mix(in oklch, var(--ink) 20.7%, var(--canvas)), color-mix(in oklch, var(--ink) 18.7%, var(--canvas)))",
+    "--pill-surface-selected-border": "color-mix(in oklch, var(--ink) 25.2%, var(--canvas))",
+    "--surface-recessed-soft-solid": "color-mix(in oklch, var(--ink) 4.2%, var(--canvas))",
+    "--version-upgrade": "color-mix(in oklch, var(--ink) 96%, var(--canvas))",
   },
 };

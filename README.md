@@ -144,8 +144,8 @@ To build the same archive locally, run `scripts/release-archive.sh v<x.y.z> <out
   themes are built from the kit's tokens. Don't edit the theme here: change it in the
   [brand repo](https://github.com/lean-software-production/brand), then run
   `npm run sync-brand -- <sha>` and `npm run build:assets`. A test checks the generated files are
-  current, that the theme is the brand's byte for byte apart from the font, and that text keeps
-  4.5:1 in both modes as BB actually paints it.
+  current, that the theme is the brand's byte for byte apart from the font, that text keeps
+  4.5:1 in both modes as BB actually paints it, and that BB's greys stay warm rather than pink.
 - **Tutor's own surfaces.** The outline, cards, pages and Rule tab are drawn with the brand's
   Sketchbook kit (`vendor/brand/kit/`), scoped under `.tutor-sk` at build time
   (`app/sketch/kit.css`) so it can't restyle BB. `app/styles/*.css` sets only size and layout, and
