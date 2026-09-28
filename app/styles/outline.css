@@ -1,16 +1,16 @@
 /*
- * The course outline (revises mockup 1B): one tree of lessons, each with its
- * coach thread, the coach thread's Rules and its side chats. Fills BB's
- * sidebar scroll area.
+ * The course outline (mockup "outline", docs/mockups-sketchbook/): one tree of
+ * lessons, each with its coach thread, the coach thread's Rules and its side
+ * chats. Fills BB's sidebar scroll area. The kit draws the step badges, the
+ * highlighter, the ticks and the icon patches; this file only lays them out.
  */
 
 .tutor-sk.tp-outline {
   display: flex;
   flex-direction: column;
   min-height: 100%;
-  padding: 16px 12px 18px;
-  background: var(--tp-rule);
-  font-size: 13px;
+  padding: 12px 10px 18px 6px;
+  font-size: 16px;
 }
 .tutor-sk.tp-outline a {
   color: inherit;
@@ -20,35 +20,29 @@
   border: 0;
   background: none;
   color: inherit;
+  font: inherit;
   text-align: left;
+  cursor: pointer;
 }
 .tutor-sk.tp-outline :focus-visible {
-  outline: 2px solid var(--tp-heading);
+  outline: 2px dashed var(--tp-heading);
   outline-offset: 1px;
 }
 
 .tutor-sk .tp-outline-brand {
   display: flex;
-  gap: 9px;
+  gap: 8px;
   align-items: center;
-  margin-bottom: 16px;
-  color: var(--tp-text);
-  font-size: 0.68rem;
-  font-weight: 750;
-  letter-spacing: 0.1em;
+  margin: 0 0 8px 13px;
+  color: var(--tp-heading);
+  font-family: var(--tp-font-label);
+  font-size: 19px;
+  letter-spacing: 0.03em;
   line-height: 1.2;
-  text-transform: uppercase;
 }
-.tutor-sk .tp-brand-mark {
-  display: grid;
-  flex: none;
-  width: 24px;
-  height: 24px;
-  place-items: center;
-  border-radius: 7px;
-  background: var(--tp-heading);
-  color: var(--tp-on-heading);
-  font-size: 12px;
+.tutor-sk .tp-brand-mark img {
+  width: 30px;
+  height: 30px;
 }
 
 /* ---- the tree: lessons ---- */
@@ -59,125 +53,93 @@
   padding: 0;
   list-style: none;
 }
-.tutor-sk.tp-outline .tp-lesson-head {
+.tutor-sk.tp-outline .tp-lesson-head,
+.tutor-sk .tp-lesson-row {
   display: flex;
-  align-items: flex-start;
-  gap: 6px;
+  align-items: center;
+  gap: 9px;
   width: 100%;
-  padding: 6px 6px 7px 2px;
-  border-radius: 7px;
+  min-height: 32px;
+  padding: 4px 6px;
+  border-radius: 10px;
   color: var(--tp-text);
 }
-.tutor-sk.tp-outline .tp-lesson-head:hover {
-  background: color-mix(in oklab, var(--tp-page) 45%, transparent);
+.tutor-sk.tp-outline .tp-lesson-head:hover,
+.tutor-sk .tp-lesson-row:hover {
+  background: var(--tp-hover);
 }
-.tutor-sk .tp-caret {
+.tutor-sk .tp-lesson-head .tp-n,
+.tutor-sk .tp-lesson-row .tp-n {
   flex: none;
-  width: 10px;
-  color: var(--tp-muted);
-  font-size: 0.6rem;
-  line-height: 1.5rem;
+  font-size: 12px;
 }
-.tutor-sk .tp-lesson-mark {
-  flex: none;
-  width: 12px;
-  color: var(--tp-faint);
-  font-size: 0.7rem;
-  line-height: 1.5rem;
-  text-align: center;
-}
-.tutor-sk .tp-lesson--done .tp-lesson-mark {
-  color: var(--tp-good);
-}
-.tutor-sk .tp-lesson--current .tp-lesson-mark {
-  color: var(--tp-heading);
-}
-.tutor-sk .tp-lesson-text {
-  display: grid;
+.tutor-sk .tp-ltitle {
   flex: 1;
-  gap: 4px;
   min-width: 0;
+  font-size: 17px;
+  line-height: 1.25;
 }
-.tutor-sk .tp-lesson-title {
-  font: 500 0.92rem/1.25 var(--tp-font-body);
-  letter-spacing: -0.01em;
+.tutor-sk .tp-ltick {
+  margin-left: 4px;
+  font-size: 17px;
 }
-.tutor-sk .tp-lesson-title .tp-n {
-  color: var(--tp-muted);
-  font: 500 0.64rem var(--tp-font-mono);
-  letter-spacing: 0;
-}
-.tutor-sk .tp-lesson--current .tp-lesson-title {
-  color: var(--tp-heading);
-  font-weight: 600;
-}
-.tutor-sk .tp-lesson--ahead .tp-lesson-title {
+.tutor-sk .tp-lesson--ahead .tp-ltitle,
+.tutor-sk .tp-lesson-row--ahead .tp-ltitle {
   color: var(--tp-muted);
 }
 .tutor-sk .tp-lesson--viewed > .tp-lesson-head {
-  background: color-mix(in oklab, var(--tp-page) 60%, transparent);
+  background: var(--tp-hover);
 }
-.tutor-sk .tp-lesson-meter {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-.tutor-sk .tp-lesson-bar {
-  flex: 1;
-  height: 3px;
-  overflow: hidden;
-  border-radius: 2px;
-  background: var(--tp-track);
-}
-.tutor-sk .tp-lesson-bar i {
-  display: block;
-  height: 100%;
-  background: var(--tp-good-fill);
-}
-.tutor-sk .tp-lesson-count {
+.tutor-sk .tp-lcount {
   flex: none;
   color: var(--tp-muted);
-  font: 500 0.6rem var(--tp-font-mono);
+  font-size: 15px;
+  white-space: nowrap;
 }
 .tutor-sk .tp-lesson-body {
   display: grid;
   gap: 1px;
-  margin: 0 0 8px 16px;
+  padding: 2px 0 6px 8px;
 }
 
 /* ---- the tree: the coach thread's Rules ---- */
 .tutor-sk .tp-rules {
   display: grid;
-  gap: 1px;
-  margin: 0 0 4px 14px;
+  gap: 0;
+  margin: 0 0 4px;
+  padding: 0 0 0 8px;
 }
 .tutor-sk.tp-outline .tp-feat {
   display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 6px 2px 2px;
-  color: var(--tp-muted);
-  font-size: 0.58rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  align-items: baseline;
+  margin: 6px 0 2px 8px;
+  color: var(--tp-heading);
+  font-family: var(--tp-font-label);
+  font-size: 15px;
+  letter-spacing: 0.05em;
 }
 .tutor-sk .tp-rrow {
   display: flex;
-  gap: 6px;
-  padding: 3px 6px;
-  border-radius: 4px;
-  color: var(--tp-muted);
-  font-size: 0.68rem;
-  line-height: 1.22;
+  align-items: baseline;
+  gap: 7px;
+  padding: 2px 4px;
+  border-radius: 6px;
+  color: var(--tp-text);
+  font-size: 15.5px;
+  line-height: 1.3;
 }
 .tutor-sk a.tp-rrow:hover {
-  background: color-mix(in oklab, var(--tp-page) 50%, transparent);
+  background: var(--tp-hover);
 }
 .tutor-sk .tp-rrow .tp-g {
   flex: none;
-  width: 10px;
+  width: 14px;
+  color: var(--tp-muted);
+  font-size: 13px;
   text-align: center;
+}
+.tutor-sk .tp-rrow .tp-g > span {
+  font-size: 16px;
 }
 .tutor-sk .tp-rrow .tp-rname {
   display: -webkit-box;
@@ -185,31 +147,21 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
-.tutor-sk .tp-rrow--passing .tp-g {
-  color: var(--tp-good);
-}
 .tutor-sk .tp-rrow--not-yet .tp-g {
   color: var(--tp-warn);
-}
-.tutor-sk .tp-rrow--pending .tp-g {
-  color: var(--tp-faint);
-}
-.tutor-sk .tp-rrow--focus {
-  background: color-mix(in oklab, var(--tp-page) 60%, transparent);
-  color: var(--tp-heading);
-  font-weight: 750;
+  font-weight: 700;
 }
 .tutor-sk .tp-rrow--focus .tp-g {
   color: var(--tp-heading);
 }
-/* Not reached yet: no section to jump to. Muted, still 4.5:1 on the outline. */
+/* The sidebar is a shade darker than the kit page: a touch more ink keeps "new" at 4.5:1. */
+.tutor-sk.tp-outline .tp-change-badge {
+  color: color-mix(in oklch, var(--tp-new) 80%, var(--tp-text));
+}
+/* Not reached yet: no section to jump to. Quiet: muted text, no mark of its own. */
 .tutor-sk .tp-rrow--unreached {
   color: var(--tp-muted);
-  font-weight: 400;
   cursor: default;
-}
-.tutor-sk .tp-rrow--unreached .tp-g {
-  opacity: 0.7;
 }
 
 /* ---- separators and thread rows ---- */
@@ -217,56 +169,48 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin: 16px 0 6px;
-  padding-top: 12px;
+  margin: 14px 6px 0;
+  padding-top: 10px;
   border-top: 1px solid var(--tp-rule);
   color: var(--tp-muted);
-  font-size: 0.6rem;
-  font-weight: 800;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
+  font-family: var(--tp-font-label);
+  font-size: 15px;
+  letter-spacing: 0.05em;
 }
 .tutor-sk.tp-outline .tp-sep-action {
   padding: 0 4px;
   border-radius: 4px;
   color: var(--tp-muted);
-  font-size: 0.85rem;
   line-height: 1;
 }
 .tutor-sk.tp-outline .tp-sep-action:hover {
-  background: color-mix(in oklab, var(--tp-page) 60%, transparent);
+  background: var(--tp-hover);
   color: var(--tp-text);
 }
 .tutor-sk .tp-th {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   width: 100%;
-  padding: 4px 7px;
-  border-radius: 6px;
+  min-height: 30px;
+  padding: 3px 8px;
+  border-radius: 8px;
   color: var(--tp-text);
-  font-size: 0.69rem;
-  line-height: 1.2;
+  font-size: 16px;
+  line-height: 1.25;
 }
 .tutor-sk .tp-th:hover {
-  background: color-mix(in oklab, var(--tp-page) 45%, transparent);
+  background: var(--tp-hover);
 }
 .tutor-sk .tp-th .tp-ic {
-  display: grid;
   flex: none;
-  width: 15px;
-  height: 15px;
-  place-items: center;
-  border: 1px solid var(--tp-rule);
-  border-radius: 4px;
-  background: var(--tp-page);
+  width: 22px;
   color: var(--tp-muted);
-  font-size: 0.55rem;
+  text-align: center;
 }
-.tutor-sk .tp-th--coach .tp-ic {
-  border-color: var(--tp-good);
-  background: var(--tp-good-fill);
-  color: var(--tp-on-good);
+.tutor-sk .tp-th .tp-ic img {
+  width: 22px;
+  height: 22px;
 }
 .tutor-sk .tp-th .tp-t {
   overflow: hidden;
@@ -279,22 +223,17 @@
 }
 .tutor-sk .tp-th--on,
 .tutor-sk .tp-th--on:hover {
-  background: var(--tp-page);
-  box-shadow: 0 1px 2px color-mix(in oklab, var(--tp-line) 7%, transparent);
-  color: var(--tp-heading);
-  font-weight: 700;
+  background: var(--tp-hover);
+  box-shadow: inset 0 0 0 1px var(--tp-rule);
 }
 .tutor-sk .tp-th--start,
-.tutor-sk .tp-th--page {
+.tutor-sk .tp-th--page,
+.tutor-sk .tp-th--ask {
   color: var(--tp-heading);
-  font-weight: 700;
+  font-family: var(--tp-font-label);
 }
 .tutor-sk .tp-th--side {
   align-items: flex-start;
-}
-.tutor-sk .tp-th--side .tp-ic {
-  border-color: transparent;
-  background: none;
 }
 .tutor-sk .tp-side-text {
   display: grid;
@@ -303,15 +242,10 @@
 .tutor-sk .tp-cap {
   overflow: hidden;
   color: var(--tp-muted);
-  font-size: 0.58rem;
+  font-size: 13.5px;
+  line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.tutor-sk .tp-th--ask {
-  color: var(--tp-muted);
-}
-.tutor-sk .tp-th--ask .tp-ic {
-  border-style: dashed;
 }
 
 /* Indicator dots drawn from PluginSidebarThread.indicator. */
@@ -353,63 +287,41 @@
 }
 
 .tutor-sk .tp-other-project {
-  padding: 6px 7px 2px;
+  padding: 6px 8px 2px;
   color: var(--tp-muted);
-  font-size: 0.6rem;
-  font-weight: 700;
+  font-family: var(--tp-font-label);
+  font-size: 14px;
+  letter-spacing: 0.04em;
 }
 .tutor-sk.tp-outline .tp-outline-more {
-  padding: 4px 7px;
+  padding: 4px 8px;
   color: var(--tp-heading);
-  font-size: 0.66rem;
-  font-weight: 650;
+  font-family: var(--tp-font-label);
+  font-size: 15px;
 }
 
 /* ---- no factory project / loading / error ---- */
-.tutor-sk .tp-lesson-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 7px;
-  border-radius: 6px;
-  color: var(--tp-muted);
-  font-size: 0.75rem;
-  line-height: 1.25;
-}
-.tutor-sk .tp-lesson-row .tp-n {
-  color: var(--tp-muted);
-  font-family: var(--tp-font-mono);
-  font-size: 0.64rem;
-}
-.tutor-sk .tp-lesson-row .tp-gl-mark {
-  width: 10px;
-  color: var(--tp-faint);
-  text-align: center;
-}
 .tutor-sk .tp-setup-card {
   display: block;
-  margin-top: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--tp-heading-line);
-  border-radius: 10px;
-  background: var(--tp-heading-wash);
+  margin: 12px 4px 0 8px;
   color: var(--tp-heading);
-  font-size: 0.72rem;
-  font-weight: 700;
+  font-family: var(--tp-font-label);
+  font-size: 17px;
 }
 .tutor-sk .tp-outline-note {
   display: block;
-  margin: 4px 0;
-  padding: 4px 7px;
+  margin: 6px 0 0 4px;
+  padding: 2px 8px;
   color: var(--tp-muted);
-  font-size: 0.68rem;
+  font-size: 15px;
 }
 .tutor-sk .tp-outline-note--error {
   border-left: 3px solid var(--tp-bad);
   color: var(--tp-bad);
 }
-/* The outline resets its buttons; Reload stays the paper's blue button. */
+/* The outline resets its buttons; Reload stays a filled button. */
 .tutor-sk.tp-outline .tp-outline-note .tp-reload {
+  margin-left: 8px;
   border: 1px solid var(--tp-heading);
   background: var(--tp-heading);
   color: var(--tp-on-heading);

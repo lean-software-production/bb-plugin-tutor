@@ -68,17 +68,16 @@
 }
 
 /* ---- atoms ---- */
+/* "new" / "reworded": a word in the label hand, in the new-colour (mockup .tp-new). */
 .tutor-sk .tp-change-badge {
-  display: inline-block;
-  margin-left: 5px;
-  padding: 0 4px;
-  border-radius: 3px;
-  background: var(--tp-warn-wash);
-  color: var(--tp-warn);
-  font: 700 0.55rem/1.5 var(--tp-font-body);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  vertical-align: 1px;
+  margin-left: 6px;
+  color: var(--tp-new);
+  font-family: var(--tp-font-label);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  white-space: nowrap;
 }
 
 .tutor-sk .tp-chip {

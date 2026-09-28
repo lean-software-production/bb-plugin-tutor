@@ -191,11 +191,13 @@
 
 /* ---- Course nav row accessory ---- */
 .tutor-sk.tp-accessory {
-  color: var(--tp-text);
-  font: 600 10.5px/1.25rem var(--tp-font-body);
+  margin-left: auto;
+  color: var(--tp-muted);
+  font-size: 15px;
+  line-height: 1.25rem;
   white-space: nowrap;
 }
 .tutor-sk.tp-accessory i {
-  color: var(--tp-heading);
+  color: var(--tp-text);
   font-style: normal;
 }

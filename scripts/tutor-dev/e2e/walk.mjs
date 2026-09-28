@@ -102,7 +102,7 @@ const anchorSelector = (coach, rule) => `[data-tutor-rule-anchor="${anchorOf(coa
 const { browser, context, page, errors } = await openBrowser();
 const steps = [];
 const outline = () => page.locator("nav.tp-outline");
-const lessonRow = (id) => outline().locator("li.tp-lesson").filter({ has: page.locator(`.tp-n`, { hasText: id }) });
+const lessonRow = (id) => outline().locator(`li.tp-lesson[data-lesson-id="${id}"]`);
 async function openThread(threadId) {
   if (!page.url().endsWith(`/threads/${threadId}`)) {
     await page.goto(`${BASE}/threads/${threadId}`, { waitUntil: "load" });
@@ -151,7 +151,9 @@ step("02 confirm lands on Lesson 0's start page; the outline is one tree of less
   const config = JSON.parse(bb("plugin", "config", "tutor", "--json"));
   check(/^proj_/.test(config.values.factoryProject ?? ""), `factoryProject is set (${config.values.factoryProject})`);
   await outline().locator("li.tp-lesson").first().waitFor({ timeout: 30000 });
-  const ids = await outline().locator("li.tp-lesson .tp-lesson-title .tp-n").allInnerTexts();
+  const ids = await outline().locator("li.tp-lesson").evaluateAll((rows) => rows.map((row) => row.getAttribute("data-lesson-id")));
+  const badges = await outline().locator("li.tp-lesson .tp-lesson-head .tp-n").allInnerTexts();
+  check(badges[0] === "0", `each lesson's step badge shows its number (${badges.join(" ")})`);
   check(["000", "001", "002", "003", "007"].every((id) => ids.includes(id)), `the outline lists every lesson as a row (${ids.join(" ")})`);
   const zero = lessonRow("000");
   check((await zero.locator(".tp-lesson-head").getAttribute("aria-expanded")) === "true", "the lesson you are on is expanded");
