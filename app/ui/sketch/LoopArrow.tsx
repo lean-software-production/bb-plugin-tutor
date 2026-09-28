@@ -8,6 +8,10 @@ const MIN_WIDTH = 360;
 const FROM_INSET = 28;
 /** How far along "What's next" the loop arrives, at most. */
 const TO_INSET = 44;
+/** Room between the stats and the loop's start: text glyphs reach a few px below their line box. */
+const FROM_GAP = 8;
+/** Room between "What's next" and the loop's end, for the arrowhead (it reaches about 5 px past the end). */
+const TO_GAP = 8;
 /** The floor sits this far above the bottom of the reserved band. */
 const FLOOR_MARGIN = 10;
 
@@ -41,8 +45,8 @@ export function LoopArrow({ from, to, depth = 58, className }: LoopArrowProps) {
       const next = t.getBoundingClientRect();
       setLoop(
         loopPath(
-          { x: stats.right - FROM_INSET - origin.left, y: stats.bottom - origin.top },
-          { x: next.left + Math.min(TO_INSET, next.width / 2) - origin.left, y: next.bottom - origin.top },
+          { x: stats.right - FROM_INSET - origin.left, y: stats.bottom + FROM_GAP - origin.top },
+          { x: next.left + Math.min(TO_INSET, next.width / 2) - origin.left, y: next.bottom + TO_GAP - origin.top },
           depth - FLOOR_MARGIN,
         ),
       );

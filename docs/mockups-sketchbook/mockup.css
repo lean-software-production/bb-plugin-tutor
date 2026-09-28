@@ -119,14 +119,16 @@ body.single .shot > .frame { box-shadow: none; border-radius: 0; }
 .tp .sk-meter { height: 10px; }
 .tp .sk-btn { font-size: 19px; padding: 9px 22px 8px; }
 
-.tp-chip { position: relative; isolation: isolate; display: inline-block; padding: 3px 14px 2px; font-size: 16px; color: var(--sk-text); }
-.tp-chip::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: 99px; border: 2px solid var(--muted-foreground); filter: url(#sk-wobble); }
-.tp-chip--new { color: var(--sk-mustard-text); }
-.tp-chip--new::before { border-color: currentColor; }
+/* A chip is a small filled wash with the kit's thin line, like a panel. sk-wobble
+   shifts the line by whole pixels at 1x: a 2px line thinned to a broken-looking
+   1px hairline at each step, a 3px line stays at least 2px. */
+.tp-chip { --tp-chip-line: var(--muted-foreground); position: relative; isolation: isolate; display: inline-block; padding: 3px 14px 2px; font-size: 16px; color: var(--sk-text); }
+.tp-chip::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: 99px; border: var(--sk-line-thin) solid var(--tp-chip-line); background: color-mix(in oklab, var(--tp-chip-line) var(--sk-wash-amount), var(--sk-page)); filter: url(#sk-wobble); }
+.tp-chip--new { --tp-chip-line: var(--sk-mustard); color: var(--sk-mustard-text); }
 
 /* ------------------------------------------------------------------ outline */
 .tp-outline { padding: 12px 10px 12px 6px; font-size: 16px; position: relative; }
-.tp-brand { display: flex; align-items: center; gap: 8px; font-family: var(--sk-font-label); color: var(--sk-heading); font-size: 19px; margin: 0 0 8px 6px; letter-spacing: .03em; }
+.tp-brand { display: flex; align-items: center; gap: 8px; font-family: var(--sk-font-label); color: var(--sk-heading); font-size: 19px; margin: 0 0 8px 13px; letter-spacing: .03em; }
 .tp-brand .sk-patch img { width: 30px; height: 30px; }
 .tp-lessons { list-style: none; margin: 0; padding: 0; }
 .tp-lesson { margin: 0 0 2px; }
@@ -237,13 +239,16 @@ body.single .shot > .frame { box-shadow: none; border-radius: 0; }
 .tp-rcard .tp-rulehead .sk-label { font-size: 21px; }
 .tp-rcard .desc { font-size: 17px; line-height: 1.4; margin: 0; }
 
-/* lesson complete: What's next and the stats on one row, and the kit loop
-   under them, from the stats back round to What's next. */
+/* lesson complete: What's next and the stats on one row, and the loop under
+   them, from the stats back round to What's next. The loop is drawn 1:1 in
+   the band below the row (app/sketch/loop-geometry.ts, the path pasted in
+   index.html); the band is in flow so the summary sits clear of it. */
 .tp-done { max-width: 700px; margin: 10px 0 16px; overflow: visible; }
 .tp-done .sk-ribbon { font-size: 21px; align-self: flex-start; margin: 4px 0 4px 64px; }
 .tp-done .sk-ribbon img { height: 30px; }
 .tp-done-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 28px; margin-top: 6px; }
-.tp-done .sk-loop { width: auto; margin: 2px 70px 0 24px; }
+.tp-loop { position: relative; }
+.tp-loop > .sk-loop { position: absolute; overflow: visible; pointer-events: none; }
 .tp-done-body { display: flex; gap: 18px; align-items: center; margin-top: 4px; }
 .tp-stats { display: flex; gap: 26px; margin: 0; }
 .tp-stats div { font-size: 15px; color: var(--muted-foreground); line-height: 1.15; }

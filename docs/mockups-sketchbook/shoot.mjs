@@ -7,7 +7,11 @@
 //                   i.e. next to the plugin checkout)
 //   --only <id>     one screen only
 //   --check         also print a WCAG contrast report: every text run whose
-//                   colour against its composited background is under 4.5:1
+//                   colour against its composited background is under 4.5:1,
+//                   and run the geometry checks, which fail the run (exit 1):
+//                   every paper patch (its ::before overhang included) sits
+//                   at least 16px inside the frame, and the lesson-complete
+//                   loop crosses no text and ends within 12px of What's next
 //   --min <ratio>   report threshold for --check (default 4.5)
 //
 // Writes <screen>-<light|dark>.png. The page loads its fonts from Google
@@ -101,6 +105,47 @@ function contrastReport(min) {
   return [...seen.entries()].map(([k, v]) => `${v.ratio}  ${k}  (${v.size}px)  ${v.samples.join(" | ")}`);
 }
 
+// Runs in the page: the geometry rules for one screen. Returns the failures.
+function geometryReport({ screen, patchMargin, loopReach }) {
+  const frame = document.querySelector(`.shot[data-screen="${screen}"] > .frame`);
+  const fr = frame.getBoundingClientRect();
+  const fail = [];
+  const name = (el) => (el.querySelector("img")?.getAttribute("src") ?? el.className).split("/").pop();
+  const px = (v) => parseFloat(v) || 0;
+  // (a) a patch's paper reaches past its drawing (the ::before inset); all of it stays inside the frame.
+  for (const patch of frame.querySelectorAll(".sk-patch")) {
+    const r = patch.getBoundingClientRect();
+    if (!r.width || !r.height) continue;
+    const b = getComputedStyle(patch, "::before");
+    const outer = { left: r.left + px(b.left), top: r.top + px(b.top), right: r.right - px(b.right), bottom: r.bottom - px(b.bottom) };
+    const margin = Math.min(outer.left - fr.left, outer.top - fr.top, fr.right - outer.right, fr.bottom - outer.bottom);
+    if (margin < patchMargin) fail.push(`patch ${name(patch)} is ${margin.toFixed(1)}px from the frame's edge (want >= ${patchMargin})`);
+  }
+  // (b) the loop, with its stroke and arrowhead (reaching about 6px past the
+  // path), crosses no text, and its end lands on What's next.
+  const path = frame.querySelector(".tp-loop path, .tp-done .sk-loop path");
+  if (path) {
+    const r = path.getBoundingClientRect(), reachOut = 6;
+    const box = { left: r.left - reachOut, top: r.top - reachOut, right: r.right + reachOut, bottom: r.bottom + reachOut };
+    const walker = document.createTreeWalker(frame, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      if (!n.textContent.trim()) continue;
+      const range = document.createRange(); range.selectNodeContents(n);
+      for (const t of range.getClientRects()) {
+        const overlap = Math.min(box.right, t.right) - Math.max(box.left, t.left) > 0 && Math.min(box.bottom, t.bottom) - Math.max(box.top, t.top) > 0;
+        if (overlap) fail.push(`loop box crosses text "${n.textContent.trim().slice(0, 40)}"`);
+      }
+    }
+    const end = path.getPointAtLength(path.getTotalLength()).matrixTransform(path.getScreenCTM());
+    const next = frame.querySelector(".tp-next").getBoundingClientRect();
+    const dx = Math.max(next.left - end.x, 0, end.x - next.right);
+    const dy = Math.max(next.top - end.y, 0, end.y - next.bottom);
+    const reach = Math.hypot(dx, dy);
+    if (reach > loopReach) fail.push(`loop ends ${reach.toFixed(1)}px from What's next (want <= ${loopReach})`);
+  }
+  return fail;
+}
+
 mkdirSync(opts.out, { recursive: true });
 // Chromium ignores HTTPS_PROXY credentials; hand a proxy with auth to Playwright.
 function proxyFromEnv() {
@@ -130,6 +175,9 @@ for (const screen of SCREENS.filter((s) => !opts.only || s === opts.only)) {
     if (opts.check) {
       const bad = await page.evaluate(contrastReport, opts.min);
       for (const line of bad) console.log(`  under ${opts.min}: ${line}`);
+      const broken = await page.evaluate(geometryReport, { screen, patchMargin: 16, loopReach: 12 });
+      for (const line of broken) console.log(`  geometry: ${line}`);
+      if (broken.length) process.exitCode = 1;
     }
   }
 }
