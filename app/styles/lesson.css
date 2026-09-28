@@ -74,15 +74,17 @@
   padding: 3rem 0;
 }
 /* ---- lesson header ---- */
-.tutor-sk .tp-lesson .tp-lesson-title {
+/* Child combinators: the outline's rows are .tp-lesson too, with a .tp-lesson-title
+   inside their button (outline-scope.test.ts). */
+.tutor-sk .tp-lesson > .tp-lesson-title {
   font-size: 46px;
 }
-.tutor-sk .tp-lesson .tp-dek {
+.tutor-sk .tp-lesson > .tp-dek {
   margin-bottom: 16px;
   font-size: 19px;
 }
 @media (max-width: 640px) {
-  .tutor-sk .tp-lesson .tp-lesson-title {
+  .tutor-sk .tp-lesson > .tp-lesson-title {
     font-size: 34px;
   }
   .tutor-sk.tp-lead,
