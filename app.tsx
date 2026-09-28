@@ -9,6 +9,7 @@ import { ContinueSection, CourseAccessory } from "./app/ui/Home.tsx";
 import { CourseOutline } from "./app/ui/Outline.tsx";
 import { RuleTab } from "./app/ui/RuleTab.tsx";
 import { SimpleNavigation } from "./app/ui/SimpleNavigation.tsx";
+import { withWobbleDefs } from "./app/ui/sketch/index.ts";
 import { mountActivityReporter } from "./app/activity.ts";
 import "./app/sketchbook.css";
 import "./app/styles/atoms.css";
@@ -18,6 +19,7 @@ import "./app/styles/pages.css";
 import "./app/styles/chat.css";
 import "./app/styles/panels.css";
 import "./app/styles/nav.css";
+import "./app/styles/motion.css";
 
 export default definePluginApp((app) => {
   // Reports the student's activity so the Codespace is not idle-stopped under them.
@@ -32,30 +34,30 @@ export default definePluginApp((app) => {
     id: SLOT_IDS.threadList,
     title: "Course outline",
     description: "The course as one tree: each lesson, its coach thread and side chats, and the Rules your coach works through.",
-    component: CourseOutline,
+    component: withWobbleDefs(CourseOutline),
   });
   app.slots.navPanel({
     id: SLOT_IDS.navPanel,
     title: "Course",
     icon: "FileText",
     path: NAV_PANEL_PATH,
-    component: CoursePage,
-    experimental_sidebarAccessory: CourseAccessory,
+    component: withWobbleDefs(CoursePage),
+    experimental_sidebarAccessory: withWobbleDefs(CourseAccessory),
   });
-  app.slots.messageDirective({ id: DIRECTIVE_NAMES.lesson, component: LessonCardDirective });
-  app.slots.messageDirective({ id: DIRECTIVE_NAMES.progress, component: ProgressCardDirective });
-  app.slots.messageDirective({ id: DIRECTIVE_NAMES.term, component: TermDirective });
+  app.slots.messageDirective({ id: DIRECTIVE_NAMES.lesson, component: withWobbleDefs(LessonCardDirective) });
+  app.slots.messageDirective({ id: DIRECTIVE_NAMES.progress, component: withWobbleDefs(ProgressCardDirective) });
+  app.slots.messageDirective({ id: DIRECTIVE_NAMES.term, component: withWobbleDefs(TermDirective) });
   app.slots.homepageSection({
     id: SLOT_IDS.homepageSection,
     title: "Continue your course",
-    component: ContinueSection,
+    component: withWobbleDefs(ContinueSection),
   });
   app.slots.threadPanelAction({
     id: SLOT_IDS.ruleTab,
     title: "Rule",
     icon: "FileText",
     layout: "flush",
-    component: RuleTab,
+    component: withWobbleDefs(RuleTab),
     run: ({ openPanel }) => {
       openPanel({ title: "Rule" });
     },

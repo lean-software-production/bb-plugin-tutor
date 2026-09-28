@@ -202,3 +202,18 @@
   background: var(--tp-page);
   box-shadow: var(--tp-shadow);
 }
+
+/* The kit meter with its count in words (app/ui/sketch/Meter.tsx). */
+.tutor-sk .tp-meter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tutor-sk .tp-meter-bar {
+  flex: 1;
+}
+.tutor-sk .tp-meter-count {
+  flex: none;
+  color: var(--tp-muted);
+  white-space: nowrap;
+}
