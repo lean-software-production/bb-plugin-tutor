@@ -165,13 +165,16 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   };
   const SURFACES = {
     welcome: async (page) => {
-      await page.goto(`${BASE}/plugins/tutor/course`, { waitUntil: "load" });
-      await page.getByText("Start the course →").waitFor({ timeout: 30000 });
+      // The course's own route redirects to the current lesson once one is started; welcome stays put.
+      await page.goto(`${BASE}/plugins/tutor/course/welcome`, { waitUntil: "load" });
+      await page.locator(".tp-edge--waver").waitFor({ timeout: 30000 });
       await sleep(2000);
     },
     start: async (page) => {
-      await page.goto(`${BASE}/plugins/tutor/course/start/006`, { waitUntil: "load" });
-      await page.getByText(/Start with your coach/).first().waitFor({ timeout: 30000 });
+      // A lesson with a coach thread redirects there, so shoot the next lesson's start page.
+      const next = String(Number(current ?? "000") + 1).padStart(3, "0");
+      await page.goto(`${BASE}/plugins/tutor/course/start/${next}`, { waitUntil: "load" });
+      await page.locator("article.tp-lesson").waitFor({ timeout: 30000 });
       await sleep(2000);
     },
     home: async (page) => {
@@ -206,10 +209,15 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       await showRight(page, "Side chat");
     },
     "rule-tab": async (page) => {
+      // Empty params: the tab shows the coach thread's lesson and the Rule in focus. BB wants each tab's id.
       await openTab(page, coachNow, (t) => t.pluginId === "tutor" && t.title === "Rule", {
+        id: `plugin-panel:${encodeURIComponent("tutor:rule-tab:{}")}:none`,
         kind: "plugin-panel", pluginId: "tutor", actionId: "rule-tab", title: "Rule", paramsJson: "{}",
       });
       await openThread(page, coachNow);
+      // A tab added while BB's client already holds the thread's tabs shows after a fresh load.
+      const tab = page.getByText("Rule", { exact: true }).last();
+      if (!(await tab.isVisible().catch(() => false))) await openThread(page, coachNow);
       await showRight(page, "Rule");
     },
     "lesson-complete": async (page) => {
