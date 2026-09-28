@@ -53,9 +53,10 @@
   .tutor-sk .tp-page-in--edge {
     padding-bottom: 160px;
   }
+  /* The patch reaches past the drawing (edge.test.ts); these keep it 24px in. */
   .tutor-sk .tp-edge--waver {
-    right: 16px;
-    bottom: 20px;
+    right: 34px;
+    bottom: 32px;
   }
   .tutor-sk .tp-edge--waver img {
     height: 120px;
