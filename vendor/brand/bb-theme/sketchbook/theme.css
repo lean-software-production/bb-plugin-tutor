@@ -39,8 +39,9 @@
   --surface-selected: var(--sk-highlighter);
   --surface-selected-border: var(--sk-mustard);
 
+  /* Quieter text, still at least 4.5:1 on the canvas and on bb's sidebar */
   --muted-foreground: color-mix(in oklch, var(--ink) 70%, var(--canvas));
-  --subtle-foreground: color-mix(in oklch, var(--ink) 58%, var(--canvas));
+  --subtle-foreground: color-mix(in oklch, var(--ink) 62%, var(--canvas));
   --readback-foreground: color-mix(in oklch, var(--ink) 64%, var(--canvas));
 
   /* Teal darkened just enough to read as file-path text */
