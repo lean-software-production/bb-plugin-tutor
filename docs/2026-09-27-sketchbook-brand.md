@@ -1,6 +1,6 @@
 # Tutor in the Sketchbook brand
 
-Status: **built in 0.3.0 (unreleased)**; approved design 2026-09-27. See
+Status: **built in 0.3.0**; approved design 2026-09-27. See
 [What was built](#what-was-built) for the decisions taken and the mockup fixes. This redraws Tutor, and the BB theme it
 installs, in the Lean Software Production brand from
 [`lean-software-production/brand`](https://github.com/lean-software-production/brand). The brand is
@@ -218,8 +218,8 @@ expect paper-coloured text on the ink page, every icon and character on a paper 
 
 ## What was built
 
-Plugin 0.3.0 (unreleased) on `tutor/sketchbook`, with the brand pinned at `71944a2` (it was
-`2824384` until D12, `ef29ca3` until D13).
+Plugin 0.3.0, with the brand pinned at `a7e33ca`, brand `main` after brand#2 merged (it was
+`2824384` until D12, `ef29ca3` until D13, `71944a2` until the merge).
 
 **Mockup fixes.** The first mockup had three weak spots, fixed before any plugin code:
 
