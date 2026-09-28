@@ -20,9 +20,9 @@ committed. It then drives BB with host-side Playwright chromium through about
   and side chats. When the project is a starter clone's top folder, the walk
   goes on through lessons 001 to 003 and adopts 004, then checks that Tutor
   moved the factory to `factory/` exactly as the starter's `fetch.sh` does in
-  a second clone. The Rule card, the outline and lesson complete are also shot
-  dark, checked against the Sketchbook geometry, and (Rule card, outline)
-  checked for the kit's wobble outlines. Step 11b checks that a page asking for
+  a second clone. The Rule card, the outline and lesson complete are also
+  checked against the Sketchbook geometry, and (Rule card, outline) checked
+  for the kit's wobble outlines. Step 11b checks that a page asking for
   less motion sees a passed Rule's swash and the ribbon hold still.
   `E2E_BROWSER=firefox` runs the walk in Firefox (its browser must be installed:
   `npx playwright install firefox`);
@@ -94,7 +94,7 @@ both that name and the `tutor.e2e=tutor-e2e` label.
 | `hot-plugin.sh` | Swaps the working tree in over the installed plugin, then rebuilds and reloads it. Also useful on its own as a dev loop against a running `tutor-e2e`. |
 | `make-factory.sh` | Readies the project at `$PROJECT` and runs the Feature's start-up hook. |
 | `walk.mjs [step-prefix…]`, `polish.mjs first-start\|restart\|ui` | The Playwright checks. Pass step prefixes to `walk.mjs`, or set `POLISH_ONLY`, to run part of a check against a container that is already up. |
-| `sketch-check.mjs [surface…] [--dark] [--size WxH] [--tag T] [--browser B] [--reduced-motion]` | Shoots each Tutor surface after the walk and checks the Sketchbook geometry (patches inside the page, the loop, drawings on patches in dark). |
+| `sketch-check.mjs [surface…] [--size WxH] [--tag T] [--browser B] [--reduced-motion]` | Shoots each Tutor surface after the walk and checks the Sketchbook geometry (drawings inside the page, the loop). |
 | `lib.mjs`, `env.sh` | Shared helpers and settings. |
 
 Nothing here reads or copies host credentials. The only provider used is the

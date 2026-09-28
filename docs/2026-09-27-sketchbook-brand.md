@@ -22,8 +22,9 @@ blue, Archivo and Spectral, graph-paper cards) described in [`DESIGN.md`](DESIGN
    icons, speech bubbles, a loop arrow, characters, and small animations.
 4. **Brand voice first, then Tutor.** The brand's "Voice and tone" (a `TODO.md` item) is drafted
    in the brand repo for a person to decide; Tutor's skill and UI copy follow it.
-5. **Ship the brand's proposed dark mode** (ink page, paper text, lighter teal), contrast-tested
-   here; what the tests find goes back to the brand's dark-mode decision.
+5. ~~**Ship the brand's proposed dark mode** (ink page, paper text, lighter teal), contrast-tested
+   here; what the tests find goes back to the brand's dark-mode decision.~~ *Superseded
+   2026-09-28 by [D12](#what-was-built): the brand is light mode only.*
 6. **Sketchbook replaces Tutor paper.** Students on Paper are moved; a theme a student chose
    themselves is never replaced.
 
@@ -47,11 +48,11 @@ and loading the kit live from GitHub Pages (breaks offline codespaces and pinnin
 
 - `app/theme/build.ts` builds `themes/sketchbook.css` from `vendor/brand/.../theme.css`: drops
   the `@import`, prepends the inlined `@font-face` rules, and maps `--font-sans` to the `Tutor`
-  families. A light and a dark code theme (`themes/sketchbook-code*.json`) are built from
-  `tokens.json`.
+  families. One light code theme (`themes/sketchbook-code-light.json`) is built from
+  `tokens.json`; the manifest names it for both of BB's modes (D12).
 - `package.json` contributes `sketchbook` ("Sketchbook"). `theme.test.ts` checks text-tier
-  contrast in both modes against the built CSS, and that each grey BB mixes from ink and paper in
-  oklch is re-mixed in oklab (see D11). A failure is fixed in the brand repo and re-pinned, not
+  contrast against the built CSS, that each grey BB mixes from ink and paper in oklch is re-mixed
+  in oklab (see D11), and that the page is the same with BB's `.dark` class as without it (D12). A failure is fixed in the brand repo and re-pinned, not
   patched here.
 - **Retiring Paper.** For one release, `paper` stays registered with the Sketchbook CSS and the
   name "Tutor paper (now Sketchbook)", so a student who selected it, and a codespace on Feature
@@ -65,7 +66,8 @@ and loading the kit live from GitHub Pages (breaks offline codespaces and pinnin
 ## Tutor's surfaces
 
 `app/paper.css` becomes `app/sketchbook.css`; its `--tp-*` tokens are generated from
-`tokens.json` (no literal colours in component CSS), in light and dark.
+`tokens.json` (no literal colours in component CSS). They were generated in light and dark until
+D12; they are light only now.
 
 The kit pieces come from the brand kit, not from Tutor. The kit now has them all:
 
@@ -75,8 +77,8 @@ The kit pieces come from the brand kit, not from Tutor. The kit now has them all
 - the tick (`sk-tick`);
 - buttons (`sk-btn`, and `sk-secondary` for the quiet one);
 - the progress meter (`sk-meter`);
-- the paper patch (`sk-patch`);
-- dark role tokens, under `.dark` and `.sk-dark`.
+- the paper patch (`sk-patch`) and dark role tokens under `.dark` and `.sk-dark`. *Both removed
+  from the kit with light mode only (D12).*
 
 Tutor's own CSS keeps only BB-shell and Tutor layout. Small components in `app/ui/sketch/`,
 each usable alone, wrap those pieces:
@@ -87,9 +89,9 @@ each usable alone, wrap those pieces:
 | `Panel` | A kit panel: wobbly outline, pastel wash, optional `dashed` to single one out. |
 | `Highlight` | The highlighter swash behind text; optional sweep-in. |
 | `Tick`, `Button`, `Meter` | The kit's tick, buttons and progress meter. A meter always has its count in words beside it. |
-| `Patch` | The kit's paper patch behind an icon or character. |
+| ~~`Patch`~~ | ~~The kit's paper patch behind an icon or character.~~ *Removed (D12): with no ink page, a drawing needs no paper behind it.* |
 | `StepBadge` | A lesson or Rule number in the step order mustard → teal → forest → coral → blue, repeating. |
-| `KitIcon`, `Character` | A vendored icon or character, as a whole file, never recoloured, always in a `Patch`. |
+| `KitIcon`, `Character` | A vendored icon or character, as a whole file, never recoloured (in a `.tp-drawing` wrapper; in a `Patch` until D12). |
 | `Bubble`, `Ribbon` | Speech bubble and ribbon banner. |
 | `LoopArrow` | The kit's hand-drawn loop-back arrow. |
 
@@ -114,17 +116,21 @@ Where they go:
 - **Missing drawings** are not drawn here: the closest kit element is used and the gap is raised
   in the brand repo (brand skill rule 4).
 
-In dark mode the surfaces sit on the ink page: washes are mixed toward ink, and the highlighter
-becomes the teal tint BB's dark theme uses for selection. Characters and icons keep their own
-colours. Each one sits on a paper patch, a small wobbly piece of cream paper. In light mode the
-patch is invisible, because the page is already paper.
+*Superseded 2026-09-28 (D12), kept for the record:* In dark mode the surfaces sit on the ink
+page: washes are mixed toward ink, and the highlighter becomes the teal tint BB's dark theme uses
+for selection. Characters and icons keep their own colours. Each one sits on a paper patch, a
+small wobbly piece of cream paper. In light mode the patch is invisible, because the page is
+already paper.
+
+Now the surfaces stay on paper in both of BB's modes, and characters and icons sit straight on the
+page.
 
 ## Mockup
 
 [`mockups-sketchbook/`](mockups-sketchbook/) is the mockup. It replaces the look of
 [`mockups.html`](mockups.html). It loads the kit from the plugin's `vendor/brand/` (pinned at `vendor/brand/PIN`) and
-draws seven screens in light and dark. `shoot.mjs` takes the 14 screenshots; `--check` reports
-any text under 4.5:1.
+draws seven screens. `shoot.mjs` takes the seven screenshots; `--check` reports any text under
+4.5:1. (It drew them in light and dark, 14 screenshots, until D12.)
 
 The outline screen is a composite. It puts states from different moments on one screen, so the
 outline shows every kind of row at once: passed, current, not reached, and a side chat. BB never
@@ -136,6 +142,7 @@ shows exactly this screen.
   headlines, words we avoid, explaining jargon briefly, and cheering small wins without gushing.
   A person decides it; it's then removed from `TODO.md`. The same pass records the dark-mode
   decision and what the contrast tests say about mustard and coral text (likely decorative only).
+  *The dark-mode decision, 2026-09-28: light mode only (D12).*
 - **Tutor skill** (`skills/tutor/SKILL.md`): a short Voice section from the vendored brand voice.
   The coaching method stays the course's coach file; Tutor only adds how to sound.
 - **UI copy**: every string in `app/ui/` rewritten to the voice (short, warm, plain, one idea per
@@ -143,10 +150,10 @@ shows exactly this screen.
 
 ## Order
 
-1. Brand repo: voice draft → decided; dark mode decided.
+1. Brand repo: voice draft → decided; dark mode decided (light mode only, D12).
 2. A Sketchbook mockup of the outline, lesson card, Rule card, lesson complete, welcome and home,
-   in light and dark, built from the kit (replaces `mockups.html`). Screenshots reviewed before
-   plugin code.
+   in light and dark (light only since D12), built from the kit (replaces `mockups.html`).
+   Screenshots reviewed before plugin code.
 3. Plugin 0.3.0: vendor + sync check, fonts, theme, surfaces, copy, skill voice, Paper alias.
 4. Feature 0.7.0: default theme and the Paper migration.
 5. A real codespace from capstone-project-starter's "BB tutor" config.
@@ -154,7 +161,8 @@ shows exactly this screen.
 ## Testing
 
 - `sync-brand.ts --check` in CI.
-- `theme.test.ts`: text-tier contrast in light and dark on the built Sketchbook CSS.
+- `theme.test.ts`: text-tier contrast on the built Sketchbook CSS, and that the theme's light
+  values also apply under BB's `.dark` (D12). Until D12 it checked light and dark contrast.
 - Unit tests for `StepBadge`'s colour order and the token generation.
 - The e2e walk (`scripts/tutor-dev/e2e`) with new screenshots, plus a Firefox pass (wobble
   filters present, outlines visible) and a reduced-motion pass (no animation).
@@ -184,10 +192,15 @@ shows exactly this screen.
 2. Expect: the lesson-complete card shows a ribbon and the group characters, with a "What's next"
    link and a loop arrow from the stats back to it.
 
-### 5. Dark mode reads
+### 5. ~~Dark mode reads~~ Dark mode stays light
+*Superseded 2026-09-28 (D12). It was:* switch BB to dark mode on a lesson with a coach thread;
+expect paper-coloured text on the ink page, every icon and character on a paper patch, and
+`theme.test.ts` passing its dark contrast checks.
+
 1. Switch BB to dark mode on a lesson with a coach thread.
-2. Expect: paper-coloured text on the ink page, every icon and character on a paper patch, and
-   `theme.test.ts` passes its dark contrast checks.
+2. Expect: the page, the sidebar and code blocks stay cream paper with ink text, the drawings
+   sit straight on the page, and `theme.test.ts` passes its check that every BB token resolves
+   the same with `.dark`.
 
 ### 6. Reduced motion is respected
 1. Turn on the OS "reduce motion" setting and pass a Rule.
@@ -205,7 +218,8 @@ shows exactly this screen.
 
 ## What was built
 
-Plugin 0.3.0 (unreleased) on `tutor/sketchbook`, with the brand pinned at `2824384`.
+Plugin 0.3.0 (unreleased) on `tutor/sketchbook`, with the brand pinned at `ef29ca3` (it was
+`2824384` until D12).
 
 **Mockup fixes.** The first mockup had three weak spots, fixed before any plugin code:
 
@@ -213,12 +227,13 @@ Plugin 0.3.0 (unreleased) on `tutor/sketchbook`, with the brand pinned at `28243
   not stretched. It leaves the stats, curls once, comes back under "What's next", and crosses no
   text.
 - **Patches at the frame's edge.** The welcome waver sits 40px in from the frame, and the outline's
-  books patch moved in. Every patch is now at least 16px inside the frame.
+  books patch moved in. Every patch is now at least 16px inside the frame. (Since D12 there are no
+  patches; the same 16px check applies to the drawings.)
 - **Chips.** A chip is a filled wash with the kit's 3px line. The old 2px line thinned to a hairline
   where `sk-wobble` shifted it by a whole pixel.
 
-`shoot.mjs --check` now checks all three: patch margins, the loop clear of text, and the loop's end
-within 12px of "What's next".
+`shoot.mjs --check` now checks all three: patch margins (drawing margins since D12), the loop clear
+of text, and the loop's end within 12px of "What's next".
 
 **Decisions taken** (numbered as in the build plan):
 
@@ -240,3 +255,17 @@ within 12px of "What's next".
   contrast, is unchanged. **Known gap:** BB's open-in-split sidebar row keeps a faint pink tint. It
   is an oklch mix BB sets on its own class, which the theme can't reach through tokens.
 - **D9** (where the long e2e runs) is still open.
+- **D12. Light mode only (2026-09-28).** The brand is light mode only (brand `ef29ca3`), and so
+  is Tutor. This supersedes decision 5 and acceptance criterion 5.
+  - The brand theme's one block is `:root, .light, .dark` with `color-scheme: light`. It pins
+    every value BB's `.dark` changes to BB's light values, so someone who picks dark mode in BB
+    still gets paper and ink. The oklab re-mixes of D11 stay.
+  - `codeTheme.dark` names the light code theme. The field is optional in BB's schema, but BB
+    falls back to its own dark code theme when it is missing, which would put dark code blocks on
+    a paper page. `sketchbook-code-dark.json` is gone.
+  - The kit's dark role block, its paper patch (`sk-patch`) and the `Patch` component are gone.
+    Drawings sit straight on the page in a plain `.tp-drawing` wrapper that lays out as before.
+    The kit transform refuses a `.dark` or `.sk-dark` selector.
+  - `theme.test.ts` checks that the built theme has that one block and no separate `.dark` one,
+    and that every BB grey and role resolves to the same colour with `.dark` as without it. The
+    warm-grey tests stay. The mockup and the e2e scripts lost their dark screens.

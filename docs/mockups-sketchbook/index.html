@@ -9,19 +9,12 @@
 <link rel="stylesheet" href="../../vendor/brand/bb-theme/sketchbook/theme.css">
 <link rel="stylesheet" href="mockup.css">
 <script src="../../vendor/brand/kit/sketchbook.js" defer></script>
-<script>
-  // ?screen=<id> shows one frame; &mode=dark puts .dark on the root.
-  (function () {
-    var q = new URLSearchParams(location.search);
-    if (q.get("mode") === "dark") document.documentElement.classList.add("dark");
-  })();
-</script>
 </head>
 <body class="gallery">
 
 <header class="gallery-head">
   <h1>Tutor in Sketchbook</h1>
-  <p>Screen mockups for step 2 of docs/2026-09-27-sketchbook-brand.md. Add <code>?screen=&lt;id&gt;</code> for one frame, <code>&amp;mode=dark</code> for dark mode.</p>
+  <p>Screen mockups for step 2 of docs/2026-09-27-sketchbook-brand.md. Add <code>?screen=&lt;id&gt;</code> for one frame. The brand is light mode only.</p>
 </header>
 
 <!-- 1 · first-run ---------------------------------------------------------->
@@ -48,7 +41,7 @@
           <button class="sk-btn sk-secondary" type="button">Use a different project</button>
         </div>
       </div>
-      <span class="sk-patch tp-edge" style="right:40px;bottom:40px"><img src="../../vendor/brand/kit/characters/waver.svg" alt="" style="height:170px"></span>
+      <span class="tp-drawing tp-edge" style="right:40px;bottom:40px"><img src="../../vendor/brand/kit/characters/waver.svg" alt="" style="height:170px"></span>
     </main>
   </div>
 </figure>
@@ -109,7 +102,7 @@
           <p>Before you build anything, get to know the tutor you'll build it with: the course outline, your coach thread and its side chats. You pass this lesson the way you'll pass every lesson after it, one Rule at a time.</p>
           <div class="tp-tally"><div class="sk-meter" role="progressbar" aria-label="Examples that hold" aria-valuemin="0" aria-valuemax="10" aria-valuenow="0" style="--sk-value:0%"></div><span>0 of 10 Examples hold</span></div>
           <div class="tp-checklist">
-            <span class="sk-patch"><img src="../../vendor/brand/kit/icons/checklist.svg" alt=""></span>
+            <span class="tp-drawing"><img src="../../vendor/brand/kit/icons/checklist.svg" alt=""></span>
             <div class="hd">Your tutor<span class="tp-new">new</span><span class="n">0/10</span></div>
             <ul>
               <li class="focus"><span class="g">●</span><span><span class="sk-hl">The course outline shows where you are</span></span></li>
@@ -167,7 +160,7 @@
             <div class="t"><p class="tp-eyebrow">Not yet</p><div class="tt">A Rule opens where your coach started it</div></div>
             <div class="tp-ring"><b>2/10</b>examples</div>
           </div>
-          <div class="tp-speaker"><span class="sk-patch"><img src="../../vendor/brand/kit/icons/robot.svg" alt=""></span><div class="sk-bubble">The thread didn't scroll to the Rule's card. Let's find out why.</div><a class="tp-link">Open the Rule ›</a></div>
+          <div class="tp-speaker"><span class="tp-drawing"><img src="../../vendor/brand/kit/icons/robot.svg" alt=""></span><div class="sk-bubble">The thread didn't scroll to the Rule's card. Let's find out why.</div><a class="tp-link">Open the Rule ›</a></div>
         </div>
       </div></div>
       <div class="bb-composer-wrap" data-composer="thread"></div>
@@ -245,7 +238,7 @@
           <div class="tp-loop" style="height:58px" aria-hidden="true"><svg class="sk-loop" viewBox="28 -15 620 79" style="left:28px;top:-15px;width:620px;height:79px"><path d="M 632 1 C 632 26.96, 610.96 48, 585 48 C 509.27 48, 433.53 48, 357.8 48 C 344.56 48, 333.2 39.94, 329.9 30 C 326.6 20.06, 331.36 12, 338 12 C 344.64 12, 349.4 20.06, 346.1 30 C 342.8 39.94, 331.44 48, 318.2 48 C 242.47 48, 166.73 48, 91 48 C 65.04 48, 44 26.96, 44 1" fill="none" stroke-width="5" stroke-linecap="round" marker-end="url(#sk-head)" filter="url(#sk-wobble-soft)"/></svg></div>
           <div class="tp-done-body">
             <p class="tp-done-sum">You know your way around the tutor: the outline, the cards and side chats. <span class="tp-muted">(your coach's summary)</span></p>
-            <span class="sk-patch"><img src="../../vendor/brand/kit/characters/group.svg" alt=""></span>
+            <span class="tp-drawing"><img src="../../vendor/brand/kit/characters/group.svg" alt=""></span>
           </div>
         </article>
         <div class="msg"><p>That's Lesson 0 done. In Lesson 1 your factory starts building, and the Examples are about what it makes. Choose <b>What's next</b> when you're ready.</p></div>
@@ -280,7 +273,7 @@
               <div class="tp-hs-now"><b>New in this lesson</b>16 Rules · none done yet</div>
             </div>
           </div>
-          <span class="sk-patch tp-edge" style="right:-104px;bottom:-2px"><img src="../../vendor/brand/kit/characters/explainer.svg" alt="" style="height:150px"></span>
+          <span class="tp-drawing tp-edge" style="right:-104px;bottom:-2px"><img src="../../vendor/brand/kit/characters/explainer.svg" alt="" style="height:150px"></span>
         </div>
       </div>
     </main>
@@ -329,7 +322,7 @@
             ["Orchestration", ["The factory works in the codebase around it", "Each pass does one task, then stops"]]];
 
   var TICK = '<span class="sk-tick" role="img" aria-label="passed"></span>';
-  function patch(src, alt) { return '<span class="sk-patch"><img src="' + src + '" alt="' + (alt || "") + '"></span>'; }
+  function drawing(src, alt) { return '<span class="tp-drawing"><img src="' + src + '" alt="' + (alt || "") + '"></span>'; }
 
   function rule(name, st) {
     if (st === "pass") return '<li class="tp-rule"><span class="g">' + TICK + '</span><span>' + name + "</span></li>";
@@ -342,7 +335,7 @@
     return '<div class="tp-feat">' + name + '<span class="tp-new">new</span></div><ul class="tp-rules">' + rules.join("") + "</ul>";
   }
   function coachRow(lessonId, sel) {
-    return '<div class="tp-th' + (sel ? " sel" : "") + '">' + patch("../../vendor/brand/kit/icons/chat.svg") + '<span>Coach · Lesson ' + lessonId + "</span></div>";
+    return '<div class="tp-th' + (sel ? " sel" : "") + '">' + drawing("../../vendor/brand/kit/icons/chat.svg") + '<span>Coach · Lesson ' + lessonId + "</span></div>";
   }
   function sideRow(title, from, sel) {
     return '<div class="tp-th' + (sel ? " sel" : "") + '"><span class="arrow">↳</span><span>' + title + (from ? "<small>from: " + from + "</small>" : "") + "</span></div>";
@@ -373,7 +366,7 @@
       '<a' + (o.courseSel ? ' class="sel"' : "") + ">" + ic("book") + "Course" + (o.acc ? '<span class="acc"><i>' + o.acc[0] + "</i> · " + o.acc[1] + "</span>" : "") + "</a>" +
       "</nav>" +
       '<div class="bb-side-scroll"><nav class="tp tp-outline" aria-label="Course outline">' +
-      '<div class="tp-brand">' + patch("../../vendor/brand/kit/icons/books.svg") + 'Tutorial</div>' +
+      '<div class="tp-brand">' + drawing("../../vendor/brand/kit/icons/books.svg") + 'Tutorial</div>' +
       '<ul class="tp-lessons">' + lessons + "</ul>" +
       (o.unset ? '<a class="tp-link tp-setup">Set up your factory project →</a>' : "") +
       '<div class="tp-others"><div class="hd"><span>Other threads</span><span>+</span></div><p>No other threads yet.</p></div>' +

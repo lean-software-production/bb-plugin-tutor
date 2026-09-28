@@ -1,7 +1,7 @@
 /* Sketchbook kit: tokens + reusable chunks. Spec: README.md. Also include sketchbook.js (wobble filters). */
 @import url("https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Patrick+Hand&family=Patrick+Hand+SC&display=swap");
 
-/* Palette and fonts. These never change; the roles below point at them. */
+/* Palette and fonts. The roles below point at them. */
 :root {
   --sk-mustard: #EEA306;
   --sk-teal: #039695;
@@ -25,7 +25,7 @@
   --sk-line-chunky: 5px;
 }
 
-/* Roles: what the pieces paint with. Light mode here; dark mode below. */
+/* Roles: what the pieces paint with. */
 :root {
   --sk-page: var(--sk-paper);
   --sk-text: var(--sk-body-text);
@@ -38,8 +38,6 @@
   --sk-bubble-fill: var(--sk-bubble);
   --sk-swash: var(--sk-highlighter);
   --sk-track: color-mix(in oklab, var(--sk-ink) 12%, var(--sk-paper));
-  --sk-patch: transparent;
-  --sk-wash-amount: 9%;
   --sk-mustard-text: color-mix(in oklch, var(--sk-mustard) 55%, var(--sk-ink));
   --sk-teal-text: color-mix(in oklch, var(--sk-teal) 70%, var(--sk-ink));
   --sk-forest-text: color-mix(in oklch, var(--sk-forest) 85%, var(--sk-ink));
@@ -47,34 +45,6 @@
   --sk-blue-text: color-mix(in oklch, var(--sk-blue) 85%, var(--sk-ink));
   --sk-rust-text: color-mix(in oklch, var(--sk-rust) 70%, var(--sk-ink));
   --sk-deep-teal-text: var(--sk-deep-teal);
-  --sk-swash-img: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20400%20100%22%20preserveAspectRatio%3D%22none%22%3E%3Cdefs%3E%3Cfilter%20id%3D%22f%22%20filterUnits%3D%22userSpaceOnUse%22%20x%3D%22-20%22%20y%3D%22-20%22%20width%3D%22440%22%20height%3D%22140%22%3E%3CfeTurbulence%20type%3D%22fractalNoise%22%20baseFrequency%3D%220.02%22%20numOctaves%3D%222%22%20seed%3D%223%22%2F%3E%3CfeDisplacementMap%20in%3D%22SourceGraphic%22%20scale%3D%227%22%2F%3E%3C%2Ffilter%3E%3C%2Fdefs%3E%3Cpath%20filter%3D%22url%28%23f%29%22%20fill%3D%22%23FFEEB8%22%20d%3D%22M10%2016%20C%20120%204%2C%20280%206%2C%20392%2014%20L%20394%2084%20C%20280%2096%2C%20120%2094%2C%206%2088%20Z%22%2F%3E%3C%2Fsvg%3E");
-  --sk-accent: var(--sk-teal); --sk-accent-text: var(--sk-teal-text); --sk-on-accent: var(--sk-ink-title);
-}
-
-/* Dark mode: put .dark (bb's class) or .sk-dark on <html> or any ancestor.
-   An ink page, paper text, a lighter teal, and a pale-teal tint instead of the highlighter. */
-.dark, .sk-dark {
-  --sk-page: var(--sk-ink);
-  --sk-text: var(--sk-paper);
-  --sk-title-text: var(--sk-paper);
-  --sk-line: color-mix(in oklab, var(--sk-paper) 85%, var(--sk-ink));
-  --sk-heading: color-mix(in oklch, var(--sk-teal) 80%, var(--sk-paper));
-  --sk-on-heading: var(--sk-ink);
-  --sk-connector: color-mix(in oklch, var(--sk-slate) 60%, var(--sk-paper));
-  --sk-loop: color-mix(in oklch, var(--sk-blue) 75%, var(--sk-paper));
-  --sk-bubble-fill: color-mix(in oklab, var(--sk-bubble) 12%, var(--sk-ink));
-  --sk-swash: color-mix(in srgb, var(--sk-heading) 32%, var(--sk-ink));
-  --sk-track: color-mix(in oklab, var(--sk-paper) 16%, var(--sk-ink));
-  --sk-patch: var(--sk-paper);
-  --sk-wash-amount: 10%;
-  --sk-mustard-text: var(--sk-mustard);
-  --sk-teal-text: color-mix(in oklch, var(--sk-teal) 80%, var(--sk-paper));
-  --sk-forest-text: color-mix(in oklch, var(--sk-forest) 60%, var(--sk-paper));
-  --sk-coral-text: color-mix(in oklch, var(--sk-coral) 80%, var(--sk-paper));
-  --sk-blue-text: color-mix(in oklch, var(--sk-blue) 60%, var(--sk-paper));
-  --sk-rust-text: color-mix(in oklch, var(--sk-rust) 65%, var(--sk-paper));
-  --sk-deep-teal-text: color-mix(in oklch, var(--sk-teal) 80%, var(--sk-paper));
-  --sk-swash-img: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20400%20100%22%20preserveAspectRatio%3D%22none%22%3E%3Cdefs%3E%3Cfilter%20id%3D%22f%22%20filterUnits%3D%22userSpaceOnUse%22%20x%3D%22-20%22%20y%3D%22-20%22%20width%3D%22440%22%20height%3D%22140%22%3E%3CfeTurbulence%20type%3D%22fractalNoise%22%20baseFrequency%3D%220.02%22%20numOctaves%3D%222%22%20seed%3D%223%22%2F%3E%3CfeDisplacementMap%20in%3D%22SourceGraphic%22%20scale%3D%227%22%2F%3E%3C%2Ffilter%3E%3C%2Fdefs%3E%3Cpath%20filter%3D%22url%28%23f%29%22%20fill%3D%22%2352AAA9%22%20fill-opacity%3D%220.32%22%20d%3D%22M10%2016%20C%20120%204%2C%20280%206%2C%20392%2014%20L%20394%2084%20C%20280%2096%2C%20120%2094%2C%206%2088%20Z%22%2F%3E%3C%2Fsvg%3E");
   --sk-accent: var(--sk-teal); --sk-accent-text: var(--sk-teal-text); --sk-on-accent: var(--sk-ink-title);
 }
 
@@ -88,8 +58,6 @@
 .sk-blue { --sk-accent: var(--sk-blue); --sk-accent-text: var(--sk-blue-text); --sk-on-accent: #fff; }
 .sk-rust { --sk-accent: var(--sk-rust); --sk-accent-text: var(--sk-rust-text); --sk-on-accent: var(--sk-ink-title); }
 .sk-deep-teal { --sk-accent: var(--sk-deep-teal); --sk-accent-text: var(--sk-deep-teal-text); --sk-on-accent: #fff; }
-/* deep teal disappears on ink, so in dark mode it becomes the lighter teal */
-:is(.dark, .sk-dark) .sk-deep-teal, .sk-deep-teal:is(.dark, .sk-dark) { --sk-accent: var(--sk-heading); --sk-on-accent: var(--sk-ink-title); }
 
 /* ---------- paper: a 16:9 slide, or any paper-backed block ---------- */
 .sk-paper {
@@ -123,7 +91,7 @@
 
 /* ---------- highlighter swash: in a title, on a phrase, or on a whole row ---------- */
 .sk-hl {
-  background: var(--sk-swash-img) center / 100% 100% no-repeat;
+  background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20400%20100%22%20preserveAspectRatio%3D%22none%22%3E%3Cdefs%3E%3Cfilter%20id%3D%22f%22%20filterUnits%3D%22userSpaceOnUse%22%20x%3D%22-20%22%20y%3D%22-20%22%20width%3D%22440%22%20height%3D%22140%22%3E%3CfeTurbulence%20type%3D%22fractalNoise%22%20baseFrequency%3D%220.02%22%20numOctaves%3D%222%22%20seed%3D%223%22%2F%3E%3CfeDisplacementMap%20in%3D%22SourceGraphic%22%20scale%3D%227%22%2F%3E%3C%2Ffilter%3E%3C%2Fdefs%3E%3Cpath%20filter%3D%22url%28%23f%29%22%20fill%3D%22%23FFEEB8%22%20d%3D%22M10%2016%20C%20120%204%2C%20280%206%2C%20392%2014%20L%20394%2084%20C%20280%2096%2C%20120%2094%2C%206%2088%20Z%22%2F%3E%3C%2Fsvg%3E") center / 100% 100% no-repeat;
   -webkit-box-decoration-break: clone; box-decoration-break: clone;
   padding: .08em .4em 0; margin: 0 -.25em;
 }
@@ -163,22 +131,10 @@
 }
 .sk-panel.sk-dashed::before { border-style: dashed; }
 /* .sk-wash: a pale wash of the accent mixed with the page */
-.sk-panel.sk-wash::before { background: color-mix(in oklab, var(--sk-accent) var(--sk-wash-amount), var(--sk-page)); }
-.sk-panel > img, .sk-panel > .sk-icon, .sk-panel > .sk-patch { width: 42%; align-self: center; }
-.sk-panel > .sk-patch > img { width: 100%; height: auto; }
+.sk-panel.sk-wash::before { background: color-mix(in oklab, var(--sk-accent) 9%, var(--sk-page)); }
+.sk-panel > img, .sk-panel > .sk-icon { width: 42%; align-self: center; }
 .sk-panel p { margin: 0; font-size: 1.25em; line-height: 1.2; color: var(--sk-text); }
 .sk-panel .sk-em { color: var(--sk-accent-text); }
-
-/* ---------- paper patch: a drawing on a small wobbly patch of cream paper ----------
-   Nothing in light mode. In dark mode the drawing's ink outlines need paper behind them. */
-.sk-patch { position: relative; isolation: isolate; display: inline-block; line-height: 0; vertical-align: middle; }
-.sk-patch > img, .sk-patch > svg { display: block; max-width: 100%; }
-/* the patch reaches a little past the drawing, so keep neighbours apart */
-.sk-patch + .sk-patch { margin-left: 1em; }
-.sk-patch::before {
-  content: ""; position: absolute; inset: -5% -7%; z-index: -1; background: var(--sk-patch);
-  border-radius: 22% 18% 24% 17% / 18% 23% 16% 21%; filter: url(#sk-wobble-line);
-}
 
 /* ---------- tick: a hand-drawn tick, sized and coloured like text ---------- */
 .sk-tick {
@@ -224,7 +180,7 @@
 .sk-bubble.sk-tail-right::after { left: auto; right: 2em; }
 .sk-bubble .sk-em { color: var(--sk-rust-text); font-weight: 700; }
 
-/* ---------- ribbon banner: a paper banner, so it stays cream with ink in dark mode ---------- */
+/* ---------- ribbon banner ---------- */
 .sk-ribbon {
   position: relative; isolation: isolate; display: inline-flex; align-items: center; gap: .5em;
   padding: .45em 1.4em .35em; margin: 0 2.4em;
@@ -238,7 +194,7 @@
   content: ""; position: absolute; inset: .45em -2.2em -.45em; z-index: -2;
   background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2092%2092%22%3E%3Cdefs%3E%3Cfilter%20id%3D%22f%22%20filterUnits%3D%22userSpaceOnUse%22%20x%3D%22-10%22%20y%3D%22-10%22%20width%3D%22112%22%20height%3D%22112%22%3E%3CfeTurbulence%20type%3D%22fractalNoise%22%20baseFrequency%3D%220.02%22%20numOctaves%3D%222%22%20seed%3D%223%22%2F%3E%3CfeDisplacementMap%20in%3D%22SourceGraphic%22%20scale%3D%226%22%2F%3E%3C%2Ffilter%3E%3C%2Fdefs%3E%3Cpath%20filter%3D%22url%28%23f%29%22%20d%3D%22M40%2012%20L%203%2040%20L%2040%2066%20L%2024%2082%20L%2090%2082%20L%2090%2012%20Z%22%20fill%3D%22%23F1DAB0%22%20stroke%3D%22%232A2724%22%20stroke-width%3D%222.5%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E") left center / auto 100% no-repeat, url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2092%2092%22%3E%3Cdefs%3E%3Cfilter%20id%3D%22f%22%20filterUnits%3D%22userSpaceOnUse%22%20x%3D%22-10%22%20y%3D%22-10%22%20width%3D%22112%22%20height%3D%22112%22%3E%3CfeTurbulence%20type%3D%22fractalNoise%22%20baseFrequency%3D%220.02%22%20numOctaves%3D%222%22%20seed%3D%223%22%2F%3E%3CfeDisplacementMap%20in%3D%22SourceGraphic%22%20scale%3D%226%22%2F%3E%3C%2Ffilter%3E%3C%2Fdefs%3E%3Cg%20transform%3D%22translate%2892%200%29%20scale%28-1%201%29%22%3E%3Cpath%20filter%3D%22url%28%23f%29%22%20d%3D%22M40%2012%20L%203%2040%20L%2040%2066%20L%2024%2082%20L%2090%2082%20L%2090%2012%20Z%22%20fill%3D%22%23F1DAB0%22%20stroke%3D%22%232A2724%22%20stroke-width%3D%222.5%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E") right center / auto 100% no-repeat;
 }
-.sk-ribbon .sk-kicker { font-family: var(--sk-font-label); color: color-mix(in oklch, var(--sk-rust) 70%, var(--sk-ink)); }
+.sk-ribbon .sk-kicker { font-family: var(--sk-font-label); color: var(--sk-rust-text); }
 .sk-ribbon img { height: 1.4em; }
 
 /* ---------- step row: equal-width panels with arrows between ---------- */

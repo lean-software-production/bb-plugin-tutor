@@ -1,16 +1,15 @@
 // Screenshots of every Tutor surface in the Sketchbook look against the
 // tutor-e2e container, each followed by the geometry checks (plan Task 15):
-//   node sketch-check.mjs [surface…] [--dark] [--size WxH] [--out DIR] [--tag TAG]
+//   node sketch-check.mjs [surface…] [--size WxH] [--out DIR] [--tag TAG]
 //                         [--browser chromium|firefox] [--reduced-motion]
 // Surfaces (default: all): welcome start home outline lesson-card rule-card
 // progress side-chat rule-tab lesson-complete completion appearance.
-// Each shot is <out>/<surface>-<light|dark>[-<tag>].png (out defaults to $E2E_SHOTS).
+// Each shot is <out>/<surface>[-<tag>].png (out defaults to $E2E_SHOTS). The
+// brand is light mode only, so there is one look to shoot.
 // The checks, per page (sketchReport, also used by walk.mjs):
-//   - every visible .sk-patch, its ::before overhang included, is at least 16px
-//     inside the viewport (patches a scroller has scrolled partly away are skipped);
+//   - every visible drawing (.tp-drawing) is at least 16px inside the viewport
+//     (drawings a scroller has scrolled partly away are skipped);
 //   - the lesson-complete loop crosses no text and ends within 12px of What's next;
-//   - in dark mode every kit drawing (a data: svg <img> in .tutor-sk) sits on a
-//     .sk-patch (or on the paper ribbon);
 //   - the wobble defs (#tutor-sk-defs) are in the document exactly once.
 // It needs the walk to have run (coach threads for lessons 000 and 004).
 // Exits non-zero when a surface fails to load or a check fails.
@@ -18,9 +17,8 @@ import { BASE, bb, bbJson, pw, sleep, until } from "./lib.mjs";
 import { mkdirSync } from "node:fs";
 
 /** Runs in the page. Returns the failed checks. */
-export function sketchReportInPage({ dark, patchMargin = 16, loopReach = 12 }) {
+export function sketchReportInPage({ drawingMargin = 16, loopReach = 12 } = {}) {
   const fail = [];
-  const px = (v) => parseFloat(v) || 0;
   const vw = window.innerWidth, vh = window.innerHeight;
   const roots = document.querySelectorAll(".tutor-sk");
   if (roots.length > 0) {
@@ -44,15 +42,13 @@ export function sketchReportInPage({ dark, patchMargin = 16, loopReach = 12 }) {
     return false;
   };
   const name = (el) => (el.querySelector("img")?.getAttribute("alt") || el.className || el.tagName).toString().slice(0, 50);
-  for (const patch of document.querySelectorAll(".sk-patch")) {
-    if (!visible(patch)) continue;
-    const r = patch.getBoundingClientRect();
-    const b = getComputedStyle(patch, "::before");
-    const outer = { left: r.left + px(b.left), top: r.top + px(b.top), right: r.right - px(b.right), bottom: r.bottom - px(b.bottom) };
-    if (outer.bottom < 0 || outer.top > vh || outer.right < 0 || outer.left > vw) continue;
-    if (clippedByScroller(patch, outer)) continue;
-    const margin = Math.min(outer.left, outer.top, vw - outer.right, vh - outer.bottom);
-    if (margin < patchMargin) fail.push(`patch ${name(patch)} (${patch.className}) is ${margin.toFixed(1)}px from the viewport's edge (want >= ${patchMargin})`);
+  for (const drawing of document.querySelectorAll(".tp-drawing")) {
+    if (!visible(drawing)) continue;
+    const r = drawing.getBoundingClientRect();
+    if (r.bottom < 0 || r.top > vh || r.right < 0 || r.left > vw) continue;
+    if (clippedByScroller(drawing, r)) continue;
+    const margin = Math.min(r.left, r.top, vw - r.right, vh - r.bottom);
+    if (margin < drawingMargin) fail.push(`drawing ${name(drawing)} (${drawing.className}) is ${margin.toFixed(1)}px from the viewport's edge (want >= ${drawingMargin})`);
   }
   for (const path of document.querySelectorAll(".tp-done .sk-loop path")) {
     const panel = path.closest(".tp-done");
@@ -73,12 +69,6 @@ export function sketchReportInPage({ dark, patchMargin = 16, loopReach = 12 }) {
     const next = panel.querySelector(".tp-next").getBoundingClientRect();
     const reach = Math.hypot(Math.max(next.left - end.x, 0, end.x - next.right), Math.max(next.top - end.y, 0, end.y - next.bottom));
     if (reach > loopReach) fail.push(`loop ends ${reach.toFixed(1)}px from What's next (want <= ${loopReach})`);
-  }
-  if (dark) {
-    for (const img of document.querySelectorAll('.tutor-sk img[src^="data:image/svg"]')) {
-      if (!visible(img)) continue;
-      if (!img.closest(".sk-patch, .sk-ribbon")) fail.push(`kit drawing ${img.alt || img.src.slice(0, 40)} in ${img.parentElement.className} has no paper patch`);
-    }
   }
   return fail;
 }
@@ -110,11 +100,10 @@ export function outlineReportInPage(selector = ".tutor-sk .sk-panel") {
 // ---- CLI ----------------------------------------------------------------
 if (import.meta.url === `file://${process.argv[1]}`) {
   const args = process.argv.slice(2);
-  const opts = { dark: false, width: 1280, height: 800, out: process.env.E2E_SHOTS, tag: "", browser: "chromium", reducedMotion: false, surfaces: [] };
+  const opts = { width: 1280, height: 800, out: process.env.E2E_SHOTS, tag: "", browser: "chromium", reducedMotion: false, surfaces: [] };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
-    if (a === "--dark") opts.dark = true;
-    else if (a === "--reduced-motion") opts.reducedMotion = true;
+    if (a === "--reduced-motion") opts.reducedMotion = true;
     else if (a === "--size") [opts.width, opts.height] = args[++i].split("x").map(Number);
     else if (a === "--out") opts.out = args[++i];
     else if (a === "--tag") opts.tag = args[++i];
@@ -243,7 +232,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const browser = await pw[opts.browser].launch({ headless: true });
   const context = await browser.newContext({
     viewport: { width: opts.width, height: opts.height },
-    colorScheme: opts.dark ? "dark" : "light",
+    colorScheme: "light",
     reducedMotion: opts.reducedMotion ? "reduce" : "no-preference",
     ...(mobile ? { isMobile: opts.browser !== "firefox", hasTouch: true } : {}),
   });
@@ -252,14 +241,12 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   page.on("pageerror", (e) => errors.push(`[pageerror] ${e.message}`));
   let failed = 0;
   for (const s of list) {
-    const file = `${opts.out}/${s}-${opts.dark ? "dark" : "light"}${opts.tag ? `-${opts.tag}` : ""}.png`;
+    const file = `${opts.out}/${s}${opts.tag ? `-${opts.tag}` : ""}.png`;
     try {
       if (!SURFACES[s]) throw new Error(`unknown surface ${s}`);
       await SURFACES[s](page);
-      const isDark = await page.evaluate(() => document.documentElement.classList.contains("dark"));
-      if (isDark !== opts.dark) throw new Error(`BB is ${isDark ? "dark" : "light"}, want ${opts.dark ? "dark" : "light"}`);
       await page.screenshot({ path: file });
-      const report = await sketchReport(page, { dark: opts.dark });
+      const report = await sketchReport(page);
       if (opts.browser === "firefox") report.push(...(await page.evaluate(outlineReportInPage)));
       if (report.length) {
         failed++;

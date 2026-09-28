@@ -1,9 +1,21 @@
 /*
  * Tutor's shared atoms: type, the change badge, chips, the meter's count and
  * the lesson-complete loop's band. They paint with the --tp-* tokens
- * (app/sketch/tokens.css), which alias the Sketchbook kit's roles, so they
- * follow BB's light and dark modes.
+ * (app/sketch/tokens.css), which alias the Sketchbook kit's roles.
  */
+
+/* ---- a drawing (KitIcon, Character): the whole vendored file, never
+   recoloured. The wrapper sizes like an inline image; :where() keeps it at
+   one class, so a component's own rule for the drawing wins. ---- */
+:where(.tutor-sk) .tp-drawing {
+  display: inline-block;
+  line-height: 0;
+  vertical-align: middle;
+}
+:where(.tutor-sk) .tp-drawing > img {
+  display: block;
+  max-width: 100%;
+}
 
 /* ---- type (mockup .tp-eyebrow, .tp-dek) ---- */
 .tutor-sk .tp-eyebrow,

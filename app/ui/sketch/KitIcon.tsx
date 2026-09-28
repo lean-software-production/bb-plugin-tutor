@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import { icons, type IconName } from "../../sketch/drawings.ts";
-import { Patch } from "./Patch.tsx";
+import { cx } from "../../sketch/tone.ts";
 
 type KitIconProps = {
   name: IconName;
@@ -10,11 +10,11 @@ type KitIconProps = {
   style?: CSSProperties;
 };
 
-/** One of the brand's drawn icons, on its paper patch. */
+/** One of the brand's drawn icons, as the whole vendored file (styles/atoms.css `.tp-drawing`). */
 export function KitIcon({ name, alt = "", className, style }: KitIconProps) {
   return (
-    <Patch className={className} style={style}>
+    <span className={cx("tp-drawing", className)} style={style}>
       <img src={icons[name]} alt={alt} />
-    </Patch>
+    </span>
   );
 }

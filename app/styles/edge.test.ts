@@ -1,8 +1,6 @@
-// The welcome page's waver stands at the page's corner on a paper patch. The
-// patch reaches past the drawing (the kit's `.sk-patch::before` is inset
-// -5% -7%), and all of it must stay at least 24px inside the page at every
-// width the page sets offsets for (plan Task 12; checked in the browser by
-// scripts/tutor-dev/e2e/sketch-check.mjs).
+// The welcome page's waver stands at the page's corner. The drawing must stay
+// at least 24px inside the page at every width the page sets offsets for
+// (plan Task 12; checked in the browser by scripts/tutor-dev/e2e/sketch-check.mjs).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -10,9 +8,6 @@ import postcss from "postcss";
 
 const PAGES = readFileSync(new URL("./pages.css", import.meta.url), "utf8");
 const MARGIN = 24;
-/** The patch's overhang past its drawing, from the kit: 7% of its width, 5% of its height. */
-const OVERHANG_X = 0.07;
-const OVERHANG_Y = 0.05;
 
 type Placement = { right?: number; bottom?: number; height?: number };
 
@@ -37,22 +32,20 @@ function placements(css: string): Map<string, Placement> {
   return byMedia;
 }
 
-test("the waver's patch stays at least 24px inside the page at every width", () => {
+test("the waver stays at least 24px inside the page at every width", () => {
   const all = placements(PAGES);
   const base = all.get("");
   assert.ok(base?.right !== undefined && base.bottom !== undefined && base.height !== undefined, "pages.css places the waver");
   for (const [media, own] of all) {
     const place = { ...base, ...own };
-    // The waver is taller than it is wide, so its height bounds the patch's width.
-    const right = place.right! - OVERHANG_X * place.height!;
-    const bottom = place.bottom! - OVERHANG_Y * place.height!;
-    assert.ok(right >= MARGIN, `${media || "default"}: the patch's right edge is ${right.toFixed(1)}px from the page's (want >= ${MARGIN})`);
-    assert.ok(bottom >= MARGIN, `${media || "default"}: the patch's bottom edge is ${bottom.toFixed(1)}px from the page's (want >= ${MARGIN})`);
+    assert.ok(place.height! > 0, `${media || "default"}: the waver has a height`);
+    assert.ok(place.right! >= MARGIN, `${media || "default"}: the waver's right edge is ${place.right}px from the page's (want >= ${MARGIN})`);
+    assert.ok(place.bottom! >= MARGIN, `${media || "default"}: the waver's bottom edge is ${place.bottom}px from the page's (want >= ${MARGIN})`);
   }
 });
 
 // BB home's explainer leans past the Continue panel's right edge
-// (`right: -104px`, as in the mockup). Its patch must stay at least 16px
+// (`right: -104px`, as in the mockup). The drawing must stay at least 16px
 // inside BB's page column (plan Task 12; sketch-check.mjs measures it in the
 // browser). BB caps the home page's content at 760px inside that column, and
 // the column's width depends on BB's resizable sidebar, so only a query on
@@ -65,11 +58,7 @@ const PANEL = 728;
 
 type Shown = { query: string; column: number | null };
 
-test("the home explainer shows only where its patch stays at least 16px inside BB's page column", () => {
-  const svg = readFileSync(new URL("../../vendor/brand/kit/characters/explainer.svg", import.meta.url), "utf8");
-  const box = /viewBox="[-\d.]+ [-\d.]+ ([\d.]+) ([\d.]+)"/.exec(svg);
-  assert.ok(box !== null, "the explainer drawing has a viewBox");
-  const aspect = Number(box[1]) / Number(box[2]);
+test("the home explainer shows only where it stays at least 16px inside BB's page column", () => {
   let right: number | undefined;
   let height: number | undefined;
   let hiddenByDefault = false;
@@ -93,10 +82,9 @@ test("the home explainer shows only where its patch stays at least 16px inside B
   assert.ok(right !== undefined && height !== undefined, "pages.css places the explainer");
   assert.ok(hiddenByDefault, "the explainer is hidden unless a query on BB's page column shows it");
   assert.ok(shown.length > 0, "a query on BB's page column shows the explainer where it has room");
-  const overhang = OVERHANG_X * aspect * height;
   for (const { query, column } of shown) {
     assert.ok(column !== null, `${query}: only a min-width query on BB's page container knows the column's width`);
-    const margin = (column - PANEL) / 2 + right - overhang;
-    assert.ok(margin >= HOME_MARGIN, `${query}: in a ${column}px column the explainer's patch is ${margin.toFixed(1)}px from the column's edge (want >= ${HOME_MARGIN})`);
+    const margin = (column - PANEL) / 2 + right;
+    assert.ok(margin >= HOME_MARGIN, `${query}: in a ${column}px column the explainer is ${margin.toFixed(1)}px from the column's edge (want >= ${HOME_MARGIN})`);
   }
 });

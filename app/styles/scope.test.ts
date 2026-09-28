@@ -15,8 +15,6 @@ const REPO_DIR = fileURLToPath(new URL("../..", import.meta.url));
 const ROOTS = [".tutor-sk", ".tutor-nav"];
 const KIT = `${APP_DIR}sketch/kit.css`;
 const TOKENS = `${APP_DIR}sketch/tokens.css`;
-// BB's dark-mode class on <html>: a Tutor selector may start with it.
-const MODE_PREFIX = /^\.dark\s+/;
 /** A root written as `:where(.root)` (no specificity) counts as the root. */
 const unwrapRoot = (selector: string) => selector.replace(/^:where\((\.[\w-]+)\)/, "$1");
 
@@ -81,10 +79,10 @@ test("the literal-colour finder catches hex, colour functions and names, and not
 test("every Tutor selector is scoped under a Tutor root and uses tp-* classes", () => {
   for (const file of stylesheets()) {
     for (const selector of selectors(readFileSync(file, "utf8"))) {
-      const unprefixed = unwrapRoot(selector.replace(MODE_PREFIX, ""));
+      const unprefixed = unwrapRoot(selector);
       assert.ok(
         ROOTS.some((root) => unprefixed.startsWith(root)),
-        `${file}: "${selector}" must start with ${ROOTS.join(" or ")} (optionally after .dark)`,
+        `${file}: "${selector}" must start with ${ROOTS.join(" or ")}`,
       );
       for (const className of unprefixed.match(/\.[\w-]+/g) ?? []) {
         assert.ok(
@@ -104,7 +102,7 @@ test("every kit selector matches only inside a .tutor-sk root and names only kit
     assert.ok(selector.includes(".tutor-sk"), `kit.css: "${selector}" is not scoped to .tutor-sk`);
     for (const className of selector.match(/\.[\w-]+/g) ?? []) {
       assert.ok(
-        [".tutor-sk", ".dark"].includes(className) || className.startsWith(".sk-"),
+        className === ".tutor-sk" || className.startsWith(".sk-"),
         `kit.css: "${selector}" uses ${className}`,
       );
     }
@@ -148,11 +146,18 @@ function classNames(): { file: string; value: string }[] {
   return found;
 }
 
-test("no Tutor root carries a kit colour modifier: `.dark .tutor-sk` would beat it", () => {
-  const MODIFIER = /(?<![\w-])sk-(mustard|teal|forest|coral|blue|rust|deep-teal)(?![\w-])/;
-  const roots = classNames().filter(({ value }) => /(?<![\w-])tutor-sk(?![\w-])/.test(value));
-  assert.ok(roots.length > 5, "the app's surfaces carry .tutor-sk");
-  for (const { file, value } of roots) assert.doesNotMatch(value, MODIFIER, `${file}: className "${value}"`);
+test("light mode only: no Tutor stylesheet, nor the kit as shipped, has a dark-mode rule", () => {
+  for (const file of [...stylesheets(), KIT]) {
+    for (const selector of selectors(readFileSync(file, "utf8"))) {
+      assert.doesNotMatch(selector, /\.(sk-)?dark(?![\w-])/, `${file}: "${selector}"`);
+    }
+    postcss.parse(readFileSync(file, "utf8")).walkDecls("color-scheme", (decl) => {
+      assert.equal(decl.value, "light", `${file}: color-scheme ${decl.value}`);
+    });
+    postcss.parse(readFileSync(file, "utf8")).walkAtRules("media", (rule) => {
+      assert.doesNotMatch(rule.params, /prefers-color-scheme/, `${file}: @media ${rule.params}`);
+    });
+  }
 });
 
 test("the paper-era roots are gone from the app", () => {

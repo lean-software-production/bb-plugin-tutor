@@ -24,9 +24,10 @@ test("the palette and light-role :root blocks move onto the Tutor root", () => {
   assert.equal(out, ".tutor-sk { --sk-mustard: #EEA306; } .tutor-sk { --sk-page: var(--sk-paper); }");
 });
 
-test("the dark-role block matches the Tutor root under BB's .dark, and .sk-dark stays a scoped kit class", () => {
-  const out = flat(transformKit(".dark, .sk-dark { --sk-page: var(--sk-ink); }"));
-  assert.equal(out, ".dark .tutor-sk, .sk-dark:where(.tutor-sk, .tutor-sk *) { --sk-page: var(--sk-ink); }");
+test("the transform refuses a dark-mode selector: Tutor is light mode only", () => {
+  assert.throws(() => transformKit(".dark, .sk-dark { --sk-page: var(--sk-ink); }"), /light mode only/);
+  assert.throws(() => transformKit(".sk-dark .sk-panel { color: red; }"), /\.sk-dark/);
+  assert.throws(() => transformKit(":is(.dark, .x) .sk-deep-teal { color: red; }"), /\.dark/);
 });
 
 test("other selectors get the scope on their subject compound, before any pseudo-element", () => {
@@ -34,11 +35,11 @@ test("other selectors get the scope on their subject compound, before any pseudo
     [".sk-panel::before", ".sk-panel:where(.tutor-sk, .tutor-sk *)::before"],
     [".sk-hl.sk-sweep", ".sk-hl.sk-sweep:where(.tutor-sk, .tutor-sk *)"],
     [".sk-btn:hover::before", ".sk-btn:hover:where(.tutor-sk, .tutor-sk *)::before"],
-    [".sk-panel > .sk-patch > img", ".sk-panel > .sk-patch > img:where(.tutor-sk, .tutor-sk *)"],
+    [".sk-panel > .sk-drawing > img", ".sk-panel > .sk-drawing > img:where(.tutor-sk, .tutor-sk *)"],
     [".sk-arrow :is(line, path)", ".sk-arrow :is(line, path):where(.tutor-sk, .tutor-sk *)"],
     [
-      ":is(.dark, .sk-dark) .sk-deep-teal, .sk-deep-teal:is(.dark, .sk-dark)",
-      ":is(.dark, .sk-dark) .sk-deep-teal:where(.tutor-sk, .tutor-sk *), .sk-deep-teal:is(.dark, .sk-dark):where(.tutor-sk, .tutor-sk *)",
+      ":is(.sk-a, .sk-b) .sk-deep-teal, .sk-deep-teal:is(.sk-a, .sk-b)",
+      ":is(.sk-a, .sk-b) .sk-deep-teal:where(.tutor-sk, .tutor-sk *), .sk-deep-teal:is(.sk-a, .sk-b):where(.tutor-sk, .tutor-sk *)",
     ],
   ];
   for (const [input, expected] of cases) {
@@ -91,12 +92,12 @@ test("the transform refuses kit shapes it does not know how to scope", () => {
 
 test("specificity is computed the CSS way: :where adds nothing, :is takes its heaviest argument", () => {
   assert.deepEqual(specificity(".a:where(.b, .b *)::before"), [0, 1, 1]);
-  assert.deepEqual(specificity(":is(.dark, #x) .a"), [1, 1, 0]);
+  assert.deepEqual(specificity(":is(.b, #x) .a"), [1, 1, 0]);
   assert.deepEqual(specificity(":root"), [0, 1, 0]);
   assert.deepEqual(specificity(".a > img"), [0, 1, 1]);
 });
 
-test("every transformed kit selector keeps its specificity; only the root-token blocks gain one class", () => {
+test("every transformed kit selector keeps its specificity", () => {
   const before = postcss.parse(vendored);
   const after = postcss.parse(transformKit(vendored));
   const rules = (root: postcss.Root) => {
@@ -110,19 +111,16 @@ test("every transformed kit selector keeps its specificity; only the root-token 
   const was = rules(before);
   const now = rules(after);
   assert.equal(now.length, was.length);
-  let rootBlocks = 0;
   was.forEach((rule, i) => {
     const original = rule.selectors;
     const scoped = now[i]!.selectors;
     assert.equal(scoped.length, original.length, rule.selector);
     original.forEach((selector, j) => {
       const [a, b, c] = specificity(selector);
-      const expected: [number, number, number] = selector === ".dark" ? (rootBlocks++, [a, b + 1, c]) : [a, b, c];
-      assert.deepEqual(specificity(scoped[j]!), expected, `${selector} -> ${scoped[j]}`);
+      assert.deepEqual(specificity(scoped[j]!), [a, b, c], `${selector} -> ${scoped[j]}`);
       assert.ok(scoped[j]!.includes(".tutor-sk"), `${scoped[j]} is not scoped`);
     });
   });
-  assert.equal(rootBlocks, 1, "the kit has one dark-role block");
 });
 
 test("app/sketch/kit.css is the transformed vendored kit (npm run build:assets)", () => {

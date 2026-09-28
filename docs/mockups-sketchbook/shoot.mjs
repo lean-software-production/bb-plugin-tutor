@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Screenshot every Sketchbook mockup screen in light and dark mode.
+// Screenshot every Sketchbook mockup screen (the brand is light mode only).
 //
 //   node docs/mockups-sketchbook/shoot.mjs [--out <dir>] [--only <screen>] [--check]
 //
@@ -9,12 +9,12 @@
 //   --check         also print a WCAG contrast report: every text run whose
 //                   colour against its composited background is under 4.5:1,
 //                   and run the geometry checks, which fail the run (exit 1):
-//                   every paper patch (its ::before overhang included) sits
-//                   at least 16px inside the frame, and the lesson-complete
+//                   every drawing (.tp-drawing) sits at least 16px inside
+//                   the frame, and the lesson-complete
 //                   loop crosses no text and ends within 12px of What's next
 //   --min <ratio>   report threshold for --check (default 4.5)
 //
-// Writes <screen>-<light|dark>.png. The page loads its fonts from Google
+// Writes <screen>.png. The page loads its fonts from Google
 // Fonts (fonts.googleapis.com, fonts.gstatic.com), so those hosts must be
 // reachable; each shot waits for document.fonts.ready and then finishes the
 // highlighter sweep so the PNG shows its final state.
@@ -29,7 +29,6 @@ import { homedir } from "node:os";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SCREENS = ["first-run", "outline", "lesson-card", "rule-cards", "side-chat", "lesson-complete", "home"];
-const MODES = ["light", "dark"];
 
 const args = process.argv.slice(2);
 const opts = { out: resolve(here, "../../../shots-sketchbook"), only: null, check: false, min: 4.5 };
@@ -106,20 +105,17 @@ function contrastReport(min) {
 }
 
 // Runs in the page: the geometry rules for one screen. Returns the failures.
-function geometryReport({ screen, patchMargin, loopReach }) {
+function geometryReport({ screen, drawingMargin, loopReach }) {
   const frame = document.querySelector(`.shot[data-screen="${screen}"] > .frame`);
   const fr = frame.getBoundingClientRect();
   const fail = [];
   const name = (el) => (el.querySelector("img")?.getAttribute("src") ?? el.className).split("/").pop();
-  const px = (v) => parseFloat(v) || 0;
-  // (a) a patch's paper reaches past its drawing (the ::before inset); all of it stays inside the frame.
-  for (const patch of frame.querySelectorAll(".sk-patch")) {
-    const r = patch.getBoundingClientRect();
+  // (a) every drawing stays inside the frame.
+  for (const drawing of frame.querySelectorAll(".tp-drawing")) {
+    const r = drawing.getBoundingClientRect();
     if (!r.width || !r.height) continue;
-    const b = getComputedStyle(patch, "::before");
-    const outer = { left: r.left + px(b.left), top: r.top + px(b.top), right: r.right - px(b.right), bottom: r.bottom - px(b.bottom) };
-    const margin = Math.min(outer.left - fr.left, outer.top - fr.top, fr.right - outer.right, fr.bottom - outer.bottom);
-    if (margin < patchMargin) fail.push(`patch ${name(patch)} is ${margin.toFixed(1)}px from the frame's edge (want >= ${patchMargin})`);
+    const margin = Math.min(r.left - fr.left, r.top - fr.top, fr.right - r.right, fr.bottom - r.bottom);
+    if (margin < drawingMargin) fail.push(`drawing ${name(drawing)} is ${margin.toFixed(1)}px from the frame's edge (want >= ${drawingMargin})`);
   }
   // (b) the loop, with its stroke and arrowhead (reaching about 6px past the
   // path), crosses no text, and its end lands on What's next.
@@ -162,23 +158,20 @@ page.on("requestfailed", (r) => console.error(`[requestfailed] ${r.url()} ${r.fa
 
 const index = pathToFileURL(resolve(here, "index.html")).href;
 for (const screen of SCREENS.filter((s) => !opts.only || s === opts.only)) {
-  for (const mode of MODES) {
-    await page.emulateMedia({ colorScheme: mode });
-    await page.goto(`${index}?screen=${screen}${mode === "dark" ? "&mode=dark" : ""}`, { waitUntil: "load" });
-    await page.evaluate(() => document.fonts.ready);
-    await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
-    await page.evaluate(() => document.getAnimations().forEach((a) => a.finish()));
-    await page.waitForTimeout(150);
-    const file = resolve(opts.out, `${screen}-${mode}.png`);
-    await page.locator(`.shot[data-screen="${screen}"] > .frame`).screenshot({ path: file });
-    console.log(file);
-    if (opts.check) {
-      const bad = await page.evaluate(contrastReport, opts.min);
-      for (const line of bad) console.log(`  under ${opts.min}: ${line}`);
-      const broken = await page.evaluate(geometryReport, { screen, patchMargin: 16, loopReach: 12 });
-      for (const line of broken) console.log(`  geometry: ${line}`);
-      if (broken.length) process.exitCode = 1;
-    }
+  await page.goto(`${index}?screen=${screen}`, { waitUntil: "load" });
+  await page.evaluate(() => document.fonts.ready);
+  await page.waitForFunction(() => document.documentElement.dataset.ready === "1");
+  await page.evaluate(() => document.getAnimations().forEach((a) => a.finish()));
+  await page.waitForTimeout(150);
+  const file = resolve(opts.out, `${screen}.png`);
+  await page.locator(`.shot[data-screen="${screen}"] > .frame`).screenshot({ path: file });
+  console.log(file);
+  if (opts.check) {
+    const bad = await page.evaluate(contrastReport, opts.min);
+    for (const line of bad) console.log(`  under ${opts.min}: ${line}`);
+    const broken = await page.evaluate(geometryReport, { screen, drawingMargin: 16, loopReach: 12 });
+    for (const line of broken) console.log(`  geometry: ${line}`);
+    if (broken.length) process.exitCode = 1;
   }
 }
 await browser.close();

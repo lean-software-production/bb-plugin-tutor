@@ -135,17 +135,18 @@ To build the same archive locally, run `scripts/release-archive.sh v<x.y.z> <out
 ## Codespace polish
 
 - **Theme.** `bb.themes` contributes `sketchbook` (`plugin:tutor:sketchbook`): the Sketchbook
-  brand's bb theme, with cream paper, ink, deep teal and Patrick Hand for the UI in light mode, an
-  ink page with paper text in dark mode, and BB's own mono for code. There are light and dark code
-  themes as well. `paper` (`plugin:tutor:paper`, "Tutor paper (now Sketchbook)") is the same theme
+  brand's bb theme, with cream paper, ink, deep teal and Patrick Hand for the UI, and BB's own mono
+  for code. The brand is light mode only: picking dark mode in BB keeps the page paper and ink,
+  and the one light code theme is named for both modes, so code blocks stay light too. `paper` (`plugin:tutor:paper`, "Tutor paper (now Sketchbook)") is the same theme
   under the old id, because Feature 0.6 and earlier default to it. It goes away in the next release.
   `themes/sketchbook.css` is the brand's `bb-theme/sketchbook/theme.css` from `vendor/brand/` with
   Patrick Hand inlined in place of its Google Fonts `@import` (a theme is one CSS file). The code
-  themes are built from the kit's tokens. Don't edit the theme here: change it in the
+  theme is built from the kit's tokens. Don't edit the theme here: change it in the
   [brand repo](https://github.com/lean-software-production/brand), then run
   `npm run sync-brand -- <sha>` and `npm run build:assets`. A test checks the generated files are
   current, that the theme is the brand's byte for byte apart from the font, that text keeps
-  4.5:1 in both modes as BB actually paints it, and that BB's greys stay warm rather than pink.
+  4.5:1 as BB actually paints it, that BB's greys stay warm rather than pink, and that every BB
+  token resolves the same with BB's `.dark` class as without it.
 - **Tutor's own surfaces.** The outline, cards, pages and Rule tab are drawn with the brand's
   Sketchbook kit (`vendor/brand/kit/`), scoped under `.tutor-sk` at build time
   (`app/sketch/kit.css`) so it can't restyle BB. `app/styles/*.css` sets only size and layout, and
@@ -187,7 +188,7 @@ thread (or side chat) changes only its own lesson's progress.
 | `server/course/` | Course loading: course.yaml or ledger, Gherkin, slugs, hashes, new/reworded changes, lexicon, Lesson 0 |
 | `server/progress/`, `server/coach/`, `server/rpc/` | Student state, coach tools and threads, RPC handlers |
 | `app/` | Course outline (`Outline.tsx`), start page, lesson and Rule cards and other directives, the jump to a Rule's section, rule tab, home section, sidebar navigation, activity reporter; `sketchbook.css`, the scoped kit (`sketch/`), fonts and the theme build |
-| `themes/` | The Sketchbook BB theme (generated from the vendored brand) and its light and dark code themes |
+| `themes/` | The Sketchbook BB theme (generated from the vendored brand) and its light code theme |
 | `vendor/brand/` | The brand at its pin (`PIN`): the bb theme, the kit and `VOICE.md`; refreshed by `npm run sync-brand` |
 | `skills/tutor/` | The coach's skill |
 | `components/`, `lib/`, `hooks/` | Vendored BB UI components (shadcn model) |

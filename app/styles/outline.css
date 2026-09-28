@@ -2,7 +2,7 @@
  * The course outline (mockup "outline", docs/mockups-sketchbook/): one tree of
  * lessons, each with its coach thread, the coach thread's Rules and its side
  * chats. Fills BB's sidebar scroll area. The kit draws the step badges, the
- * highlighter, the ticks and the icon patches; this file only lays them out.
+ * highlighter, the ticks and the icons; this file only lays them out.
  */
 
 .tutor-sk.tp-outline {

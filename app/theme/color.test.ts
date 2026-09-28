@@ -70,7 +70,7 @@ test("unsupported syntax fails loudly", () => {
   assert.throws(() => resolveColor("#12345", {}), /#12345/);
 });
 
-test("BB's base tokens cover both modes and every derived token the contrast test needs", () => {
+test("BB's base tokens cover BB's light and .dark values and every derived token the theme tests need", () => {
   for (const mode of ["light", "dark"] as const) {
     for (const name of ["--sidebar", "--secondary", "--muted", "--sidebar-accent", "--muted-foreground", "--surface-selected", "--sidebar-foreground", "--foreground"]) {
       assert.ok(BB_BASE_TOKENS[mode][name], `${mode} ${name}`);

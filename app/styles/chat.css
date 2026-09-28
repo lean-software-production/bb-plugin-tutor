@@ -226,7 +226,7 @@
   gap: 18px;
   align-items: baseline;
 }
-/* The coach's note: the robot on its patch, speaking in a bubble. */
+/* The coach's note: the robot, speaking in a bubble. */
 .tutor-sk .tp-speaker {
   display: flex;
   flex-wrap: wrap;

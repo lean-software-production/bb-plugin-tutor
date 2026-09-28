@@ -8,8 +8,8 @@
 // everywhere, and a second plugin vendoring another kit pin would collide with
 // its classes, filter ids and keyframes. The transform:
 //   1. drops the Google Fonts @import (the fonts are self-hosted, app/fonts);
-//   2. moves the :root token blocks onto .tutor-sk, and the bare .dark of the
-//      dark-role block to `.dark .tutor-sk` (BB puts .dark on <html>);
+//   2. moves the :root token blocks onto .tutor-sk (the brand is light mode
+//      only, so a .dark selector in the kit is refused);
 //   3. adds :where(.tutor-sk, .tutor-sk *) to the subject of every other
 //      selector, before any pseudo-element, so a kit rule only matches inside a
 //      Tutor root and keeps its specificity (:where counts for nothing);
@@ -75,16 +75,8 @@ function scopeSelector(selector: string): string {
         complex.replaceWith(selectorParser.selector({ value: "", nodes: [selectorParser.className({ value: ROOT })] }));
         return;
       }
-      if (text === ".dark") {
-        const scoped = selectorParser.selector({ value: "", nodes: [] });
-        scoped.append(selectorParser.className({ value: "dark" }));
-        scoped.append(selectorParser.combinator({ value: " " }));
-        scoped.append(selectorParser.className({ value: ROOT }));
-        scoped.spaces.before = complex.spaces.before;
-        complex.replaceWith(scoped);
-        return;
-      }
       complex.walk((node) => {
+        if (node.type === "class" && ["dark", "sk-dark"].includes(node.value)) throw new Error(`kit selector "${text}" names .${node.value}: Tutor is light mode only`);
         if (node.type === "tag" && ["html", "body"].includes(node.value)) throw new Error(`kit selector "${text}" names ${node.value}`);
         if (node.type === "pseudo" && node.value === ":root") throw new Error(`kit selector "${text}" uses :root beyond a token block`);
       });
@@ -181,7 +173,7 @@ export const TOKENS: readonly { comment: string; tokens: readonly [string, strin
     tokens: [
       ["--tp-heading", "var(--sk-heading)"],
       ["--tp-on-heading", "var(--sk-on-heading)"],
-      ["--tp-heading-wash", "color-mix(in oklab, var(--sk-heading) var(--sk-wash-amount), var(--sk-page))"],
+      ["--tp-heading-wash", "color-mix(in oklab, var(--sk-heading) 9%, var(--sk-page))"],
       ["--tp-heading-line", "color-mix(in oklab, var(--sk-heading) 40%, var(--sk-page))"],
     ],
   },
@@ -191,18 +183,18 @@ export const TOKENS: readonly { comment: string; tokens: readonly [string, strin
       ["--tp-good", "var(--sk-forest-text)"],
       ["--tp-good-fill", "var(--sk-forest)"],
       ["--tp-on-good", "var(--sk-paper)"],
-      ["--tp-good-wash", "color-mix(in oklab, var(--sk-forest) var(--sk-wash-amount), var(--sk-page))"],
+      ["--tp-good-wash", "color-mix(in oklab, var(--sk-forest) 9%, var(--sk-page))"],
       ["--tp-good-line", "color-mix(in oklab, var(--sk-forest) 40%, var(--sk-page))"],
       ["--tp-warn", "var(--sk-rust-text)"],
-      ["--tp-warn-wash", "color-mix(in oklab, var(--sk-rust) var(--sk-wash-amount), var(--sk-page))"],
+      ["--tp-warn-wash", "color-mix(in oklab, var(--sk-rust) 9%, var(--sk-page))"],
       ["--tp-warn-line", "color-mix(in oklab, var(--sk-rust) 40%, var(--sk-page))"],
       ["--tp-new", "var(--sk-mustard-text)"],
       ["--tp-new-fill", "var(--sk-mustard)"],
       ["--tp-bad", "var(--sk-coral-text)"],
-      ["--tp-bad-wash", "color-mix(in oklab, var(--sk-coral) var(--sk-wash-amount), var(--sk-page))"],
+      ["--tp-bad-wash", "color-mix(in oklab, var(--sk-coral) 9%, var(--sk-page))"],
       ["--tp-bad-line", "color-mix(in oklab, var(--sk-coral) 40%, var(--sk-page))"],
       ["--tp-other", "var(--sk-blue-text)"],
-      ["--tp-other-wash", "color-mix(in oklab, var(--sk-blue) var(--sk-wash-amount), var(--sk-page))"],
+      ["--tp-other-wash", "color-mix(in oklab, var(--sk-blue) 9%, var(--sk-page))"],
       ["--tp-other-line", "color-mix(in oklab, var(--sk-blue) 40%, var(--sk-page))"],
     ],
   },

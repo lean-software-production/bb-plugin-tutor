@@ -4,8 +4,8 @@
 // side chats (Tutor's "Ask a side question" and BB's "Reply in side chat").
 //   node walk.mjs [step-prefix…]
 // Screenshots: $E2E_SHOTS (default <repo>/.tutor-e2e/shots)/e2e-NN-*.png and tree-*.png. Exits non-zero on the first failed check.
-// The Rule card (05), the outline (09) and lesson complete (11) also get a dark copy (*-dark.png)
-// and the Sketchbook geometry checks; 05 and 09 check the kit's wobble outlines draw.
+// The Rule card (05), the outline (09) and lesson complete (11) also get the Sketchbook geometry
+// checks; 05 and 09 check the kit's wobble outlines draw. The brand is light mode only: no dark copies.
 // E2E_BROWSER=firefox runs the walk in Firefox (shots carry -firefox). 11b checks that a page
 // asking for less motion (reducedMotion: "reduce") sees a passed Rule's swash and the ribbon still.
 // PROJECT (set by run-all.sh from the checkout's devcontainer.json; FACTORY before it) picks the layout:
@@ -150,7 +150,7 @@ async function inViewport(selector) {
     return r.bottom > 0 && r.top < window.innerHeight;
   }, selector);
 }
-/** Another page on the same browser: dark, or with reduced motion. */
+/** Another page on the same browser, e.g. with reduced motion. */
 async function otherPage(options) {
   const other = await browser.newContext({ viewport: page.viewportSize(), ...options });
   return other.newPage();
@@ -168,22 +168,9 @@ async function checkOutlines(p, where, selector) {
   check(fail.length === 0, `${where}: the wobble filters are mounted and ${selector}::before draws a filtered box${fail.length ? ` (${fail.join("; ")})` : ""}`);
 }
 /** The Sketchbook geometry checks (sketch-check.mjs) hold on a page. */
-async function checkSketch(p, where, dark) {
-  const fail = await sketchReport(p, { dark });
+async function checkSketch(p, where) {
+  const fail = await sketchReport(p);
   check(fail.length === 0, `${where}: the Sketchbook geometry holds${fail.length ? ` (${fail.join("; ")})` : ""}`);
-}
-/** A dark copy of a shot: the thread on a dark page, placed by `place`, checked and shot as <name>-dark. */
-async function darkCopy(name, threadId, place) {
-  const dark = await otherPage({ colorScheme: "dark" });
-  try {
-    await openOn(dark, threadId);
-    check(await dark.evaluate(() => document.documentElement.classList.contains("dark")), `${name}-dark: BB is in dark mode`);
-    await place(dark);
-    await checkSketch(dark, `${name}-dark`, true);
-    await shot(dark, `${name}-dark`);
-  } finally {
-    await dark.context().close();
-  }
 }
 /** Scrolls a page's timeline to its newest message. */
 async function showLatestOn(p) {
@@ -298,15 +285,8 @@ step("05 the coach reaches the first Rule: its Rule card starts its section, and
   check(true, "the outline counts 1/10, live");
   await showLatest();
   await checkOutlines(page, "the Rule card", `${anchorSelector(ctx.coach0, ctx.ruleA)} .tp-rcard`);
-  await checkSketch(page, "e2e-05-rule-card", false);
+  await checkSketch(page, "e2e-05-rule-card");
   await shot(page, "e2e-05-rule-card");
-  await darkCopy("e2e-05-rule-card", ctx.coach0, async (dark) => {
-    await showLatestOn(dark);
-    const card = dark.locator(anchorSelector(ctx.coach0, ctx.ruleA));
-    await card.waitFor({ timeout: 20000 });
-    await card.evaluate((el) => el.scrollIntoView({ block: "start" }));
-    await sleep(800);
-  });
 });
 
 step(`06 ${FILLER_TURNS} more turns, then a second Rule far below the first`, async () => {
@@ -389,15 +369,10 @@ step("09 BB's own Reply in side chat also lands in the outline", async () => {
   await sleep(1000);
   await shot(page, "tree-desktop-thread");
   await checkOutlines(page, "the outline", "nav.tp-outline .sk-num");
-  await checkSketch(page, "tree-desktop-thread", false);
+  await checkSketch(page, "tree-desktop-thread");
   const tree = `tree-desktop${BROWSER === "chromium" ? "" : `-${BROWSER}`}.png`;
   await page.locator("nav.tp-outline").screenshot({ path: `${SHOTS}/${tree}` });
   console.log(`  shot ${tree}`);
-  await darkCopy("tree-desktop-thread", ctx.coach0, async (dark) => {
-    await showLatestOn(dark);
-    await dark.locator("nav.tp-outline").screenshot({ path: `${SHOTS}/tree-desktop-dark.png` });
-    console.log("  shot tree-desktop-dark.png");
-  });
 });
 
 step("09b closing a side chat's tab and choosing it in the outline puts the tab back", async () => {
@@ -445,12 +420,8 @@ step("11 every Example passes; the coach completes Lesson 0", async () => {
   await openThread(ctx.coach0);
   await showLatest();
   await page.locator(".tp-done").waitFor({ timeout: 20000 });
-  await checkSketch(page, "e2e-11-lesson-complete", false);
+  await checkSketch(page, "e2e-11-lesson-complete");
   await shot(page, "e2e-11-lesson-complete");
-  await darkCopy("e2e-11-lesson-complete", ctx.coach0, async (dark) => {
-    await showLatestOn(dark);
-    await dark.locator(".tp-done").waitFor({ timeout: 20000 });
-  });
 });
 
 step("11b reduced motion: a passed Rule's swash and the lesson-complete ribbon hold still", async () => {

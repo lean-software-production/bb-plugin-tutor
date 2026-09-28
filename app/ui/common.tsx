@@ -129,7 +129,7 @@ export function GherkinRow({ line }: { line: GherkinLine }) {
 
 /**
  * A Tutor page in the Sketchbook kit: the plain kit page with one centred
- * column. `edge` is one small character in its patch, placed by the caller's
+ * column. `edge` is one small character, placed by the caller's
  * CSS at an edge of the page (not over the column).
  */
 export function SketchPage({ children, roomy = false, edge = null }: { children: ReactNode; roomy?: boolean; edge?: ReactNode }) {

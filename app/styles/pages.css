@@ -53,7 +53,7 @@
   .tutor-sk .tp-page-in--edge {
     padding-bottom: 160px;
   }
-  /* The patch reaches past the drawing (edge.test.ts); these keep it 24px in. */
+  /* These keep the drawing 24px inside the page (edge.test.ts). */
   .tutor-sk .tp-edge--waver {
     right: 34px;
     bottom: 32px;
@@ -381,7 +381,7 @@
   letter-spacing: 0.04em;
 }
 /* The explainer leans on the panel's right edge where BB's page column has room
-   for it, its patch 16px inside the column (edge.test.ts). The column's width
+   for it, 16px inside the column (edge.test.ts). The column's width
    depends on BB's sidebar, so this asks BB's page container, not the viewport;
    without that container the explainer stays hidden. */
 .tutor-sk .tp-edge--explainer {

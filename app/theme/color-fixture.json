@@ -18,7 +18,7 @@
       "--ink": "var(--sk-ink)",
       "--primary": "var(--sk-deep-teal)"
     },
-    "dark": {
+    "ink-page": {
       "--sk-mustard": "#eea306",
       "--sk-teal": "#039695",
       "--sk-forest": "#4a7d4b",
@@ -136,7 +136,7 @@
     },
     {
       "expr": "color-mix(in oklch, var(--ink) 70%, var(--canvas))",
-      "tokens": "dark",
+      "tokens": "ink-page",
       "computed": "oklch(0.770396 0.00811738 none)",
       "srgb": [
         185.024,
@@ -191,7 +191,7 @@
     },
     {
       "expr": "var(--primary)",
-      "tokens": "dark",
+      "tokens": "ink-page",
       "computed": "oklch(0.683978 0.0846604 193.936)",
       "srgb": [
         81.866,
@@ -202,7 +202,7 @@
     },
     {
       "expr": "color-mix(in oklch, var(--sk-coral) 80%, var(--sk-paper))",
-      "tokens": "dark",
+      "tokens": "ink-page",
       "computed": "oklch(0.751904 0.148246 40.0355)",
       "srgb": [
         252.136,
@@ -213,7 +213,7 @@
     },
     {
       "expr": "color-mix(in oklch, var(--sk-forest) 70%, var(--sk-paper))",
-      "tokens": "dark",
+      "tokens": "ink-page",
       "computed": "oklch(0.672928 0.0685251 144.541)",
       "srgb": [
         124.263,
@@ -224,7 +224,7 @@
     },
     {
       "expr": "color-mix(in oklab, var(--sk-paper) 85%, var(--sk-ink))",
-      "tokens": "dark",
+      "tokens": "ink-page",
       "computed": "oklab(0.876579 0.00113097 0.00823171)",
       "srgb": [
         216.899,
@@ -235,7 +235,7 @@
     },
     {
       "expr": "color-mix(in srgb, var(--primary) 32%, var(--sk-ink))",
-      "tokens": "dark",
+      "tokens": "ink-page",
       "computed": "color(srgb 0.214732 0.317451 0.307662)",
       "srgb": [
         54.754,
@@ -257,7 +257,7 @@
     },
     {
       "expr": "color-mix(in oklch, var(--ink) 4.3%, var(--canvas))",
-      "tokens": "dark",
+      "tokens": "ink-page",
       "computed": "oklch(0.305316 0.00710439 none)",
       "srgb": [
         50.365,
@@ -292,7 +292,7 @@
     },
     {
       "expr": "color-mix(in oklab, var(--primary) 12%, transparent)",
-      "tokens": "dark",
+      "tokens": "ink-page",
       "over": "var(--canvas)",
       "computed": "oklab(0.683978 -0.0821683 -0.0203901 / 0.12)",
       "overComputed": "rgb(42, 39, 36)",

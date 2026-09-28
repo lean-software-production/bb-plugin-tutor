@@ -1,10 +1,10 @@
-// The Sketchbook code themes (VS Code format, `bb.themes[].codeTheme`), built
-// from the vendored kit tokens (vendor/brand/kit/tokens.json) so they follow
+// The Sketchbook code theme (VS Code format, `bb.themes[].codeTheme`), built
+// from the vendored kit tokens (vendor/brand/kit/tokens.json) so it follows
 // the brand when the pin moves. Written by app/theme/build.ts.
 //
-// Both modes share one scope map; only the colours differ. The background is
-// the mode's page (the theme's --canvas), and every foreground must read at
-// 4.5:1 on it (theme.test.ts). Palette colours are not text colours on paper
+// The brand is light mode only, so there is one code theme and the manifest
+// names it for both of BB's modes. The background is the page (the theme's
+// --canvas), and every foreground must read at 4.5:1 on it (theme.test.ts). Palette colours are not text colours on paper
 // (mustard, coral and teal fail), so the choices are:
 //   comment      ink tint at 62% (the theme's --subtle-foreground share), italic
 //   keyword      deep-teal-text (the theme's --primary)
@@ -12,38 +12,33 @@
 //   number       rust-text (constants too)
 //   function     blue-text
 //   type         mustard-text (the theme's --warning-text)
-//   variable     text (body text; paper in dark mode)
+//   variable     text (body text)
 //   punctuation  ink tint at 70% (the theme's --muted-foreground share)
 //   invalid      coral-text (removed lines too)
-// The -text roles are the kit's text-safe variants: mixed with ink in light
-// mode and with paper in dark mode. The ink tints mix the mode's text anchor
-// into its page, as the theme does.
+// The -text roles are the kit's text-safe variants, mixed with ink. The ink
+// tints mix ink into the page, as the theme does.
 import { readFileSync } from "node:fs";
 import { resolveColor, toBytes, type Tokens } from "./color.ts";
 
-type Mode = "light" | "dark";
-
 interface KitTokens {
   color: Record<string, string>;
-  role: Record<string, { light: string; dark: string; use: string }>;
+  role: Record<string, { css: string; use: string }>;
 }
 
 export interface CodeTheme {
   name: string;
-  type: Mode;
+  type: "light";
   colors: Record<string, string>;
   tokenColors: { name: string; scope: string[]; settings: { foreground?: string; fontStyle?: string } }[];
 }
 
 const KIT_TOKENS = new URL("../../vendor/brand/kit/tokens.json", import.meta.url);
 
-/** The kit's palette and each role's value in `mode`, as the kit's `--sk-*` custom properties. */
-export function kitTokens(mode: Mode, kit: KitTokens = JSON.parse(readFileSync(KIT_TOKENS, "utf8")) as KitTokens): Tokens {
+/** The kit's palette and roles, as the kit's `--sk-*` custom properties. */
+export function kitTokens(kit: KitTokens = JSON.parse(readFileSync(KIT_TOKENS, "utf8")) as KitTokens): Tokens {
   const tokens: Record<string, string> = {};
   for (const [name, value] of Object.entries(kit.color)) tokens[`--sk-${name}`] = value;
-  for (const [name, role] of Object.entries(kit.role)) tokens[`--sk-${name}`] = role[mode];
-  // The anchor text colour of each mode: ink on paper, paper on ink.
-  tokens["--tutor-anchor"] = mode === "light" ? "var(--sk-ink)" : "var(--sk-paper)";
+  for (const [name, role] of Object.entries(kit.role)) tokens[`--sk-${name}`] = role.css;
   return tokens;
 }
 
@@ -56,7 +51,7 @@ const hex = (expr: string, tokens: Tokens, alpha?: string): string => {
 // Mixed in oklab, not oklch: Chromium drops the hue of a near-grey colour in
 // oklch, which tints ink-into-paper mixes pink. A code theme holds fixed hex
 // values, so it can take the warm grey the mix is meant to be.
-const inkTint = (percent: number) => `color-mix(in oklab, var(--tutor-anchor) ${percent}%, var(--sk-page))`;
+const inkTint = (percent: number) => `color-mix(in oklab, var(--sk-ink) ${percent}%, var(--sk-page))`;
 
 /** The one scope map, category by category, with the kit expression each category is painted with. */
 const SCOPES: { name: string; scope: string[]; colour: string; fontStyle?: string }[] = [
@@ -79,10 +74,10 @@ const SCOPES: { name: string; scope: string[]; colour: string; fontStyle?: strin
   { name: "invalid", scope: ["invalid", "markup.deleted"], colour: "var(--sk-coral-text)" },
 ];
 
-export function codeTheme(mode: Mode, tokens: Tokens = kitTokens(mode)): CodeTheme {
+export function codeTheme(tokens: Tokens = kitTokens()): CodeTheme {
   return {
-    name: `tutor-sketchbook-${mode}`,
-    type: mode,
+    name: "tutor-sketchbook-light",
+    type: "light",
     colors: {
       "editor.background": hex("var(--sk-page)", tokens),
       "editor.foreground": hex("var(--sk-text)", tokens),
@@ -108,6 +103,6 @@ export function codeTheme(mode: Mode, tokens: Tokens = kitTokens(mode)): CodeThe
   };
 }
 
-export function renderCodeTheme(mode: Mode): string {
-  return `${JSON.stringify(codeTheme(mode), null, 2)}\n`;
+export function renderCodeTheme(): string {
+  return `${JSON.stringify(codeTheme(), null, 2)}\n`;
 }

@@ -10,10 +10,11 @@
 // BB gives one. bb-app 0.43.4 (the version CI builds with) has identical
 // values for every token here. Re-check on each bb bump.
 //
-// The cascade the theme test models, in order: BB light, then BB dark (dark
-// mode only), then the theme's `:root, .light`, then its `.dark` (dark mode
-// only). The theme is injected after BB's CSS with equal specificity, so its
-// `:root` values also beat BB's `.dark` ones.
+// The cascade the theme test models, in order: BB light, then BB dark (when
+// BB's `.dark` class is on <html>), then the theme's one block. The theme is
+// light mode only: its block is `:root, .light, .dark`, injected after BB's
+// CSS with equal specificity, so its values beat BB's `.dark` ones and the
+// page stays light when someone picks dark mode (theme.test.ts).
 import type { Tokens } from "./color.ts";
 
 export const BB_VERSION = "0.44.0";
@@ -91,3 +92,101 @@ export const BB_BASE_TOKENS: { light: Tokens; dark: Tokens } = {
     "--version-upgrade": "color-mix(in oklch, var(--ink) 96%, var(--canvas))",
   },
 };
+
+/**
+ * Every custom property whose value BB's `.dark` blocks change from its
+ * `:root, .light` ones (bb-app 0.44.0, `@supports` values included). The
+ * theme test checks the theme pins each one it needs to, so dark mode
+ * changes nothing a student sees.
+ */
+export const BB_DARK_MODE_CHANGES: readonly string[] = [
+  "--lightningcss-light",
+  "--lightningcss-dark",
+  "--canvas",
+  "--ink",
+  "--primary",
+  "--primary-foreground",
+  "--secondary",
+  "--accent",
+  "--muted",
+  "--muted-foreground",
+  "--subtle-foreground",
+  "--readback-foreground",
+  "--timeline-accent",
+  "--state-hover",
+  "--state-active",
+  "--destructive",
+  "--destructive-text",
+  "--attention",
+  "--warning",
+  "--warning-text",
+  "--success",
+  "--diff-added",
+  "--diff-removed",
+  "--pr-merged",
+  "--brand-discord",
+  "--border",
+  "--border-hairline",
+  "--border-seam",
+  "--input",
+  "--surface-destructive",
+  "--surface-destructive-border",
+  "--surface-attention",
+  "--surface-selected",
+  "--pill-surface",
+  "--pill-shadow",
+  "--pill-surface-selected",
+  "--pill-surface-selected-border",
+  "--sidebar",
+  "--sidebar-accent",
+  "--sidebar-border",
+  "--sidebar-search-match",
+  "--sidebar-search-match-border",
+  "--shadow-opacity",
+  "--shadow-color",
+  "--shadow-2xs",
+  "--shadow-xs",
+  "--shadow-sm",
+  "--shadow",
+  "--shadow-md",
+  "--shadow-lift",
+  "--shadow-lg",
+  "--shadow-xl",
+  "--shadow-2xl",
+  "--ansi-0",
+  "--ansi-1",
+  "--ansi-2",
+  "--ansi-3",
+  "--ansi-4",
+  "--ansi-5",
+  "--ansi-6",
+  "--ansi-7",
+  "--ansi-8",
+  "--ansi-9",
+  "--ansi-10",
+  "--ansi-11",
+  "--ansi-12",
+  "--ansi-13",
+  "--ansi-14",
+  "--ansi-15",
+  "--ansi-bg-fg-0",
+  "--ansi-bg-fg-1",
+  "--ansi-bg-fg-2",
+  "--ansi-bg-fg-3",
+  "--ansi-bg-fg-4",
+  "--ansi-bg-fg-5",
+  "--ansi-bg-fg-6",
+  "--ansi-bg-fg-7",
+  "--ansi-bg-fg-8",
+  "--ansi-bg-fg-9",
+  "--ansi-bg-fg-10",
+  "--ansi-bg-fg-11",
+  "--ansi-bg-fg-12",
+  "--ansi-bg-fg-13",
+  "--ansi-bg-fg-14",
+  "--ansi-bg-fg-15",
+  "--diffs-dark-bg",
+  "--diffs-dark",
+  "--diffs-dark-addition-color",
+  "--diffs-dark-deletion-color",
+];

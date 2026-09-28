@@ -1,5 +1,5 @@
-// Generates the BB theme the manifest contributes (`bb.themes`) and its two
-// code themes. Regenerate: npm run build:assets
+// Generates the BB theme the manifest contributes (`bb.themes`) and its code
+// theme. Regenerate: npm run build:assets
 //
 // themes/sketchbook.css is the brand's bb theme (vendor/brand, pinned by
 // scripts/sync-brand.ts) with three mechanical changes: its Google Fonts
@@ -20,10 +20,14 @@ const path = (relative: string) => fileURLToPath(new URL(relative, import.meta.u
 export const VENDORED_THEME = path("../../vendor/brand/bb-theme/sketchbook/theme.css");
 export const BRAND_PIN = readFileSync(path("../../vendor/brand/PIN"), "utf8").trim();
 export const THEME_CSS = path("../../themes/sketchbook.css");
-export const CODE_THEME_FILES = {
-  light: path("../../themes/sketchbook-code-light.json"),
-  dark: path("../../themes/sketchbook-code-dark.json"),
-} as const;
+export const CODE_THEME_FILE = path("../../themes/sketchbook-code-light.json");
+
+/**
+ * The selector of the theme's one block. The brand is light mode only, so the
+ * block covers BB's `.dark` class too: someone who picks dark mode in BB still
+ * gets paper and ink (theme.test.ts guards this).
+ */
+export const THEME_SELECTOR = ":root,\n.light,\n.dark";
 
 /** The theme minus its `@import` lines and the blank lines right after them. */
 export function stripImport(css: string): string {
@@ -66,18 +70,19 @@ export function themeBlock(css: string, selector: string): Tokens {
 }
 
 /**
- * The tokens BB paints with in each mode once the theme is injected: BB's own
- * light values, then its dark ones (dark mode), then the theme's `:root, .light`,
- * then its `.dark` (dark mode). The theme comes last with equal specificity, so
- * its `:root` values beat BB's `.dark` ones too.
+ * The tokens BB paints with once the theme is injected, without and with BB's
+ * `.dark` class on <html>: BB's own light values, then its dark ones (with
+ * `.dark`), then the theme's block. The theme comes last with equal
+ * specificity, and its block names `.dark` too, so its values beat BB's dark
+ * ones.
  */
 export function modeTokens(css: string, mode: "light" | "dark"): Tokens {
-  const root = themeBlock(css, ":root,\n.light");
-  if (mode === "light") return { ...BB_BASE_TOKENS.light, ...root };
-  return { ...BB_BASE_TOKENS.light, ...BB_BASE_TOKENS.dark, ...root, ...themeBlock(css, ".dark") };
+  const theme = themeBlock(css, THEME_SELECTOR);
+  if (mode === "light") return { ...BB_BASE_TOKENS.light, ...theme };
+  return { ...BB_BASE_TOKENS.light, ...BB_BASE_TOKENS.dark, ...theme };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   writeFileSync(THEME_CSS, renderThemeCss());
-  for (const mode of ["light", "dark"] as const) writeFileSync(CODE_THEME_FILES[mode], renderCodeTheme(mode));
+  writeFileSync(CODE_THEME_FILE, renderCodeTheme());
 }

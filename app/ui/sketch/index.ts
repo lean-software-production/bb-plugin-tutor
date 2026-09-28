@@ -8,7 +8,6 @@ export { Highlight } from "./Highlight.tsx";
 export { KitIcon } from "./KitIcon.tsx";
 export { Meter } from "./Meter.tsx";
 export { Panel } from "./Panel.tsx";
-export { Patch } from "./Patch.tsx";
 export { Ribbon } from "./Ribbon.tsx";
 export { Tick } from "./Tick.tsx";
 export { WobbleDefs } from "./WobbleDefs.tsx";

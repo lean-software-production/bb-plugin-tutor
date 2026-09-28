@@ -361,8 +361,8 @@ not data.
 - **Theme:** `bb.themes` contributes `paper` (`THEME_ID`; BB lists it as `plugin:tutor:paper`).
   `themes/sketchbook.css` is the brand's bb theme (`vendor/brand/bb-theme/sketchbook/theme.css`)
   with Patrick Hand inlined in place of its Google Fonts `@import`, and
-  `themes/sketchbook-code-{light,dark}.json` are built from the kit tokens. `npm run build:assets`
-  generates all three (`app/theme/build.ts`, `app/theme/code-theme.ts`).
+  `themes/sketchbook-code-light.json` is built from the kit tokens (named for both of BB's modes:
+  the brand is light mode only). `npm run build:assets` generates both (`app/theme/build.ts`, `app/theme/code-theme.ts`).
 - **Jumping to a Rule's section** (`app/model/rule-jump.ts`, pure and tested; DOM hooks in
   `app/rule-jump.ts`): open the coach thread, then look for the anchor in the scroller holding the
   thread's timeline rows (`[data-timeline-row-id^="<thread>:"]` and their scrollable ancestor, never

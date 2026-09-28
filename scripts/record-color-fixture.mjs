@@ -19,8 +19,10 @@ import { resolve } from "node:path";
 
 const OUT = new URL("../app/theme/color-fixture.json", import.meta.url);
 
-// The brand palette (vendor/brand/bb-theme/sketchbook/theme.css) and each
-// mode's anchors, as the theme sets them.
+// The brand palette (vendor/brand/bb-theme/sketchbook/theme.css) and the
+// theme's anchors. "ink-page" is the retired ink page (the brand is light mode
+// only since 2026-09-28): its cases stay as extra resolver inputs, since they
+// exercise mixes toward a dark anchor.
 const PALETTE = {
   "--sk-mustard": "#eea306",
   "--sk-teal": "#039695",
@@ -36,7 +38,7 @@ const PALETTE = {
 const TOKEN_SETS = {
   none: {},
   light: { ...PALETTE, "--canvas": "var(--sk-paper)", "--ink": "var(--sk-ink)", "--primary": "var(--sk-deep-teal)" },
-  dark: {
+  "ink-page": {
     ...PALETTE,
     "--canvas": "var(--sk-ink)",
     "--ink": "var(--sk-paper)",
@@ -56,23 +58,23 @@ const CASES = [
   { expr: "oklab(0.5 0.1 -0.1)", tokens: "none" },
   // The theme's own mixes
   { expr: "color-mix(in oklch, var(--ink) 70%, var(--canvas))", tokens: "light" },
-  { expr: "color-mix(in oklch, var(--ink) 70%, var(--canvas))", tokens: "dark" },
+  { expr: "color-mix(in oklch, var(--ink) 70%, var(--canvas))", tokens: "ink-page" },
   { expr: "color-mix(in oklch, var(--ink) 58%, var(--canvas))", tokens: "light" },
   { expr: "color-mix(in oklch, var(--sk-teal) 80%, var(--sk-ink))", tokens: "light" },
   { expr: "color-mix(in oklch, var(--sk-rust) 75%, var(--sk-ink))", tokens: "light" },
   { expr: "color-mix(in oklch, var(--sk-mustard) 55%, var(--sk-ink))", tokens: "light" },
-  { expr: "var(--primary)", tokens: "dark" },
-  { expr: "color-mix(in oklch, var(--sk-coral) 80%, var(--sk-paper))", tokens: "dark" },
-  { expr: "color-mix(in oklch, var(--sk-forest) 70%, var(--sk-paper))", tokens: "dark" },
+  { expr: "var(--primary)", tokens: "ink-page" },
+  { expr: "color-mix(in oklch, var(--sk-coral) 80%, var(--sk-paper))", tokens: "ink-page" },
+  { expr: "color-mix(in oklch, var(--sk-forest) 70%, var(--sk-paper))", tokens: "ink-page" },
   // Kit roles in other spaces
-  { expr: "color-mix(in oklab, var(--sk-paper) 85%, var(--sk-ink))", tokens: "dark" },
-  { expr: "color-mix(in srgb, var(--primary) 32%, var(--sk-ink))", tokens: "dark" },
+  { expr: "color-mix(in oklab, var(--sk-paper) 85%, var(--sk-ink))", tokens: "ink-page" },
+  { expr: "color-mix(in srgb, var(--primary) 32%, var(--sk-ink))", tokens: "ink-page" },
   // BB's derivations over the theme's anchors
   { expr: "color-mix(in oklch, var(--ink) 2.2%, var(--canvas))", tokens: "light" },
-  { expr: "color-mix(in oklch, var(--ink) 4.3%, var(--canvas))", tokens: "dark" },
+  { expr: "color-mix(in oklch, var(--ink) 4.3%, var(--canvas))", tokens: "ink-page" },
   { expr: "color-mix(in oklch, var(--ink) 11%, var(--canvas))", tokens: "light" },
   { expr: "color-mix(in oklab, var(--primary) 16%, transparent)", tokens: "light", over: "var(--canvas)" },
-  { expr: "color-mix(in oklab, var(--primary) 12%, transparent)", tokens: "dark", over: "var(--canvas)" },
+  { expr: "color-mix(in oklab, var(--primary) 12%, transparent)", tokens: "ink-page", over: "var(--canvas)" },
   // Percentage normalisation and hue interpolation
   { expr: "color-mix(in oklch, #eea306, #1f78a8)", tokens: "none" },
   { expr: "color-mix(in oklch, #eea306, #1f78a8 25%)", tokens: "none" },

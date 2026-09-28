@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import { characters, type CharacterName } from "../../sketch/drawings.ts";
-import { Patch } from "./Patch.tsx";
+import { cx } from "../../sketch/tone.ts";
 
 type CharacterProps = {
   name: CharacterName;
@@ -10,11 +10,11 @@ type CharacterProps = {
   style?: CSSProperties;
 };
 
-/** One of the brand's characters, on its paper patch. */
+/** One of the brand's characters, as the whole vendored file (styles/atoms.css `.tp-drawing`). */
 export function Character({ name, alt = "", className, style }: CharacterProps) {
   return (
-    <Patch className={className} style={style}>
+    <span className={cx("tp-drawing", className)} style={style}>
       <img src={characters[name]} alt={alt} />
-    </Patch>
+    </span>
   );
 }

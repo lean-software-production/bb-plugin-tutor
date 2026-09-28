@@ -1,17 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { BRAND_PIN, CODE_THEME_FILES, THEME_CSS, VENDORED_THEME, modeTokens, renderThemeCss, stripImport, themeBlock } from "./build.ts";
+import postcss from "postcss";
+import { BRAND_PIN, CODE_THEME_FILE, THEME_CSS, THEME_SELECTOR, VENDORED_THEME, modeTokens, renderThemeCss, stripImport, themeBlock } from "./build.ts";
 import { renderCodeTheme, type CodeTheme } from "./code-theme.ts";
-import { BB_BASE_TOKENS } from "./bb-base-tokens.ts";
+import { BB_BASE_TOKENS, BB_DARK_MODE_CHANGES } from "./bb-base-tokens.ts";
 import { contrast, over, resolveColor, toBytes, type Tokens } from "./color.ts";
 
 const vendored = readFileSync(VENDORED_THEME, "utf8");
-const MODES = ["light", "dark"] as const;
 
-test("themes/sketchbook.css and both code themes are up to date (npm run build:assets)", () => {
+test("themes/sketchbook.css and the code theme are up to date (npm run build:assets)", () => {
   assert.equal(readFileSync(THEME_CSS, "utf8"), renderThemeCss());
-  for (const mode of MODES) assert.equal(readFileSync(CODE_THEME_FILES[mode], "utf8"), renderCodeTheme(mode));
+  assert.equal(readFileSync(CODE_THEME_FILE, "utf8"), renderCodeTheme());
 });
 
 test("the theme is under BB's 256 KB cap, inlines Patrick Hand once as the UI font, keeps BB's mono and imports nothing", () => {
@@ -49,44 +49,91 @@ test("the build refuses a brand theme whose font stack no longer starts with Pat
   assert.throws(() => renderThemeCss(vendored.replace('--font-sans: "Patrick Hand"', '--font-sans: "Other"')), /Patrick Hand/);
 });
 
-test("the contrast model follows BB's cascade: BB light, BB dark, the theme's :root, then its .dark", () => {
-  const root = themeBlock(vendored, ":root,\n.light");
-  const dark = themeBlock(vendored, ".dark");
+test("the contrast model follows BB's cascade: BB light, BB dark (with .dark), then the theme's block", () => {
+  const theme = themeBlock(vendored, THEME_SELECTOR);
   const light = modeTokens(vendored, "light");
-  const darkTokens = modeTokens(vendored, "dark");
+  const dark = modeTokens(vendored, "dark");
   // BB derives what the theme leaves unset.
   assert.equal(light["--sidebar-foreground"], BB_BASE_TOKENS.light["--sidebar-foreground"]);
-  assert.equal(darkTokens["--sidebar-foreground"], BB_BASE_TOKENS.dark["--sidebar-foreground"]);
-  // The theme's :root is injected after BB's .dark with equal specificity, so it wins in dark mode too...
-  assert.equal(darkTokens["--muted-foreground"], root["--muted-foreground"]);
-  assert.notEqual(darkTokens["--muted-foreground"], BB_BASE_TOKENS.dark["--muted-foreground"]);
-  // ...and its .dark wins over its :root.
-  assert.equal(darkTokens["--canvas"], dark["--canvas"]);
+  // The theme is injected after BB's .dark with equal specificity, so it wins with .dark too.
+  assert.equal(dark["--muted-foreground"], theme["--muted-foreground"]);
+  assert.notEqual(dark["--muted-foreground"], BB_BASE_TOKENS.dark["--muted-foreground"]);
   // Comments are not declarations.
-  assert.equal(root["--pr-merged"], undefined);
+  assert.deepEqual(themeBlock(`${THEME_SELECTOR} {\n  /* --x: red; */\n  --y: blue;\n}`, THEME_SELECTOR), { "--y": "blue" });
+});
+
+// Light mode only (docs/2026-09-27-sketchbook-brand.md, 2026-09-28). BB puts
+// a `dark` class on <html> when someone picks dark mode; the theme must keep
+// the page paper and ink regardless.
+test("light mode only: the theme's one block also covers .dark, and every BB token resolves the same with .dark", () => {
+  const css = renderThemeCss();
+  const rules: postcss.Rule[] = [];
+  postcss.parse(css).walkRules((rule) => {
+    if (rule.parent?.type === "root") rules.push(rule);
+  });
+  // One block (the @font-face is an at-rule, not a rule), naming .dark, and no separate .dark block.
+  assert.deepEqual(
+    rules.map((rule) => rule.selectors),
+    [[":root", ".light", ".dark"]],
+  );
+  const block = rules[0];
+  assert.ok(block);
+  const colourScheme = block.nodes.filter((node): node is postcss.Declaration => node.type === "decl" && node.prop === "color-scheme");
+  assert.deepEqual(
+    colourScheme.map((decl) => decl.value),
+    ["light"],
+  );
+  const code = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  assert.doesNotMatch(code, /\.sk-dark|\.dark\s+[.:#\w]/);
+
+  // Every token BB paints with, light or dark, resolves to the same colour
+  // with and without .dark: its value, or each stop of a gradient.
+  const light = modeTokens(css, "light");
+  const dark = modeTokens(css, "dark");
+  const names = [...new Set([...Object.keys(BB_BASE_TOKENS.light), ...Object.keys(BB_BASE_TOKENS.dark)])];
+  const stopsOf = (value: string) => value.match(/color-mix\([^()]*(?:\([^()]*\)[^()]*)*\)/g) ?? [value];
+  const bytes = (expr: string, tokens: Tokens) => {
+    const c = resolveColor(expr, tokens);
+    return [...toBytes(c).map(Math.round), Math.round(c.alpha * 100)];
+  };
+  const differing: string[] = [];
+  for (const name of names) {
+    const [a, b] = [light[name] ?? "", dark[name] ?? ""];
+    const [stopsA, stopsB] = [stopsOf(a), stopsOf(b)];
+    if (stopsA.length !== stopsB.length) {
+      differing.push(`${name}: ${a} vs ${b}`);
+      continue;
+    }
+    stopsA.forEach((stop, i) => {
+      const [x, y] = [bytes(stop, light), bytes(stopsB[i] ?? "", dark)];
+      if (x.join() !== y.join()) differing.push(`${name}: ${x.join()} vs ${y.join()} with .dark`);
+    });
+  }
+  assert.ok(names.length > 30, `${names.length} tokens checked`);
+  assert.deepEqual(differing, []);
+
+  // And the block pins every property BB's .dark changes, except the ones BB
+  // never paints with (lightningcss's toggles) and the --diffs-dark-* ones,
+  // which only exist under .dark and point at tokens the theme sets.
+  const declared = new Set(block.nodes.flatMap((node) => (node.type === "decl" ? [node.prop] : [])));
+  const unpinned = BB_DARK_MODE_CHANGES.filter((name) => !declared.has(name) && !/^--(lightningcss-|diffs-dark)/.test(name));
+  assert.deepEqual(unpinned, []);
 });
 
 // Between two near-greys, Chromium's oklch mix loses the hue and renders it as
 // 0, so a grey mixed from the warm ink and paper in oklch comes out pink.
 const NEUTRAL_ANCHORS = new Set(["--ink", "--canvas", "--sk-ink", "--sk-paper"]);
 const oklchInkMix = /color-mix\(in oklch, var\(--ink\) [\d.]+%, var\(--canvas\)\)/;
-/** The tokens BB mixes from --ink and --canvas in oklch in `mode`. */
-const bbOklchGreys = (mode: (typeof MODES)[number]) =>
-  Object.entries(BB_BASE_TOKENS[mode])
-    .filter(([, value]) => oklchInkMix.test(value))
-    .map(([name]) => name);
+/** The tokens BB mixes from --ink and --canvas in oklch, without and with .dark. */
+const bbOklchGreys = () =>
+  [...new Set([...Object.entries(BB_BASE_TOKENS.light), ...Object.entries(BB_BASE_TOKENS.dark)].filter(([, value]) => oklchInkMix.test(value)).map(([name]) => name))];
 
-test("the theme re-mixes each of BB's oklch greys in that mode's own block, so none keeps BB's pink mix", () => {
-  const css = readFileSync(THEME_CSS, "utf8");
-  const blocks = { light: themeBlock(css, ":root,\n.light"), dark: themeBlock(css, ".dark") };
-  assert.ok(bbOklchGreys("light").includes("--pill-surface-selected"));
-  const missing: string[] = [];
-  for (const mode of MODES) {
-    for (const name of bbOklchGreys(mode)) {
-      const value = blocks[mode][name];
-      if (value === undefined || value.includes("in oklch")) missing.push(`${mode}: ${name} = ${value ?? "BB's " + BB_BASE_TOKENS[mode][name]}`);
-    }
-  }
+test("the theme re-mixes each of BB's oklch greys (light and dark) in its own block, so none keeps BB's pink mix", () => {
+  const block = themeBlock(readFileSync(THEME_CSS, "utf8"), THEME_SELECTOR);
+  assert.ok(bbOklchGreys().includes("--pill-surface-selected"));
+  const missing = bbOklchGreys()
+    .filter((name) => block[name] === undefined || block[name]?.includes("in oklch"))
+    .map((name) => `${name} = ${block[name] ?? "BB's " + BB_BASE_TOKENS.light[name]}`);
   assert.deepEqual(missing, []);
 });
 
@@ -98,19 +145,16 @@ test("the theme mixes no two neutral anchors (--ink, --canvas, --sk-ink, --sk-pa
   assert.deepEqual(neutral, []);
 });
 
-test("every grey BB mixes from ink and paper renders warm (red >= green >= blue), in both modes", () => {
-  const css = readFileSync(THEME_CSS, "utf8");
+test("every grey BB mixes from ink and paper renders warm (red >= green >= blue)", () => {
+  const tokens = modeTokens(readFileSync(THEME_CSS, "utf8"), "light");
   const pink: string[] = [];
-  for (const mode of MODES) {
-    const tokens = modeTokens(css, mode);
-    for (const name of [...bbOklchGreys(mode), "--muted-foreground", "--subtle-foreground", "--readback-foreground"]) {
-      // A pill surface is a gradient: check each of its stops.
-      const stops = (tokens[name] ?? "").match(/color-mix\([^()]*(?:\([^()]*\)[^()]*)*\)/g) ?? [];
-      assert.ok(stops.length > 0, `${mode}: ${name} is a mix`);
-      for (const stop of stops) {
-        const [r, g, b] = toBytes(resolveColor(stop, tokens)).map(Math.round) as [number, number, number];
-        if (!(r >= g && g >= b)) pink.push(`${mode}: ${name} ${stop} renders ${r},${g},${b}`);
-      }
+  for (const name of [...bbOklchGreys(), "--muted-foreground", "--subtle-foreground", "--readback-foreground"]) {
+    // A pill surface is a gradient: check each of its stops.
+    const stops = (tokens[name] ?? "").match(/color-mix\([^()]*(?:\([^()]*\)[^()]*)*\)/g) ?? [];
+    assert.ok(stops.length > 0, `${name} is a mix`);
+    for (const stop of stops) {
+      const [r, g, b] = toBytes(resolveColor(stop, tokens)).map(Math.round) as [number, number, number];
+      if (!(r >= g && g >= b)) pink.push(`${name} ${stop} renders ${r},${g},${b}`);
     }
   }
   assert.deepEqual(pink, []);
@@ -121,7 +165,7 @@ const colour = (tokens: Tokens, name: string) => {
   return c.alpha < 1 ? over(c, resolveColor("var(--canvas)", tokens)) : c;
 };
 
-test("text keeps WCAG AA contrast on the surfaces BB paints it on, in both modes", () => {
+test("text keeps WCAG AA contrast on the surfaces BB paints it on", () => {
   const text: [string, string][] = [
     ["--foreground", "--canvas"],
     ["--foreground", "--sidebar"],
@@ -141,42 +185,33 @@ test("text keeps WCAG AA contrast on the surfaces BB paints it on, in both modes
     ["--file-accent", "--canvas"],
   ];
   const failures: string[] = [];
-  for (const mode of MODES) {
-    const tokens = modeTokens(vendored, mode);
-    for (const [fg, bg] of text) {
-      const ratio = contrast(colour(tokens, fg), colour(tokens, bg));
-      if (ratio < 4.5) failures.push(`${mode}: ${fg} on ${bg} is ${ratio.toFixed(2)}:1`);
-    }
-    // The primary colour is a UI component (buttons, focus), so 3:1.
-    const primary = contrast(colour(tokens, "--primary"), colour(tokens, "--canvas"));
-    if (primary < 3) failures.push(`${mode}: --primary on --canvas is ${primary.toFixed(2)}:1`);
+  const tokens = modeTokens(vendored, "light");
+  for (const [fg, bg] of text) {
+    const ratio = contrast(colour(tokens, fg), colour(tokens, bg));
+    if (ratio < 4.5) failures.push(`${fg} on ${bg} is ${ratio.toFixed(2)}:1`);
   }
+  // The primary colour is a UI component (buttons, focus), so 3:1.
+  const primary = contrast(colour(tokens, "--primary"), colour(tokens, "--canvas"));
+  if (primary < 3) failures.push(`--primary on --canvas is ${primary.toFixed(2)}:1`);
   assert.deepEqual(failures, []);
 });
 
-test("each code theme has its mode's type, sits on that mode's canvas, and keeps every token colour at 4.5:1", () => {
-  for (const mode of MODES) {
-    const theme = JSON.parse(renderCodeTheme(mode)) as CodeTheme;
-    assert.equal(theme.type, mode);
-    assert.equal(theme.name, `tutor-sketchbook-${mode}`);
-    const background = theme.colors["editor.background"];
-    assert.ok(background);
-    const canvas = colour(modeTokens(vendored, mode), "--canvas");
-    assert.equal(contrast(background, canvas), 1, `${mode}: editor.background is the canvas`);
-    const scopes = new Set(theme.tokenColors.flatMap((rule) => rule.scope));
-    for (const scope of ["comment", "keyword", "string", "constant.numeric", "entity.name.function", "entity.name.type", "variable", "punctuation", "invalid"]) {
-      assert.ok(scopes.has(scope), `${mode}: ${scope}`);
-    }
-    for (const foreground of [theme.colors["editor.foreground"], ...theme.tokenColors.map((rule) => rule.settings.foreground)]) {
-      if (foreground === undefined) continue;
-      assert.match(foreground, /^#[0-9a-f]{6}$/);
-      const ratio = contrast(foreground, background);
-      assert.ok(ratio >= 4.5, `${mode}: ${foreground} on ${background} is ${ratio.toFixed(2)}:1`);
-    }
+test("the code theme is light, sits on the canvas, and keeps every token colour at 4.5:1", () => {
+  const theme = JSON.parse(renderCodeTheme()) as CodeTheme;
+  assert.equal(theme.type, "light");
+  assert.equal(theme.name, "tutor-sketchbook-light");
+  const background = theme.colors["editor.background"];
+  assert.ok(background);
+  const canvas = colour(modeTokens(vendored, "light"), "--canvas");
+  assert.equal(contrast(background, canvas), 1, "editor.background is the canvas");
+  const scopes = new Set(theme.tokenColors.flatMap((rule) => rule.scope));
+  for (const scope of ["comment", "keyword", "string", "constant.numeric", "entity.name.function", "entity.name.type", "variable", "punctuation", "invalid"]) {
+    assert.ok(scopes.has(scope), scope);
   }
-});
-
-test("both code themes share one scope map", () => {
-  const scopesOf = (mode: "light" | "dark") => (JSON.parse(renderCodeTheme(mode)) as CodeTheme).tokenColors.map((rule) => rule.scope);
-  assert.deepEqual(scopesOf("light"), scopesOf("dark"));
+  for (const foreground of [theme.colors["editor.foreground"], ...theme.tokenColors.map((rule) => rule.settings.foreground)]) {
+    if (foreground === undefined) continue;
+    assert.match(foreground, /^#[0-9a-f]{6}$/);
+    const ratio = contrast(foreground, background);
+    assert.ok(ratio >= 4.5, `${foreground} on ${background} is ${ratio.toFixed(2)}:1`);
+  }
 });
