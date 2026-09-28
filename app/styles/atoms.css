@@ -217,3 +217,13 @@
   color: var(--tp-muted);
   white-space: nowrap;
 }
+
+/* The lesson-complete loop's band; its svg is placed at the measured gap (app/ui/sketch/LoopArrow.tsx). */
+.tutor-sk .tp-loop {
+  position: relative;
+}
+.tutor-sk .tp-loop-svg {
+  position: absolute;
+  overflow: visible;
+  pointer-events: none;
+}

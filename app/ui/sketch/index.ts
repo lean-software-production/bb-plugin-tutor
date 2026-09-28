@@ -13,3 +13,5 @@ export { Ribbon } from "./Ribbon.tsx";
 export { Tick } from "./Tick.tsx";
 export { WobbleDefs } from "./WobbleDefs.tsx";
 export { withWobbleDefs } from "./withWobbleDefs.tsx";
+export { LoopArrow } from "./LoopArrow.tsx";
+export { StepBadge } from "./StepBadge.tsx";
