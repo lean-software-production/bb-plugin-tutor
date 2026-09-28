@@ -48,6 +48,8 @@ export interface RuleView {
   status: RuleStatus;
   isFocus: boolean;
   isUpNext: boolean;
+  /** 1-based place among all the lesson's Rules, in file order: the number on its step badge. */
+  number: number;
   /** Right-hand text of the collapsed row: "2/2 · 6m ago", "up next". */
   summary: string;
   examples: ExampleView[];
@@ -279,6 +281,7 @@ export function featureView(
   focusKey: string | null,
   upNext: string | null,
   now: number,
+  numbers: ReadonlyMap<string, number>,
 ): FeatureView {
   const counts = countExamples(
     feature.rules.flatMap((rule) => rule.examples),
@@ -303,11 +306,18 @@ export function featureView(
         status,
         isFocus: rule.key === focusKey,
         isUpNext,
+        number: numbers.get(rule.key) ?? 0,
         summary: ruleSummary(rule, status, isUpNext, progress, now),
         examples: rule.examples.map((example) => exampleView(example, progress, now)),
       };
     }),
   };
+}
+
+/** Each Rule's 1-based place among all the lesson's Rules, in file order. */
+export function ruleNumbers(lesson: Lesson): Map<string, number> {
+  const keys = lesson.features.flatMap((feature) => feature.rules.map((rule) => rule.key));
+  return new Map(keys.map((key, index) => [key, index + 1]));
 }
 
 /** `lessons` is the course order from getOverview, used to name the previous lesson. */
@@ -316,8 +326,9 @@ export function buildLesson(detail: LessonDetail, lessons: readonly LessonSummar
   const counts = countExamples(lessonExamples(lesson), progress);
   const focus = resolveFocus(detail, progress);
   const upNext = upNextKey(detail, progress, focus?.ruleKey ?? null);
+  const numbers = ruleNumbers(lesson);
   const features = lesson.features.map((feature) =>
-    featureView(feature, progress, focus?.ruleKey ?? null, upNext, now),
+    featureView(feature, progress, focus?.ruleKey ?? null, upNext, now, numbers),
   );
   const holder = features.find((feature) => feature.rules.some((rule) => rule.key === focus?.ruleKey)) ?? null;
   const focusIndex = holder?.rules.findIndex((rule) => rule.isFocus) ?? -1;

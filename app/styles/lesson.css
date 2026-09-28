@@ -1,7 +1,9 @@
 /*
- * A lesson's start page (from mockup 2A, ".lt") and the paper lesson with
- * annotated Gherkin (mockup 6B), which the Rule card in the coach thread
- * reuses. The page is a .tutor-sk scroller.
+ * A lesson's start page (Sketchbook mockup "outline", ".lt") and the lesson
+ * with annotated Gherkin, which the Rule card in the coach thread reuses. The
+ * kit draws the title's highlighter, the section headings, the Rule panels,
+ * step badges, ticks, meter and buttons; this file lays them out. The page is
+ * a .tutor-sk scroller.
  */
 
 .tutor-sk.tp-lt {
@@ -21,14 +23,14 @@
   border-bottom: 1px solid var(--tp-rule);
   background: color-mix(in oklab, var(--tp-page) 92%, transparent);
   color: var(--tp-muted);
-  font-size: 0.74rem;
+  font-size: 15px;
   white-space: nowrap;
 }
 .tutor-sk.tp-lthd b {
   overflow: hidden;
   color: var(--tp-text);
-  font: 500 1.02rem var(--tp-font-body);
-  letter-spacing: -0.01em;
+  font: 400 18px var(--tp-font-label);
+  letter-spacing: 0.02em;
   text-overflow: ellipsis;
 }
 .tutor-sk.tp-lthd .tp-crumb {
@@ -39,13 +41,17 @@
 .tutor-sk.tp-lthd .tp-sp {
   flex: 1;
 }
-.tutor-sk.tp-lthd .tp-bar {
+.tutor-sk .tp-lthd-meter {
   flex: none;
-  width: 110px;
+}
+.tutor-sk .tp-lthd-meter .tp-meter-bar {
+  flex: none;
+  width: 120px;
+  height: 10px;
 }
 @media (max-width: 760px) {
   .tutor-sk.tp-lthd .tp-crumb,
-  .tutor-sk.tp-lthd .tp-bar {
+  .tutor-sk .tp-lthd-meter .tp-meter-bar {
     display: none;
   }
 }
@@ -58,7 +64,7 @@
 }
 .tutor-sk.tp-lead {
   position: relative;
-  width: min(740px, calc(100% - 96px));
+  width: min(800px, calc(100% - 96px));
   margin: 0 auto;
   padding: 1.8rem 0 0;
 }
@@ -68,8 +74,21 @@
   padding: 3rem 0;
 }
 /* ---- lesson header ---- */
-.tutor-sk .tp-lesson .tp-h1 {
-  font-size: 3rem;
+.tutor-sk .tp-lesson .tp-lesson-title {
+  font-size: 46px;
+}
+.tutor-sk .tp-lesson .tp-dek {
+  margin-bottom: 16px;
+  font-size: 19px;
+}
+@media (max-width: 640px) {
+  .tutor-sk .tp-lesson .tp-lesson-title {
+    font-size: 34px;
+  }
+  .tutor-sk.tp-lead,
+  .tutor-sk.tp-lt-message {
+    width: calc(100% - 40px);
+  }
 }
 .tutor-sk .tp-meta {
   display: flex;
@@ -79,15 +98,18 @@
   margin-top: 18px;
 }
 .tutor-sk .tp-banner {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 1.4rem;
   padding: 10px 14px;
   border: 1px solid var(--tp-good-line);
   border-radius: 10px;
   background: var(--tp-good-wash);
   color: var(--tp-good);
-  font-size: 0.82rem;
-  font-weight: 700;
+  font-family: var(--tp-font-label);
+  font-size: 18px;
+  letter-spacing: 0.02em;
   text-decoration: none;
 }
 .tutor-sk .tp-compass {
@@ -138,13 +160,13 @@
 }
 .tutor-sk .tp-fold-file {
   color: var(--tp-muted);
-  font-size: 0.7rem;
+  font-size: 13px;
 }
 .tutor-sk .tp-fold .tp-x,
 .tutor-sk .tp-collapsed-rule .tp-x {
   margin-left: auto;
   color: var(--tp-muted);
-  font: 600 0.7rem var(--tp-font-mono);
+  font: 15px var(--tp-font-body);
   white-space: nowrap;
 }
 .tutor-sk .tp-fold-body {
@@ -154,27 +176,31 @@
 /* ---- feature and Rule ---- */
 .tutor-sk .tp-featurehead {
   margin-top: 2.6rem;
-  padding-top: 1.4rem;
-  border-top: 2px solid var(--tp-text);
+}
+.tutor-sk .tp-featurehead .tp-section-label {
+  margin: 0;
 }
 .tutor-sk .tp-featurehead .tp-row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 12px;
 }
-.tutor-sk .tp-featurehead .tp-h2 {
-  margin: 0;
+.tutor-sk .tp-feature-name {
+  flex: 1;
+  min-width: 0;
+  margin: 4px 0 6px;
+  font-size: 24px;
 }
 .tutor-sk .tp-featurehead .tp-cnt {
   margin-left: auto;
   color: var(--tp-muted);
-  font: 600 0.78rem var(--tp-font-mono);
+  font: 15px var(--tp-font-body);
   white-space: nowrap;
 }
 .tutor-sk .tp-feature-desc {
-  margin-top: 12px;
-  color: var(--tp-muted);
-  font-size: 1rem;
+  margin: 6px 0 16px;
+  font-size: 17px;
+  line-height: 1.45;
 }
 .tutor-sk .tp-section-label .tp-change-badge {
   margin-left: 6px;
@@ -198,18 +224,31 @@
   font: 0.8rem/1.75 var(--tp-font-mono);
 }
 
+/* A closed Rule: its step badge, its name and a tick once it passes (mockup .tp-more). */
 .tutor-sk .tp-collapsed-rule {
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 10px 0;
+  margin-top: 8px;
+  padding: 4px 6px;
   border: 0;
-  border-bottom: 1px dashed var(--tp-rule);
+  border-radius: 8px;
   background: none;
   color: var(--tp-text);
-  font: 1.02rem/1.35 var(--tp-font-body);
+  font: 18px/1.35 var(--tp-font-body);
   text-align: left;
+  cursor: pointer;
+}
+.tutor-sk .tp-collapsed-rule:hover {
+  background: var(--tp-hover);
+}
+.tutor-sk .tp-collapsed-rule .tp-n {
+  flex: none;
+  font-size: 12px;
+}
+.tutor-sk .tp-collapsed-rule .tp-rule-name {
+  min-width: 0;
 }
 .tutor-sk .tp-collapsed-rule:hover .tp-rule-name {
   color: var(--tp-heading);
@@ -228,25 +267,34 @@
   color: var(--tp-faint);
 }
 
+/* An open Rule: a panel in its step colour, dashed while it is the focus (mockup .tp-rulepanel). */
 .tutor-sk .tp-rule {
-  margin-top: 2.4rem;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 16px 20px 18px;
   scroll-margin-top: 24px;
 }
 .tutor-sk .tp-collapsed-rule {
   scroll-margin-top: 24px;
 }
-.tutor-sk .tp-rule--focus {
-  position: relative;
+.tutor-sk .tp-rule .tp-rule-label {
+  margin: 0;
 }
-.tutor-sk .tp-rule--focus::before {
-  position: absolute;
-  top: 4px;
-  bottom: 0;
-  left: -30px;
-  width: 4px;
-  border-radius: 4px;
-  background: var(--tp-heading);
-  content: "";
+.tutor-sk .tp-rule .tp-rulehead {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 400;
+}
+.tutor-sk .tp-rule .tp-tt {
+  font-size: 22px;
+}
+.tutor-sk .tp-rule .tp-prose {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.45;
+}
+.tutor-sk .tp-rule .tp-gutterwrap {
+  margin-top: 4px;
 }
 .tutor-sk .tp-link-button {
   margin-left: 8px;
@@ -254,9 +302,10 @@
   border: 0;
   background: none;
   color: var(--tp-heading);
-  font: 650 0.68rem var(--tp-font-body);
-  letter-spacing: 0;
+  font: 15px var(--tp-font-label);
+  letter-spacing: 0.03em;
   text-transform: none;
+  cursor: pointer;
 }
 .tutor-sk .tp-rule-actions {
   display: flex;
@@ -411,9 +460,8 @@
 .tutor-sk .tp-start {
   margin: 2.4rem 0 4rem;
   padding: 20px 22px;
-  border: 1px dashed var(--tp-rule);
-  border-radius: 12px;
-  background: color-mix(in oklab, var(--tp-page) 60%, transparent);
+  border: 2px dashed color-mix(in oklab, var(--tp-heading) 45%, var(--tp-page));
+  border-radius: 14px;
 }
 .tutor-sk .tp-start .tp-prose {
   margin-bottom: 14px;

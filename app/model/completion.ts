@@ -107,22 +107,3 @@ export function whatsNext(view: CompletionView | null): WhatsNextView {
   if (view === null) return { label, detail: null };
   return { label, detail: view.next === null ? "That was the last lesson" : `${lessonLabel(view.next.id)} · ${view.next.title}` };
 }
-
-export interface ConfettiPiece {
-  left: number;
-  top: number;
-  rotate: number;
-  color: string;
-}
-
-const CONFETTI_COLOURS = ["#2459a8", "#1f735b", "#e3b341", "#b43b3b", "#7c5cc4", "#2a9d8f"] as const;
-
-/** The mockup's deterministic scatter, kept to the top right so the heading and summary stay clear. */
-export function confettiPieces(count = 46): ConfettiPiece[] {
-  return Array.from({ length: count }, (_, i) => ({
-    left: 55 + ((i * 37) % 45),
-    top: Math.round(((i * 53) % 90) * 0.4),
-    rotate: (i * 47) % 360,
-    color: CONFETTI_COLOURS[i % CONFETTI_COLOURS.length] ?? "#2459a8",
-  }));
-}

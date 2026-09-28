@@ -1,8 +1,8 @@
 // The route `start/<id>[/<rule>]`. The coach lives in BB's own thread view,
 // with the lesson carried into it by the lesson card and Rule cards, so a
 // lesson that has a coach thread opens it (at the Rule's section when the
-// route names one). A lesson without one shows its start page: the paper
-// lesson (mockups 2A and 6B) and "Start with your coach".
+// route names one). A lesson without one shows its start page: the lesson
+// (Sketchbook mockup "outline") and "Start with your coach".
 import { useCallback, useEffect, useState } from "react";
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { formatRoute } from "../../shared/routes.ts";
@@ -11,8 +11,9 @@ import { lessonLabel } from "../model/format.ts";
 import { buildLesson, coachStart, foldsHiding } from "../model/lesson.ts";
 import type { CoachStart, LessonView } from "../model/lesson.ts";
 import { QUERY_KEYS } from "../state/app-state.ts";
-import { Bar, ErrorNotice, Loading, coursePageHref, isPlainClick } from "./common.tsx";
+import { ErrorNotice, Loading, coursePageHref, isPlainClick } from "./common.tsx";
 import { Lesson } from "./Lesson.tsx";
+import { Button, Meter, Tick } from "./sketch/index.ts";
 
 /** Marks the history entry that already sent the student on to the coach thread, so Back lands here instead of bouncing. */
 const REDIRECTED = "tutorOpenedCoach";
@@ -87,9 +88,7 @@ function ToCoach({
       <div className="tutor-sk tp-lt-message">
         <p className="tp-eyebrow">{lessonLabel(lessonId)}</p>
         <p className="tp-prose">Your coach for {lessonLabel(lessonId).toLowerCase()} is in its thread.</p>
-        <button type="button" className="tp-btn tp-btn--big" onClick={open}>
-          Open the coach thread →
-        </button>
+        <Button onClick={open}>Open the coach thread →</Button>
       </div>
     </div>
   );
@@ -137,10 +136,13 @@ function StartPageBody({
         <b>{view.barTitle}</b>
         {view.crumb === null ? null : <span className="tp-crumb">{view.crumb}</span>}
         <span className="tp-sp" />
-        <Bar percent={view.percent} label={`${view.counts.passing} of ${view.counts.total} examples hold`} />
-        <span>
-          {view.counts.passing}/{view.counts.total}
-        </span>
+        <Meter
+          className="tp-lthd-meter"
+          value={view.counts.passing}
+          max={view.counts.total}
+          label="Examples that hold"
+          unit={view.counts.total === 1 ? "example holds" : "examples hold"}
+        />
       </header>
       <div className="tp-lt-body">
         <div className="tutor-sk tp-lead">
@@ -163,7 +165,7 @@ function StartPageBody({
                       goCourse({ kind: "complete", lessonId });
                     }}
                   >
-                    ✓ You finished {lessonLabel(lessonId).toLowerCase()}. See what's next →
+                    <Tick /> You finished {lessonLabel(lessonId).toLowerCase()}. See what's next →
                   </a>
                 ) : null}
               </>
@@ -213,9 +215,7 @@ function StartCoach({
           <p className="tp-prose">
             Your coach works in your factory project. Pick that project first, then come back to start with your coach.
           </p>
-          <button type="button" className="tp-btn tp-btn--big" onClick={onSetUp}>
-            Set up your factory project →
-          </button>
+          <Button onClick={onSetUp}>Set up your factory project →</Button>
         </div>
       );
     case "start":
@@ -227,9 +227,9 @@ function StartCoach({
               ? "Your coach works through this lesson with you, one Rule at a time, in your factory repo. The conversation opens in its own thread, led by this lesson."
               : "You finished this lesson. Open a coach thread to look back at how it went."}
           </p>
-          <button type="button" className="tp-btn tp-btn--big" disabled={pending} onClick={onStart}>
+          <Button disabled={pending} onClick={onStart}>
             {pending ? "Starting…" : start === "start" ? "Start with your coach →" : "Open a coach thread →"}
-          </button>
+          </Button>
           {error === null ? null : <ErrorNotice message={error} />}
         </div>
       );

@@ -319,10 +319,8 @@
   border-left: 3px solid var(--tp-bad);
   color: var(--tp-bad);
 }
-/* The outline resets its buttons; Reload stays a filled button. */
+/* The outline resets its buttons; Reload keeps the kit button's hand. */
 .tutor-sk.tp-outline .tp-outline-note .tp-reload {
-  margin-left: 8px;
-  border: 1px solid var(--tp-heading);
-  background: var(--tp-heading);
-  color: var(--tp-on-heading);
+  color: var(--tp-text);
+  font-family: var(--tp-font-label);
 }

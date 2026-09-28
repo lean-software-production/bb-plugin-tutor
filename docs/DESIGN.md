@@ -188,7 +188,7 @@ authorisation. Tools re-derive everything from the repo.
 | An optional Rule tab in the right panel | `threadPanelAction` | 2C, 4 |
 | Progress cards and lexicon pop-ups inside chat | `messageDirective` (`::tutor-progress`, `::term`) | 3A |
 | "Continue" section on BB's home page | `homepageSection` | 5 |
-| Between lessons: summary, confetti, `FACTORY.md` diff, "Start lesson N" | `navPanel` | 7 |
+| Between lessons: summary, the lesson-complete ribbon, `FACTORY.md` diff, "Start lesson N" | `navPanel` | 7 |
 | First run: confirm the detected factory project, or the fallback picker | `navPanel` and a `project` setting | 8 |
 
 Paper CSS is scoped to plugin-owned elements. In `mockups.html`, turn on **Show BB / plugin

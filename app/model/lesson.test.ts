@@ -102,6 +102,16 @@ test("the current lesson ends at the Rule in focus, other features collapsed ahe
   assert.equal(view.readyToComplete, false);
 });
 
+test("every Rule carries its number across the whole lesson, for its step badge", () => {
+  const view = buildLesson(fixtureLessonDetail, lessons, NOW);
+  const keys = fixtureLessonDetail.lesson.features.flatMap((feature) => feature.rules.map((rule) => rule.key));
+  const shown = [...view.otherFeatures, ...(view.focusFeature === null ? [] : [view.focusFeature])]
+    .flatMap((feature) => feature.rules)
+    .concat(view.laterRules);
+  assert.equal(shown.length, keys.length);
+  for (const rule of shown) assert.equal(rule.number, keys.indexOf(rule.key) + 1, rule.name);
+});
+
 test("opening a Rule unfolds whatever hides it", () => {
   const view = buildLesson(fixtureLessonDetail, lessons, NOW);
   assert.deepEqual(foldsHiding(view, "planning/the-planner-writes-a-plan"), ["planning"]);

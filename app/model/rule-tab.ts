@@ -7,6 +7,7 @@ import { formatRoute } from "../../shared/routes.ts";
 import type { ExampleStatus } from "../../shared/model.ts";
 import type { LessonDetail, TutorThread } from "../../shared/rpc.ts";
 import { percent } from "./format.ts";
+import { ruleNumbers } from "./lesson.ts";
 
 const LESSON_ID = /^\d{3}$/;
 
@@ -50,6 +51,8 @@ export type RuleTabView =
       kind: "rule";
       eyebrow: string;
       title: string;
+      /** 1-based place among the lesson's Rules: the number on its step badge. */
+      number: number;
       passing: number;
       total: number;
       percent: number;
@@ -87,6 +90,7 @@ export function ruleTabView(lessonDetail: LessonDetail, target: RuleTabTarget, f
     kind: "rule",
     eyebrow,
     title: rule.name,
+    number: ruleNumbers(lessonDetail.lesson).get(rule.key) ?? 0,
     passing: counts.passing,
     total: counts.total,
     percent: percent(counts.passing, counts.total),

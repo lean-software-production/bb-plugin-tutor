@@ -1,60 +1,37 @@
 /*
- * Tutor's shared atoms: type, chips, status pills and glyphs, buttons, the
- * progress bar and the card. They paint with the --tp-* tokens
+ * Tutor's shared atoms: type, the change badge, chips, the meter's count and
+ * the lesson-complete loop's band. They paint with the --tp-* tokens
  * (app/sketch/tokens.css), which alias the Sketchbook kit's roles, so they
  * follow BB's light and dark modes.
  */
 
-/* ---- type ---- */
+/* ---- type (mockup .tp-eyebrow, .tp-dek) ---- */
 .tutor-sk .tp-eyebrow,
 .tutor-sk .tp-section-label {
   margin: 0 0 10px;
   color: var(--tp-heading);
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font-family: var(--tp-font-label);
+  font-size: 17px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
 }
 .tutor-sk .tp-section-label {
   margin-bottom: 8px;
   color: var(--tp-muted);
-  font-size: 0.68rem;
-}
-.tutor-sk .tp-h1 {
-  margin: 0;
-  font-family: var(--tp-font-body);
-  font-size: 3rem;
-  font-weight: 500;
-  line-height: 0.98;
-  letter-spacing: -0.055em;
-}
-.tutor-sk .tp-h2 {
-  margin: 0 0 14px;
-  font-family: var(--tp-font-body);
-  font-size: 1.9rem;
-  font-weight: 500;
-  line-height: 1.1;
-  letter-spacing: -0.035em;
-}
-.tutor-sk .tp-h3 {
-  margin: 0;
-  font-family: var(--tp-font-body);
-  font-size: 1.35rem;
-  font-weight: 500;
-  line-height: 1.2;
-  letter-spacing: -0.02em;
+  font-size: 15px;
 }
 .tutor-sk .tp-dek {
-  margin: 1.1rem 0 0;
-  max-width: 690px;
+  max-width: 700px;
+  margin: 0 0 24px;
   color: var(--tp-text);
-  font: 1.12rem/1.6 var(--tp-font-body);
+  font: 21px/1.45 var(--tp-font-body);
 }
 .tutor-sk .tp-prose {
   max-width: 700px;
   margin: 0 0 18px;
   color: var(--tp-text);
-  font: 1.08rem/1.68 var(--tp-font-body);
+  font: 18px/1.5 var(--tp-font-body);
 }
 .tutor-sk code,
 .tutor-sk .tp-mono {
@@ -109,108 +86,6 @@
 .tutor-sk .tp-chip--new {
   --tp-chip-line: var(--tp-new-fill);
   color: var(--tp-new);
-}
-
-/* Example status pill: .tp-st.tp-st--{pending|passing|not-yet|skipped|real}. */
-.tutor-sk .tp-st {
-  align-self: start;
-  padding: 3px 8px;
-  border-radius: 99px;
-  font-family: var(--tp-font-body);
-  font-size: 0.66rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-.tutor-sk .tp-st--pending {
-  background: var(--tp-code-bg);
-  color: var(--tp-muted);
-}
-.tutor-sk .tp-st--passing {
-  background: var(--tp-good-wash);
-  color: var(--tp-good);
-}
-.tutor-sk .tp-st--not-yet {
-  background: var(--tp-warn-wash);
-  color: var(--tp-warn);
-}
-.tutor-sk .tp-st--skipped {
-  background: var(--tp-code-bg);
-  color: var(--tp-muted);
-  text-decoration: line-through;
-}
-.tutor-sk .tp-st--real {
-  background: var(--tp-other-wash);
-  color: var(--tp-other);
-}
-
-/* Status glyphs ✓ ! ○ ●: .tp-glyph.tp-glyph--{passing|not-yet|pending|focus}. */
-.tutor-sk .tp-glyph {
-  flex: none;
-  width: 10px;
-  text-align: center;
-}
-.tutor-sk .tp-glyph--passing {
-  color: var(--tp-good);
-}
-.tutor-sk .tp-glyph--not-yet {
-  color: var(--tp-warn);
-}
-.tutor-sk .tp-glyph--pending {
-  color: var(--tp-faint);
-}
-.tutor-sk .tp-glyph--focus {
-  color: var(--tp-heading);
-}
-
-.tutor-sk .tp-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 15px;
-  border: 1px solid var(--tp-heading);
-  border-radius: 9px;
-  background: var(--tp-heading);
-  box-shadow: 0 1px 0 color-mix(in oklab, var(--tp-line) 8%, transparent);
-  color: var(--tp-on-heading);
-  font: 700 0.82rem var(--tp-font-body);
-  text-decoration: none;
-}
-.tutor-sk .tp-btn:disabled {
-  cursor: default;
-  opacity: 0.6;
-}
-.tutor-sk .tp-btn--ghost {
-  border-color: var(--tp-rule);
-  background: var(--tp-page);
-  color: var(--tp-text);
-}
-.tutor-sk .tp-btn--big {
-  padding: 13px 20px;
-  border-radius: 11px;
-  font-size: 0.95rem;
-}
-
-/* Progress bar: <div class="tp-bar"><i style="width:73%"></i></div>. */
-.tutor-sk .tp-bar {
-  height: 5px;
-  overflow: hidden;
-  border-radius: 9px;
-  background: var(--tp-track);
-}
-.tutor-sk .tp-bar > i {
-  display: block;
-  height: 100%;
-  border-radius: 9px;
-  background: var(--tp-good);
-}
-
-.tutor-sk .tp-card {
-  border: 1px solid var(--tp-rule);
-  border-radius: 12px;
-  background: var(--tp-page);
-  box-shadow: var(--tp-shadow);
 }
 
 /* The kit meter with its count in words (app/ui/sketch/Meter.tsx). */

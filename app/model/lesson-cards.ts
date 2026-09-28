@@ -7,7 +7,7 @@ import { countExamples, lessonExamples, ruleStatus } from "../../shared/derive.t
 import type { Change } from "../../shared/model.ts";
 import type { LessonDetail } from "../../shared/rpc.ts";
 import { lessonEyebrow, percent } from "./format.ts";
-import { featureView } from "./lesson.ts";
+import { featureView, ruleNumbers } from "./lesson.ts";
 import type { RuleView } from "./lesson.ts";
 import type { RuleGlyph } from "./outline.ts";
 
@@ -102,11 +102,11 @@ export interface RuleCardView {
 
 /** Null when the lesson has no such Rule (a card from a stale message). */
 export function ruleCardView(detail: LessonDetail, ruleKey: string, now: number): RuleCardView | null {
-  const keys = detail.lesson.features.flatMap((feature) => feature.rules.map((rule) => rule.key));
+  const numbers = ruleNumbers(detail.lesson);
   for (const feature of detail.lesson.features) {
     if (!feature.rules.some((rule) => rule.key === ruleKey)) continue;
     const focus = detail.status === "current" ? detail.focus : null;
-    const view = featureView(feature, detail.progress, focus, null, now);
+    const view = featureView(feature, detail.progress, focus, null, now, numbers);
     const rule = view.rules.find((candidate) => candidate.key === ruleKey);
     if (rule === undefined) return null;
     const counts = countExamples(
@@ -118,7 +118,7 @@ export function ruleCardView(detail: LessonDetail, ruleKey: string, now: number)
       featureName: feature.name,
       featureChange: feature.change,
       rule,
-      number: keys.indexOf(ruleKey) + 1,
+      number: rule.number,
       passing: counts.passing,
       total: counts.total,
       current: detail.status === "current",

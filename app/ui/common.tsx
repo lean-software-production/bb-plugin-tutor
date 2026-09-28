@@ -1,5 +1,5 @@
-// Small paper atoms shared by every Tutor surface. All of them render inside
-// a `.tutor-sk` ancestor; see app/sketchbook.css.
+// Small atoms shared by every Tutor surface. All of them render inside a
+// `.tutor-sk` ancestor; see app/sketchbook.css.
 import type { MouseEvent, ReactNode } from "react";
 import { NAV_PANEL_PATH, PLUGIN_ID } from "../../shared/constants.ts";
 import type { Change } from "../../shared/model.ts";
@@ -7,6 +7,8 @@ import type { GherkinLine } from "../model/gherkin.ts";
 import { parseInline } from "../model/inline.ts";
 import type { Chip } from "../model/lesson.ts";
 import { isConnectionLost } from "../model/rpc-errors.ts";
+import { cx } from "../sketch/tone.ts";
+import { Button, KitIcon, Panel } from "./sketch/index.ts";
 
 /** App-relative URL of a course sub-route, for anchors that also work with middle-click. */
 export function coursePageHref(subPath: string): string {
@@ -44,14 +46,6 @@ export function ChangeBadge({ change, mixedLabel = "reworded" }: { change: Chang
   return <span className="tp-change-badge">{change === "new" ? "new" : mixedLabel}</span>;
 }
 
-export function Bar({ percent, label }: { percent: number; label: string }) {
-  return (
-    <div className="tp-bar" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}>
-      <i style={{ width: `${percent}%` }} />
-    </div>
-  );
-}
-
 export function Chips({ chips }: { chips: readonly Chip[] }) {
   return (
     <div className="tp-meta">
@@ -64,11 +58,17 @@ export function Chips({ chips }: { chips: readonly Chip[] }) {
   );
 }
 
+/** A note on a page: a kit panel with the closest drawn icon (the robot when something went wrong). */
 export function Notice({ tone = "info", children }: { tone?: "info" | "error"; children: ReactNode }) {
   return (
-    <div className={`tp-notice tp-notice--${tone}`} role={tone === "error" ? "alert" : "status"}>
-      {children}
-    </div>
+    <Panel
+      tone={tone === "error" ? "coral" : "teal"}
+      className={`tp-notice tp-notice--${tone}`}
+      role={tone === "error" ? "alert" : "status"}
+    >
+      <KitIcon name={tone === "error" ? "robot" : "books"} className="tp-notice-icon" />
+      <div className="tp-notice-body">{children}</div>
+    </Panel>
   );
 }
 
@@ -76,9 +76,9 @@ export function Notice({ tone = "info", children }: { tone?: "info" | "error"; c
 export function ReloadButton({ message }: { message: string | null }) {
   if (!isConnectionLost(message)) return null;
   return (
-    <button type="button" className="tp-btn tp-reload" onClick={() => window.location.reload()}>
+    <Button secondary className="tp-reload" onClick={() => window.location.reload()}>
       Reload
-    </button>
+    </Button>
   );
 }
 
@@ -96,6 +96,7 @@ export function ErrorNotice({ message }: { message: string | null }) {
 export function Loading({ label }: { label: string }) {
   return (
     <p className="tp-loading" role="status">
+      <KitIcon name="books" className="tp-loading-icon" />
       {label}
     </p>
   );
@@ -126,11 +127,18 @@ export function GherkinRow({ line }: { line: GherkinLine }) {
   );
 }
 
-/** A plain paper page: grid background, one centred column with the margin rule. */
-export function PaperPage({ children, roomy = false }: { children: ReactNode; roomy?: boolean }) {
+/**
+ * A Tutor page in the Sketchbook kit: the plain kit page with one centred
+ * column. `edge` is one small character in its patch, placed by the caller's
+ * CSS at an edge of the page (not over the column).
+ */
+export function SketchPage({ children, roomy = false, edge = null }: { children: ReactNode; roomy?: boolean; edge?: ReactNode }) {
   return (
     <div className="tutor-sk tp-page">
-      <div className={`tutor-sk tp-page-col${roomy ? " tp-page-col--roomy" : ""}`}>{children}</div>
+      <div className={cx("tp-page-in", edge !== null && "tp-page-in--edge")}>
+        <div className={cx("tp-page-col", roomy && "tp-page-col--roomy")}>{children}</div>
+        {edge}
+      </div>
     </div>
   );
 }

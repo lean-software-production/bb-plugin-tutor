@@ -8,9 +8,11 @@ import { toast } from "sonner";
 import { useAction, useLiveRefresh, useOpenRule, useQuery, useTutorRpc } from "../hooks.ts";
 import { parseRuleTabParams, ruleTabTarget, ruleTabView } from "../model/rule-tab.ts";
 import { QUERY_KEYS } from "../state/app-state.ts";
-import { Bar, ErrorNotice, InlineText, Loading } from "./common.tsx";
+import { stepTone } from "../sketch/step-colour.ts";
+import { ErrorNotice, InlineText, Loading } from "./common.tsx";
+import { Button, Meter, Panel, StepBadge, Tick } from "./sketch/index.ts";
 
-const GLYPHS = { passing: "✓", "not-yet": "!", pending: "○", skipped: "–" } as const;
+const GLYPHS = { "not-yet": "!", pending: "○", skipped: "–" } as const;
 
 export function RuleTab({ threadId, params }: PluginThreadPanelProps) {
   useLiveRefresh();
@@ -55,44 +57,52 @@ export function RuleTab({ threadId, params }: PluginThreadPanelProps) {
     return (
       <>
         <p className="tp-eyebrow">{view.eyebrow}</p>
-        <h3 className="tp-h3">{view.title}</h3>
-        <Bar percent={view.percent} label={`${view.passing} of ${view.total} examples hold`} />
-        <div className="tp-lbl">
-          <span>
-            {view.passing} of {view.total} examples hold
-          </span>
-        </div>
-        <div className="tp-now">
-          <p className="tp-section-label">{view.examples.length === 1 ? "Example" : "Examples"}</p>
+        <h3 className="sk-step tp-yah-step">
+          <StepBadge position={view.number - 1} label={view.number} />
+          <span className="sk-label tp-tt">{view.title}</span>
+        </h3>
+        <Meter
+          className="tp-yah-meter"
+          value={view.passing}
+          max={view.total}
+          label="Examples that hold"
+          unit={view.total === 1 ? "example holds" : "examples hold"}
+        />
+        <Panel tone={stepTone(view.number - 1)} className="tp-now">
+          <p className="tp-eyebrow">{view.examples.length === 1 ? "Example" : "Examples"}</p>
           {view.examples.map((example) => (
             <div key={example.key} className="tp-now-ex">
               <div className="tp-t">{example.name}</div>
               <div className={`tp-ex tp-ex--${example.status}`}>
-                <span className="tp-g" aria-hidden>
-                  {GLYPHS[example.status]}
-                </span>
+                {example.status === "passing" ? (
+                  <Tick className="tp-g" />
+                ) : (
+                  <span className="tp-g" aria-hidden>
+                    {GLYPHS[example.status]}
+                  </span>
+                )}
                 <span>
                   <InlineText text={example.detail} />
                 </span>
               </div>
             </div>
           ))}
-        </div>
+        </Panel>
         <div className="tp-acts">
           {thread?.role === "sideChat" && coachThreadId !== null ? (
-            <button type="button" onClick={() => navigate.toThread(coachThreadId)}>
+            <Button secondary onClick={() => navigate.toThread(coachThreadId)}>
               Back to coach
-            </button>
+            </Button>
           ) : null}
           {reached && coachThreadId !== null && ruleKey !== null ? (
-            <button type="button" className="tp-pri" onClick={() => openRule({ coachThreadId, lessonId: target.lessonId, ruleKey })}>
+            <Button className="tp-pri" onClick={() => openRule({ coachThreadId, lessonId: target.lessonId, ruleKey })}>
               Show in the conversation
-            </button>
+            </Button>
           ) : null}
           {canRedirect ? (
-            <button type="button" disabled={redirect.pending} onClick={() => void redirect.run(target.lessonId, ruleKey)}>
+            <Button secondary disabled={redirect.pending} onClick={() => void redirect.run(target.lessonId, ruleKey)}>
               Work on this Rule next
-            </button>
+            </Button>
           ) : null}
         </div>
         {redirect.error === null ? null : <ErrorNotice message={redirect.error} />}
