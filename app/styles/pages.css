@@ -379,8 +379,12 @@
   font-weight: 400;
   letter-spacing: 0.04em;
 }
-/* The explainer leans on the panel's right edge where the page has room for it. */
+/* The explainer leans on the panel's right edge where BB's page column has room
+   for it, its patch 16px inside the column (edge.test.ts). The column's width
+   depends on BB's sidebar, so this asks BB's page container, not the viewport;
+   without that container the explainer stays hidden. */
 .tutor-sk .tp-edge--explainer {
+  display: none;
   right: -104px;
   bottom: -2px;
 }
@@ -388,9 +392,9 @@
   width: auto;
   height: 150px;
 }
-@media (max-width: 1180px) {
+@container page (min-width: 984px) {
   .tutor-sk .tp-edge--explainer {
-    display: none;
+    display: inline-block;
   }
 }
 @media (max-width: 640px) {
