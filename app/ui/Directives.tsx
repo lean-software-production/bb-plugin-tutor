@@ -44,7 +44,7 @@ export function LessonCardDirective({ attributes, source }: PluginMessageDirecti
     return detail.status === "error" ? (
       <SourceFallback source={source} />
     ) : (
-      <div className="tutor-paper tp-lcard tp-lcard--loading" role="status">
+      <div className="tutor-sk tp-lcard tp-lcard--loading" role="status">
         Loading the lesson…
       </div>
     );
@@ -56,7 +56,7 @@ function LessonCard({ view }: { view: LessonCardView }) {
   const openRule = useOpenRule();
   const coachThreadId = view.coachThreadId;
   return (
-    <article className="tutor-paper tp-lcard" aria-label={`${view.eyebrow}: ${view.title}`} data-tutor-lesson={view.lessonId}>
+    <article className="tutor-sk tp-lcard" aria-label={`${view.eyebrow}: ${view.title}`} data-tutor-lesson={view.lessonId}>
       <div className="tp-lcard-top">
         <p className="tp-eyebrow">{view.eyebrow}</p>
         <h2 className="tp-h2">{view.title}</h2>
@@ -158,7 +158,7 @@ function RuleCard({ view, anchorProps }: { view: RuleCardView; anchorProps: Reco
   const askSide = useAskSideQuestion();
   const { rule } = view;
   return (
-    <article className="tutor-paper tp-rcard" aria-label={`Rule: ${rule.name}`} {...anchorProps}>
+    <article className="tutor-sk tp-rcard" aria-label={`Rule: ${rule.name}`} {...anchorProps}>
       <div className="tp-rcard-top">
         <span className="tp-mk tp-mk--blue" aria-hidden>
           ●
@@ -231,7 +231,7 @@ function ProgressCard({ view, anchorProps = {} }: { view: ProgressCardView; anch
   };
   const completed = view.completedLessonId;
   return (
-    <div className={`tutor-paper tp-pcard tp-pcard--${view.kind}`} role="group" aria-label={`${view.eyebrow}: ${view.title}`} {...anchorProps}>
+    <div className={`tutor-sk tp-pcard tp-pcard--${view.kind}`} role="group" aria-label={`${view.eyebrow}: ${view.title}`} {...anchorProps}>
       <div className="tp-pcard-top">
         <span className={`tp-mk tp-mk--${view.tone}`} aria-hidden>
           {view.mark}
@@ -293,7 +293,7 @@ export function TermDirective({ attributes, source }: PluginMessageDirectiveProp
     return lexicon.status === "error" ? (
       <SourceFallback source={source} />
     ) : (
-      <div className="tutor-paper tp-term-line">
+      <div className="tutor-sk tp-term-line">
         <span className="tp-term tp-term--loading">{ref.label ?? ref.id}</span>
       </div>
     );
@@ -301,7 +301,7 @@ export function TermDirective({ attributes, source }: PluginMessageDirectiveProp
   const term = termView(ref, lexicon.data.entries);
   if (term === null) return <SourceFallback source={source} />;
   return (
-    <div className="tutor-paper tp-term-line">
+    <div className="tutor-sk tp-term-line">
       <Popover.Root open={open} onOpenChange={(next) => setOpen(next || hovering.current)}>
         <Popover.Trigger asChild>
           <button
@@ -324,7 +324,7 @@ export function TermDirective({ attributes, source }: PluginMessageDirectiveProp
         <Popover.Portal>
           <Popover.Content
             {...portalScope}
-            className="tutor-paper tp-termpop"
+            className="tutor-sk tp-termpop"
             side="top"
             align="start"
             sideOffset={6}

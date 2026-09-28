@@ -100,5 +100,5 @@ export function RuleTab({ threadId, params }: PluginThreadPanelProps) {
     );
   };
 
-  return <div className="tutor-grid tutor-paper tp-yah">{body()}</div>;
+  return <div className="tutor-sk tp-yah">{body()}</div>;
 }

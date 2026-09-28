@@ -64,7 +64,7 @@ export function CourseOutline({ activeThreadId, activeProjectId, onNavigate }: P
   const factoryProjectId = overview.data?.factoryProject.status === "found" ? overview.data.factoryProject.projectId : null;
 
   return (
-    <nav className="tutor-paper tp-outline" aria-label="Course outline">
+    <nav className="tutor-sk tp-outline" aria-label="Course outline">
       <a className="tp-outline-brand" href={coursePageHref("")} onClick={(event) => go(event, { kind: "home" })}>
         <span className="tp-brand-mark" aria-hidden>
           ⚙

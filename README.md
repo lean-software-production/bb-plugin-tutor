@@ -176,7 +176,7 @@ thread (or side chat) changes only its own lesson's progress.
 | `shared/` | Model, keys, RPC contract, tool schemas, directive attributes, routes, fixtures |
 | `server/course/` | Course loading: course.yaml or ledger, Gherkin, slugs, hashes, new/reworded changes, lexicon, Lesson 0 |
 | `server/progress/`, `server/coach/`, `server/rpc/` | Student state, coach tools and threads, RPC handlers |
-| `app/` | Course outline (`Outline.tsx`), start page, lesson and Rule cards and other directives, the jump to a Rule's section, rule tab, home section, sidebar navigation, activity reporter; `paper.css`, fonts and the theme build |
+| `app/` | Course outline (`Outline.tsx`), start page, lesson and Rule cards and other directives, the jump to a Rule's section, rule tab, home section, sidebar navigation, activity reporter; `sketchbook.css`, the scoped kit (`sketch/`), fonts and the theme build |
 | `themes/` | The `paper` BB theme (generated CSS) and its light code theme |
 | `skills/tutor/` | The coach's skill |
 | `components/`, `lib/`, `hooks/` | Vendored BB UI components (shadcn model) |
@@ -187,4 +187,4 @@ thread (or side chat) changes only its own lesson's progress.
   directly; `@/…` aliases are for `.tsx` files only.
 - Type-only imports use `import type` (enforced by `verbatimModuleSyntax`).
 - Frontend code imports `shared/model.ts` and `shared/rpc.ts` with `import type` only.
-- Paper CSS stays under `.tutor-paper` / `.tutor-grid` with `tp-` classes and `--tp-` tokens.
+- Tutor CSS stays under `.tutor-sk` with `tp-` classes and `--tp-` tokens; the kit (`app/sketch/kit.css`) is generated, scoped to `.tutor-sk`.

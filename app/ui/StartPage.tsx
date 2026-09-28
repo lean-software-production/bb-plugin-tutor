@@ -41,8 +41,8 @@ export function StartPage({ lessonId, ruleKey }: { lessonId: string; ruleKey: st
   const detail = useQuery(QUERY_KEYS.lessonDetail(lessonId), () => rpc.call("getLessonDetail", { lessonId }));
   if (detail.data === null) {
     return (
-      <div className="tutor-grid tp-lt">
-        <div className="tutor-paper tp-lt-message">
+      <div className="tutor-sk tp-lt">
+        <div className="tutor-sk tp-lt-message">
           {detail.status === "error" ? <ErrorNotice message={detail.error} /> : <Loading label="Loading the lesson…" />}
         </div>
       </div>
@@ -83,8 +83,8 @@ function ToCoach({
     // Once per page visit, not once per render.
   }, [coachThreadId, ruleKey]);
   return (
-    <div className="tutor-grid tp-lt">
-      <div className="tutor-paper tp-lt-message">
+    <div className="tutor-sk tp-lt">
+      <div className="tutor-sk tp-lt-message">
         <p className="tp-eyebrow">{lessonLabel(lessonId)}</p>
         <p className="tp-prose">Your coach for {lessonLabel(lessonId).toLowerCase()} is in its thread.</p>
         <button type="button" className="tp-btn tp-btn--big" onClick={open}>
@@ -132,8 +132,8 @@ function StartPageBody({
 
   const completeHref = coursePageHref(formatRoute({ kind: "complete", lessonId }));
   return (
-    <div className="tutor-grid tp-lt">
-      <header className="tutor-paper tp-lthd">
+    <div className="tutor-sk tp-lt">
+      <header className="tutor-sk tp-lthd">
         <b>{view.barTitle}</b>
         {view.crumb === null ? null : <span className="tp-crumb">{view.crumb}</span>}
         <span className="tp-sp" />
@@ -143,7 +143,7 @@ function StartPageBody({
         </span>
       </header>
       <div className="tp-lt-body">
-        <div className="tutor-paper tp-lead tp-margin">
+        <div className="tutor-sk tp-lead">
           <Lesson
             view={view}
             openRules={openRules}

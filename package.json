@@ -49,7 +49,7 @@
     "test": "node --experimental-strip-types --no-warnings=ExperimentalWarning --test \"shared/**/*.test.ts\" \"server/**/*.test.ts\" \"app/**/*.test.ts\" \"test/**/*.test.ts\" \"scripts/*.test.ts\"",
     "build": "bb plugin build .",
     "sync-brand": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/sync-brand.ts",
-    "build:assets": "node --experimental-strip-types --no-warnings=ExperimentalWarning app/fonts/embed.ts && node --experimental-strip-types --no-warnings=ExperimentalWarning app/theme/build.ts",
+    "build:assets": "node --experimental-strip-types --no-warnings=ExperimentalWarning app/fonts/embed.ts && node --experimental-strip-types --no-warnings=ExperimentalWarning app/theme/build.ts && node --experimental-strip-types --no-warnings=ExperimentalWarning app/sketch/build-kit.ts",
     "fonts": "npm run build:assets"
   },
   "dependencies": {
@@ -85,6 +85,8 @@
     "clsx": "^2.1.1",
     "cron-parser": "^5.5.0",
     "hono": "^4.11.9",
+    "postcss": "^8.5.28",
+    "postcss-selector-parser": "^7.1.6",
     "sonner": "^1.7.4",
     "tailwind-merge": "^3.4.0",
     "typescript": "^5.7.0",

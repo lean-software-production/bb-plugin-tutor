@@ -376,9 +376,10 @@ not data.
   `ConnectionLostError` (`app/model/rpc-errors.ts`); every error surface then says the connection
   to the Codespace was lost and offers Reload, never a raw "HTTP 401".
 
-- **CSS:** `app/paper.css` holds the fonts and tokens. Wrap plugin-owned markup in
-  `.tutor-paper`. Use `.tutor-grid` for grid-paper backgrounds that may contain BB components; it
-  sets nothing that inherits. `.tutor-nav` is a third root, for the simple navigation, which uses
+- **CSS:** `app/sketchbook.css` imports the fonts, the scoped Sketchbook kit (`app/sketch/kit.css`,
+  generated from the vendored brand kit by `app/sketch/build-kit.ts`) and Tutor's `--tp-*` tokens
+  (`app/sketch/tokens.css`, aliases of the kit's roles). Wrap plugin-owned markup in `.tutor-sk`; it
+  sets typography. `.tutor-nav` is a second root, for the simple navigation, which uses
   BB's tokens and no paper typography. Classes are `tp-*` and tokens are `--tp-*`: BB's theme uses unprefixed
   names such as `--ink`, and a bare token would leak into BB's own components. Never style BB's
   chat. Light mode only.

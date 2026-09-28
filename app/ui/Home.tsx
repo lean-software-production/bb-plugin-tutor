@@ -31,21 +31,21 @@ export function ContinueSection(_props: PluginHomepageSectionProps) {
 
   if (view === null) {
     return overview.status === "error" ? (
-      <div className="tutor-paper">
+      <div className="tutor-sk">
         <ErrorNotice message={overview.error} />
       </div>
     ) : null;
   }
   if (view.kind === "error") {
     return (
-      <div className="tutor-paper">
+      <div className="tutor-sk">
         <ErrorNotice message={view.message} />
       </div>
     );
   }
   if (view.kind === "setup") {
     return (
-      <div className="tutor-paper tutor-grid tp-hs tp-hs--setup">
+      <div className="tutor-sk tp-hs tp-hs--setup">
         <div className="tp-hs-l">
           <div className="tp-ey">Your course</div>
           <h2>{view.courseTitle}</h2>
@@ -62,7 +62,7 @@ export function ContinueSection(_props: PluginHomepageSectionProps) {
     );
   }
   return (
-    <div className="tutor-paper tutor-grid tp-hs">
+    <div className="tutor-sk tp-hs">
       <div className="tp-hs-l">
         <div className="tp-ey">{view.eyebrow}</div>
         <h2>{view.title}</h2>
@@ -126,7 +126,7 @@ export function CourseAccessory() {
   const current = overview.data?.current ?? null;
   if (current === null) return null;
   return (
-    <span className="tutor-paper tp-accessory">
+    <span className="tutor-sk tp-accessory">
       <i>{current.lessonId}</i> · {current.counts.passing}/{current.counts.total}
     </span>
   );

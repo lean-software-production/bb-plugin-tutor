@@ -4,238 +4,230 @@
  * and term chips (mockup 3A, ".pcard" and ".term").
  */
 
-.tutor-paper.tp-pcard {
+.tutor-sk.tp-pcard {
   max-width: 560px;
   margin: 6px 0;
   overflow: hidden;
-  border: 1px solid var(--tp-line);
+  border: 1px solid var(--tp-rule);
   border-radius: 12px;
-  background: #fff;
+  background: var(--tp-page);
   box-shadow: var(--tp-shadow);
   line-height: 1.4;
 }
-.tutor-paper .tp-pcard-top {
+.tutor-sk .tp-pcard-top {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 12px 14px;
-  background-color: var(--tp-grid-paper);
-  background-image:
-    linear-gradient(rgb(151 178 192 / 0.16) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(151 178 192 / 0.16) 1px, transparent 1px);
-  background-size: 18px 18px;
+  background: var(--tp-page);
 }
-.tutor-paper .tp-mk {
+.tutor-sk .tp-mk {
   display: grid;
   flex: none;
   width: 28px;
   height: 28px;
   place-items: center;
   border-radius: 50%;
-  color: #fff;
+  color: var(--tp-page);
   font-size: 0.8rem;
   font-weight: 800;
 }
-.tutor-paper .tp-mk--green {
-  background: var(--tp-green);
+.tutor-sk .tp-mk--green {
+  background: var(--tp-good-fill);
 }
-.tutor-paper .tp-mk--amber {
-  background: var(--tp-amber);
+.tutor-sk .tp-mk--amber {
+  background: var(--tp-warn);
 }
-.tutor-paper .tp-mk--blue {
-  background: var(--tp-blue);
+.tutor-sk .tp-mk--blue {
+  background: var(--tp-heading);
 }
-.tutor-paper.tp-pcard--lesson-complete .tp-mk {
+.tutor-sk.tp-pcard--lesson-complete .tp-mk {
   width: 36px;
   height: 36px;
   font-size: 1rem;
 }
-.tutor-paper.tp-pcard--lesson-complete {
-  border-color: #bfe0d2;
+.tutor-sk.tp-pcard--lesson-complete {
+  border-color: var(--tp-good-line);
 }
-.tutor-paper.tp-pcard .tp-ey {
+.tutor-sk.tp-pcard .tp-ey {
   color: var(--tp-muted);
   font-size: 0.58rem;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
-.tutor-paper.tp-pcard .tp-tt {
-  color: var(--tp-ink);
-  font: 500 1.05rem/1.25 var(--tp-font-display);
+.tutor-sk.tp-pcard .tp-tt {
+  color: var(--tp-text);
+  font: 500 1.05rem/1.25 var(--tp-font-body);
 }
-.tutor-paper .tp-ring {
+.tutor-sk .tp-ring {
   flex: none;
   margin-left: auto;
   color: var(--tp-muted);
   font-size: 0.62rem;
   text-align: right;
 }
-.tutor-paper .tp-ring b {
+.tutor-sk .tp-ring b {
   display: block;
-  color: var(--tp-ink);
-  font: 500 1.15rem/1 var(--tp-font-display);
+  color: var(--tp-text);
+  font: 500 1.15rem/1 var(--tp-font-body);
 }
-.tutor-paper .tp-pcard-next {
+.tutor-sk .tp-pcard-next {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
-  border-top: 1px solid var(--tp-line-soft);
-  color: #3d4a55;
+  border-top: 1px solid var(--tp-rule-soft);
+  color: var(--tp-text);
   font-size: 0.74rem;
 }
-.tutor-paper .tp-pcard-next .tp-lab {
+.tutor-sk .tp-pcard-next .tp-lab {
   flex: none;
-  color: var(--tp-blue);
+  color: var(--tp-heading);
   font-size: 0.58rem;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
-.tutor-paper .tp-pcard-next b {
-  font: 500 0.95rem var(--tp-font-display);
+.tutor-sk .tp-pcard-next b {
+  font: 500 0.95rem var(--tp-font-body);
 }
-.tutor-paper .tp-pcard-rows {
+.tutor-sk .tp-pcard-rows {
   padding: 6px 14px 10px;
   font-size: 0.74rem;
 }
-.tutor-paper .tp-pcard-rows > div {
+.tutor-sk .tp-pcard-rows > div {
   display: flex;
   gap: 8px;
   padding: 3px 0;
-  color: #3d4a55;
+  color: var(--tp-text);
 }
-.tutor-paper .tp-pcard-rows .tp-g,
-.tutor-paper .tp-pcard-rows .tp-a {
+.tutor-sk .tp-pcard-rows .tp-g,
+.tutor-sk .tp-pcard-rows .tp-a {
   flex: none;
   width: 12px;
   font-weight: 800;
 }
-.tutor-paper .tp-pcard-rows .tp-g {
-  color: var(--tp-green);
+.tutor-sk .tp-pcard-rows .tp-g {
+  color: var(--tp-good);
 }
-.tutor-paper .tp-pcard-rows .tp-a {
-  color: var(--tp-amber);
+.tutor-sk .tp-pcard-rows .tp-a {
+  color: var(--tp-warn);
 }
-.tutor-paper .tp-pcard-ft {
+.tutor-sk .tp-pcard-ft {
   display: flex;
   gap: 14px;
   padding: 8px 14px;
-  border-top: 1px solid var(--tp-line-soft);
+  border-top: 1px solid var(--tp-rule-soft);
 }
-.tutor-paper .tp-pcard-ft .tp-link-button {
+.tutor-sk .tp-pcard-ft .tp-link-button {
   margin: 0;
   font-size: 0.72rem;
   font-weight: 700;
 }
 
 /* ::term — a leaf directive, so a chip on its own line with a pop-up definition. */
-.tutor-paper.tp-term-line {
+.tutor-sk.tp-term-line {
   margin: 2px 0;
 }
-.tutor-paper .tp-term {
+.tutor-sk .tp-term {
   display: inline-block;
   padding: 1px 2px;
   border: 0;
-  border-bottom: 1.5px dotted var(--tp-blue);
+  border-bottom: 1.5px dotted var(--tp-heading);
   background: none;
-  color: var(--tp-blue-ink);
-  font: 500 0.95rem var(--tp-font-display);
+  color: var(--tp-heading);
+  font: 500 0.95rem var(--tp-font-body);
   cursor: help;
 }
-.tutor-paper .tp-term--loading {
+.tutor-sk .tp-term--loading {
   cursor: default;
 }
-.tutor-paper.tp-termpop {
+.tutor-sk.tp-termpop {
   z-index: 60;
   width: min(300px, calc(100vw - 24px));
   padding: 10px 12px;
-  border: 1px solid var(--tp-line);
+  border: 1px solid var(--tp-rule);
   border-radius: 10px;
-  background: var(--tp-paper);
+  background: var(--tp-page);
   box-shadow: var(--tp-shadow);
-  color: #34414c;
-  font: 400 0.78rem/1.5 var(--tp-font-display);
+  color: var(--tp-text);
+  font: 400 0.78rem/1.5 var(--tp-font-body);
 }
-.tutor-paper.tp-termpop b {
+.tutor-sk.tp-termpop b {
   display: block;
   margin-bottom: 3px;
-  color: var(--tp-blue);
-  font: 800 0.58rem var(--tp-font-core);
+  color: var(--tp-heading);
+  font: 800 0.58rem var(--tp-font-body);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
-.tutor-paper.tp-termpop code {
+.tutor-sk.tp-termpop code {
   font-size: 0.72rem;
 }
 
 /* ::tutor-lesson — the lesson card leading the coach thread. */
-.tutor-paper.tp-lcard {
+.tutor-sk.tp-lcard {
   max-width: 640px;
   margin: 6px 0 10px;
   overflow: hidden;
-  border: 1px solid var(--tp-line);
+  border: 1px solid var(--tp-rule);
   border-radius: 12px;
-  background: var(--tp-paper);
+  background: var(--tp-page);
   box-shadow: var(--tp-shadow);
   line-height: 1.4;
 }
-.tutor-paper.tp-lcard--loading {
+.tutor-sk.tp-lcard--loading {
   padding: 14px 16px;
   color: var(--tp-muted);
   font-size: 0.8rem;
 }
-.tutor-paper .tp-lcard-top {
+.tutor-sk .tp-lcard-top {
   padding: 16px 18px 12px;
-  border-bottom: 1px solid var(--tp-line-soft);
-  background-color: var(--tp-grid-paper);
-  background-image:
-    linear-gradient(rgb(151 178 192 / 0.16) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(151 178 192 / 0.16) 1px, transparent 1px);
-  background-size: 18px 18px;
+  border-bottom: 1px solid var(--tp-rule-soft);
+  background: var(--tp-page);
 }
-.tutor-paper .tp-lcard-top .tp-h2 {
+.tutor-sk .tp-lcard-top .tp-h2 {
   margin: 2px 0 4px;
 }
-.tutor-paper .tp-lcard-dek {
+.tutor-sk .tp-lcard-dek {
   margin: 0 0 8px;
   font-size: 0.85rem;
 }
-.tutor-paper .tp-lcard-tally {
+.tutor-sk .tp-lcard-tally {
   display: flex;
   align-items: center;
   gap: 10px;
   color: var(--tp-muted);
   font-size: 0.7rem;
 }
-.tutor-paper .tp-lcard-tally .tp-bar {
+.tutor-sk .tp-lcard-tally .tp-bar {
   flex: 0 0 140px;
 }
-.tutor-paper .tp-lcard-rules {
+.tutor-sk .tp-lcard-rules {
   display: grid;
   gap: 8px;
   padding: 10px 18px 14px;
 }
-.tutor-paper .tp-lcard-rules ul {
+.tutor-sk .tp-lcard-rules ul {
   display: grid;
   gap: 1px;
   margin: 2px 0 0;
   padding: 0;
   list-style: none;
 }
-.tutor-paper .tp-lcard-count {
+.tutor-sk .tp-lcard-count {
   margin-left: auto;
   font-family: var(--tp-font-mono);
   font-weight: 500;
   letter-spacing: 0;
 }
-.tutor-paper .tp-lcard-rules .tp-section-label {
+.tutor-sk .tp-lcard-rules .tp-section-label {
   display: flex;
   gap: 6px;
   align-items: center;
 }
-.tutor-paper .tp-lcard-rule {
+.tutor-sk .tp-lcard-rule {
   display: flex;
   gap: 8px;
   width: 100%;
@@ -243,103 +235,103 @@
   border: 0;
   border-radius: 5px;
   background: none;
-  color: var(--tp-ink);
-  font: 400 0.8rem/1.3 var(--tp-font-core);
+  color: var(--tp-text);
+  font: 400 0.8rem/1.3 var(--tp-font-body);
   text-align: left;
 }
-.tutor-paper button.tp-lcard-rule {
+.tutor-sk button.tp-lcard-rule {
   cursor: pointer;
 }
-.tutor-paper button.tp-lcard-rule:hover {
-  background: var(--tp-blue-pale);
-  color: var(--tp-blue-ink);
+.tutor-sk button.tp-lcard-rule:hover {
+  background: var(--tp-heading-wash);
+  color: var(--tp-heading);
 }
-.tutor-paper .tp-lcard-rule--unreached {
-  color: #6f757b;
+.tutor-sk .tp-lcard-rule--unreached {
+  color: var(--tp-muted);
 }
-.tutor-paper .tp-lcard-rule .tp-g {
+.tutor-sk .tp-lcard-rule .tp-g {
   flex: none;
   width: 12px;
   text-align: center;
 }
-.tutor-paper .tp-g--passing {
-  color: var(--tp-green);
+.tutor-sk .tp-g--passing {
+  color: var(--tp-good);
 }
-.tutor-paper .tp-g--not-yet {
-  color: var(--tp-amber);
+.tutor-sk .tp-g--not-yet {
+  color: var(--tp-warn);
 }
-.tutor-paper .tp-g--pending {
-  color: var(--tp-todo);
+.tutor-sk .tp-g--pending {
+  color: var(--tp-faint);
 }
-.tutor-paper .tp-g--focus {
-  color: var(--tp-blue);
+.tutor-sk .tp-g--focus {
+  color: var(--tp-heading);
 }
 
 /* A focus card is the Rule card: where the Rule's section of the thread starts. */
-.tutor-paper.tp-rcard {
+.tutor-sk.tp-rcard {
   max-width: 680px;
   margin: 8px 0 10px;
   overflow: hidden;
-  border: 1px solid #b6cce9;
+  border: 1px solid var(--tp-heading-line);
   border-radius: 12px;
-  background: #fff;
+  background: var(--tp-page);
   box-shadow: var(--tp-shadow);
   line-height: 1.4;
   scroll-margin-top: 16px;
 }
-.tutor-paper .tp-rcard-top {
+.tutor-sk .tp-rcard-top {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 12px 14px;
-  background: var(--tp-blue-pale);
+  background: var(--tp-heading-wash);
 }
-.tutor-paper .tp-rcard-head {
+.tutor-sk .tp-rcard-head {
   min-width: 0;
 }
-.tutor-paper.tp-rcard .tp-ey {
+.tutor-sk.tp-rcard .tp-ey {
   display: flex;
   gap: 6px;
   align-items: center;
-  color: var(--tp-blue);
+  color: var(--tp-heading);
   font-size: 0.58rem;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
-.tutor-paper.tp-rcard .tp-tt {
+.tutor-sk.tp-rcard .tp-tt {
   margin: 0;
-  color: var(--tp-ink);
-  font: 500 1.1rem/1.25 var(--tp-font-display);
+  color: var(--tp-text);
+  font: 500 1.1rem/1.25 var(--tp-font-body);
 }
-.tutor-paper .tp-rcard-desc {
+.tutor-sk .tp-rcard-desc {
   margin: 10px 14px 0;
   font-size: 0.82rem;
 }
-.tutor-paper .tp-rcard-toggle {
+.tutor-sk .tp-rcard-toggle {
   display: block;
   margin: 8px 14px 4px;
   padding: 0;
   border: 0;
   background: none;
-  color: var(--tp-blue-ink);
-  font: 700 0.7rem var(--tp-font-core);
+  color: var(--tp-heading);
+  font: 700 0.7rem var(--tp-font-body);
   cursor: pointer;
 }
-.tutor-paper .tp-rcard-examples {
+.tutor-sk .tp-rcard-examples {
   margin: 0 14px 12px;
 }
-.tutor-paper.tp-pcard,
-.tutor-paper.tp-rcard {
+.tutor-sk.tp-pcard,
+.tutor-sk.tp-rcard {
   transition: box-shadow 0.4s ease;
 }
 /* The card the course outline just jumped to. */
-.tutor-paper.tp-anchor-flash {
-  box-shadow: 0 0 0 3px var(--tp-blue), var(--tp-shadow);
+.tutor-sk.tp-anchor-flash {
+  box-shadow: 0 0 0 3px var(--tp-heading), var(--tp-shadow);
 }
 @media (prefers-reduced-motion: reduce) {
-  .tutor-paper.tp-pcard,
-  .tutor-paper.tp-rcard {
+  .tutor-sk.tp-pcard,
+  .tutor-sk.tp-rcard {
     transition: none;
   }
 }

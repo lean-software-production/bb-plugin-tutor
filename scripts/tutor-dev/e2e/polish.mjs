@@ -111,7 +111,7 @@ async function ui() {
     await sleep(3000);
     await shot(page, "polish-e2e-theme-thread");
     await page.goto(`${BASE}/plugins/tutor/course`);
-    await page.locator(".tutor-paper, .tp-course, main").first().waitFor({ timeout: 30000 });
+    await page.locator(".tutor-sk, .tp-course, main").first().waitFor({ timeout: 30000 });
     await sleep(2000);
     await shot(page, "polish-e2e-theme-course");
 

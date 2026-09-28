@@ -1,5 +1,5 @@
 // Small paper atoms shared by every Tutor surface. All of them render inside
-// a `.tutor-paper` ancestor; see app/paper.css.
+// a `.tutor-sk` ancestor; see app/sketchbook.css.
 import type { MouseEvent, ReactNode } from "react";
 import { NAV_PANEL_PATH, PLUGIN_ID } from "../../shared/constants.ts";
 import type { Change } from "../../shared/model.ts";
@@ -129,8 +129,8 @@ export function GherkinRow({ line }: { line: GherkinLine }) {
 /** A plain paper page: grid background, one centred column with the margin rule. */
 export function PaperPage({ children, roomy = false }: { children: ReactNode; roomy?: boolean }) {
   return (
-    <div className="tutor-grid tp-page">
-      <div className={`tutor-paper tp-page-col tp-margin${roomy ? " tp-page-col--roomy" : ""}`}>{children}</div>
+    <div className="tutor-sk tp-page">
+      <div className={`tutor-sk tp-page-col${roomy ? " tp-page-col--roomy" : ""}`}>{children}</div>
     </div>
   );
 }
