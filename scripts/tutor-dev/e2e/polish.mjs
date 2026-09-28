@@ -7,9 +7,7 @@ import { readFileSync } from "node:fs";
 import { BASE, bb, bbJson, openBrowser, sh, shot, sleep, until } from "./lib.mjs";
 
 const STATE = "/workspaces/.bb-state/.tutor-feature";
-// Feature 0.6 and earlier still default to the old id, which the manifest keeps as an alias of Sketchbook.
-const THEME = "plugin:tutor:paper";
-const SKETCHBOOK = "plugin:tutor:sketchbook";
+const THEME = "plugin:tutor:sketchbook";
 // What the theme paints in light mode, read from the vendored brand theme rather than copied by hand.
 const BRAND_THEME = readFileSync(new URL("../../../vendor/brand/bb-theme/sketchbook/theme.css", import.meta.url), "utf8");
 const brandColour = (name) => {
@@ -96,17 +94,16 @@ async function ui() {
     check(/Tutor Patrick Hand/.test(look.font), "BB's UI font is Tutor Patrick Hand", look.font);
     let resolveError = "";
     try {
-      bb("theme", "show", SKETCHBOOK);
+      bb("theme", "show", THEME);
     } catch (error) {
       resolveError = String(error.stderr || error.message).trim();
     }
-    check(resolveError === "", `bb resolves ${SKETCHBOOK}`, resolveError);
+    check(resolveError === "", `bb resolves ${THEME}`, resolveError);
     await page.goto(`${BASE}/settings/appearance`);
     // BB's Palette setting is a menu button naming the active palette; the menu lists the plugin themes.
     await page.locator("button", { hasText: /Sketchbook/ }).first().click({ timeout: 30000 });
     const palettes = page.getByRole("menuitem");
     await palettes.filter({ hasText: /^Sketchbook/ }).first().waitFor({ timeout: 30000 });
-    check(await palettes.filter({ hasText: /^Tutor paper \(now Sketchbook\)/ }).count() > 0, "Settings › Appearance offers Sketchbook and the Tutor paper alias");
     await shot(page, "polish-e2e-theme-settings");
     await shot(page, "polish-e2e-theme-home");
     await page.goto(`${BASE}/threads/${coach.id}`);

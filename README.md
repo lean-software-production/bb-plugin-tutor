@@ -25,7 +25,7 @@ learner's BB and does the rest of the set-up:
 
 - clones the course (and the starter);
 - registers the course and the factory as BB projects;
-- selects the course outline as the sidebar and the `paper` theme (Sketchbook under its old id);
+- selects the course outline as the sidebar and the Sketchbook theme (`plugin:tutor:sketchbook`);
 - switches off plugins a learner does not need;
 - runs the keep-alive that reads Tutor's activity heartbeat.
 
@@ -137,8 +137,7 @@ To build the same archive locally, run `scripts/release-archive.sh v<x.y.z> <out
 - **Theme.** `bb.themes` contributes `sketchbook` (`plugin:tutor:sketchbook`): the Sketchbook
   brand's bb theme, with cream paper, ink, deep teal and Patrick Hand for the UI, and BB's own mono
   for code. The brand is light mode only: picking dark mode in BB keeps the page paper and ink,
-  and the one light code theme is named for both modes, so code blocks stay light too. `paper` (`plugin:tutor:paper`, "Tutor paper (now Sketchbook)") is the same theme
-  under the old id, because Feature 0.6 and earlier default to it. It goes away in the next release.
+  and the one light code theme is named for both modes, so code blocks stay light too.
   `themes/sketchbook.css` is the brand's `bb-theme/sketchbook/theme.css` from `vendor/brand/` with
   Patrick Hand inlined in place of its Google Fonts `@import` (a theme is one CSS file). The code
   theme is built from the kit's tokens. Don't edit the theme here: change it in the
