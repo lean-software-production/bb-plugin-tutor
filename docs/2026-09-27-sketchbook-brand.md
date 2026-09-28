@@ -63,41 +63,70 @@ and loading the kit live from GitHub Pages (breaks offline codespaces and pinnin
 ## Tutor's surfaces
 
 `app/paper.css` becomes `app/sketchbook.css`; its `--tp-*` tokens are generated from
-`tokens.json` (no literal colours in component CSS), in light and dark. Small components in
-`app/ui/sketch/`, each usable alone:
+`tokens.json` (no literal colours in component CSS), in light and dark.
+
+The kit pieces come from the brand kit, not from Tutor. The kit now has them all:
+
+- the panel wash (`sk-wash`);
+- the highlighter on any text (`sk-hl`), with an optional sweep (`sk-sweep`) that is off under
+  reduced motion;
+- the tick (`sk-tick`);
+- buttons (`sk-btn`, and `sk-secondary` for the quiet one);
+- the progress meter (`sk-meter`);
+- the paper patch (`sk-patch`);
+- dark role tokens, under `.dark` and `.sk-dark`.
+
+Tutor's own CSS keeps only BB-shell and Tutor layout. Small components in `app/ui/sketch/`,
+each usable alone, wrap those pieces:
 
 | Component | What it draws |
 |---|---|
 | `WobbleDefs` | The kit's thin, chunky and soft wobble filters, mounted once per surface (as `sketchbook.js` does). Without it outlines vanish in Firefox. |
 | `Panel` | A kit panel: wobbly outline, pastel wash, optional `dashed` to single one out. |
 | `Highlight` | The highlighter swash behind text; optional sweep-in. |
+| `Tick`, `Button`, `Meter` | The kit's tick, buttons and progress meter. A meter always has its count in words beside it. |
+| `Patch` | The kit's paper patch behind an icon or character. |
 | `StepBadge` | A lesson or Rule number in the step order mustard → teal → forest → coral → blue, repeating. |
-| `KitIcon`, `Character` | A vendored icon or character, as a whole file, never recoloured. |
+| `KitIcon`, `Character` | A vendored icon or character, as a whole file, never recoloured, always in a `Patch`. |
 | `Bubble`, `Ribbon` | Speech bubble and ribbon banner. |
 | `LoopArrow` | The kit's hand-drawn loop-back arrow. |
 
 Where they go:
 
 - **Outline**: `StepBadge` per lesson; the current lesson and Rule on the highlighter; passed
-  Rules get a hand-drawn tick; a loop arrow down the lesson list (the build → check → iterate
-  loop).
+  Rules get the kit tick. No loop arrow here: it was too busy next to the lesson list.
 - **Lesson card** (`::tutor-lesson`): a `Panel` with the lesson title in Luckiest Guy on the
   highlighter, the Rules as a checklist with the `checklist` icon.
 - **Rule and progress cards** (`::tutor-progress`): `Panel`s; "not yet" and coach notes in a
   `Bubble`; passing a Rule sweeps its highlighter in.
 - **Lesson complete**: a `Ribbon` ("Lesson 3 done!") and the `group` characters as a small
-  celebration scene; "What's next" as a marker-lettered link.
+  celebration scene; "What's next" as a marker-lettered link. The `LoopArrow` lives here now. It
+  runs from the stats back round to "What's next": you finish, then you go again. It crosses
+  nothing.
 - **Welcome, home and start pages, empty states**: one small character at the edge, doing
-  something (the `learner` with a laptop, the `explainer` pointing at the next step), never the
-  centrepiece.
+  something, never the centrepiece. We use real kit characters: the `waver` says hello on the
+  welcome page, the `explainer` points at the next step on home, and the `group` cheers a
+  finished lesson. The kit has no learner with a laptop.
 - **Motion**: the highlighter sweep and a short ribbon unfurl only, both off under
   `prefers-reduced-motion`.
 - **Missing drawings** are not drawn here: the closest kit element is used and the gap is raised
   in the brand repo (brand skill rule 4).
 
-In dark mode the surfaces sit on the ink page: washes are mixed toward ink, the highlighter
-becomes the teal tint BB's dark theme uses for selection, and characters and icons keep their own
-colours.
+In dark mode the surfaces sit on the ink page: washes are mixed toward ink, and the highlighter
+becomes the teal tint BB's dark theme uses for selection. Characters and icons keep their own
+colours. Each one sits on a paper patch, a small wobbly piece of cream paper. In light mode the
+patch is invisible, because the page is already paper.
+
+## Mockup
+
+[`mockups-sketchbook/`](mockups-sketchbook/) is the mockup. It replaces the look of
+[`mockups.html`](mockups.html). It vendors the kit at a pinned brand commit (`brand/PIN`) and
+draws seven screens in light and dark. `shoot.mjs` takes the 14 screenshots; `--check` reports
+any text under 4.5:1.
+
+The outline screen is a composite. It puts states from different moments on one screen, so the
+outline shows every kind of row at once: passed, current, not reached, and a side chat. BB never
+shows exactly this screen.
 
 ## Words
 
@@ -146,17 +175,17 @@ colours.
 1. Open a lesson whose coach thread has passed one Rule.
 2. Look at the sidebar outline.
 3. Expect: step-coloured lesson badges in the mustard → teal → forest → coral → blue order, the
-   current Rule on the highlighter, and a tick on the passed Rule.
+   current Rule on the highlighter, a tick on the passed Rule, and no loop arrow.
 
 ### 4. Finishing a lesson celebrates
 1. Complete a lesson in its coach thread.
 2. Expect: the lesson-complete card shows a ribbon and the group characters, with a "What's next"
-   link.
+   link and a loop arrow from the stats back to it.
 
 ### 5. Dark mode reads
 1. Switch BB to dark mode on a lesson with a coach thread.
-2. Expect: paper-coloured text on the ink page, and `theme.test.ts` passes its dark contrast
-   checks.
+2. Expect: paper-coloured text on the ink page, every icon and character on a paper patch, and
+   `theme.test.ts` passes its dark contrast checks.
 
 ### 6. Reduced motion is respected
 1. Turn on the OS "reduce motion" setting and pass a Rule.

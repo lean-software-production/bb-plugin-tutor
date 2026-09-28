@@ -61,13 +61,13 @@ function contrastReport(min) {
   const hex = (c) => "#" + c.slice(0, 3).map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
 
   // Background layers from the element up: own background, ::before wash
-  // (kit panels paint there), the highlighter swash (read as --tp-hl-solid).
+  // (kit panels paint there), the highlighter swash (read as the kit's --sk-swash role).
   function layers(el) {
     const out = [];
     for (let e = el; e && e.nodeType === 1; e = e.parentElement) {
       const cs = getComputedStyle(e);
-      if (cs.backgroundImage.includes("svg") && (e.classList.contains("tp-hl") || e.classList.contains("sk-hl"))) {
-        out.push(rgba(cs.getPropertyValue("--tp-hl-solid").trim() || "#FFEEB8"));
+      if (cs.backgroundImage.includes("svg") && e.classList.contains("sk-hl")) {
+        out.push(rgba(cs.getPropertyValue("--sk-swash").trim() || "#FFEEB8"));
       }
       out.push(rgba(cs.backgroundColor));
       const b = getComputedStyle(e, "::before");
