@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { PALETTE_CSS, THEME_CSS, contrast, paletteBlock, renderThemeCss } from "./build.ts";
+import { PALETTE_CSS, THEME_CSS, paletteBlock, renderThemeCss } from "./build.ts";
+import { contrast } from "./color.ts";
 
 test("themes/paper.css is up to date with the palette and the Patrick Hand font (npm run fonts)", () => {
   assert.equal(readFileSync(THEME_CSS, "utf8"), renderThemeCss());
