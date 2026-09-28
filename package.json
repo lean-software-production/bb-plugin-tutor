@@ -1,6 +1,6 @@
 {
   "name": "bb-plugin-tutor",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "Tutor: a coached, Gherkin-driven course inside BB.",
   "license": "MIT",
@@ -26,16 +26,6 @@
         "id": "sketchbook",
         "name": "Sketchbook",
         "description": "The Sketchbook brand: cream paper, ink, deep teal and handwriting.",
-        "css": "./themes/sketchbook.css",
-        "codeTheme": {
-          "light": "./themes/sketchbook-code-light.json",
-          "dark": "./themes/sketchbook-code-light.json"
-        }
-      },
-      {
-        "id": "paper",
-        "name": "Tutor paper (now Sketchbook)",
-        "description": "The old name for Sketchbook, kept so an existing choice still works. It goes away in the next release: pick Sketchbook instead.",
         "css": "./themes/sketchbook.css",
         "codeTheme": {
           "light": "./themes/sketchbook-code-light.json",

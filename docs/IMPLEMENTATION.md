@@ -179,8 +179,8 @@ the real tutorial repo behind `TUTOR_TEST_COURSE=/path/to/tutorial`, and skip it
   treats a stamp under 120 s old as active and prints a line to its terminal every 30 s.
 - **Once per BB state directory, the feature's start-up hook** also switches off the plugins in its
   `disablePlugins` option (recorded per id in `.tutor-feature/plugins-disabled`, so a student can
-  turn one back on) and selects the `theme` option (`plugin:tutor:paper`) while BB's default theme
-  is active (`.tutor-feature/theme-selected`).
+  turn one back on) and selects the `theme` option (`plugin:tutor:sketchbook`) while BB's default
+  theme is active (`.tutor-feature/theme-selected`).
 
 ### Student state (BACKEND implements `ProgressStore` in `server/progress/`)
 
@@ -358,7 +358,7 @@ not data.
 | `experimental_sidebarNavigation` `simple-nav` | BB's own navigation rows minus Plugins and Skills, activated through BB; renders BB's original while the `simpleNavigation` setting (boolean, default true) is off or loading | `useSettings` |
 | content script `activity` | none: reports activity for the keep-alive (see "Where things are") | `heartbeat` |
 
-- **Theme:** `bb.themes` contributes `paper` (`THEME_ID`; BB lists it as `plugin:tutor:paper`).
+- **Theme:** `bb.themes` contributes `sketchbook` (`THEME_ID`; BB lists it as `plugin:tutor:sketchbook`).
   `themes/sketchbook.css` is the brand's bb theme (`vendor/brand/bb-theme/sketchbook/theme.css`)
   with Patrick Hand inlined in place of its Google Fonts `@import`, and
   `themes/sketchbook-code-light.json` is built from the kit tokens (named for both of BB's modes:

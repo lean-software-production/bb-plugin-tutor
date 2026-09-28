@@ -58,6 +58,7 @@ and loading the kit live from GitHub Pages (breaks offline codespaces and pinnin
   name "Tutor paper (now Sketchbook)", so a student who selected it, and a codespace on Feature
   ≤0.6 whose default is `plugin:tutor:paper`, see Sketchbook without breaking. The release after
   removes it.
+  - 2026-09-28: removed in 0.4.0. No Codespaces remain on Feature 0.6, so the `paper` alias is gone.
 - **Feature 0.7.0**: the `theme` default becomes `plugin:tutor:sketchbook`. At start-up, once per
   state directory (a `theme-migrated` marker), an active `plugin:tutor:paper` is switched to
   `plugin:tutor:sketchbook`. Any other theme, including BB's own a student picked, is left alone,
