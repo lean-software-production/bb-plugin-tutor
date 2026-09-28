@@ -3,3 +3,7 @@
 /.github/ export-ignore
 /docs/ export-ignore
 /scripts/ export-ignore
+
+# The brand repo's files, vendored byte for byte (scripts/sync-brand.ts --check
+# compares bytes), so git never rewrites their line endings.
+/vendor/brand/** -text

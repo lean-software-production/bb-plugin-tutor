@@ -25,6 +25,7 @@
     "server",
     "app",
     "test",
+    "scripts/*.ts",
     "components",
     "lib",
     "hooks"

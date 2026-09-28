@@ -120,7 +120,7 @@ patch is invisible, because the page is already paper.
 ## Mockup
 
 [`mockups-sketchbook/`](mockups-sketchbook/) is the mockup. It replaces the look of
-[`mockups.html`](mockups.html). It vendors the kit at a pinned brand commit (`brand/PIN`) and
+[`mockups.html`](mockups.html). It loads the kit from the plugin's `vendor/brand/` (pinned at `vendor/brand/PIN`) and
 draws seven screens in light and dark. `shoot.mjs` takes the 14 screenshots; `--check` reports
 any text under 4.5:1.
 

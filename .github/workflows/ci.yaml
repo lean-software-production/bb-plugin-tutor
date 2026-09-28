@@ -25,6 +25,9 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      # vendor/brand/ is byte-identical to the brand repo at vendor/brand/PIN.
+      - name: The vendored brand matches its pin
+        run: node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/sync-brand.ts --check
       # `bb plugin build` needs only bb's JavaScript; the native-addon install
       # scripts (node-pty, @parcel/watcher, better-sqlite3) are for running a
       # BB server, so they are skipped.

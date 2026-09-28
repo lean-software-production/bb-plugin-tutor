@@ -3,7 +3,7 @@
  *
  * Only BB-shell and Tutor-specific layout lives here. Every Sketchbook piece
  * (panels and their wash, the highlighter, ticks, buttons, meters, the paper
- * patch, dark mode) comes from the pinned kit in brand/sketchbook.css, and its
+ * patch, dark mode) comes from the pinned kit in vendor/brand/kit/sketchbook.css, and its
  * colours from the kit's role tokens (--sk-page, --sk-text, --sk-heading ...),
  * which switch under .dark. The BB chrome uses the theme's variables only.
  */
