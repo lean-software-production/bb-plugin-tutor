@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { parseProgressCard } from "../../shared/directives.ts";
 import { findLesson, lessonExamples } from "../../shared/derive.ts";
-import { fixtureCourse, fixtureFreshStudent, fixtureStudent } from "../../shared/fixtures.ts";
+import { fixtureCourse, fixtureFreshStudent, fixtureLayoutlessCourse, fixtureStudent } from "../../shared/fixtures.ts";
+import { NOT_READY } from "../../layouts/state.ts";
 import type { StudentState } from "../../shared/model.ts";
-import { makeWorld } from "../../test/helpers/world.ts";
+import { courseLayout, makeWorld, repoLayout } from "../../test/helpers/world.ts";
 import {
   adoptAction,
   adoptionTargets,
@@ -173,4 +174,30 @@ test("a WIP lesson whose spec/PROGRESS.yaml is damaged is never adopted again: t
   assert.ok("error" in marked);
   assert.doesNotMatch(marked.error, /tutor_adopt_iteration/, "the coach is not sent to adopt");
   assert.match(marked.error, /spec\/PROGRESS\.yaml could not be read/);
+});
+
+test("a capstone course's lessons wait for its layout; Lesson 0 does not", () => {
+  const world = makeWorld(fixtureStudent);
+  const blocked = "This repo has no factory folder.";
+  const notReady = { ...world, layout: courseLayout(fixtureCourse, "/ws", { ...repoLayout("/ws"), problems: [blocked], blocked }) };
+  assert.deepEqual(coachStateOf(notReady), { error: NOT_READY });
+  const onZero = makeWorld(fixtureFreshStudent);
+  const state = coachStateOf({ ...onZero, layout: notReady.layout });
+  assert.ok(!("error" in state), "Lesson 0 works once a workspace is attached");
+  const adopt = adoptAction(state, { iteration: "001" }, NOW);
+  assert.ok("error" in adopt && adopt.error === NOT_READY);
+});
+
+test("a layoutless course adopts a lesson without copying anything into the workspace", () => {
+  const state = coachStateOf(makeWorld(fixtureFreshStudent, undefined, fixtureLayoutlessCourse));
+  assert.ok(!("error" in state), "error" in state ? state.error : "");
+  assert.equal(state.layout.id, null);
+  const lesson = findLesson(fixtureLayoutlessCourse, "001");
+  assert.ok(lesson !== undefined);
+  const outcome = adoptAction(state, { iteration: "001" }, NOW);
+  assert.ok("text" in outcome, "error" in outcome ? outcome.error : "");
+  assert.equal(outcome.adopt, undefined);
+  assert.deepEqual(outcome.iteration, { iteration: "001", status: "WIP" });
+  assert.equal(outcome.progress?.iteration, "001");
+  assert.match(outcome.text, new RegExp(`^Adopted lesson 001 "${lesson.title}": .* Its spec is in the course; nothing was copied into your workspace\\.$`));
 });

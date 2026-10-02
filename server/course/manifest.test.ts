@@ -22,6 +22,7 @@ lessons:
     id: "software-factory",
     title: "Build a software factory",
     description: null,
+    layout: null,
     coachPath: "/course/.agents/coach-me.md",
     lexiconPath: "/course/docs/lexicon.yaml",
     lessons: [
@@ -54,4 +55,11 @@ test("paths may not leave the course folder", () => {
     /^Could not read course\.yaml, line 5: \.\.\/elsewhere is outside the course folder\.$/,
   );
   throwsAt("id: x\ntitle: X\ncoach: /etc/passwd\nlessons:\n  - { id: '001', title: One, dir: one }\n", /line 3: \/etc\/passwd is outside/);
+});
+
+test("course.yaml may declare layout: capstone-factory, and nothing else", () => {
+  const yaml = (layout: string) => `id: c\ntitle: C\nlayout: ${layout}\nlessons:\n  - { id: "001", title: One, dir: one }\n`;
+  assert.equal(parseCourseYaml(yaml("capstone-factory"), "/c", "course.yaml").layout, "capstone-factory");
+  assert.throws(() => parseCourseYaml(yaml("other"), "/c", "course.yaml"), /line 3: layout/);
+  assert.equal(parseCourseYaml("id: c\ntitle: C\nlessons:\n  - { id: \"001\", title: One, dir: one }\n", "/c", "course.yaml").layout, null);
 });

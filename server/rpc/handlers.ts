@@ -5,6 +5,7 @@ import { rpcContract } from "../../shared/rpc.ts";
 import type { Workspace } from "../../shared/rpc.ts";
 import { findLesson, findRule, lessonStatus } from "../../shared/derive.ts";
 import type { Course, Lesson, Rule } from "../../shared/model.ts";
+import { NOT_READY } from "../../layouts/state.ts";
 import { adoptionTargets } from "../coach/actions.ts";
 import { coachThreadOf } from "../coach/auth.ts";
 import { recordCoachThread, recordedCoachThread } from "../coach/coach-record.ts";
@@ -50,6 +51,11 @@ function requireFactory(world: World): FoundFactory {
       ? "The workspace Tutor was set up with has gone. Pick it again on the Course page."
       : "No workspace is set up yet. Confirm it on the Course page.",
   );
+}
+
+/** A course's own lessons wait for its layout in the workspace; Lesson 0 never does. */
+function requireLayoutFor(world: World, lesson: Lesson): void {
+  if (!lesson.builtin && world.layout !== null && !world.layout.ready) throw new Error(NOT_READY);
 }
 
 function requireRule(lesson: Lesson, ruleKey: string): Rule {
@@ -227,6 +233,7 @@ export function registerRpc(rt: TutorRuntime): void {
       const course = requireCourse(world);
       const factoryProject = requireFactory(world);
       const lesson = requireLesson(course, lessonId);
+      requireLayoutFor(world, lesson);
       if (world.pointer === null || lessonStatus(course, world.pointer, lesson.id) === "ahead") {
         throw new Error(`Lesson ${lesson.id} has not started yet.`);
       }
@@ -238,6 +245,7 @@ export function registerRpc(rt: TutorRuntime): void {
       const course = requireCourse(world);
       const factoryProject = requireFactory(world);
       const lesson = requireLesson(course, lessonId);
+      requireLayoutFor(world, lesson);
       if (lesson.builtin || world.pointer === null || !adoptionTargets(course, world.pointer).includes(lesson.id)) {
         throw new Error(`Lesson ${lesson.id} cannot be started yet: finish the lesson before it first.`);
       }
@@ -295,6 +303,7 @@ export function registerRpc(rt: TutorRuntime): void {
       const course = requireCourse(world);
       const factoryProject = requireFactory(world);
       const lesson = requireLesson(course, lessonId);
+      requireLayoutFor(world, lesson);
       if (world.pointer === null || lessonStatus(course, world.pointer, lesson.id) !== "current") {
         throw new Error("You can only choose the next Rule in the lesson you are on.");
       }

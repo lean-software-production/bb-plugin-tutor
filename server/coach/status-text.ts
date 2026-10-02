@@ -1,5 +1,6 @@
 // tutor_status: a compact, bounded picture of the lesson the coach can act
 // on. Keys are listed because every other tool takes them.
+import { relative } from "node:path";
 import { countExamples, exampleStatus, findRule, lessonExamples } from "../../shared/derive.ts";
 import type { ExampleStatus } from "../../shared/model.ts";
 import { unrecorded, unreadableProgressText, type CoachState } from "./actions.ts";
@@ -16,9 +17,15 @@ function clip(text: string, max: number): string {
   return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
 }
 
-/** Where the factory is: in a starter clone, its folder in the repo (tetris/.factory, then factory/ from 004). */
+/**
+ * Where the work is. A capstone: the factory, in a starter clone its folder in the repo (tetris/.factory, then factory/ from 004).
+ * A course without a layout: the workspace, and the folder Tutor keeps the course's progress in.
+ */
 function factoryLine(state: CoachState): string {
-  const { layout } = state;
+  if (state.layout.id === null) {
+    return `Workspace: ${state.root}. Tutor keeps this course's progress in ${relative(state.root, state.layout.progress.dir)}/.`;
+  }
+  const { layout } = state.layout;
   if (layout.mode === "legacy") return `Factory: ${state.root}.`;
   return `Factory: ${layout.factoryShown}/ (in ${state.root}). Work in it: cd ${layout.factoryShown} and follow its AGENTS.md.`;
 }
@@ -55,7 +62,7 @@ export function statusText(state: CoachState, caller: StatusCaller | null = null
   const problems = state.student.problems;
   if (problems.length > 0) {
     const more = problems.length > MAX_PROBLEMS ? ` (and ${problems.length - MAX_PROBLEMS} more)` : "";
-    lines.push(`Problems reading the factory: ${problems.slice(0, MAX_PROBLEMS).join(" ")}${more}`);
+    lines.push(`Problems reading the ${state.layout.id === null ? "workspace" : "factory"}: ${problems.slice(0, MAX_PROBLEMS).join(" ")}${more}`);
   }
   lines.push("", "Rules in suggested order (● focus; ✓ passing, ! not yet, ○ pending, – skipped):");
   for (const key of lesson.suggestedRuleOrder) {

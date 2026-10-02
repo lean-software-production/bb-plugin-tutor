@@ -159,6 +159,8 @@ export const courseSchema = z.object({
   lessons: z.array(lessonSchema),
   lexicon: z.array(lexiconEntrySchema),
   source: z.enum(["course.yaml", "ledger"]),
+  /** What the course expects in the workspace (layouts/state.ts): course.yaml's `layout`; a ledger course is the capstone's. */
+  layout: z.enum(["capstone-factory"]).nullable(),
 });
 export type Course = z.infer<typeof courseSchema>;
 

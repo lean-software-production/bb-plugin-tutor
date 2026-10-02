@@ -4,7 +4,8 @@ import { fixtureWorkspace, fixtureCourse, fixtureStudent } from "../../shared/fi
 import type { Course, StudentState } from "../../shared/model.ts";
 import type { Workspace } from "../../shared/rpc.ts";
 import type { World } from "../../server/coach/world.ts";
-import type { Layout } from "../../layouts/capstone-factory/detect.ts";
+import { capstoneProgress, type Layout } from "../../layouts/capstone-factory/detect.ts";
+import type { CourseLayoutState } from "../../layouts/state.ts";
 
 /** What resolveLayout makes of a project whose folder is the factory itself (tetris/.factory, as v0.1.0 set it up). */
 export function legacyLayout(root: string): Layout {
@@ -46,6 +47,14 @@ export function repoLayout(root: string, factoryAt: "early" | "late" = "early"):
   };
 }
 
+/** What resolveCourseLayout makes of `course` in a workspace at `root`: a legacy capstone factory, or a layoutless course's folder. */
+export function courseLayout(course: Course, root: string, layout: Layout = legacyLayout(root)): CourseLayoutState {
+  if (course.layout === null) {
+    return { id: null, ready: true, progress: { dir: join(root, ".tutor/courses", course.id), progressFile: "progress.yaml", iterationFiles: ["ITERATION"] }, problems: [], blocked: null };
+  }
+  return { id: course.layout, ready: layout.blocked === null, layout, progress: capstoneProgress(layout), problems: layout.problems, blocked: layout.blocked };
+}
+
 export function makeWorld(
   student: StudentState = fixtureStudent,
   workspace: Workspace = fixtureWorkspace,
@@ -59,7 +68,7 @@ export function makeWorld(
     coachPath: course.coachPath,
     workspace,
     hostId: workspace.status === "found" ? "host_1" : null,
-    layout: workspace.status === "found" ? legacyLayout(workspace.root) : null,
+    layout: workspace.status === "found" ? courseLayout(course, workspace.root) : null,
     student: effective,
     pointer: resolveCurrent(course, effective),
     projectHint: null,

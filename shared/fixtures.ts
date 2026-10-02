@@ -370,6 +370,18 @@ export const fixtureCourse: Course = {
   lessons: [lesson0, lesson1, lesson2, lesson3],
   lexicon: fixtureLexicon,
   source: "ledger",
+  layout: "capstone-factory",
+};
+
+/** A course.yaml course with no layout: it needs nothing in the workspace, and keeps its progress under .tutor/courses/<id>. */
+export const fixtureLayoutlessCourse: Course = {
+  ...fixtureCourse,
+  id: "intro",
+  title: "An introduction",
+  description: "A course that needs no starter files.",
+  coachPath: null,
+  source: "course.yaml",
+  layout: null,
 };
 
 /** fixtureCourse with lesson 004 too, for the factory's move to factory/. */
@@ -496,6 +508,7 @@ export const fixtureOverview: Overview = {
   course: { id: fixtureCourse.id, title: fixtureCourse.title, description: fixtureCourse.description },
   courseError: null,
   workspace: fixtureWorkspace,
+  layout: { id: "capstone-factory", ready: true },
   lessons: fixtureCourse.lessons.map((hw) => ({
     id: hw.id,
     title: hw.title,
@@ -505,6 +518,7 @@ export const fixtureOverview: Overview = {
     counts: countExamples(lessonExamples(hw), hw.id === "002" ? (fixtureStudent.progress?.examples ?? {}) : {}),
     coachThreadId: coachByLesson[hw.id] ?? null,
     outline: outline(hw.id),
+    needsLayout: false,
   })),
   current: {
     lessonId: "002",
@@ -531,12 +545,15 @@ export const fixtureOverview: Overview = {
 export const fixtureOverviewNoFactory: Overview = {
   ...fixtureOverview,
   workspace: { status: "unset" },
+  // No workspace, so the factory isn't there yet: the course's own lessons wait for it.
+  layout: { id: "capstone-factory", ready: false },
   lessons: fixtureOverview.lessons.map((hw) => ({
     ...hw,
     status: hw.id === BUILTIN_LESSON_ID ? "current" : "ahead",
     counts: countExamples(examplesOf(hw.id), {}),
     coachThreadId: null,
     outline: outline(hw.id, NOTHING_RECORDED),
+    needsLayout: !hw.builtin,
   })),
   current: null,
   threads: [],

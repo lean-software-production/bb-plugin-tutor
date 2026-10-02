@@ -3,6 +3,7 @@
 import { resolve } from "node:path";
 import { z } from "zod";
 import { lessonIdSchema } from "../../shared/model.ts";
+import type { LayoutId } from "../../layouts/state.ts";
 import { CourseLoadError } from "../../shared/ports.ts";
 import { isInside } from "../paths.ts";
 import { readYaml } from "./yaml-file.ts";
@@ -19,6 +20,8 @@ export interface CourseManifest {
   id: string;
   title: string;
   description: string | null;
+  /** What the course expects in the workspace; null for none. A ledger course is "capstone-factory". */
+  layout: LayoutId | null;
   /** Absolute; the file named by `coach`, or null when there is none. */
   coachPath: string | null;
   /** Absolute; the file named by `lexicon`, or null when there is none. */
@@ -35,6 +38,7 @@ const courseYamlSchema = z.object({
   id: text,
   title: text,
   description: z.string().optional(),
+  layout: z.enum(["capstone-factory"], { error: "should be capstone-factory, or left out" }).optional(),
   coach: text.optional(),
   lexicon: text.optional(),
   lessons: z
@@ -72,6 +76,7 @@ export function parseCourseYaml(source: string, root: string, displayPath: strin
     id: course.id,
     title: course.title,
     description: course.description?.trim() || null,
+    layout: course.layout ?? null,
     coachPath: course.coach === undefined ? null : inside(course.coach, ["coach"]),
     lexiconPath: course.lexicon === undefined ? null : inside(course.lexicon, ["lexicon"]),
     lessons: course.lessons.map((lesson, index) => ({

@@ -20,7 +20,7 @@ import type { ToolParameters } from "../../shared/tools.ts";
 import { carryOver } from "../../layouts/progress/carry-over.ts";
 import { progressFor } from "../progress/current.ts";
 import { needsFactoryMove } from "../progress/factory-move.ts";
-import type { Layout } from "../../layouts/capstone-factory/detect.ts";
+import { NOT_READY, type CourseLayoutState } from "../../layouts/state.ts";
 import type { World } from "./world.ts";
 
 const LATE_FACTORY = STARTER_LAYOUT.lateFactory;
@@ -32,8 +32,8 @@ export interface CoachState {
   projectId: string;
   /** The BB project's folder, where coach threads work: the student's repo, or (legacy) the factory itself. */
   root: string;
-  /** Where the factory is in it: every file the tools write goes into layout.factoryDir. */
-  layout: Layout;
+  /** The course's layout in it: the tools write progress to layout.progress, and a capstone lesson's spec into its factory. */
+  layout: CourseLayoutState;
   hostId: string;
   lesson: Lesson;
   pointer: CurrentPointer;
@@ -62,6 +62,8 @@ export function coachStateOf(world: World): CoachState | { error: string } {
   }
   const lesson = findLesson(world.course, world.pointer.lessonId);
   if (lesson === undefined) return { error: `Lesson ${world.pointer.lessonId} is not in this course.` };
+  // Lesson 0 works in any workspace; the course's own lessons wait for its layout.
+  if (!lesson.builtin && !world.layout.ready) return { error: NOT_READY };
   return {
     course: world.course,
     coachPath: world.coachPath,
@@ -267,14 +269,20 @@ export function adoptAction(state: CoachState, input: ToolParameters<"tutor_adop
     const damaged = state.student.progressUnreadable === true ? ` ${unreadableProgressText(state.pointer.lessonId)}` : "";
     return { error: `Lesson ${input.iteration} cannot be adopted now. ${current} ${allowed}${damaged}` };
   }
-  const { layout } = state;
-  if (layout.blocked !== null) return { error: `Lesson ${input.iteration} cannot be adopted: ${layout.blocked}` };
+  const { layout: course } = state;
+  if (!lesson.builtin && !course.ready) return { error: NOT_READY };
+  if (course.blocked !== null) return { error: `Lesson ${input.iteration} cannot be adopted: ${course.blocked}` };
   const progress = carryOver(state.student.progress, lesson, now);
   const carried = Object.keys(progress.examples).length;
   const total = lessonExamples(lesson).length;
   const summary = `Adopted lesson ${lesson.id} "${lesson.title}": ${total} examples, ${carried} carried over as passing.`;
   if (lesson.builtin) return { text: `${summary}\nThis lesson lives in Tutor only: nothing was copied into spec/.`, progress };
-  const adopted = { progress, iteration: { iteration: lesson.id, status: "WIP" as const }, adopt: lesson };
+  const iteration = { iteration: lesson.id, status: "WIP" as const };
+  if (course.id === null) {
+    return { text: `${summary} Its spec is in the course; nothing was copied into your workspace.`, progress, iteration };
+  }
+  const { layout } = course;
+  const adopted = { progress, iteration, adopt: lesson };
   if (layout.mode === "legacy") {
     return {
       text: [

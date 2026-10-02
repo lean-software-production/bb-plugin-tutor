@@ -4,6 +4,7 @@
 import { SKILL_ID, STARTER_LAYOUT, TOOL_NAMES } from "../../shared/constants.ts";
 import { formatLessonRef } from "../../shared/directives.ts";
 import { coachThreadMetadataSchema, type Course, type Lesson, type Rule } from "../../shared/model.ts";
+import type { CourseLayoutState } from "../../layouts/state.ts";
 
 export type CoachThreadStart = "adopt" | "resume" | "revisit";
 
@@ -23,9 +24,10 @@ export interface FactoryWhere {
   folder: string;
 }
 
-/** The layout's factory, as the coach needs to hear about it (null in legacy mode). */
-export function factoryWhere(layout: { mode: "repo" | "legacy"; factoryShown: string } | null): FactoryWhere | null {
-  return layout === null || layout.mode === "legacy" ? null : { folder: layout.factoryShown };
+/** The capstone's factory, as the coach needs to hear about it (null in legacy mode, and for a course without that layout). */
+export function factoryWhere(course: CourseLayoutState | null): FactoryWhere | null {
+  if (course === null || course.id !== "capstone-factory") return null;
+  return course.layout.mode === "legacy" ? null : { folder: course.layout.factoryShown };
 }
 
 /** Coach threads start at the repo's top folder; the factory is a folder in it, which moves at lesson 004. */

@@ -1,13 +1,14 @@
 // Everything a handler needs, re-derived from disk and BB on each call: the
-// course, the workspace, where its factory is (layouts/capstone-factory), and
+// course, the workspace, the course's layout in it (layouts/state.ts), and
 // the student's state. Nothing here comes from thread metadata. The workspace
 // is reached only through the WorkspaceAccess for its machine.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { resolveCurrent, type CurrentPointer } from "../../shared/derive.ts";
+import { slugify } from "../../shared/keys.ts";
 import type { Course, StudentState } from "../../shared/model.ts";
 import type { CourseSource, ProgressStore } from "../../shared/ports.ts";
 import type { Workspace } from "../../shared/rpc.ts";
-import { capstoneProgress, resolveLayout, type Layout } from "../../layouts/capstone-factory/detect.ts";
+import { resolveCourseLayout, type CourseLayoutState } from "../../layouts/state.ts";
 import { overlaps, realPath } from "../paths.ts";
 import type { WorkspaceAccess } from "../workspace/access.ts";
 import { resolveWorkspace, workspaceSetting } from "../workspace/workspace-project.ts";
@@ -35,9 +36,9 @@ export interface World {
   workspace: Workspace;
   /** The machine holding the project's folder; null without a workspace. */
   hostId: string | null;
-  /** Where the factory, codebase and seeds are in the project's folder; null without a workspace. */
-  layout: Layout | null;
-  /** Read from layout.factoryDir, with the layout's problems. Empty state while there is no workspace. */
+  /** The course's layout in the workspace, and where its progress is; null without a workspace or a course. */
+  layout: CourseLayoutState | null;
+  /** Read from layout.progress, with the layout's problems. Empty state while there is no workspace or course. */
   student: StudentState;
   /** Null while the course is missing. */
   pointer: CurrentPointer | null;
@@ -60,7 +61,15 @@ export interface WorldSource {
   /** The coach file from the most recent load of the course, for synchronous callers (configure). */
   lastCoachPath(): string | null;
   /** The layout from the most recent load, for synchronous callers (configure). */
-  lastLayout(): Layout | null;
+  lastLayout(): CourseLayoutState | null;
+}
+
+/**
+ * Where a layoutless course keeps its files in the workspace: .tutor/courses/<id>.
+ * course.yaml's id is any text, so it is slugged: an id like "../x" never leads out of .tutor/courses.
+ */
+function courseDirOf(course: Course): string {
+  return `.tutor/courses/${slugify(course.id)}`;
 }
 
 const EMPTY_STUDENT: StudentState = { iteration: null, progress: null, problems: [] };
@@ -70,7 +79,7 @@ type CourseResult = { course: Course; error: null } | { course: null; error: str
 export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps: WorldDeps): WorldSource {
   let cached: { path: string; at: number; result: Promise<CourseResult> } | null = null;
   let lastCoach: string | null = null;
-  let lastLayout: Layout | null = null;
+  let lastLayout: CourseLayoutState | null = null;
 
   function loadCourse(path: string): Promise<CourseResult> {
     const now = deps.now().getTime();
@@ -102,15 +111,19 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
           ? { workspace: { status: "missing" as const, projectId: resolved.workspace.projectId }, hostId: null }
           : resolved;
       const access = workspace.status === "found" && hostId !== null ? deps.access(hostId) : null;
-      const layout = workspace.status === "found" && access !== null ? await resolveLayout(workspace.root, access) : null;
-      const read = layout === null || access === null ? EMPTY_STUDENT : await deps.store.read(access, capstoneProgress(layout));
+      const course = courseResult.course;
+      const layout =
+        workspace.status === "found" && access !== null && course !== null
+          ? await resolveCourseLayout(course.layout, workspace.root, courseDirOf(course), access)
+          : null;
+      const read = layout === null || access === null ? EMPTY_STUDENT : await deps.store.read(access, layout.progress);
       const student = layout === null || layout.problems.length === 0 ? read : { ...read, problems: [...layout.problems, ...read.problems] };
       const coachPath =
         courseResult.course === null
           ? null
           : access === null
             ? courseResult.course.coachPath
-            : await resolveCoachFile(courseResult.course.coachPath, layout?.factoryDir ?? null, access);
+            : await resolveCoachFile(courseResult.course.coachPath, layout?.id === "capstone-factory" ? layout.layout.factoryDir : null, access);
       if (courseResult.course !== null) lastCoach = coachPath;
       lastLayout = layout;
       return {

@@ -103,6 +103,8 @@ export const lessonSummarySchema = z.object({
   coachThreadId: threadIdSchema.nullable(),
   /** Its features and Rules, for the course outline. */
   outline: z.array(featureOutlineSchema),
+  /** The course declares a layout that isn't ready in the workspace (or there is no workspace yet), so this lesson can't start. Never for Lesson 0. */
+  needsLayout: z.boolean(),
 });
 export type LessonSummary = z.infer<typeof lessonSummarySchema>;
 
@@ -132,6 +134,8 @@ export const overviewSchema = z.object({
   /** Why the course could not be loaded (course is then null). */
   courseError: z.string().nullable(),
   workspace: workspaceSchema,
+  /** The course's layout (layouts/state.ts) and whether the workspace has it. A course without one is ready; so is a missing course, with nothing to wait for. */
+  layout: z.object({ id: z.enum(["capstone-factory"]).nullable(), ready: z.boolean() }),
   lessons: z.array(lessonSummarySchema),
   /** Null while the course is missing or there is no workspace. */
   current: currentStateSchema.nullable(),

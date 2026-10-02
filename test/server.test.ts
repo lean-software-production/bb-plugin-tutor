@@ -2,7 +2,8 @@
 // tool authorisation, coach thread spawn-or-find, and the PROGRESS.yaml round
 // trip through the coach tools, including carry-over on adopt.
 import assert from "node:assert/strict";
-import { mkdir, readFile, readdir, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
 import {
@@ -13,6 +14,7 @@ import {
 import type { PluginAgentToolResult } from "@get-bb/plugin-sdk";
 import { ALL_TOOL_NAMES } from "../shared/constants.ts";
 import { findLesson, lessonExamples } from "../shared/derive.ts";
+import { fixtureCourse, fixtureLayoutlessCourse } from "../shared/fixtures.ts";
 import type { Completion, LessonDetail, Overview } from "../shared/rpc.ts";
 import { NOT_A_TUTOR_THREAD } from "../server/coach/auth.ts";
 import type { WorkspaceAccess } from "../server/workspace/access.ts";
@@ -986,4 +988,17 @@ test("a Codespace set up by an older Tutor (factoryProject only) keeps its works
   assert.equal(overview.workspace.status, "found");
   await host.harness.behavior.callRpc("confirmWorkspace", { projectId: PROJECT_ID });
   assert.equal((await host.rt.settings.get()).workspaceProject, PROJECT_ID);
+});
+
+test("a capstone lesson waits for the layout, with its own message; a layoutless course's lesson does not", async (t) => {
+  const ws = await mkdtemp(join(tmpdir(), "ws-"));
+  t.after(() => rm(ws, { recursive: true, force: true }));
+  await mkdir(join(ws, ".git"));
+  const capstone = await makeTutorHost({ ...fixtureCourse, layout: "capstone-factory" }, ws);
+  t.after(() => capstone.harness.lifecycle.dispose());
+  await assert.rejects(capstone.harness.behavior.callRpc("startNextLesson", { lessonId: "001" }), /Add the course from the outline first/);
+  const plain = await makeTutorHost(fixtureLayoutlessCourse, ws);
+  t.after(() => plain.harness.lifecycle.dispose());
+  const { threadId } = (await plain.harness.behavior.callRpc("startNextLesson", { lessonId: "001" })) as { threadId: string };
+  assert.ok(threadId);
 });

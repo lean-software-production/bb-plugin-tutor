@@ -112,14 +112,25 @@ export function buildOverview(world: World, threads: readonly TutorThreadRecord[
   const course = world.course;
   const pointer = world.pointer;
   if (course === null || pointer === null) {
-    return { course: null, courseError: world.courseError, workspace: world.workspace, lessons: [], current: null, threads: [] };
+    return {
+      course: null,
+      courseError: world.courseError,
+      workspace: world.workspace,
+      layout: { id: null, ready: true },
+      lessons: [],
+      current: null,
+      threads: [],
+    };
   }
+  // Without a workspace a course with a layout has nowhere to find it: not ready.
+  const layoutReady = world.layout?.ready ?? course.layout === null;
   const courseThreads =
     world.workspace.status === "found" ? threads.filter((thread) => thread.courseId === course.id) : [];
   return {
     course: { id: course.id, title: course.title, description: course.description },
     courseError: null,
     workspace: world.workspace,
+    layout: { id: course.layout, ready: layoutReady },
     lessons: course.lessons.map((lesson) => {
       const coachThread = findCoachThread(courseThreads, course.id, lesson.id);
       return {
@@ -131,6 +142,7 @@ export function buildOverview(world: World, threads: readonly TutorThreadRecord[
         counts: countExamples(lessonExamples(lesson), progressMap(world, lesson.id)),
         coachThreadId: coachThread?.id ?? null,
         outline: lessonOutline(world, lesson, coachThread),
+        needsLayout: !lesson.builtin && !layoutReady,
       };
     }),
     current: currentState(world, course, courseThreads),

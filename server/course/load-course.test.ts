@@ -46,6 +46,7 @@ test("a course.yaml course loads with Lesson 0 in front", async () => {
   const course = await load(fixture("synthetic"));
   courseSchema.parse(course);
   assert.equal(course.source, "course.yaml");
+  assert.equal(course.layout, null, "a course.yaml without layout has none");
   assert.equal(course.id, "widget-works");
   assert.equal(course.title, "Build a widget works");
   assert.equal(course.description, "Two lessons, one widget works.");
@@ -138,6 +139,7 @@ test("without a course.yaml the ledger table is the course", async () => {
   const course = await load(root);
   courseSchema.parse(course);
   assert.equal(course.source, "ledger");
+  assert.equal(course.layout, "capstone-factory", "only the capstone uses the ledger format");
   assert.equal(course.id, "ledger");
   assert.equal(course.title, "Steps course");
   assert.equal(course.description, null);
