@@ -4,7 +4,7 @@
 import { readFile } from "node:fs/promises";
 import { DEFAULT_COURSE_PATH, ENV_VARS, FEATURE_CONFIG_SCHEMA_VERSION } from "../../shared/constants.ts";
 import { findRepoRoot } from "../../layouts/capstone-factory/detect.ts";
-import type { LayoutProbe } from "../../layouts/types.ts";
+import { followedKind, type LayoutProbe } from "../../layouts/types.ts";
 
 export interface FeatureConfig {
   course?: string;
@@ -82,6 +82,6 @@ export async function resolveProjectHint(env: Env, config: FeatureConfig, probe:
   if (repo !== undefined) return repo;
   const factory = resolveFactoryHint(env, config);
   if (factory === null) return null;
-  if (((await probe.kinds([factory]))[factory] ?? "none") === "none") return factory;
+  if ((await followedKind(probe, factory)) === "none") return factory;
   return (await findRepoRoot(factory, probe)) ?? factory;
 }

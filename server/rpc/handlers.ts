@@ -207,13 +207,14 @@ export function registerRpc(rt: TutorRuntime): void {
     },
 
     confirmWorkspace: async ({ projectId }) => {
-      const { workspace } = await resolveWorkspace(bb.sdk, projectId, rt.access);
-      if (workspace.status !== "found") {
+      const { workspace, hostId } = await resolveWorkspace(bb.sdk, projectId, rt.access);
+      if (workspace.status !== "found" || hostId === null) {
         throw new Error("That project has no folder on this machine, so Tutor cannot coach in it.");
       }
       // The coach writes spec/, stand-ins/ and ../seeds/ beside the factory, so it must never be the course checkout.
       const { coursePath } = await rt.world.load();
-      if (overlaps(await realPath(workspace.root), await realPath(coursePath))) {
+      // The workspace's real folder is the machine's to say; the course checkout is the server's.
+      if (overlaps(await rt.access(hostId).realPath(workspace.root), await realPath(coursePath))) {
         throw new Error("That project's folder is, or shares a folder with, the course. Pick the repo you build your factory in.");
       }
       // settings.onChange publishes the workspace signal.

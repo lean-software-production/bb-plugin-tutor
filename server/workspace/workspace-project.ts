@@ -3,17 +3,18 @@
 // repo on that source's machine, probed through WorkspaceAccess.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type { Workspace } from "../../shared/rpc.ts";
+import { followedKind } from "../../layouts/types.ts";
 import type { WorkspaceAccess } from "./access.ts";
 
-type Sdk = BbPluginApi["sdk"];
+export type Sdk = BbPluginApi["sdk"];
 export type ProjectWithSources = Awaited<ReturnType<Sdk["projects"]["get"]>>;
 
 /** The workspace access for a machine. */
 export type AccessFor = (hostId: string) => WorkspaceAccess;
 
-/** Whether anything is at `path` (a folder, file or symbolic link), asked through `access`. */
+/** Whether anything is at `path`, following symbolic links (a dangling one is nothing), asked through `access`. */
 export async function pathExists(access: WorkspaceAccess, path: string): Promise<boolean> {
-  return ((await access.kinds([path]))[path] ?? "none") !== "none";
+  return (await followedKind(access, path)) !== "none";
 }
 
 export function defaultSource(project: ProjectWithSources) {

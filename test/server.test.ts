@@ -15,6 +15,8 @@ import { ALL_TOOL_NAMES } from "../shared/constants.ts";
 import { findLesson, lessonExamples } from "../shared/derive.ts";
 import type { Completion, LessonDetail, Overview } from "../shared/rpc.ts";
 import { NOT_A_TUTOR_THREAD } from "../server/coach/auth.ts";
+import type { WorkspaceAccess } from "../server/workspace/access.ts";
+import { createDiskAccess } from "./helpers/disk-access.ts";
 import { makeSandbox, makeRepoSandbox, type Sandbox } from "./helpers/disk.ts";
 import { makeTutorHost, PROJECT_ID, type TutorHost } from "./helpers/fake-bb.ts";
 import { THREAD_PAGE_SIZE } from "../server/coach/threads.ts";
@@ -922,6 +924,24 @@ test("concurrent starts of the next lesson spawn one coach thread", async (t) =>
   const started = await Promise.all([start(), start()]);
   assert.equal(host.harness.inspection.sdk.callsTo("threads.spawn").length, 1);
   assert.equal(started[0]?.threadId, started[1]?.threadId);
+});
+
+test("confirmWorkspace asks the workspace's machine for its real folder, not the server", async (t) => {
+  const sandbox = await makeSandbox();
+  t.after(() => sandbox.cleanup());
+  const factory = join(sandbox.root, "tutorial-factory");
+  await mkdir(factory);
+  const asked: { hostId: string; path: string }[] = [];
+  const disk = createDiskAccess();
+  // On the machine, the project's folder is really the course checkout.
+  const access = (hostId: string): WorkspaceAccess => ({
+    ...disk,
+    realPath: async (path) => (asked.push({ hostId, path }), path === factory ? sandbox.course.root : disk.realPath(path)),
+  });
+  const host = await makeTutorHost(sandbox.course, factory, { coursePath: sandbox.course.root }, { access });
+  t.after(() => host.harness.lifecycle.dispose());
+  await assert.rejects(host.harness.behavior.callRpc("confirmWorkspace", { projectId: PROJECT_ID }), /course/);
+  assert.ok(asked.some((call) => call.hostId === "host_1" && call.path === factory));
 });
 
 test("confirmWorkspace refuses the course checkout, a folder inside it, or one holding it", async (t) => {

@@ -99,7 +99,9 @@ async function starterOf(access: WorkspaceAccess, root: string): Promise<{ facto
   for (const folder of folders) {
     if (kinds[join(root, folder)] === "folder") return { factory: folder === STARTER_LAYOUT.lateFactory ? `${folder}/` : folder };
   }
-  return (kinds[skill] ?? "none") !== "none" ? { factory: null } : undefined;
+  const skillKind = kinds[skill] ?? "none";
+  const hasSkill = skillKind === "link" ? await pathExists(access, skill) : skillKind !== "none";
+  return hasSkill ? { factory: null } : undefined;
 }
 
 async function probe(project: ProjectWithSources, accessFor: AccessFor): Promise<ProjectProbe> {

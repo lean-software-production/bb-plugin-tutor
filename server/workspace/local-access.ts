@@ -2,9 +2,9 @@
 // does, without BB. Temporary: production uses it until Task 8 reaches the
 // workspace through the machine, and then its body moves to
 // test/helpers/disk-access.ts.
-import { createHash } from "node:crypto";
-import { lstat, mkdir, readFile, realpath, rename, unlink, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { createHash, randomBytes } from "node:crypto";
+import { chmod, lstat, mkdir, readFile, realpath, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
+import { basename, dirname, join, resolve } from "node:path";
 import type { PathKind } from "../../layouts/types.ts";
 import { WriteConflictError, type WorkspaceAccess } from "./access.ts";
 
@@ -33,10 +33,23 @@ export function createLocalAccess(): WorkspaceAccess {
         const current = await readFile(path, "utf8").then(sha, () => null);
         if (current !== expected) throw new WriteConflictError(`${path} changed since it was read.`);
       }
-      await mkdir(dirname(path), { recursive: true });
-      const temp = `${path}.${process.pid}.tmp`;
-      await writeFile(temp, text, "utf8");
-      await rename(temp, path);
+      // Via a hidden sibling temp file and a rename, so readers never see half a
+      // file; a file being replaced keeps its permissions.
+      const dir = dirname(path);
+      await mkdir(dir, { recursive: true });
+      const temp = join(dir, `.${basename(path)}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`);
+      const existingMode = await stat(path).then(
+        (stats) => stats.mode & 0o777,
+        () => null,
+      );
+      try {
+        await writeFile(temp, text, "utf8");
+        if (existingMode !== null) await chmod(temp, existingMode);
+        await rename(temp, path);
+      } catch (cause) {
+        await rm(temp, { force: true });
+        throw cause;
+      }
     },
     async remove(path) {
       await unlink(path).catch((cause: NodeJS.ErrnoException) => {

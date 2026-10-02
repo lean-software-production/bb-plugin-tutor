@@ -7,7 +7,7 @@
 // The skill is in the workspace, so every probe goes through the LayoutProbe.
 import { dirname, join } from "node:path";
 import { findRepoRoot } from "../../layouts/capstone-factory/detect.ts";
-import type { LayoutProbe } from "../../layouts/types.ts";
+import { followedKind, type LayoutProbe } from "../../layouts/types.ts";
 import { STARTER_COACH_SKILL } from "../../shared/constants.ts";
 
 /**
@@ -40,6 +40,10 @@ export async function resolveCoachFile(
   if (factoryRoot === null) return null;
   const skills = (await skillHomes(factoryRoot, probe)).map((home) => join(home, STARTER_COACH_SKILL));
   const kinds = await probe.kinds(skills);
-  // A file, or a symbolic link (to one, as stat used to follow it).
-  return skills.find((skill) => kinds[skill] === "file" || kinds[skill] === "link") ?? null;
+  for (const skill of skills) {
+    const kind = kinds[skill] ?? "none";
+    // A file, or a symbolic link that leads to one.
+    if (kind === "file" || (kind === "link" && (await followedKind(probe, skill)) === "file")) return skill;
+  }
+  return null;
 }

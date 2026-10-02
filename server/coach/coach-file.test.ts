@@ -79,3 +79,19 @@ test("the search for the skill stops at the repo's top folder", async (t) => {
   assert.equal(await resolveCoachFile(null, join(inner, ".factory"), disk), null);
   assert.ok(factory);
 });
+
+test("a link to the skill counts only when it leads to a file", async (t) => {
+  const { factory, skill, top } = await starter(t, false);
+  await mkdir(join(skill, ".."), { recursive: true });
+  // A link to a folder, then a dangling link, then a link to a real file.
+  await mkdir(join(top, "a-folder"));
+  await symlink(join(top, "a-folder"), skill);
+  assert.equal(await resolveCoachFile(null, factory, disk), null, "link to a folder");
+  await rm(skill);
+  await symlink(join(top, "gone.md"), skill);
+  assert.equal(await resolveCoachFile(null, factory, disk), null, "dangling link");
+  await rm(skill);
+  await writeFile(join(top, "real.md"), "---\nname: coach-me\n---\n");
+  await symlink(join(top, "real.md"), skill);
+  assert.equal(await resolveCoachFile(null, factory, disk), skill, "link to a file");
+});

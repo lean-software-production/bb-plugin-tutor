@@ -16,3 +16,16 @@ export interface ProgressLocation {
   /** Read in order; the first is the one written. Empty: there is no ITERATION (the built-in course). */
   iterationFiles: readonly string[];
 }
+
+/**
+ * What is at `path` once symbolic links are followed, as stat sees it: a link
+ * reads as its target's kind, and a dangling one as "none".
+ */
+export async function followedKind(probe: LayoutProbe, path: string): Promise<PathKind> {
+  const kind = (await probe.kinds([path]))[path] ?? "none";
+  if (kind !== "link") return kind;
+  const target = await probe.realPath(path);
+  const targetKind = (await probe.kinds([target]))[target] ?? "none";
+  // A link that does not resolve comes back as itself (or another link): nothing is there.
+  return targetKind === "link" ? "none" : targetKind;
+}

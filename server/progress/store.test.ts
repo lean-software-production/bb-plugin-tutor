@@ -6,7 +6,7 @@ import { fixtureStudent } from "../../shared/fixtures.ts";
 import type { ProgressLocation } from "../../layouts/types.ts";
 import { createDiskAccess } from "../../test/helpers/disk-access.ts";
 import { makeSandbox } from "../../test/helpers/disk.ts";
-import type { WorkspaceAccess } from "../workspace/access.ts";
+import { WriteConflictError, type WorkspaceAccess } from "../workspace/access.ts";
 import { createProgressStore } from "./store.ts";
 
 const store = createProgressStore();
@@ -210,6 +210,30 @@ test("progress lives wherever the location says", async () => {
     const noIteration: ProgressLocation = { ...elsewhere, iterationFiles: [] };
     assert.equal((await store.read(disk, noIteration)).iteration, null);
     await assert.rejects(store.writeIteration(disk, noIteration, { iteration: "002", status: "WIP" }), /no ITERATION/);
+  } finally {
+    await sandbox.cleanup();
+  }
+});
+
+test("PROGRESS.yaml changed by someone else between the read and the write is refused and left as they wrote it", async () => {
+  const sandbox = await makeSandbox();
+  try {
+    const progress = fixtureStudent.progress;
+    assert.ok(progress !== null);
+    const path = join(sandbox.factoryRoot, "spec/PROGRESS.yaml");
+    await store.writeProgress(disk, at(sandbox.factoryRoot), progress);
+    const theirs = 'iteration: "001"\nexamples: {}\n';
+    // Another writer changes the file just after the store reads it, so the sha it read is stale.
+    const racing: WorkspaceAccess = {
+      ...disk,
+      read: async (file) => {
+        const read = await disk.read(file);
+        if (file === path) await writeFile(path, theirs);
+        return read;
+      },
+    };
+    await assert.rejects(store.writeProgress(racing, at(sandbox.factoryRoot), progress), WriteConflictError);
+    assert.equal(await readFile(path, "utf8"), theirs);
   } finally {
     await sandbox.cleanup();
   }

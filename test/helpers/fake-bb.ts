@@ -6,6 +6,7 @@ import { SKILL_ID } from "../../shared/constants.ts";
 import type { Course } from "../../shared/model.ts";
 import { registerTutor } from "../../server/coach/register.ts";
 import { createProgressStore } from "../../server/progress/store.ts";
+import type { WorkspaceAccess } from "../../server/workspace/access.ts";
 import { createDiskAccess } from "./disk-access.ts";
 import type { TutorRuntime } from "../../server/coach/runtime.ts";
 
@@ -95,7 +96,14 @@ export async function makeTutorHost(
   course: Course,
   factoryRoot: string,
   settings: Record<string, string | boolean> = { factoryProject: PROJECT_ID },
-  options: { dataDir?: string; env?: Record<string, string>; featureConfigFile?: string; projectName?: string } = {},
+  options: {
+    dataDir?: string;
+    env?: Record<string, string>;
+    featureConfigFile?: string;
+    projectName?: string;
+    /** The workspace access per machine; the local disk unless given. */
+    access?: (hostId: string) => WorkspaceAccess;
+  } = {},
 ): Promise<TutorHost> {
   const threads: FakeThread[] = [];
   const running = new Set<string>();
@@ -261,7 +269,7 @@ export async function makeTutorHost(
     env: options.env ?? {},
     featureConfigFile: options.featureConfigFile ?? "/nonexistent/tutor/config.json",
     now: () => NOW,
-    access: () => createDiskAccess(),
+    access: options.access ?? (() => createDiskAccess()),
   });
   return { ...host, rt, threads, running, sent, tabs, tabConflicts, tabWriteError, forkRefusal, archiveRefusal, beforeList, addThread };
 }
