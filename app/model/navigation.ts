@@ -7,15 +7,23 @@ export type NavigationIconLike =
   | { kind: "host"; name: string }
   | { kind: "plugin"; pluginId: string; icon: string | null };
 
-export interface NavigationItemLike {
-  id: string;
-  icon: NavigationIconLike;
-  action: { kind: string; pluginId?: string; panelId?: string };
+export interface NavigationShortcutLike {
+  label: string;
+  ariaKeyShortcuts: string;
 }
 
-/** BB 0.43.4's ids for the Plugins and Skills rows; both open BB's extensions workspace. */
-const HIDDEN_IDS: ReadonlySet<string> = new Set(["extensions", "skills"]);
-const HIDDEN_ACTIONS: ReadonlySet<string> = new Set(["open-extensions"]);
+export interface NavigationItemLike {
+  id: string;
+  label: string;
+  icon: NavigationIconLike;
+  action: { kind: string; pluginId?: string; panelId?: string };
+  isDisabled: boolean;
+  shortcut: NavigationShortcutLike | null;
+}
+
+/** BB 0.44.0's ids for the Plugins and Skills rows; each has its own action kind too. */
+const HIDDEN_IDS: ReadonlySet<string> = new Set(["__bb__/extensions", "__bb__/skills"]);
+const HIDDEN_ACTIONS: ReadonlySet<string> = new Set(["open-extensions", "open-skills"]);
 
 export function simplifyNavigation<T extends NavigationItemLike>(items: readonly T[]): T[] {
   return items.filter((item) => !HIDDEN_IDS.has(item.id) && !HIDDEN_ACTIONS.has(item.action.kind));

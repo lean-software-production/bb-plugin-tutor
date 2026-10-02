@@ -2,35 +2,40 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { navigationIconName, simpleNavigationEnabled, simplifyNavigation, type NavigationItemLike } from "./navigation.ts";
 
-// The items bb-app 0.43.4 passes to an experimental_sidebarNavigation component.
+/** A navigation item with the fields simplifyNavigation and its tests need; the rest default. */
+function item(fields: Partial<NavigationItemLike> & Pick<NavigationItemLike, "id" | "icon" | "action">): NavigationItemLike {
+  return { label: fields.id, isDisabled: false, shortcut: null, ...fields };
+}
+
+// The items bb-app 0.44.0 passes to an experimental_sidebarNavigation component.
 const HOST_ITEMS: NavigationItemLike[] = [
-  { id: "new-thread", icon: { kind: "host", name: "new-thread" }, action: { kind: "new-thread" } },
-  { id: "search-threads", icon: { kind: "host", name: "search" }, action: { kind: "search-threads" } },
-  { id: "extensions", icon: { kind: "host", name: "extensions" }, action: { kind: "open-extensions" } },
-  { id: "skills", icon: { kind: "host", name: "extensions" }, action: { kind: "open-extensions" } },
-  {
-    id: "plugin-panel:tutor/course",
+  item({ id: "__bb__/new-thread", icon: { kind: "host", name: "new-thread" }, action: { kind: "new-thread" } }),
+  item({ id: "__bb__/search-threads", icon: { kind: "host", name: "search" }, action: { kind: "search-threads" } }),
+  item({ id: "__bb__/extensions", icon: { kind: "host", name: "extensions" }, action: { kind: "open-extensions" } }),
+  item({ id: "__bb__/skills", icon: { kind: "host", name: "extensions" }, action: { kind: "open-skills" } }),
+  item({
+    id: "tutor/course",
     icon: { kind: "plugin", pluginId: "tutor", icon: "FileText" },
     action: { kind: "open-plugin-panel", pluginId: "tutor", panelId: "course" },
-  },
-  {
-    id: "plugin-panel:automations/automations",
+  }),
+  item({
+    id: "automations/automations",
     icon: { kind: "plugin", pluginId: "automations", icon: "Clock" },
     action: { kind: "open-plugin-panel", pluginId: "automations", panelId: "automations" },
-  },
+  }),
 ];
 
 test("Plugins and Skills are dropped; New thread, Search and every plugin panel stay, in order", () => {
   assert.deepEqual(
-    simplifyNavigation(HOST_ITEMS).map((item) => item.id),
-    ["new-thread", "search-threads", "plugin-panel:tutor/course", "plugin-panel:automations/automations"],
+    simplifyNavigation(HOST_ITEMS).map((i) => i.id),
+    ["__bb__/new-thread", "__bb__/search-threads", "tutor/course", "automations/automations"],
   );
 });
 
-test("the extension rows are matched by action as well as id, so a renamed id is still dropped", () => {
+test("the extension and skills rows are matched by action as well as id, so a renamed id is still dropped", () => {
   const renamed: NavigationItemLike[] = [
-    { id: "resources/plugins", icon: { kind: "host", name: "extensions" }, action: { kind: "open-extensions" } },
-    { id: "skills", icon: { kind: "host", name: "extensions" }, action: { kind: "some-future-kind" } },
+    item({ id: "resources/plugins", icon: { kind: "host", name: "extensions" }, action: { kind: "open-extensions" } }),
+    item({ id: "resources/skills", icon: { kind: "host", name: "extensions" }, action: { kind: "open-skills" } }),
   ];
   assert.deepEqual(simplifyNavigation(renamed), []);
 });
