@@ -13,6 +13,7 @@ import {
   coachStateOf,
   completeAction,
   focusAction,
+  layoutError,
   markAction,
   otherLessonError,
   type CoachState,
@@ -44,6 +45,12 @@ interface ToolSpec<Name extends ToolName> {
    * side chats, which stay with the caller's lesson.
    */
   lesson: "current" | "any";
+  /**
+   * Refused while the course's layout isn't ready for the current lesson
+   * (layoutError): the tools that change its progress. tutor_status always
+   * answers; tutor_adopt_iteration checks the lesson it adopts itself.
+   */
+  needsLayout: boolean;
   action: Action<Name>;
 }
 
@@ -91,6 +98,8 @@ function register<Name extends ToolName>(rt: TutorRuntime, spec: ToolSpec<Name>)
         if ("error" in state) return refusal(state.error);
         const otherLesson = spec.lesson === "current" ? otherLessonError(state, caller) : null;
         if (otherLesson !== null) return refusal(otherLesson);
+        const notReady = spec.needsLayout ? layoutError(state) : null;
+        if (notReady !== null) return refusal(notReady);
         const outcome = await spec.action(state, input, caller, isoSeconds(rt.now()));
         if ("error" in outcome) return refusal(outcome.error);
         const note = await applyOutcome(rt, state, outcome, caller);
@@ -152,6 +161,7 @@ export function registerCoachTools(rt: TutorRuntime): void {
       "Where the student is: the current lesson, the Rule in focus, and every Rule's Examples with their keys and status. Call it before using the other tutor tools.",
     label: { pending: "Checking course progress", completed: "Checked course progress" },
     lesson: "any",
+    needsLayout: false,
     action: (state, _input, caller) => ({ text: statusText(state, { lessonId: caller.lessonId, otherLesson: otherLessonError(state, caller) }) }),
   });
   register(rt, {
@@ -160,6 +170,7 @@ export function registerCoachTools(rt: TutorRuntime): void {
       "Move the focus to a Rule of the current lesson (coach thread only). Returns the Rule card, a ::tutor-progress line to put at the top of your next message.",
     label: { pending: "Moving to a Rule", completed: "Moved to a Rule" },
     lesson: "current",
+    needsLayout: true,
     action: (state, input, caller) => focusAction(state, input, caller.isCoachThread),
   });
   register(rt, {
@@ -168,6 +179,7 @@ export function registerCoachTools(rt: TutorRuntime): void {
       "Record one Example's status. passing needs evidence (the command you ran and its output, or a test name); not-yet needs a note saying what happened instead. Returns a ::tutor-progress card to echo.",
     label: { pending: "Marking an Example", completed: "Marked an Example" },
     lesson: "current",
+    needsLayout: true,
     action: (state, input, _caller, now) => markAction(state, input, now),
   });
   register(rt, {
@@ -177,6 +189,7 @@ export function registerCoachTools(rt: TutorRuntime): void {
     label: { pending: "Adopting the lesson", completed: "Adopted the lesson" },
     // Adopting makes the caller's lesson the current one, so it checks the lesson itself.
     lesson: "any",
+    needsLayout: false,
     action: (state, input, caller, now) => {
       const other = adoptionByOtherError(state, input, caller);
       return other === null ? adoptAction(state, input, now) : { error: other };
@@ -188,6 +201,7 @@ export function registerCoachTools(rt: TutorRuntime): void {
       "Finish the current lesson: write ITERATION as Done and store your two- or three-sentence summary for the student. Returns a ::tutor-progress card to echo.",
     label: { pending: "Completing the lesson", completed: "Completed the lesson" },
     lesson: "current",
+    needsLayout: true,
     action: (state, input) => completeAction(state, input),
   });
   register(rt, {
@@ -196,6 +210,7 @@ export function registerCoachTools(rt: TutorRuntime): void {
       "Move a side question into a BB side chat of this lesson's coach thread, optionally about one Rule, so the coach thread stays on its Rule. It opens as the \"Side chat\" tab in the coach thread's right panel and shares the working tree.",
     label: { pending: "Starting a side chat", completed: "Started a side chat" },
     lesson: "any",
+    needsLayout: false,
     action: (state, input, caller) => sideChat(rt, state, input, caller),
   });
 }

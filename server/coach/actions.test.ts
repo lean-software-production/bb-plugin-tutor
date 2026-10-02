@@ -3,7 +3,6 @@ import { test } from "node:test";
 import { parseProgressCard } from "../../shared/directives.ts";
 import { findLesson, lessonExamples } from "../../shared/derive.ts";
 import { fixtureCourse, fixtureFreshStudent, fixtureLayoutlessCourse, fixtureStudent } from "../../shared/fixtures.ts";
-import { NOT_READY } from "../../layouts/state.ts";
 import type { StudentState } from "../../shared/model.ts";
 import { courseLayout, makeWorld, repoLayout } from "../../test/helpers/world.ts";
 import {
@@ -12,6 +11,7 @@ import {
   coachStateOf,
   completeAction,
   focusAction,
+  layoutError,
   markAction,
   otherLessonError,
   type CoachState,
@@ -176,16 +176,19 @@ test("a WIP lesson whose spec/PROGRESS.yaml is damaged is never adopted again: t
   assert.match(marked.error, /spec\/PROGRESS\.yaml could not be read/);
 });
 
-test("a capstone course's lessons wait for its layout; Lesson 0 does not", () => {
+test("a capstone course's lessons wait for its layout, with the layout's own reason; Lesson 0 does not", () => {
   const world = makeWorld(fixtureStudent);
   const blocked = "This repo has no factory folder.";
   const notReady = { ...world, layout: courseLayout(fixtureCourse, "/ws", { ...repoLayout("/ws"), problems: [blocked], blocked }) };
-  assert.deepEqual(coachStateOf(notReady), { error: NOT_READY });
-  const onZero = makeWorld(fixtureFreshStudent);
-  const state = coachStateOf({ ...onZero, layout: notReady.layout });
-  assert.ok(!("error" in state), "Lesson 0 works once a workspace is attached");
-  const adopt = adoptAction(state, { iteration: "001" }, NOW);
-  assert.ok("error" in adopt && adopt.error === NOT_READY);
+  // tutor_status still reads the state; only the tools that change progress refuse.
+  const current = coachStateOf(notReady);
+  assert.ok(!("error" in current), "error" in current ? current.error : "");
+  assert.equal(layoutError(current), blocked);
+  const onZero = coachStateOf({ ...makeWorld(fixtureFreshStudent), layout: notReady.layout });
+  assert.ok(!("error" in onZero), "Lesson 0 works once a workspace is attached");
+  assert.equal(layoutError(onZero), null);
+  const adopt = adoptAction(onZero, { iteration: "001" }, NOW);
+  assert.ok("error" in adopt && adopt.error === blocked);
 });
 
 test("a layoutless course adopts a lesson without copying anything into the workspace", () => {

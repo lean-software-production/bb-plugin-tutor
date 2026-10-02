@@ -996,9 +996,44 @@ test("a capstone lesson waits for the layout, with its own message; a layoutless
   await mkdir(join(ws, ".git"));
   const capstone = await makeTutorHost({ ...fixtureCourse, layout: "capstone-factory" }, ws);
   t.after(() => capstone.harness.lifecycle.dispose());
-  await assert.rejects(capstone.harness.behavior.callRpc("startNextLesson", { lessonId: "001" }), /Add the course from the outline first/);
+  // An empty git repo has no factory folder: the capstone says so in its own words (detect.ts), not "Add the course".
+  await assert.rejects(capstone.harness.behavior.callRpc("startNextLesson", { lessonId: "001" }), /This repo has no factory folder/);
   const plain = await makeTutorHost(fixtureLayoutlessCourse, ws);
   t.after(() => plain.harness.lifecycle.dispose());
   const { threadId } = (await plain.harness.behavior.callRpc("startNextLesson", { lessonId: "001" })) as { threadId: string };
   assert.ok(threadId);
+});
+
+test("a not-ready capstone still answers tutor_status with its problem, and won't open a lesson's coach", async (t) => {
+  const ws = await mkdtemp(join(tmpdir(), "ws-"));
+  t.after(() => rm(ws, { recursive: true, force: true }));
+  await mkdir(join(ws, ".git"));
+  const host = await makeTutorHost(fixtureCourse, ws);
+  t.after(() => host.harness.lifecycle.dispose());
+  const coach = (await openCoach(host, "000")).threadId;
+  assert.match(await ok(host, "tutor_status", {}, coach), /This repo has no factory folder/);
+  const lesson1 = findLesson(fixtureCourse, "001");
+  const rule = lesson1?.features[0]?.rules[0];
+  assert.ok(rule !== undefined);
+  await assert.rejects(openCoach(host, "001"), /This repo has no factory folder/);
+  await assert.rejects(host.harness.behavior.callRpc("redirectFocus", { lessonId: "001", ruleKey: rule.key }), /This repo has no factory folder/);
+});
+
+test("a layoutless course keeps its progress and ITERATION under .tutor/courses/<id>", async (t) => {
+  const ws = await mkdtemp(join(tmpdir(), "ws-"));
+  t.after(() => rm(ws, { recursive: true, force: true }));
+  const host = await makeTutorHost(fixtureLayoutlessCourse, ws);
+  t.after(() => host.harness.lifecycle.dispose());
+  const { threadId } = (await host.harness.behavior.callRpc("startNextLesson", { lessonId: "001" })) as { threadId: string };
+  assert.match(await ok(host, "tutor_adopt_iteration", { iteration: "001" }, threadId), /nothing was copied into your workspace/);
+  const dir = join(ws, ".tutor/courses", fixtureLayoutlessCourse.id);
+  assert.equal((await readFile(join(dir, "ITERATION"), "utf8")).trim(), "001 WIP");
+  const lesson1 = findLesson(fixtureLayoutlessCourse, "001");
+  const [example] = lesson1 === undefined ? [] : lessonExamples(lesson1);
+  assert.ok(example !== undefined);
+  await ok(host, "tutor_mark_example", { example: example.key, status: "passing", evidence: "$ ./run\nok" }, threadId);
+  const progress = await readFile(join(dir, "progress.yaml"), "utf8");
+  assert.match(progress, /iteration: "?001"?/);
+  assert.ok(progress.includes(example.key), progress);
+  assert.deepEqual((await readdir(ws)).sort(), [".tutor"], "nothing else is written into the workspace");
 });

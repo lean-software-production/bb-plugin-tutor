@@ -20,7 +20,7 @@ import type { ToolParameters } from "../../shared/tools.ts";
 import { carryOver } from "../../layouts/progress/carry-over.ts";
 import { progressFor } from "../progress/current.ts";
 import { needsFactoryMove } from "../progress/factory-move.ts";
-import { NOT_READY, type CourseLayoutState } from "../../layouts/state.ts";
+import { notReadyText, type CourseLayoutState } from "../../layouts/state.ts";
 import type { World } from "./world.ts";
 
 const LATE_FACTORY = STARTER_LAYOUT.lateFactory;
@@ -62,8 +62,6 @@ export function coachStateOf(world: World): CoachState | { error: string } {
   }
   const lesson = findLesson(world.course, world.pointer.lessonId);
   if (lesson === undefined) return { error: `Lesson ${world.pointer.lessonId} is not in this course.` };
-  // Lesson 0 works in any workspace; the course's own lessons wait for its layout.
-  if (!lesson.builtin && !world.layout.ready) return { error: NOT_READY };
   return {
     course: world.course,
     coachPath: world.coachPath,
@@ -76,6 +74,16 @@ export function coachStateOf(world: World): CoachState | { error: string } {
     student: world.student,
     progress: progressFor(world.student, lesson.id),
   };
+}
+
+/**
+ * Why the tools that change progress refuse the current lesson: it is one of
+ * the course's own and the course's layout isn't ready. Lesson 0 works in any
+ * workspace, and tutor_status always answers, problems and all. Null when
+ * nothing stands in the way.
+ */
+export function layoutError(state: CoachState): string | null {
+  return !state.lesson.builtin && !state.layout.ready ? notReadyText(state.layout) : null;
 }
 
 /**
@@ -270,7 +278,7 @@ export function adoptAction(state: CoachState, input: ToolParameters<"tutor_adop
     return { error: `Lesson ${input.iteration} cannot be adopted now. ${current} ${allowed}${damaged}` };
   }
   const { layout: course } = state;
-  if (!lesson.builtin && !course.ready) return { error: NOT_READY };
+  if (!lesson.builtin && !course.ready) return { error: notReadyText(course) };
   if (course.blocked !== null) return { error: `Lesson ${input.iteration} cannot be adopted: ${course.blocked}` };
   const progress = carryOver(state.student.progress, lesson, now);
   const carried = Object.keys(progress.examples).length;

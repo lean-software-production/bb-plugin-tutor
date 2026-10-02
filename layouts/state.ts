@@ -18,6 +18,16 @@ export type CourseLayoutState =
 /** What a lesson of a course whose layout isn't ready says instead of starting. */
 export const NOT_READY = "This lesson needs the course's starter files in your workspace. Add the course from the outline first.";
 
+/**
+ * Why a course's own lessons can't start yet. A capstone factory Tutor can't
+ * use says why in its own words (no factory folder: restore it from git; a
+ * link or a file: make it a real folder), since there is nothing to add.
+ * Anything else not ready needs the course's starter files.
+ */
+export function notReadyText(state: CourseLayoutState): string {
+  return state.id === "capstone-factory" && state.blocked !== null ? state.blocked : NOT_READY;
+}
+
 /** `courseDir`: where a layoutless course keeps its files in the workspace, relative to it (".tutor/courses/<id>"). */
 export async function resolveCourseLayout(
   id: LayoutId | null,

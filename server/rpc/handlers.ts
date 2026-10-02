@@ -5,7 +5,7 @@ import { rpcContract } from "../../shared/rpc.ts";
 import type { Workspace } from "../../shared/rpc.ts";
 import { findLesson, findRule, lessonStatus } from "../../shared/derive.ts";
 import type { Course, Lesson, Rule } from "../../shared/model.ts";
-import { NOT_READY } from "../../layouts/state.ts";
+import { notReadyText } from "../../layouts/state.ts";
 import { adoptionTargets } from "../coach/actions.ts";
 import { coachThreadOf } from "../coach/auth.ts";
 import { recordCoachThread, recordedCoachThread } from "../coach/coach-record.ts";
@@ -53,9 +53,9 @@ function requireFactory(world: World): FoundFactory {
   );
 }
 
-/** A course's own lessons wait for its layout in the workspace; Lesson 0 never does. */
+/** A course's own lessons wait for its layout in the workspace, saying why (notReadyText); Lesson 0 never does. */
 function requireLayoutFor(world: World, lesson: Lesson): void {
-  if (!lesson.builtin && world.layout !== null && !world.layout.ready) throw new Error(NOT_READY);
+  if (!lesson.builtin && world.layout !== null && !world.layout.ready) throw new Error(notReadyText(world.layout));
 }
 
 function requireRule(lesson: Lesson, ruleKey: string): Rule {
