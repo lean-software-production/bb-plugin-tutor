@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { parseProgressCard, parseTermRef } from "../../shared/directives.ts";
 import {
   FIXTURE_NOW,
-  fixtureFactoryProject,
+  fixtureWorkspace,
   fixtureCandidates,
   fixtureCompletion,
   fixtureLessonDetail,
@@ -238,7 +238,7 @@ test("first run confirms a detected factory, or explains how to set one up", () 
   assert.equal(none.mode, "setup");
   assert.equal(none.preselected, null);
   assert.equal(none.missingProjectId, "prj_gone");
-  assert.equal(welcomeView([], fixtureFactoryProject).mode, "setup");
+  assert.equal(welcomeView([], fixtureWorkspace).mode, "setup");
 });
 
 // ---------------------------------------------------------------------------

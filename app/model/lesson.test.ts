@@ -199,7 +199,7 @@ test("previews and finished lessons have no focus and open every feature", () =>
   assert.deepEqual(finished.chips.map((chip) => chip.tone), ["green", "green"]);
 });
 
-test("before a coach thread exists, a student without a factory project is sent to set up the factory instead of a start that must fail", () => {
+test("before a coach thread exists, a student without a workspace is sent to set one up instead of a start that must fail", () => {
   assert.equal(coachStart("current", "unset"), "set-up");
   assert.equal(coachStart("current", "missing"), "set-up");
   assert.equal(coachStart("done", "unset"), "set-up");

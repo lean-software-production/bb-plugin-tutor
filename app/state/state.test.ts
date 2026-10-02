@@ -133,7 +133,7 @@ test("an error is never cached: the next mount retries at once", async () => {
 });
 
 test("error messages are always readable", () => {
-  assert.equal(errorMessage(new Error("No factory project is set up yet.")), "No factory project is set up yet.");
+  assert.equal(errorMessage(new Error("No workspace is set up yet.")), "No workspace is set up yet.");
   assert.equal(errorMessage("plain"), "plain");
   assert.equal(errorMessage({}), "Something went wrong.");
   assert.equal(errorMessage(new Error("  ")), "Something went wrong.");

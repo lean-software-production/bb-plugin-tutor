@@ -4,7 +4,7 @@
 // module with `import type` only.
 //
 // Handlers fail by throwing an Error whose message is shown to the student
-// as-is, so write it for them ("No factory project is set up yet.").
+// as-is, so write it for them ("No workspace is set up yet.").
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import {
@@ -46,7 +46,7 @@ export const tutorThreadSchema = z.object({
 });
 export type TutorThread = z.infer<typeof tutorThreadSchema>;
 
-export const factoryProjectSchema = z.discriminatedUnion("status", [
+export const workspaceSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("unset") }),
   z.object({
     status: z.literal("found"),
@@ -55,10 +55,10 @@ export const factoryProjectSchema = z.discriminatedUnion("status", [
     /** Absolute path of the project's default local source. */
     root: z.string(),
   }),
-  /** The factoryProject setting names a project that is gone or has no local source. */
+  /** The workspaceProject setting names a project that is gone or has no local source. */
   z.object({ status: z.literal("missing"), projectId: z.string() }),
 ]);
-export type FactoryProject = z.infer<typeof factoryProjectSchema>;
+export type Workspace = z.infer<typeof workspaceSchema>;
 
 export const courseInfoSchema = z.object({
   id: z.string(),
@@ -131,9 +131,9 @@ export const overviewSchema = z.object({
   course: courseInfoSchema.nullable(),
   /** Why the course could not be loaded (course is then null). */
   courseError: z.string().nullable(),
-  factoryProject: factoryProjectSchema,
+  workspace: workspaceSchema,
   lessons: z.array(lessonSummarySchema),
-  /** Null while the course is missing or there is no factory project. */
+  /** Null while the course is missing or there is no workspace. */
   current: currentStateSchema.nullable(),
   threads: z.array(tutorThreadSchema),
 });
@@ -197,7 +197,7 @@ export type CandidateProject = z.infer<typeof candidateProjectSchema>;
 
 /** Payload of the REALTIME_CHANNELS.stateChanged signal. */
 export const stateChangedSignalSchema = z.object({
-  reason: z.enum(["progress", "iteration", "factoryProject", "threads", "course"]),
+  reason: z.enum(["progress", "iteration", "workspace", "threads", "course"]),
   lessonId: lessonIdSchema.nullable(),
 });
 export type StateChangedSignal = z.infer<typeof stateChangedSignalSchema>;
@@ -235,10 +235,10 @@ export const rpcContract = defineRpcContract({
     input: z.null(),
     output: z.object({ projects: z.array(candidateProjectSchema) }),
   },
-  /** Stores the factoryProject setting. Never creates a project. */
-  confirmFactory: {
+  /** Stores the workspaceProject setting. Never creates a project. */
+  confirmWorkspace: {
     input: z.object({ projectId: z.string().min(1).max(128) }),
-    output: factoryProjectSchema,
+    output: workspaceSchema,
   },
   /** Finds the lesson's coach thread, or spawns it. Current or done lessons only. */
   openCoach: {

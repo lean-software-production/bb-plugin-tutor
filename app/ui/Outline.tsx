@@ -61,7 +61,7 @@ export function CourseOutline({ activeThreadId, activeProjectId, onNavigate }: P
     goCourse(target);
     onNavigate();
   };
-  const factoryProjectId = overview.data?.factoryProject.status === "found" ? overview.data.factoryProject.projectId : null;
+  const workspaceProjectId = overview.data?.workspace.status === "found" ? overview.data.workspace.projectId : null;
 
   return (
     <nav className="tutor-sk tp-outline" aria-label="Course outline">
@@ -74,7 +74,7 @@ export function CourseOutline({ activeThreadId, activeProjectId, onNavigate }: P
         outline={outline}
         status={sidebar.status}
         onNavigate={onNavigate}
-        projectId={activeProjectId ?? factoryProjectId}
+        projectId={activeProjectId ?? workspaceProjectId}
       />
     </nav>
   );
@@ -110,7 +110,7 @@ function OutlineBody({ outline, go, onNavigate }: { outline: OutlineView; go: Go
             </a>
           ))}
           <a className="tp-setup-card" href={coursePageHref("welcome")} onClick={(event) => go(event, { kind: "welcome" })}>
-            {outline.status.missing ? "Your factory project is gone. Pick it again →" : "Set up your factory project →"}
+            {outline.status.missing ? "Your workspace is gone. Pick it again →" : "Pick your workspace →"}
           </a>
         </>
       );

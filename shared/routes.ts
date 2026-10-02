@@ -3,7 +3,7 @@
 // activeThreadId as null on plugin pages.
 //
 //   ""                 home: redirects to the current lesson, or to welcome
-//   "welcome"          first run: confirm or pick the factory project (screen 8)
+//   "welcome"          first run: confirm or pick the workspace (screen 8)
 //   "start/003"        start page, or the lesson's coach thread once it has one
 //   "complete/003"     between lessons (screen 7)
 const LESSON_ID = /^\d{3}$/;

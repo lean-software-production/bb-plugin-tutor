@@ -65,7 +65,9 @@ export const NAV_PANEL_PATH = "course";
 export const SETTING_KEYS = {
   /** `type: "string"`; overrides every other course-path source. */
   coursePath: "coursePath",
-  /** `type: "project"`; the student's factory project. Written by `confirmFactory`. */
+  /** `type: "project"`; the student's workspace. Written by `confirmWorkspace`. */
+  workspaceProject: "workspaceProject",
+  /** Read only, for Tutor before 0.5: an older Tutor's workspace setting, still read as a fallback. */
   factoryProject: "factoryProject",
   /** `type: "boolean"`, default true; hides BB's Plugins and Skills navigation rows. */
   simpleNavigation: "simpleNavigation",
@@ -78,7 +80,7 @@ export const SETTING_KEYS = {
  * The repo and factory paths are only hints for detecting the student's
  * project, in this order: `TUTOR_REPO_PATH`, config `repo`, the git top folder
  * above `TUTOR_FACTORY_PATH` / config `factory`, then that factory path
- * itself. The project is always a BB project id (`factoryProject` setting).
+ * itself. The project is always a BB project id (`workspaceProject` setting).
  */
 export const ENV_VARS = {
   coursePath: "TUTOR_COURSE_PATH",

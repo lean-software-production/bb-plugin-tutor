@@ -1,6 +1,6 @@
-// First run (mockup 8): confirm the detected factory project (8A), or explain
+// First run (mockup 8): confirm the detected workspace (8A), or explain
 // how to set one up when nothing qualifies (8B). The plugin never creates it.
-import type { FactoryProject, CandidateProject } from "../../shared/rpc.ts";
+import type { Workspace, CandidateProject } from "../../shared/rpc.ts";
 
 export interface WelcomeView {
   /** "confirm" when some project looks like a factory repo; "setup" otherwise. */
@@ -14,7 +14,7 @@ export interface WelcomeView {
   missingProjectId: string | null;
 }
 
-export function welcomeView(candidates: readonly CandidateProject[], factoryProject: FactoryProject): WelcomeView {
+export function welcomeView(candidates: readonly CandidateProject[], workspace: Workspace): WelcomeView {
   const detected = candidates.filter((candidate) => candidate.qualifies);
   const others = candidates.filter((candidate) => !candidate.qualifies);
   return {
@@ -22,6 +22,6 @@ export function welcomeView(candidates: readonly CandidateProject[], factoryProj
     detected,
     others,
     preselected: detected[0]?.projectId ?? null,
-    missingProjectId: factoryProject.status === "missing" ? factoryProject.projectId : null,
+    missingProjectId: workspace.status === "missing" ? workspace.projectId : null,
   };
 }

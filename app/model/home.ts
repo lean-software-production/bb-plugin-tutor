@@ -10,7 +10,7 @@ export function homeDecision(overview: Overview): HomeDecision {
   if (overview.course === null) {
     return { kind: "error", message: overview.courseError ?? "We couldn't load the course." };
   }
-  if (overview.factoryProject.status !== "found") return { kind: "redirect", route: { kind: "welcome" } };
+  if (overview.workspace.status !== "found") return { kind: "redirect", route: { kind: "welcome" } };
   const current = overview.current;
   if (current === null) {
     const first = overview.lessons[0];
@@ -64,8 +64,8 @@ export function continueView(overview: Overview): ContinueView {
     return { kind: "error", message: overview.courseError ?? "We couldn't load the course." };
   }
   const current = overview.current;
-  if (overview.factoryProject.status !== "found" || current === null) {
-    return { kind: "setup", courseTitle: overview.course.title, missing: overview.factoryProject.status === "missing" };
+  if (overview.workspace.status !== "found" || current === null) {
+    return { kind: "setup", courseTitle: overview.course.title, missing: overview.workspace.status === "missing" };
   }
   const summary = overview.lessons.find((lesson) => lesson.id === current.lessonId);
   const set = summary?.set ?? null;

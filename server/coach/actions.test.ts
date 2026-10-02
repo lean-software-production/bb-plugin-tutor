@@ -40,9 +40,9 @@ assert.ok(planFromSeed && keptPlan && rightFirstTime && wrongFirstTime && neverS
 const validationRule = lesson2.features[1]?.rules[0];
 assert.ok(validationRule !== undefined);
 
-test("coachStateOf refuses without a course or a factory project", () => {
+test("coachStateOf refuses without a course or a workspace", () => {
   assert.match((coachStateOf({ ...makeWorld(), course: null, courseError: "no ledger" }) as { error: string }).error, /no ledger/);
-  assert.match((coachStateOf(makeWorld(fixtureStudent, { status: "unset" })) as { error: string }).error, /No factory/);
+  assert.match((coachStateOf(makeWorld(fixtureStudent, { status: "unset" })) as { error: string }).error, /No workspace/);
 });
 
 test("marking the last Example of a Rule passing gives a rule-passing card naming the next Rule", () => {

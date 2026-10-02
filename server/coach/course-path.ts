@@ -3,7 +3,7 @@
 // `course` in the feature's config file > /workspaces/tutorial.
 import { readFile } from "node:fs/promises";
 import { DEFAULT_COURSE_PATH, ENV_VARS, FEATURE_CONFIG_SCHEMA_VERSION } from "../../shared/constants.ts";
-import { pathExists } from "./factory-project.ts";
+import { pathExists } from "../workspace/workspace-project.ts";
 import { findRepoRoot } from "../progress/layout.ts";
 
 export interface FeatureConfig {

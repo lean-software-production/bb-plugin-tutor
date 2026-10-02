@@ -1,7 +1,7 @@
-// First run (mockup 8): confirm the detected factory project (8A) or explain
+// First run (mockup 8): confirm the detected workspace (8A) or explain
 // how to create one (8B). The plugin never creates the project itself.
 import { useEffect, useState } from "react";
-import type { FactoryProject, CandidateProject } from "../../shared/rpc.ts";
+import type { Workspace, CandidateProject } from "../../shared/rpc.ts";
 import { refreshAll, useAction, useCourseNavigate, useOverview, useQuery, useStore, useTutorRpc } from "../hooks.ts";
 import { homeDecision } from "../model/home.ts";
 import { welcomeView } from "../model/welcome.ts";
@@ -31,12 +31,12 @@ export function WelcomePage() {
         candidates.status === "error" || overview.status === "error" ? (
           <ErrorNotice message={candidates.error ?? overview.error} />
         ) : (
-          <Loading label="Looking for your factory project…" />
+          <Loading label="Looking for your workspace…" />
         )
       ) : (
         <Picker
           candidates={candidates.data.projects}
-          factoryProject={overview.data.factoryProject}
+          workspace={overview.data.workspace}
           description={course?.description ?? null}
         />
       )}
@@ -51,22 +51,22 @@ export function WelcomePage() {
 
 function Picker({
   candidates,
-  factoryProject,
+  workspace,
   description,
 }: {
   candidates: readonly CandidateProject[];
-  factoryProject: FactoryProject;
+  workspace: Workspace;
   description: string | null;
 }) {
   const rpc = useTutorRpc();
   const goCourse = useCourseNavigate();
-  const view = welcomeView(candidates, factoryProject);
+  const view = welcomeView(candidates, workspace);
   const [selected, setSelected] = useState<string | null>(view.preselected);
   const [showAll, setShowAll] = useState(false);
   useEffect(() => setSelected((current) => current ?? view.preselected), [view.preselected]);
   const confirm = useAction(async () => {
     if (selected === null) return;
-    await rpc.call("confirmFactory", { projectId: selected });
+    await rpc.call("confirmWorkspace", { projectId: selected });
     // Decide from a fresh overview: the cached one still says "unset".
     const decision = homeDecision(await rpc.call("getOverview", null));
     refreshAll();
@@ -77,7 +77,7 @@ function Picker({
   return (
     <>
       {view.missingProjectId === null ? null : (
-        <Notice>We can't find the factory project you chose before, or it isn't checked out here. Pick it again, or choose another.</Notice>
+        <Notice>We can't find the workspace you chose before, or it isn't checked out here. Pick it again, or choose another.</Notice>
       )}
       <p className="tp-dek">
         {view.mode === "confirm"
@@ -103,8 +103,8 @@ function Picker({
       ) : null}
       {listed.length === 0 ? null : (
         <>
-          <p className="tp-eyebrow tp-pick-label">{view.mode === "setup" ? "Or use one of these projects anyway" : "Your factory project"}</p>
-          <div className="tp-picker" role="radiogroup" aria-label="Factory project">
+          <p className="tp-eyebrow tp-pick-label">{view.mode === "setup" ? "Or use one of these projects anyway" : "Your workspace"}</p>
+          <div className="tp-picker" role="radiogroup" aria-label="Workspace">
             {listed.map((project) => (
               <Panel
                 key={project.projectId}

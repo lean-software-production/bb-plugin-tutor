@@ -57,18 +57,18 @@ export function coachStateOf(world: World): CoachState | { error: string } {
   if (world.course === null || world.pointer === null) {
     return { error: `The course could not be loaded: ${world.courseError ?? "unknown error"}` };
   }
-  if (world.factoryProject.status !== "found" || world.factoryHostId === null || world.layout === null) {
-    return { error: "No factory project is set up yet. The student confirms it on the Course page." };
+  if (world.workspace.status !== "found" || world.hostId === null || world.layout === null) {
+    return { error: "No workspace is set up yet. The student confirms it on the Course page." };
   }
   const lesson = findLesson(world.course, world.pointer.lessonId);
   if (lesson === undefined) return { error: `Lesson ${world.pointer.lessonId} is not in this course.` };
   return {
     course: world.course,
     coachPath: world.coachPath,
-    projectId: world.factoryProject.projectId,
-    root: world.factoryProject.root,
+    projectId: world.workspace.projectId,
+    root: world.workspace.root,
     layout: world.layout,
-    hostId: world.factoryHostId,
+    hostId: world.hostId,
     lesson,
     pointer: world.pointer,
     student: world.student,

@@ -8,10 +8,15 @@ const descriptors = {
     description:
       "Absolute path of the course checkout. Leave empty to use the tutor feature's setting, or /workspaces/tutorial.",
   },
+  [SETTING_KEYS.workspaceProject]: {
+    type: "project",
+    label: "Workspace",
+    description: "The BB project holding your repo, where the coach works. Tutor never creates it.",
+  },
   [SETTING_KEYS.factoryProject]: {
     type: "project",
-    label: "Factory project",
-    description: "The BB project holding your factory repo, where the coach works. Tutor never creates it.",
+    label: "Factory project (older Tutor)",
+    description: "Read only: an older Tutor's workspace setting, still read as a fallback. Set Workspace instead.",
   },
   [SETTING_KEYS.simpleNavigation]: {
     type: "boolean",

@@ -122,8 +122,8 @@ function statusOf(input: OutlineInput): OutlineStatus {
   if (overview.course === null) {
     return { kind: "error", message: overview.courseError ?? "We couldn't load the course." };
   }
-  if (overview.factoryProject.status !== "found") {
-    return { kind: "unset", missing: overview.factoryProject.status === "missing" };
+  if (overview.workspace.status !== "found") {
+    return { kind: "unset", missing: overview.workspace.status === "missing" };
   }
   return { kind: "ready" };
 }

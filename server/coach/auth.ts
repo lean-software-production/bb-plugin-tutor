@@ -20,7 +20,7 @@
 // needed, Tutor would keep the thread-to-lesson map in `bb.storage.kv` instead.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { coachThreadMetadataSchema } from "../../shared/model.ts";
-import type { FactoryProject } from "../../shared/rpc.ts";
+import type { Workspace } from "../../shared/rpc.ts";
 
 type Sdk = BbPluginApi["sdk"];
 type Thread = Awaited<ReturnType<Sdk["threads"]["get"]>>;
@@ -78,16 +78,16 @@ export async function authorizeCaller(
   sdk: Sdk,
   pluginId: string,
   threadId: string,
-  factoryProject: FactoryProject,
+  workspace: Workspace,
 ): Promise<Caller | { error: string }> {
   const thread = await getThread(sdk, threadId);
   const coachThread = thread === null ? null : await coachThreadOf(sdk, pluginId, thread);
   if (thread === null || coachThread === null) return { error: NOT_A_TUTOR_THREAD };
-  if (factoryProject.status !== "found") {
-    return { error: "No factory project is set up yet. The student confirms it on the Course page." };
+  if (workspace.status !== "found") {
+    return { error: "No workspace is set up yet. The student confirms it on the Course page." };
   }
-  if (thread.projectId !== factoryProject.projectId) {
-    return { error: "This thread is not in the student's factory project, so Tutor's tools are off here." };
+  if (thread.projectId !== workspace.projectId) {
+    return { error: "This thread is not in the student's workspace, so Tutor's tools are off here." };
   }
   // The coach thread's metadata, not the caller's: a fork's metadata was written by whoever forked it.
   const metadata = coachThreadMetadataSchema.safeParse(await sdk.threads.getPluginMetadata({ pluginId, threadId: coachThread.id }).catch(() => null));

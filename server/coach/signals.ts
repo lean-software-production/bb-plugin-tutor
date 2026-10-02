@@ -27,10 +27,10 @@ export function createStateSignals(bb: BbPluginApi): StateSignals {
   return {
     publish,
     observe(world, options = {}) {
-      if (world.factoryProject.status !== "found") return;
+      if (world.workspace.status !== "found") return;
       const next = fingerprint(world);
-      const previous = seen.get(world.factoryProject.root);
-      seen.set(world.factoryProject.root, next);
+      const previous = seen.get(world.workspace.root);
+      seen.set(world.workspace.root, next);
       const lessonId = world.pointer?.lessonId ?? null;
       if (previous === undefined) {
         if (options.publishIfUnseen === true) publish("progress", lessonId);

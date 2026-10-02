@@ -36,7 +36,7 @@ test("fetch's network TypeError (Chrome, Firefox, Safari wording) is a lost conn
 });
 
 test("BB and Tutor errors carried in a JSON body are passed through unchanged", () => {
-  const tutor = new Error("No factory project is set up yet. Confirm it on the Course page.");
+  const tutor = new Error("No workspace is set up yet. Confirm it on the Course page.");
   assert.equal(classifyRpcFailure(tutor), tutor);
 
   // BB's own JSON 401 (an expired BB session) keeps its message and code.
@@ -58,7 +58,7 @@ test("the student sees the reload advice, never the raw HTTP status", () => {
   assert.doesNotMatch(message, /HTTP|401/);
   assert.match(message, /Reload this page/);
   assert.ok(isConnectionLost(message));
-  assert.ok(!isConnectionLost("No factory project is set up yet."));
+  assert.ok(!isConnectionLost("No workspace is set up yet."));
 });
 
 test("the wrapped client rethrows lost connections as ConnectionLostError and passes results and other errors through", async () => {

@@ -1,15 +1,15 @@
 // Everything a handler needs, re-derived from disk and BB on each call: the
-// course, the factory project, where its factory is (layout.ts), and the
+// course, the workspace, where its factory is (layout.ts), and the
 // student's state. Nothing here comes from thread metadata.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { resolveCurrent, type CurrentPointer } from "../../shared/derive.ts";
 import type { Course, StudentState } from "../../shared/model.ts";
 import type { CourseSource, ProgressStore } from "../../shared/ports.ts";
-import type { FactoryProject } from "../../shared/rpc.ts";
+import type { Workspace } from "../../shared/rpc.ts";
 import { overlaps, realPath } from "../paths.ts";
 import { resolveLayout, type Layout } from "../progress/layout.ts";
 import { resolveCoachFile } from "./coach-file.ts";
-import { resolveFactory } from "./factory-project.ts";
+import { resolveWorkspace, workspaceSetting } from "../workspace/workspace-project.ts";
 import { readFeatureConfig, resolveCoursePath, resolveProjectHint, type Env } from "./course-path.ts";
 import type { TutorSettings } from "./settings.ts";
 
@@ -23,12 +23,12 @@ export interface World {
   /** The coaching method's file: the course's coach file, else the starter's coach-me skill (coach-file.ts). */
   coachPath: string | null;
   /** The BB project Tutor coaches in: the student's repo, or (legacy) the factory folder itself. */
-  factoryProject: FactoryProject;
-  /** The machine holding the project's folder; null without a factory project. */
-  factoryHostId: string | null;
-  /** Where the factory, codebase and seeds are in the project's folder; null without a factory project. */
+  workspace: Workspace;
+  /** The machine holding the project's folder; null without a workspace. */
+  hostId: string | null;
+  /** Where the factory, codebase and seeds are in the project's folder; null without a workspace. */
   layout: Layout | null;
-  /** Read from layout.factoryDir, with the layout's problems. Empty state while there is no factory project. */
+  /** Read from layout.factoryDir, with the layout's problems. Empty state while there is no workspace. */
   student: StudentState;
   /** Null while the course is missing. */
   pointer: CurrentPointer | null;
@@ -78,17 +78,17 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
       const config = await readFeatureConfig(deps.featureConfigFile);
       const coursePath = resolveCoursePath(values.coursePath, deps.env, config);
       // A config this plugin can't read stops Tutor: no course, so every RPC and tool refuses with its message.
-      const [courseResult, factory] = await Promise.all([
+      const [courseResult, resolved] = await Promise.all([
         config.error === undefined ? loadCourse(coursePath) : Promise.resolve<CourseResult>({ course: null, error: config.error }),
-        resolveFactory(bb.sdk, values.factoryProject),
+        resolveWorkspace(bb.sdk, workspaceSetting(values)),
       ]);
-      // Re-checked on every load, not just at confirmFactory: a project whose folder now
+      // Re-checked on every load, not just at confirmWorkspace: a project whose folder now
       // leads into the course would have the coach write spec/, stand-ins/ and the seed into the course.
-      const { factoryProject, hostId } =
-        factory.factoryProject.status === "found" && overlaps(await realPath(factory.factoryProject.root), await realPath(coursePath))
-          ? { factoryProject: { status: "missing" as const, projectId: factory.factoryProject.projectId }, hostId: null }
-          : factory;
-      const layout = factoryProject.status === "found" ? await resolveLayout(factoryProject.root) : null;
+      const { workspace, hostId } =
+        resolved.workspace.status === "found" && overlaps(await realPath(resolved.workspace.root), await realPath(coursePath))
+          ? { workspace: { status: "missing" as const, projectId: resolved.workspace.projectId }, hostId: null }
+          : resolved;
+      const layout = workspace.status === "found" ? await resolveLayout(workspace.root) : null;
       const read = layout === null ? EMPTY_STUDENT : await deps.store.read(layout.factoryDir);
       const student = layout === null || layout.problems.length === 0 ? read : { ...read, problems: [...layout.problems, ...read.problems] };
       const coachPath =
@@ -100,8 +100,8 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
         course: courseResult.course,
         courseError: courseResult.error,
         coachPath,
-        factoryProject,
-        factoryHostId: hostId,
+        workspace,
+        hostId,
         layout,
         student,
         pointer: courseResult.course === null ? null : resolveCurrent(courseResult.course, student),

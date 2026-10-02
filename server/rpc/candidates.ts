@@ -10,7 +10,7 @@ import { COURSE_FILES, FACTORY_FILES, STARTER_COACH_SKILL, STARTER_LAYOUT } from
 import type { CandidateProject } from "../../shared/rpc.ts";
 import { overlaps } from "../paths.ts";
 import { ITERATION_FILES, parseIteration } from "../progress/iteration.ts";
-import { defaultSourcePath, pathExists, type ProjectWithSources } from "../coach/factory-project.ts";
+import { defaultSourcePath, pathExists, type ProjectWithSources } from "../workspace/workspace-project.ts";
 
 type Sdk = BbPluginApi["sdk"];
 

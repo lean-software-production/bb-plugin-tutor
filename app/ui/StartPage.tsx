@@ -53,7 +53,7 @@ export function StartPage({ lessonId, ruleKey }: { lessonId: string; ruleKey: st
     return <ToCoach lessonId={lessonId} coachThreadId={detail.data.coachThreadId} ruleKey={ruleKey} reached={detail.data.reachedRules} />;
   }
   const view = buildLesson(detail.data, overview.data?.lessons ?? [], Date.now());
-  const start = coachStart(view.status, overview.data?.factoryProject.status ?? null);
+  const start = coachStart(view.status, overview.data?.workspace.status ?? null);
   return (
     <StartPageBody key={lessonId} view={view} start={start} urlRuleKey={ruleKey} staleError={detail.status === "error" ? detail.error : null} />
   );
@@ -213,9 +213,9 @@ function StartCoach({
       return (
         <div className="tp-start">
           <p className="tp-prose">
-            Your coach works in your factory project. Pick that project first, then come back to start with your coach.
+            Your coach works in your workspace. Pick that project first, then come back to start with your coach.
           </p>
-          <Button onClick={onSetUp}>Set up your factory project →</Button>
+          <Button onClick={onSetUp}>Pick your workspace →</Button>
         </div>
       );
     case "start":

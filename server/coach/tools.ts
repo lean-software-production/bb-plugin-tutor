@@ -82,7 +82,7 @@ function register<Name extends ToolName>(rt: TutorRuntime, spec: ToolSpec<Name>)
     parameters: toolParameterSchemas[spec.name],
     async execute(input: ToolParameters<Name>, context: PluginAgentToolContext): Promise<PluginAgentToolResult> {
       const run = async (world: World): Promise<PluginAgentToolResult> => {
-        const caller = await authorizeCaller(rt.bb.sdk, rt.bb.pluginId, context.threadId, world.factoryProject);
+        const caller = await authorizeCaller(rt.bb.sdk, rt.bb.pluginId, context.threadId, world.workspace);
         if ("error" in caller) return refusal(caller.error);
         const state = coachStateOf(world);
         if ("error" in state) return refusal(state.error);
@@ -95,10 +95,10 @@ function register<Name extends ToolName>(rt: TutorRuntime, spec: ToolSpec<Name>)
       };
       try {
         const world = await rt.world.load();
-        if (world.factoryProject.status !== "found") return await run(world);
+        if (world.workspace.status !== "found") return await run(world);
         // Read-modify-write of the factory's files: re-read them once earlier calls have written.
         // Keyed on the project's folder, which stays put when the factory moves to factory/.
-        return await rt.locks.run(factoryLockKey(world.factoryProject.root), async () => run(await rt.world.load()));
+        return await rt.locks.run(factoryLockKey(world.workspace.root), async () => run(await rt.world.load()));
       } catch (cause) {
         rt.bb.log.error(`[tutor] ${spec.name} failed: ${String(cause)}`);
         return refusal(`${spec.name} failed: ${cause instanceof Error ? cause.message : String(cause)}`);

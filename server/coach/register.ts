@@ -79,7 +79,7 @@ export async function registerTutor(bb: BbPluginApi, deps: WorldDeps): Promise<T
   });
 
   registerRpc(rt);
-  settings.onChange(() => rt.signals.publish("factoryProject", null));
+  settings.onChange(() => rt.signals.publish("workspace", null));
   void warmCoachRegistry(rt);
   return rt;
 }
@@ -88,8 +88,8 @@ export async function registerTutor(bb: BbPluginApi, deps: WorldDeps): Promise<T
 async function warmCoachRegistry(rt: TutorRuntime): Promise<void> {
   try {
     const world = await rt.world.load();
-    if (world.factoryProject.status !== "found") return;
-    rt.coaches.remember(await listTutorThreads(rt.bb.sdk, rt.bb.pluginId, world.factoryProject.projectId));
+    if (world.workspace.status !== "found") return;
+    rt.coaches.remember(await listTutorThreads(rt.bb.sdk, rt.bb.pluginId, world.workspace.projectId));
   } catch (cause) {
     rt.bb.log.warn(`[tutor] could not list coach threads at start: ${cause instanceof Error ? cause.message : String(cause)}`);
   }

@@ -2,13 +2,13 @@
 // handler fails by throwing an Error written for the student.
 import { withoutLeadingDirectives } from "../../shared/directives.ts";
 import { rpcContract } from "../../shared/rpc.ts";
-import type { FactoryProject } from "../../shared/rpc.ts";
+import type { Workspace } from "../../shared/rpc.ts";
 import { findLesson, findRule, lessonStatus } from "../../shared/derive.ts";
 import type { Course, Lesson, Rule } from "../../shared/model.ts";
 import { adoptionTargets } from "../coach/actions.ts";
 import { coachThreadOf } from "../coach/auth.ts";
 import { recordCoachThread, recordedCoachThread } from "../coach/coach-record.ts";
-import { resolveFactory } from "../coach/factory-project.ts";
+import { resolveWorkspace } from "../workspace/workspace-project.ts";
 import { coachThreadLockKey } from "../coach/lock-keys.ts";
 import type { FactoryLocation } from "../coach/threads.ts";
 import {
@@ -35,20 +35,20 @@ import { overlaps, realPath } from "../paths.ts";
 import { listCandidates } from "./candidates.ts";
 import { buildCompletion, buildLessonDetail, buildOverview, publicThread, requireCourse, requireLesson } from "./views.ts";
 
-type Found = Extract<FactoryProject, { status: "found" }>;
+type Found = Extract<Workspace, { status: "found" }>;
 
 interface FoundFactory extends Found {
   location: FactoryLocation;
 }
 
 function requireFactory(world: World): FoundFactory {
-  if (world.factoryProject.status === "found" && world.factoryHostId !== null) {
-    return { ...world.factoryProject, location: { root: world.factoryProject.root, hostId: world.factoryHostId } };
+  if (world.workspace.status === "found" && world.hostId !== null) {
+    return { ...world.workspace, location: { root: world.workspace.root, hostId: world.hostId } };
   }
   throw new Error(
-    world.factoryProject.status === "missing"
-      ? "The factory project Tutor was set up with has gone. Pick it again on the Course page."
-      : "No factory project is set up yet. Confirm it on the Course page.",
+    world.workspace.status === "missing"
+      ? "The workspace Tutor was set up with has gone. Pick it again on the Course page."
+      : "No workspace is set up yet. Confirm it on the Course page.",
   );
 }
 
@@ -69,8 +69,8 @@ export function registerRpc(rt: TutorRuntime): void {
   }
 
   async function threadsOf(world: World): Promise<TutorThreadRecord[]> {
-    if (world.factoryProject.status !== "found") return [];
-    const threads = await listTutorThreads(bb.sdk, bb.pluginId, world.factoryProject.projectId);
+    if (world.workspace.status !== "found") return [];
+    const threads = await listTutorThreads(bb.sdk, bb.pluginId, world.workspace.projectId);
     rt.coaches.remember(threads);
     return threads;
   }
@@ -206,19 +206,19 @@ export function registerRpc(rt: TutorRuntime): void {
       };
     },
 
-    confirmFactory: async ({ projectId }) => {
-      const { factoryProject } = await resolveFactory(bb.sdk, projectId);
-      if (factoryProject.status !== "found") {
+    confirmWorkspace: async ({ projectId }) => {
+      const { workspace } = await resolveWorkspace(bb.sdk, projectId);
+      if (workspace.status !== "found") {
         throw new Error("That project has no folder on this machine, so Tutor cannot coach in it.");
       }
       // The coach writes spec/, stand-ins/ and ../seeds/ beside the factory, so it must never be the course checkout.
       const { coursePath } = await rt.world.load();
-      if (overlaps(await realPath(factoryProject.root), await realPath(coursePath))) {
+      if (overlaps(await realPath(workspace.root), await realPath(coursePath))) {
         throw new Error("That project's folder is, or shares a folder with, the course. Pick the repo you build your factory in.");
       }
-      // settings.onChange publishes the factoryProject signal.
-      await rt.settings.experimental_set({ factoryProject: projectId });
-      return factoryProject;
+      // settings.onChange publishes the workspace signal.
+      await rt.settings.experimental_set({ workspaceProject: projectId });
+      return workspace;
     },
 
     openCoach: async ({ lessonId }) => {

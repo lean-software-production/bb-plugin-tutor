@@ -15,7 +15,7 @@ import { ALL_TOOL_NAMES } from "../shared/constants.ts";
 import { findLesson, lessonExamples } from "../shared/derive.ts";
 import type { Completion, LessonDetail, Overview } from "../shared/rpc.ts";
 import { NOT_A_TUTOR_THREAD } from "../server/coach/auth.ts";
-import { makeSandbox, type Sandbox } from "./helpers/disk.ts";
+import { makeSandbox, makeRepoSandbox, type Sandbox } from "./helpers/disk.ts";
 import { makeTutorHost, PROJECT_ID, type TutorHost } from "./helpers/fake-bb.ts";
 import { THREAD_PAGE_SIZE } from "../server/coach/threads.ts";
 
@@ -112,18 +112,18 @@ test("every tool refuses threads Tutor did not spawn, whatever their metadata sa
     assert.equal(text(result), NOT_A_TUTOR_THREAD);
     assert.equal(text(await tool(host, name, inputs[name], "thr_fork_of_plain")), NOT_A_TUTOR_THREAD, name);
     const elsewhere = await tool(host, name, inputs[name], "thr_elsewhere");
-    assert.ok(isError(elsewhere) && /not in the student's factory project/.test(text(elsewhere)), name);
+    assert.ok(isError(elsewhere) && /not in the student's workspace/.test(text(elsewhere)), name);
   }
   assert.deepEqual(await readdir(sandbox.factoryRoot), []);
   assert.equal(host.harness.inspection.sdk.callsTo("threads.spawn").length, 0);
   assert.equal(host.harness.inspection.sdk.callsTo("threads.fork").length, 0);
 });
 
-test("tools refuse while there is no factory project", async (t) => {
+test("tools refuse while there is no workspace", async (t) => {
   const { host } = await setup(t, {});
   host.addThread({ id: "thr_tutor", originPluginId: "tutor" });
   const result = await tool(host, "tutor_status", {}, "thr_tutor");
-  assert.ok(isError(result) && /No factory project/.test(text(result)));
+  assert.ok(isError(result) && /No workspace/.test(text(result)));
 });
 
 test("openCoach spawns one coach thread per lesson in the factory, then finds it again", async (t) => {
@@ -856,16 +856,16 @@ test("a Tutor thread going idle re-reads the factory and signals changes made ou
 test("first run: candidates, confirmation and a course that will not load", async (t) => {
   const { sandbox, host } = await setup(t, {});
   const before = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
-  assert.deepEqual(before.factoryProject, { status: "unset" });
+  assert.deepEqual(before.workspace, { status: "unset" });
   assert.equal(before.current, null);
   const { projects } = (await host.harness.behavior.callRpc("listCandidateProjects", null)) as {
     projects: { projectId: string; qualifies: boolean }[];
   };
   assert.deepEqual(projects.map((project) => project.projectId), [PROJECT_ID]);
-  await assert.rejects(host.harness.behavior.callRpc("confirmFactory", { projectId: "prj_gone" }), /no folder/);
-  const factoryProject = await host.harness.behavior.callRpc("confirmFactory", { projectId: PROJECT_ID });
-  assert.deepEqual(factoryProject, { status: "found", projectId: PROJECT_ID, projectName: "tetris/.factory", root: sandbox.factoryRoot });
-  assert.ok(host.harness.inspection.realtimeSignals.some((signal) => (signal.payload as { reason: string }).reason === "factoryProject"));
+  await assert.rejects(host.harness.behavior.callRpc("confirmWorkspace", { projectId: "prj_gone" }), /no folder/);
+  const workspace = await host.harness.behavior.callRpc("confirmWorkspace", { projectId: PROJECT_ID });
+  assert.deepEqual(workspace, { status: "found", projectId: PROJECT_ID, projectName: "tetris/.factory", root: sandbox.factoryRoot });
+  assert.ok(host.harness.inspection.realtimeSignals.some((signal) => (signal.payload as { reason: string }).reason === "workspace"));
   const after = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
   assert.equal(after.current?.iterationStatus, "not-started");
 });
@@ -923,7 +923,7 @@ test("concurrent starts of the next lesson spawn one coach thread", async (t) =>
   assert.equal(started[0]?.threadId, started[1]?.threadId);
 });
 
-test("confirmFactory refuses the course checkout, a folder inside it, or one holding it", async (t) => {
+test("confirmWorkspace refuses the course checkout, a folder inside it, or one holding it", async (t) => {
   const sandbox = await makeSandbox();
   t.after(() => sandbox.cleanup());
   const inside = join(sandbox.course.root, "docs");
@@ -931,7 +931,7 @@ test("confirmFactory refuses the course checkout, a folder inside it, or one hol
   await symlink(sandbox.course.root, linked);
   for (const root of [sandbox.course.root, inside, sandbox.root, linked]) {
     const host = await makeTutorHost(sandbox.course, root, { coursePath: sandbox.course.root });
-    await assert.rejects(host.harness.behavior.callRpc("confirmFactory", { projectId: PROJECT_ID }), /course/, root);
+    await assert.rejects(host.harness.behavior.callRpc("confirmWorkspace", { projectId: PROJECT_ID }), /course/, root);
     assert.equal(host.harness.inspection.sdk.callsTo("threads.spawn").length, 0);
     await host.harness.lifecycle.dispose();
   }
@@ -939,7 +939,7 @@ test("confirmFactory refuses the course checkout, a folder inside it, or one hol
   await mkdir(factory);
   const host = await makeTutorHost(sandbox.course, factory, { coursePath: sandbox.course.root });
   t.after(() => host.harness.lifecycle.dispose());
-  assert.equal(((await host.harness.behavior.callRpc("confirmFactory", { projectId: PROJECT_ID })) as { status: string }).status, "found");
+  assert.equal(((await host.harness.behavior.callRpc("confirmWorkspace", { projectId: PROJECT_ID })) as { status: string }).status, "found");
 });
 
 test("a stored factoryProject that now leads into the course is treated as missing: no coach, no writes", async (t) => {
@@ -950,8 +950,19 @@ test("a stored factoryProject that now leads into the course is treated as missi
   const host = await makeTutorHost(sandbox.course, link, { factoryProject: PROJECT_ID, coursePath: sandbox.course.root });
   t.after(() => host.harness.lifecycle.dispose());
   const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
-  assert.equal(overview.factoryProject.status, "missing");
+  assert.equal(overview.workspace.status, "missing");
   await assert.rejects(host.harness.behavior.callRpc("openCoach", { lessonId: "000" }));
   assert.equal(host.harness.inspection.sdk.callsTo("threads.spawn").length, 0);
   assert.equal(await readdir(join(sandbox.course.root, "spec")).catch(() => null), null, "nothing written into the course");
+});
+
+test("a Codespace set up by an older Tutor (factoryProject only) keeps its workspace, and confirming writes workspaceProject", async (t) => {
+  const sandbox = await makeRepoSandbox();
+  t.after(() => sandbox.cleanup());
+  const host = await makeTutorHost(sandbox.course, sandbox.repoRoot, { factoryProject: PROJECT_ID });
+  t.after(() => host.harness.lifecycle.dispose());
+  const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.equal(overview.workspace.status, "found");
+  await host.harness.behavior.callRpc("confirmWorkspace", { projectId: PROJECT_ID });
+  assert.equal((await host.rt.settings.get()).workspaceProject, PROJECT_ID);
 });
