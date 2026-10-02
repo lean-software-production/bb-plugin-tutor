@@ -112,7 +112,7 @@ export const ACTIVITY_FILE = ".tutor-feature/activity";
  * Paths inside the student's factory, relative to its folder (tetris/.factory,
  * then factory/ from lesson 004, in capstone-project-starter). `seedsDir` sits
  * under the codebase folder: tetris/seeds in a starter clone, ../seeds for a
- * project whose folder is the factory itself (server/progress/layout.ts).
+ * project whose folder is the factory itself (layouts/capstone-factory/detect.ts).
  */
 export const FACTORY_FILES = {
   progress: "spec/PROGRESS.yaml",

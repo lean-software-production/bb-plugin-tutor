@@ -1,28 +1,23 @@
 // The workspace: always a BB project id (the workspaceProject setting, or an
 // older Tutor's factoryProject), whose default local source is the student's
-// repo on this machine.
-import { access } from "node:fs/promises";
+// repo on that source's machine, probed through WorkspaceAccess.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type { Workspace } from "../../shared/rpc.ts";
+import type { WorkspaceAccess } from "./access.ts";
 
 type Sdk = BbPluginApi["sdk"];
 export type ProjectWithSources = Awaited<ReturnType<Sdk["projects"]["get"]>>;
 
-export async function pathExists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
-  }
+/** The workspace access for a machine. */
+export type AccessFor = (hostId: string) => WorkspaceAccess;
+
+/** Whether anything is at `path` (a folder, file or symbolic link), asked through `access`. */
+export async function pathExists(access: WorkspaceAccess, path: string): Promise<boolean> {
+  return ((await access.kinds([path]))[path] ?? "none") !== "none";
 }
 
-function defaultSource(project: ProjectWithSources) {
+export function defaultSource(project: ProjectWithSources) {
   return project.sources.find((candidate) => candidate.isDefault) ?? project.sources[0];
-}
-
-export function defaultSourcePath(project: ProjectWithSources): string | null {
-  return defaultSource(project)?.path ?? null;
 }
 
 export interface ResolvedWorkspace {
@@ -42,7 +37,7 @@ export function workspaceSetting(values: { workspaceProject?: string; factoryPro
   return undefined;
 }
 
-export async function resolveWorkspace(sdk: Sdk, projectId: string | undefined): Promise<ResolvedWorkspace> {
+export async function resolveWorkspace(sdk: Sdk, projectId: string | undefined, accessFor: AccessFor): Promise<ResolvedWorkspace> {
   if (projectId === undefined || projectId === "") return { workspace: { status: "unset" }, hostId: null };
   const missing: ResolvedWorkspace = { workspace: { status: "missing", projectId }, hostId: null };
   let project: ProjectWithSources;
@@ -52,7 +47,7 @@ export async function resolveWorkspace(sdk: Sdk, projectId: string | undefined):
     return missing;
   }
   const source = defaultSource(project);
-  if (source === undefined || !(await pathExists(source.path))) return missing;
+  if (source === undefined || !(await pathExists(accessFor(source.hostId), source.path))) return missing;
   return {
     workspace: { status: "found", projectId, projectName: project.name, root: source.path },
     hostId: source.hostId,

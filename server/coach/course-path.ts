@@ -3,8 +3,8 @@
 // `course` in the feature's config file > /workspaces/tutorial.
 import { readFile } from "node:fs/promises";
 import { DEFAULT_COURSE_PATH, ENV_VARS, FEATURE_CONFIG_SCHEMA_VERSION } from "../../shared/constants.ts";
-import { pathExists } from "../workspace/workspace-project.ts";
-import { findRepoRoot } from "../progress/layout.ts";
+import { findRepoRoot } from "../../layouts/capstone-factory/detect.ts";
+import type { LayoutProbe } from "../../layouts/types.ts";
 
 export interface FeatureConfig {
   course?: string;
@@ -77,11 +77,11 @@ export function resolveFactoryHint(env: Env, config: FeatureConfig): string | nu
  * TUTOR_REPO_PATH, then the config's `repo`, then the repo (the folder
  * holding .git) above the factory hint, then the factory hint itself.
  */
-export async function resolveProjectHint(env: Env, config: FeatureConfig): Promise<string | null> {
+export async function resolveProjectHint(env: Env, config: FeatureConfig, probe: LayoutProbe): Promise<string | null> {
   const repo = nonEmpty(env[ENV_VARS.repoPath]) ?? config.repo;
   if (repo !== undefined) return repo;
   const factory = resolveFactoryHint(env, config);
   if (factory === null) return null;
-  if (!(await pathExists(factory))) return factory;
-  return (await findRepoRoot(factory)) ?? factory;
+  if (((await probe.kinds([factory]))[factory] ?? "none") === "none") return factory;
+  return (await findRepoRoot(factory, probe)) ?? factory;
 }

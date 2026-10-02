@@ -3,7 +3,8 @@ import { lstat, mkdir, readFile, readdir, readlink, rename, rm, symlink, writeFi
 import { join, relative } from "node:path";
 import { test } from "node:test";
 import { makeRepoSandbox, makeSandbox } from "../../test/helpers/disk.ts";
-import { resolveLayout } from "./layout.ts";
+import { resolveLayout } from "../../layouts/capstone-factory/detect.ts";
+import { createDiskAccess } from "../../test/helpers/disk-access.ts";
 import { copyLessonSpec, seedFileName } from "./spec-copy.ts";
 
 test("names the seed after the codebase folder, as fetch-iteration names tetris.md", () => {
@@ -81,7 +82,7 @@ test("in a starter clone whose factory moved to factory/, the seed lands in tetr
   const sandbox = await makeRepoSandbox();
   try {
     await rename(sandbox.factoryRoot, join(sandbox.repoRoot, "factory"));
-    const layout = await resolveLayout(sandbox.repoRoot);
+    const layout = await resolveLayout(sandbox.repoRoot, createDiskAccess());
     const lesson = sandbox.course.lessons[1];
     assert.ok(lesson !== undefined && lesson.seedSpec !== null);
     await rm(join(sandbox.codebaseRoot, "seeds/.gitkeep"));

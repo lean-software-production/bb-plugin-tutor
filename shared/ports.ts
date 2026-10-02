@@ -2,6 +2,8 @@
 //
 //   CourseSource   implemented by server/course/ (CONTENT), consumed by the backend
 //   ProgressStore  implemented by server/progress/ (BACKEND), consumed by server/coach/ and server/rpc/
+import type { ProgressLocation } from "../layouts/types.ts";
+import type { WorkspaceAccess } from "../server/workspace/access.ts";
 import type { Course, IterationState, ProgressFile, StudentState } from "./model.ts";
 
 /** Thrown by CourseSource.loadCourse; the message is shown to the student as-is. */
@@ -24,12 +26,13 @@ export interface CourseSource {
 
 export interface ProgressStore {
   /**
-   * Reads ITERATION (falling back to an older factory's spec/ITERATION) and
-   * spec/PROGRESS.yaml under `factoryRoot`. Never throws for bad content.
+   * Reads the location's ITERATION files (the first found; a capstone factory
+   * falls back to an older spec/ITERATION) and its progress file, through
+   * `access`. Never throws for bad content.
    */
-  read(factoryRoot: string): Promise<StudentState>;
-  /** Writes spec/PROGRESS.yaml atomically (temp file + rename). */
-  writeProgress(factoryRoot: string, progress: ProgressFile): Promise<void>;
-  /** Writes ITERATION as "<NNN> <WIP|Done>\n", then removes any spec/ITERATION. Refuses Lesson 0. */
-  writeIteration(factoryRoot: string, state: IterationState): Promise<void>;
+  read(access: WorkspaceAccess, at: ProgressLocation): Promise<StudentState>;
+  /** Writes the progress file whole, only if it is still what this call read (or still absent). */
+  writeProgress(access: WorkspaceAccess, at: ProgressLocation, progress: ProgressFile): Promise<void>;
+  /** Writes the first ITERATION file as "<NNN> <WIP|Done>\n", then removes the older ones. Refuses Lesson 0. */
+  writeIteration(access: WorkspaceAccess, at: ProgressLocation, state: IterationState): Promise<void>;
 }

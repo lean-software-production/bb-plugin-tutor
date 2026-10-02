@@ -847,7 +847,8 @@ test("a Tutor thread going idle re-reads the factory and signals changes made ou
   await host.harness.behavior.emitThreadEvent("thread.idle", idle);
   assert.equal(host.harness.inspection.realtimeSignals.length, before);
 
-  await host.rt.store.writeIteration(sandbox.factoryRoot, { iteration: "001", status: "WIP" });
+  const factory = { dir: sandbox.factoryRoot, progressFile: "spec/PROGRESS.yaml", iterationFiles: ["ITERATION", "spec/ITERATION"] };
+  await host.rt.store.writeIteration(host.rt.access("host_1"), factory, { iteration: "001", status: "WIP" });
   await host.harness.behavior.emitThreadEvent("thread.idle", idle);
   const last = host.harness.inspection.realtimeSignals.at(-1);
   assert.deepEqual([last?.channel, last?.payload], ["state-changed", { reason: "iteration", lessonId: "001" }]);

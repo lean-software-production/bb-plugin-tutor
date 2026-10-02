@@ -2,15 +2,16 @@
 // and the student confirms; it never creates a project. A capstone-project-
 // starter clone qualifies by its layout (tetris/.factory, factory/, or the
 // coach-me skill); a folder that is a factory itself, as before, by its
-// ITERATION or an AGENTS.md naming the coach.
-import { lstat, readFile } from "node:fs/promises";
+// ITERATION or an AGENTS.md naming the coach. Each project's folder is probed
+// through the WorkspaceAccess of the machine holding it.
 import { basename, extname, join, resolve } from "node:path";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import { ITERATION_FILES, parseIteration } from "../../layouts/progress/iteration.ts";
 import { COURSE_FILES, FACTORY_FILES, STARTER_COACH_SKILL, STARTER_LAYOUT } from "../../shared/constants.ts";
 import type { CandidateProject } from "../../shared/rpc.ts";
 import { overlaps } from "../paths.ts";
-import { ITERATION_FILES, parseIteration } from "../progress/iteration.ts";
-import { defaultSourcePath, pathExists, type ProjectWithSources } from "../workspace/workspace-project.ts";
+import type { WorkspaceAccess } from "../workspace/access.ts";
+import { defaultSource, pathExists, type AccessFor, type ProjectWithSources } from "../workspace/workspace-project.ts";
 
 type Sdk = BbPluginApi["sdk"];
 
@@ -25,7 +26,7 @@ export interface ProjectProbe {
   agentsText: string | null;
   /**
    * Set when the folder is a starter clone: which factory folder it holds
-   * (factory/ wins, as in layout.ts), or null with only the coach-me skill.
+   * (factory/ wins, as in layouts/capstone-factory/detect.ts), or null with only the coach-me skill.
    * `iterationText` is then the factory's ITERATION.
    */
   starter?: { factory: string | null };
@@ -75,45 +76,54 @@ export function rankCandidates(candidates: readonly CandidateProject[], hint: st
   );
 }
 
-async function readOptional(path: string): Promise<string | null> {
-  return readFile(path, "utf8").catch(() => null);
+async function readOptional(access: WorkspaceAccess, path: string): Promise<string | null> {
+  return access.read(path).then(
+    (file) => file?.text ?? null,
+    () => null,
+  );
 }
 
-async function readIterationText(root: string): Promise<string | null> {
+async function readIterationText(access: WorkspaceAccess, root: string): Promise<string | null> {
   for (const file of ITERATION_FILES) {
-    const text = await readOptional(join(root, file));
+    const text = await readOptional(access, join(root, file));
     if (text !== null) return text;
   }
   return null;
 }
 
-async function isFolder(path: string): Promise<boolean> {
-  return (await lstat(path).catch(() => null))?.isDirectory() === true;
-}
-
 /** Whether `root` is a starter clone, and which factory folder it holds. */
-async function starterOf(root: string): Promise<{ factory: string | null } | undefined> {
-  for (const folder of [STARTER_LAYOUT.lateFactory, STARTER_LAYOUT.earlyFactory]) {
-    if (await isFolder(join(root, folder))) return { factory: folder === STARTER_LAYOUT.lateFactory ? `${folder}/` : folder };
+async function starterOf(access: WorkspaceAccess, root: string): Promise<{ factory: string | null } | undefined> {
+  const folders = [STARTER_LAYOUT.lateFactory, STARTER_LAYOUT.earlyFactory];
+  const skill = join(root, STARTER_COACH_SKILL);
+  const kinds = await access.kinds([...folders.map((folder) => join(root, folder)), skill]);
+  for (const folder of folders) {
+    if (kinds[join(root, folder)] === "folder") return { factory: folder === STARTER_LAYOUT.lateFactory ? `${folder}/` : folder };
   }
-  return (await pathExists(join(root, STARTER_COACH_SKILL))) ? { factory: null } : undefined;
+  return (kinds[skill] ?? "none") !== "none" ? { factory: null } : undefined;
 }
 
-async function probe(project: ProjectWithSources): Promise<ProjectProbe> {
-  const root = defaultSourcePath(project);
-  const rootExists = root !== null && (await pathExists(root));
+async function probe(project: ProjectWithSources, accessFor: AccessFor): Promise<ProjectProbe> {
+  const source = defaultSource(project);
+  const root = source?.path ?? null;
+  const access = source === undefined ? null : accessFor(source.hostId);
+  const rootExists = root !== null && access !== null && (await pathExists(access, root));
   const base = { projectId: project.id, name: project.name, root, rootExists };
-  if (root === null || !rootExists) return { ...base, iterationText: null, agentsText: null };
-  const starter = await starterOf(root);
+  if (root === null || access === null || !rootExists) return { ...base, iterationText: null, agentsText: null };
+  const starter = await starterOf(access, root);
   if (starter !== undefined) {
     const factory = starter.factory === null ? null : join(root, starter.factory);
-    return { ...base, iterationText: factory === null ? null : await readIterationText(factory), agentsText: null, starter };
+    return { ...base, iterationText: factory === null ? null : await readIterationText(access, factory), agentsText: null, starter };
   }
-  return { ...base, iterationText: await readIterationText(root), agentsText: await readOptional(join(root, FACTORY_FILES.agents)) };
+  return {
+    ...base,
+    iterationText: await readIterationText(access, root),
+    agentsText: await readOptional(access, join(root, FACTORY_FILES.agents)),
+  };
 }
 
 export async function listCandidates(
   sdk: Sdk,
+  accessFor: AccessFor,
   coursePath: string,
   coachPath: string | null,
   projectHint: string | null,
@@ -121,7 +131,7 @@ export async function listCandidates(
   const projects = await sdk.projects.list({ includePersonal: false });
   const coachFile = basename(coachPath ?? COURSE_FILES.defaultCoach);
   const context: CandidateContext = { coursePath, coachName: basename(coachFile, extname(coachFile)) };
-  const probes = await Promise.all(projects.filter((project) => project.kind === "standard").map(probe));
+  const probes = await Promise.all(projects.filter((project) => project.kind === "standard").map((project) => probe(project, accessFor)));
   return rankCandidates(
     probes.map((entry) => describeCandidate(entry, context)),
     projectHint,

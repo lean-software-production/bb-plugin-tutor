@@ -1,34 +1,28 @@
-// The ProgressStore port over the student's factory repo on this machine.
-import { lstat, readFile, unlink } from "node:fs/promises";
-import { join } from "node:path";
-import { BUILTIN_LESSON_ID, FACTORY_FILES } from "../../shared/constants.ts";
+// The ProgressStore port over the student's workspace, reached through
+// WorkspaceAccess: where the files are comes from a ProgressLocation.
+import { dirname, join } from "node:path";
+import { formatIteration, parseIteration } from "../../layouts/progress/iteration.ts";
+import { formatProgress, parseProgress } from "../../layouts/progress/progress-yaml.ts";
+import type { ProgressLocation } from "../../layouts/types.ts";
+import { BUILTIN_LESSON_ID } from "../../shared/constants.ts";
 import type { IterationState, ProgressFile, StudentState } from "../../shared/model.ts";
 import type { ProgressStore } from "../../shared/ports.ts";
-import { writeFileAtomic } from "./atomic-write.ts";
-import { formatIteration, ITERATION_FILES, parseIteration } from "./iteration.ts";
-import { ownFolder } from "./own-folder.ts";
-import { formatProgress, parseProgress } from "./progress-yaml.ts";
-
-/** The file's text, or null when it does not exist. */
-async function readOptional(path: string): Promise<string | null> {
-  try {
-    return await readFile(path, "utf8");
-  } catch (cause) {
-    if ((cause as NodeJS.ErrnoException).code === "ENOENT") return null;
-    throw cause;
-  }
-}
+import type { WorkspaceAccess } from "../workspace/access.ts";
 
 /**
- * spec/PROGRESS.yaml's progress. `unreadable`: the file is there but could not
+ * The progress file's progress. `unreadable`: the file is there but could not
  * be read or parsed, which is not the same as having none (StudentState).
  */
-async function readProgressFile(factoryRoot: string, problems: string[]): Promise<{ progress: ProgressFile | null; unreadable: boolean }> {
+async function readProgressFile(
+  access: WorkspaceAccess,
+  at: ProgressLocation,
+  problems: string[],
+): Promise<{ progress: ProgressFile | null; unreadable: boolean }> {
   let text: string | null;
   try {
-    text = await readOptional(join(factoryRoot, FACTORY_FILES.progress));
+    text = (await access.read(join(at.dir, at.progressFile)))?.text ?? null;
   } catch (cause) {
-    problems.push(`${FACTORY_FILES.progress} could not be read (${(cause as Error).message}).`);
+    problems.push(`${at.progressFile} could not be read (${(cause as Error).message}).`);
     return { progress: null, unreadable: true };
   }
   if (text === null) return { progress: null, unreadable: false };
@@ -38,15 +32,19 @@ async function readProgressFile(factoryRoot: string, problems: string[]): Promis
 }
 
 /**
- * The root ITERATION's text, else the legacy spec/ITERATION's, with the file
- * it came from. A file that is there but unreadable is a problem, and hides
- * the legacy one rather than falling back past it.
+ * The first ITERATION file's text, else the next one's (an older factory's
+ * spec/ITERATION), with the file it came from. A file that is there but
+ * unreadable is a problem, and hides the later ones rather than falling back past it.
  */
-async function readIteration(factoryRoot: string, problems: string[]): Promise<{ text: string; label: string } | null> {
-  for (const label of ITERATION_FILES) {
+async function readIteration(
+  access: WorkspaceAccess,
+  at: ProgressLocation,
+  problems: string[],
+): Promise<{ text: string; label: string } | null> {
+  for (const label of at.iterationFiles) {
     try {
-      const text = await readOptional(join(factoryRoot, label));
-      if (text !== null) return { text, label };
+      const file = await access.read(join(at.dir, label));
+      if (file !== null) return { text: file.text, label };
     } catch (cause) {
       problems.push(`${label} could not be read (${(cause as Error).message}).`);
       return null;
@@ -56,48 +54,67 @@ async function readIteration(factoryRoot: string, problems: string[]): Promise<{
 }
 
 /**
- * Removes a factory's older spec/ITERATION once the root one is written, so
- * the two never disagree. Only inside a real spec/ folder: through a symbolic
- * link it could delete some other file of the student's.
+ * Refuses to write `file` (relative to `dir`) when its folder is anything but
+ * a real folder or nothing yet: a symbolic link there (spec -> ../src) could
+ * point anywhere, and writing through it would touch the student's other work.
  */
-async function removeLegacyIteration(factoryRoot: string): Promise<void> {
-  const spec = await lstat(join(factoryRoot, FACTORY_FILES.specDir)).catch((cause: NodeJS.ErrnoException) => {
-    if (cause.code === "ENOENT") return null;
-    throw cause;
-  });
-  if (spec === null || spec.isSymbolicLink() || !spec.isDirectory()) return;
-  await unlink(join(factoryRoot, FACTORY_FILES.legacyIteration)).catch((cause: NodeJS.ErrnoException) => {
-    if (cause.code !== "ENOENT") throw cause;
-  });
+async function ownFolderOf(access: WorkspaceAccess, dir: string, file: string): Promise<void> {
+  const folder = dirname(file);
+  if (folder === ".") return;
+  const path = join(dir, folder);
+  const kind = (await access.kinds([path]))[path] ?? "none";
+  const label = `${folder}/ in the factory`;
+  if (kind === "link") throw new Error(`${label} is a symbolic link, so Tutor will not write through it. Make it a real folder.`);
+  if (kind === "file") throw new Error(`${label} is a file, not a folder. Move it aside so Tutor can write there.`);
+}
+
+/**
+ * Removes the older ITERATION files once the first is written, so they never
+ * disagree. Only inside a real folder: through a symbolic link it could
+ * delete some other file of the student's.
+ */
+async function removeOlderIterations(access: WorkspaceAccess, at: ProgressLocation): Promise<void> {
+  for (const file of at.iterationFiles.slice(1)) {
+    const folder = dirname(file);
+    if (folder !== ".") {
+      const path = join(at.dir, folder);
+      if ((await access.kinds([path]))[path] !== "folder") continue;
+    }
+    await access.remove(join(at.dir, file));
+  }
 }
 
 export function createProgressStore(): ProgressStore {
   return {
-    async read(factoryRoot: string): Promise<StudentState> {
+    async read(access: WorkspaceAccess, at: ProgressLocation): Promise<StudentState> {
       const problems: string[] = [];
-      const iterationFile = await readIteration(factoryRoot, problems);
+      const iterationFile = await readIteration(access, at, problems);
       let iteration: IterationState | null = null;
       if (iterationFile !== null) {
         const parsed = parseIteration(iterationFile.text, iterationFile.label);
         if ("state" in parsed) iteration = parsed.state;
         else problems.push(parsed.problem);
       }
-      const { progress, unreadable } = await readProgressFile(factoryRoot, problems);
+      const { progress, unreadable } = await readProgressFile(access, at, problems);
       return unreadable ? { iteration, progress, progressUnreadable: true, problems } : { iteration, progress, problems };
     },
 
-    async writeProgress(factoryRoot: string, progress: ProgressFile): Promise<void> {
-      await ownFolder(factoryRoot, FACTORY_FILES.specDir, "spec/ in the factory");
-      const path = join(factoryRoot, FACTORY_FILES.progress);
-      await writeFileAtomic(path, formatProgress(progress, await readOptional(path)));
+    async writeProgress(access: WorkspaceAccess, at: ProgressLocation, progress: ProgressFile): Promise<void> {
+      await ownFolderOf(access, at.dir, at.progressFile);
+      const path = join(at.dir, at.progressFile);
+      const previous = await access.read(path);
+      // Written only if the file is still what was just read (or still absent).
+      await access.write(path, formatProgress(progress, previous?.text ?? null), previous?.sha256 ?? null);
     },
 
-    async writeIteration(factoryRoot: string, state: IterationState): Promise<void> {
+    async writeIteration(access: WorkspaceAccess, at: ProgressLocation, state: IterationState): Promise<void> {
       if (state.iteration === BUILTIN_LESSON_ID) {
         throw new Error("Lesson 0 is tracked in spec/PROGRESS.yaml only; ITERATION is never written for it.");
       }
-      await writeFileAtomic(join(factoryRoot, FACTORY_FILES.iteration), formatIteration(state));
-      await removeLegacyIteration(factoryRoot);
+      const [file] = at.iterationFiles;
+      if (file === undefined) throw new Error("This course keeps no ITERATION file, so Tutor has nowhere to write it.");
+      await access.write(join(at.dir, file), formatIteration(state));
+      await removeOlderIterations(access, at);
     },
   };
 }

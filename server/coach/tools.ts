@@ -4,6 +4,7 @@ import type { PluginAgentToolContext, PluginAgentToolResult, PluginRowLabels } f
 import { TOOL_NAMES, type ToolName } from "../../shared/constants.ts";
 import { findLesson, findRule } from "../../shared/derive.ts";
 import { toolParameterSchemas, type ToolParameters } from "../../shared/tools.ts";
+import { capstoneProgress } from "../../layouts/capstone-factory/detect.ts";
 import { adoptLesson } from "../progress/factory-move.ts";
 import { isoSeconds } from "../progress/time.ts";
 import {
@@ -57,17 +58,18 @@ async function applyOutcome(rt: TutorRuntime, state: CoachState, outcome: Outcom
   // A factory Tutor can't find (or won't use) gets nothing written into where it should be.
   if (writes && state.layout.blocked !== null) throw new Error(state.layout.blocked);
   if (outcome.reached !== undefined) await recordReachedRule(rt.bb.sdk, caller.coachThreadId, outcome.reached);
-  let factoryDir = state.layout.factoryDir;
+  const access = rt.access(state.hostId);
+  let layout = state.layout;
   let note: string | null = null;
   // Adoption writes spec/, the seed and stand-ins/ before ITERATION, so ITERATION never names a lesson that isn't there.
   // From 004 in a starter clone it moves the factory to factory/ first (factory-move.ts), and the rest goes there.
   if (outcome.adopt !== undefined) {
-    const adoption = await adoptLesson(state.layout, outcome.adopt, { courseRoot: state.course.root });
-    factoryDir = adoption.layout.factoryDir;
+    const adoption = await adoptLesson(state.layout, outcome.adopt, { courseRoot: state.course.root, probe: access });
+    layout = adoption.layout;
     note = adoption.note;
   }
-  if (outcome.iteration !== undefined) await rt.store.writeIteration(factoryDir, outcome.iteration);
-  if (outcome.progress !== undefined) await rt.store.writeProgress(factoryDir, outcome.progress);
+  if (outcome.iteration !== undefined) await rt.store.writeIteration(access, capstoneProgress(layout), outcome.iteration);
+  if (outcome.progress !== undefined) await rt.store.writeProgress(access, capstoneProgress(layout), outcome.progress);
   if (outcome.iteration !== undefined || outcome.progress !== undefined) {
     rt.signals.publish(outcome.iteration === undefined ? "progress" : "iteration", outcome.progress?.iteration ?? null);
   }

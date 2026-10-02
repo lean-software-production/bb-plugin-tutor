@@ -18,7 +18,8 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { STARTER_LAYOUT } from "../../shared/constants.ts";
 import type { Lesson } from "../../shared/model.ts";
-import { resolveLayout, type Layout } from "./layout.ts";
+import { resolveLayout, type Layout } from "../../layouts/capstone-factory/detect.ts";
+import type { LayoutProbe } from "../../layouts/types.ts";
 import { checkLessonSpec, copyLessonSpec, type SpecCopyHooks, type SpecCopyOptions, type SpecCopyResult } from "./spec-copy.ts";
 
 const run = promisify(execFile);
@@ -118,7 +119,7 @@ function copyOptions(layout: Layout, courseRoot: string, hooks: SpecCopyHooks | 
  * factory/ first when the lesson calls for it. ITERATION and PROGRESS.yaml are
  * the caller's to write, into the returned layout's factory.
  */
-export async function adoptLesson(layout: Layout, lesson: Lesson, options: { courseRoot: string; hooks?: SpecCopyHooks }): Promise<Adoption> {
+export async function adoptLesson(layout: Layout, lesson: Lesson, options: { courseRoot: string; probe: LayoutProbe; hooks?: SpecCopyHooks }): Promise<Adoption> {
   if (layout.blocked !== null) throw new Error(layout.blocked);
   if (!needsFactoryMove(layout, lesson)) {
     return { layout, result: await copyLessonSpec(layout.factoryDir, lesson, copyOptions(layout, options.courseRoot, options.hooks)), moved: false, note: null };
@@ -127,7 +128,7 @@ export async function adoptLesson(layout: Layout, lesson: Lesson, options: { cou
   await checkLessonSpec(layout.factoryDir, lesson, copyOptions(layout, options.courseRoot, undefined));
   const move = await checkFactoryMove(layout);
   await moveFactory(layout, move);
-  const moved = await resolveLayout(layout.projectRoot);
+  const moved = await resolveLayout(layout.projectRoot, options.probe);
   const result = await copyLessonSpec(moved.factoryDir, lesson, copyOptions(moved, options.courseRoot, options.hooks));
   return { layout: moved, result, moved: true, note: move.note };
 }

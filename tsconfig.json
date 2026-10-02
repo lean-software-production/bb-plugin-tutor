@@ -23,6 +23,7 @@
     "app.tsx",
     "shared",
     "server",
+    "layouts",
     "app",
     "test",
     "scripts/*.ts",

@@ -3,7 +3,10 @@ import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { createDiskAccess } from "../../test/helpers/disk-access.ts";
 import { readFeatureConfig, resolveCoursePath, resolveFactoryHint, resolveProjectHint } from "./course-path.ts";
+
+const disk = createDiskAccess();
 
 test("course path: setting, then env, then config file, then the default", () => {
   const env = { TUTOR_COURSE_PATH: "/env/course" };
@@ -28,13 +31,13 @@ test("project hint: TUTOR_REPO_PATH, then config repo, then the repo holding the
   await mkdir(join(clone, ".git"), { recursive: true });
   await mkdir(factory, { recursive: true });
   const config = { repo: "/config/repo", factory };
-  assert.equal(await resolveProjectHint({ TUTOR_REPO_PATH: "/env/repo" }, config), "/env/repo");
-  assert.equal(await resolveProjectHint({}, config), "/config/repo");
-  assert.equal(await resolveProjectHint({}, { factory }), clone);
-  assert.equal(await resolveProjectHint({ TUTOR_FACTORY_PATH: factory }, {}), clone);
+  assert.equal(await resolveProjectHint({ TUTOR_REPO_PATH: "/env/repo" }, config, disk), "/env/repo");
+  assert.equal(await resolveProjectHint({}, config, disk), "/config/repo");
+  assert.equal(await resolveProjectHint({}, { factory }, disk), clone);
+  assert.equal(await resolveProjectHint({ TUTOR_FACTORY_PATH: factory }, {}, disk), clone);
   // A factory hint that isn't on this machine stays the hint.
-  assert.equal(await resolveProjectHint({}, { factory: join(top, "gone/tetris/.factory") }), join(top, "gone/tetris/.factory"));
-  assert.equal(await resolveProjectHint({}, {}), null);
+  assert.equal(await resolveProjectHint({}, { factory: join(top, "gone/tetris/.factory") }, disk), join(top, "gone/tetris/.factory"));
+  assert.equal(await resolveProjectHint({}, {}, disk), null);
 });
 
 test("the feature config's repo key is read, and a key this plugin doesn't know is ignored", async (t) => {

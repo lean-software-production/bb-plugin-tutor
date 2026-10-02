@@ -3,7 +3,7 @@
 // spec/features/ become the lesson's, leaving anything else in spec/ alone;
 // the lesson's sample seed is copied to <seeds>/<codebase>.md (tetris.md:
 // tetris/seeds/ in a starter clone, ../seeds for a factory that is its own
-// project; see layout.ts) unless that file is already there; and stand-ins/
+// project; see layouts/capstone-factory/detect.ts) unless that file is already there; and stand-ins/
 // is refreshed wholesale from the course's. Every check runs before anything
 // is written, so a refusal leaves the factory as it was (checkLessonSpec runs
 // them alone, for the factory move to go first). Tutor's tools write
@@ -108,7 +108,7 @@ async function requireCodebaseFolder(factoryRoot: string): Promise<void> {
   }
 }
 
-/** Where the lesson's sample seed goes (layout.ts works it out). */
+/** Where the lesson's sample seed goes (layouts/capstone-factory/detect.ts works it out). */
 export interface SeedsLocation {
   /** The seeds folder: tetris/seeds. */
   dir: string;

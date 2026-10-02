@@ -23,6 +23,7 @@ export async function registerTutor(bb: BbPluginApi, deps: WorldDeps): Promise<T
     settings,
     world: createWorldSource(bb, settings, deps),
     store: deps.store,
+    access: deps.access,
     signals: createStateSignals(bb),
     locks: createKeyedLock(),
     coaches: createCoachRegistry(),

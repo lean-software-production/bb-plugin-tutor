@@ -1,5 +1,6 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type { ProgressStore } from "../../shared/ports.ts";
+import type { WorkspaceAccess } from "../workspace/access.ts";
 import type { ActivityRecorder } from "../activity/heartbeat.ts";
 import type { CoachRegistry } from "./coach-registry.ts";
 import type { KeyedLock } from "./keyed-lock.ts";
@@ -13,6 +14,8 @@ export interface TutorRuntime {
   settings: TutorSettings;
   world: WorldSource;
   store: ProgressStore;
+  /** How the server reaches the workspace on a machine. */
+  access: (hostId: string) => WorkspaceAccess;
   signals: StateSignals;
   /** Serialises changes to one factory's files, and find-or-spawn of one lesson's coach. */
   locks: KeyedLock;

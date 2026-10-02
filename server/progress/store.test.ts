@@ -3,15 +3,21 @@ import { mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promis
 import { join } from "node:path";
 import { test } from "node:test";
 import { fixtureStudent } from "../../shared/fixtures.ts";
+import type { ProgressLocation } from "../../layouts/types.ts";
+import { createDiskAccess } from "../../test/helpers/disk-access.ts";
 import { makeSandbox } from "../../test/helpers/disk.ts";
+import type { WorkspaceAccess } from "../workspace/access.ts";
 import { createProgressStore } from "./store.ts";
 
 const store = createProgressStore();
+const disk = createDiskAccess();
+/** A capstone factory's progress location (capstoneProgress). */
+const at = (dir: string): ProgressLocation => ({ dir, progressFile: "spec/PROGRESS.yaml", iterationFiles: ["ITERATION", "spec/ITERATION"] });
 
 test("a repo nobody has coached reads as empty state", async () => {
   const sandbox = await makeSandbox();
   try {
-    assert.deepEqual(await store.read(sandbox.factoryRoot), { iteration: null, progress: null, problems: [] });
+    assert.deepEqual(await store.read(disk, at(sandbox.factoryRoot)), { iteration: null, progress: null, problems: [] });
   } finally {
     await sandbox.cleanup();
   }
@@ -22,9 +28,9 @@ test("progress and iteration round-trip, and writes leave no temp files", async 
   try {
     const progress = fixtureStudent.progress;
     assert.ok(progress !== null);
-    await store.writeIteration(sandbox.factoryRoot, { iteration: "002", status: "WIP" });
-    await store.writeProgress(sandbox.factoryRoot, progress);
-    assert.deepEqual(await store.read(sandbox.factoryRoot), fixtureStudent);
+    await store.writeIteration(disk, at(sandbox.factoryRoot), { iteration: "002", status: "WIP" });
+    await store.writeProgress(disk, at(sandbox.factoryRoot), progress);
+    assert.deepEqual(await store.read(disk, at(sandbox.factoryRoot)), fixtureStudent);
     assert.equal(await readFile(join(sandbox.factoryRoot, "ITERATION"), "utf8"), "002 WIP\n");
     assert.deepEqual((await readdir(sandbox.factoryRoot)).sort(), ["ITERATION", "spec"]);
     assert.deepEqual(await readdir(join(sandbox.factoryRoot, "spec")), ["PROGRESS.yaml"]);
@@ -39,7 +45,7 @@ test("malformed files become problems, never exceptions", async () => {
     await mkdir(join(sandbox.factoryRoot, "spec"));
     await writeFile(join(sandbox.factoryRoot, "ITERATION"), "three\n");
     await writeFile(join(sandbox.factoryRoot, "spec/PROGRESS.yaml"), "iteration: [\n");
-    const state = await store.read(sandbox.factoryRoot);
+    const state = await store.read(disk, at(sandbox.factoryRoot));
     assert.equal(state.iteration, null);
     assert.equal(state.progress, null);
     assert.equal(state.problems.length, 2);
@@ -52,14 +58,14 @@ test("malformed files become problems, never exceptions", async () => {
 test("a spec/PROGRESS.yaml that can't be read or has no lesson is unreadable; a missing one is not", async () => {
   const sandbox = await makeSandbox();
   try {
-    assert.equal((await store.read(sandbox.factoryRoot)).progressUnreadable, undefined);
+    assert.equal((await store.read(disk, at(sandbox.factoryRoot))).progressUnreadable, undefined);
     await mkdir(join(sandbox.factoryRoot, "spec/PROGRESS.yaml"), { recursive: true });
-    assert.equal((await store.read(sandbox.factoryRoot)).progressUnreadable, true, "a folder in its place");
+    assert.equal((await store.read(disk, at(sandbox.factoryRoot))).progressUnreadable, true, "a folder in its place");
     await rm(join(sandbox.factoryRoot, "spec/PROGRESS.yaml"), { recursive: true });
     await writeFile(join(sandbox.factoryRoot, "spec/PROGRESS.yaml"), "examples: {}\n");
-    assert.equal((await store.read(sandbox.factoryRoot)).progressUnreadable, true, "no iteration");
+    assert.equal((await store.read(disk, at(sandbox.factoryRoot))).progressUnreadable, true, "no iteration");
     await writeFile(join(sandbox.factoryRoot, "spec/PROGRESS.yaml"), 'iteration: "001"\nexamples: {}\n');
-    assert.equal((await store.read(sandbox.factoryRoot)).progressUnreadable, undefined);
+    assert.equal((await store.read(disk, at(sandbox.factoryRoot))).progressUnreadable, undefined);
   } finally {
     await sandbox.cleanup();
   }
@@ -69,7 +75,7 @@ test("reads ITERATION at the factory root", async () => {
   const sandbox = await makeSandbox();
   try {
     await writeFile(join(sandbox.factoryRoot, "ITERATION"), "003 WIP\n");
-    assert.deepEqual((await store.read(sandbox.factoryRoot)).iteration, { iteration: "003", status: "WIP" });
+    assert.deepEqual((await store.read(disk, at(sandbox.factoryRoot))).iteration, { iteration: "003", status: "WIP" });
   } finally {
     await sandbox.cleanup();
   }
@@ -80,7 +86,7 @@ test("falls back to a factory's older spec/ITERATION", async () => {
   try {
     await mkdir(join(sandbox.factoryRoot, "spec"));
     await writeFile(join(sandbox.factoryRoot, "spec/ITERATION"), "002 Done\n");
-    assert.deepEqual((await store.read(sandbox.factoryRoot)).iteration, { iteration: "002", status: "Done" });
+    assert.deepEqual((await store.read(disk, at(sandbox.factoryRoot))).iteration, { iteration: "002", status: "Done" });
   } finally {
     await sandbox.cleanup();
   }
@@ -92,7 +98,7 @@ test("the root ITERATION wins over spec/ITERATION", async () => {
     await mkdir(join(sandbox.factoryRoot, "spec"));
     await writeFile(join(sandbox.factoryRoot, "spec/ITERATION"), "002 Done\n");
     await writeFile(join(sandbox.factoryRoot, "ITERATION"), "003 WIP\n");
-    assert.deepEqual(await store.read(sandbox.factoryRoot), {
+    assert.deepEqual(await store.read(disk, at(sandbox.factoryRoot)), {
       iteration: { iteration: "003", status: "WIP" },
       progress: null,
       problems: [],
@@ -106,11 +112,11 @@ test("a problem names the ITERATION file it came from", async () => {
   const sandbox = await makeSandbox();
   try {
     await writeFile(join(sandbox.factoryRoot, "ITERATION"), "three\n");
-    assert.match((await store.read(sandbox.factoryRoot)).problems[0] ?? "", /^ITERATION should read like "003 WIP"/);
+    assert.match((await store.read(disk, at(sandbox.factoryRoot))).problems[0] ?? "", /^ITERATION should read like "003 WIP"/);
     await mkdir(join(sandbox.factoryRoot, "spec"));
     await writeFile(join(sandbox.factoryRoot, "spec/ITERATION"), "four\n");
     await rm(join(sandbox.factoryRoot, "ITERATION"));
-    assert.match((await store.read(sandbox.factoryRoot)).problems[0] ?? "", /^spec\/ITERATION should read like "003 WIP"/);
+    assert.match((await store.read(disk, at(sandbox.factoryRoot))).problems[0] ?? "", /^spec\/ITERATION should read like "003 WIP"/);
   } finally {
     await sandbox.cleanup();
   }
@@ -122,7 +128,7 @@ test("writing ITERATION writes the root file and removes spec/ITERATION", async 
     await mkdir(join(sandbox.factoryRoot, "spec"));
     await writeFile(join(sandbox.factoryRoot, "spec/ITERATION"), "001 Done\n");
     await writeFile(join(sandbox.factoryRoot, "spec/README.md"), "# Lesson 1\n");
-    await store.writeIteration(sandbox.factoryRoot, { iteration: "002", status: "WIP" });
+    await store.writeIteration(disk, at(sandbox.factoryRoot), { iteration: "002", status: "WIP" });
     assert.equal(await readFile(join(sandbox.factoryRoot, "ITERATION"), "utf8"), "002 WIP\n");
     assert.deepEqual(await readdir(join(sandbox.factoryRoot, "spec")), ["README.md"]);
   } finally {
@@ -133,7 +139,7 @@ test("writing ITERATION writes the root file and removes spec/ITERATION", async 
 test("writing ITERATION with no spec/ creates no spec/", async () => {
   const sandbox = await makeSandbox();
   try {
-    await store.writeIteration(sandbox.factoryRoot, { iteration: "001", status: "WIP" });
+    await store.writeIteration(disk, at(sandbox.factoryRoot), { iteration: "001", status: "WIP" });
     assert.deepEqual(await readdir(sandbox.factoryRoot), ["ITERATION"]);
   } finally {
     await sandbox.cleanup();
@@ -141,7 +147,7 @@ test("writing ITERATION with no spec/ creates no spec/", async () => {
 });
 
 test("refuses to write ITERATION for Lesson 0", async () => {
-  await assert.rejects(store.writeIteration("/nonexistent", { iteration: "000", status: "WIP" }), /Lesson 0/);
+  await assert.rejects(store.writeIteration(disk, at("/nonexistent"), { iteration: "000", status: "WIP" }), /Lesson 0/);
 });
 
 test("refuses to write PROGRESS.yaml through a spec/ that is a symbolic link, and never removes an ITERATION through it", async () => {
@@ -152,10 +158,58 @@ test("refuses to write PROGRESS.yaml through a spec/ that is a symbolic link, an
     await symlink("src", join(sandbox.factoryRoot, "spec"));
     const progress = fixtureStudent.progress;
     assert.ok(progress !== null);
-    await assert.rejects(store.writeProgress(sandbox.factoryRoot, progress), /symbolic link/);
-    await store.writeIteration(sandbox.factoryRoot, { iteration: "002", status: "WIP" });
+    await assert.rejects(store.writeProgress(disk, at(sandbox.factoryRoot), progress), /symbolic link/);
+    await store.writeIteration(disk, at(sandbox.factoryRoot), { iteration: "002", status: "WIP" });
     assert.equal(await readFile(join(sandbox.factoryRoot, "ITERATION"), "utf8"), "002 WIP\n");
     assert.deepEqual(await readdir(join(sandbox.factoryRoot, "src")), ["ITERATION"]);
+  } finally {
+    await sandbox.cleanup();
+  }
+});
+
+/** The disk, recording the expected sha256 of every write. */
+function recording(): { access: WorkspaceAccess; writes: { path: string; expected: string | null | undefined }[] } {
+  const writes: { path: string; expected: string | null | undefined }[] = [];
+  return {
+    writes,
+    access: {
+      ...disk,
+      write: (path, text, expected) => (writes.push({ path, expected }), disk.write(path, text, expected)),
+    },
+  };
+}
+
+test("PROGRESS.yaml is written only if it is still what the same call read", async () => {
+  const sandbox = await makeSandbox();
+  try {
+    const progress = fixtureStudent.progress;
+    assert.ok(progress !== null);
+    const { access, writes } = recording();
+    await store.writeProgress(access, at(sandbox.factoryRoot), progress);
+    await store.writeProgress(access, at(sandbox.factoryRoot), progress);
+    const read = await disk.read(join(sandbox.factoryRoot, "spec/PROGRESS.yaml"));
+    assert.equal(writes[0]?.expected, null, "a new file must not exist yet");
+    assert.equal(writes[1]?.expected, read?.sha256, "a rewrite expects the text it read");
+    await store.writeIteration(access, at(sandbox.factoryRoot), { iteration: "002", status: "WIP" });
+    assert.equal(writes[2]?.expected, undefined, "ITERATION is written without a check");
+  } finally {
+    await sandbox.cleanup();
+  }
+});
+
+test("progress lives wherever the location says", async () => {
+  const sandbox = await makeSandbox();
+  try {
+    const progress = fixtureStudent.progress;
+    assert.ok(progress !== null);
+    const elsewhere: ProgressLocation = { dir: join(sandbox.factoryRoot, ".tutor/courses/x"), progressFile: "progress.yaml", iterationFiles: ["ITERATION"] };
+    await store.writeIteration(disk, elsewhere, { iteration: "002", status: "WIP" });
+    await store.writeProgress(disk, elsewhere, progress);
+    assert.deepEqual(await store.read(disk, elsewhere), fixtureStudent);
+    assert.deepEqual((await readdir(elsewhere.dir)).sort(), ["ITERATION", "progress.yaml"]);
+    const noIteration: ProgressLocation = { ...elsewhere, iterationFiles: [] };
+    assert.equal((await store.read(disk, noIteration)).iteration, null);
+    await assert.rejects(store.writeIteration(disk, noIteration, { iteration: "002", status: "WIP" }), /no ITERATION/);
   } finally {
     await sandbox.cleanup();
   }

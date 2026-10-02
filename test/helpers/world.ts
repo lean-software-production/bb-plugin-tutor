@@ -4,9 +4,9 @@ import { fixtureWorkspace, fixtureCourse, fixtureStudent } from "../../shared/fi
 import type { Course, StudentState } from "../../shared/model.ts";
 import type { Workspace } from "../../shared/rpc.ts";
 import type { World } from "../../server/coach/world.ts";
-import type { Layout } from "../../server/progress/layout.ts";
+import type { Layout } from "../../layouts/capstone-factory/detect.ts";
 
-/** What layout.ts makes of a project whose folder is the factory itself (tetris/.factory, as v0.1.0 set it up). */
+/** What resolveLayout makes of a project whose folder is the factory itself (tetris/.factory, as v0.1.0 set it up). */
 export function legacyLayout(root: string): Layout {
   const codebaseDir = dirname(root);
   return {
@@ -26,7 +26,7 @@ export function legacyLayout(root: string): Layout {
   };
 }
 
-/** What layout.ts makes of a starter clone that is the project, its factory at `factoryAt`. */
+/** What resolveLayout makes of a starter clone that is the project, its factory at `factoryAt`. */
 export function repoLayout(root: string, factoryAt: "early" | "late" = "early"): Layout {
   const factoryShown = factoryAt === "late" ? "factory" : "tetris/.factory";
   return {

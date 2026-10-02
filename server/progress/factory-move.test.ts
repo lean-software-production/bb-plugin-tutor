@@ -7,7 +7,10 @@ import { fixtureCourseTo004 } from "../../shared/fixtures.ts";
 import type { Lesson } from "../../shared/model.ts";
 import { git, makeRepoSandbox, type Sandbox } from "../../test/helpers/disk.ts";
 import { adoptLesson, checkFactoryMove, moveFactory, needsFactoryMove } from "./factory-move.ts";
-import { resolveLayout } from "./layout.ts";
+import { resolveLayout } from "../../layouts/capstone-factory/detect.ts";
+import { createDiskAccess } from "../../test/helpers/disk-access.ts";
+
+const disk = createDiskAccess();
 
 // The starter's fetch.sh (.agents/skills/fetch-iteration/fetch.sh), its last
 // step verbatim: run from the repo's top folder once it has adopted 004 in
@@ -61,21 +64,21 @@ async function exists(path: string): Promise<boolean> {
 
 test("the move at 004 is due only in a starter clone whose factory is still tetris/.factory, from lesson 4 on", async (t) => {
   const sandbox = await at003(t);
-  const early = await resolveLayout(sandbox.repoRoot);
+  const early = await resolveLayout(sandbox.repoRoot, disk);
   assert.equal(needsFactoryMove(early, lessonOf(sandbox, "003")), false);
   assert.equal(needsFactoryMove(early, lessonOf(sandbox, "004")), true);
   assert.equal(needsFactoryMove(early, lessonOf(sandbox, "000")), false);
   // A factory that is its own project (v0.1.0) is never moved.
-  assert.equal(needsFactoryMove(await resolveLayout(sandbox.factoryRoot), lessonOf(sandbox, "004")), false);
+  assert.equal(needsFactoryMove(await resolveLayout(sandbox.factoryRoot, disk), lessonOf(sandbox, "004")), false);
   git(sandbox.repoRoot, "mv", "tetris/.factory", "factory");
-  assert.equal(needsFactoryMove(await resolveLayout(sandbox.repoRoot), lessonOf(sandbox, "004")), false);
+  assert.equal(needsFactoryMove(await resolveLayout(sandbox.repoRoot, disk), lessonOf(sandbox, "004")), false);
 });
 
 test("Tutor's move leaves the repo as fetch.sh's does: the same staged changes and the same skills link", async (t) => {
   const tutor = await at003(t);
   const fetch = await at003(t);
 
-  const layout = await resolveLayout(tutor.repoRoot);
+  const layout = await resolveLayout(tutor.repoRoot, disk);
   await moveFactory(layout, await checkFactoryMove(layout));
   execFileSync("bash", ["-euo", "pipefail", "-c", FETCH_SH_MOVE_STEP], { cwd: fetch.repoRoot, env: GIT_ENV });
 
@@ -94,7 +97,7 @@ test("Tutor's move leaves the repo as fetch.sh's does: the same staged changes a
 
 test("adopting 004 moves the factory, then writes the lesson into factory/ and the repo-relative paths it wrote", async (t) => {
   const sandbox = await at003(t);
-  const adoption = await adoptLesson(await resolveLayout(sandbox.repoRoot), lessonOf(sandbox, "004"), { courseRoot: sandbox.course.root });
+  const adoption = await adoptLesson(await resolveLayout(sandbox.repoRoot, disk), lessonOf(sandbox, "004"), { courseRoot: sandbox.course.root, probe: disk });
   assert.equal(adoption.moved, true);
   assert.equal(adoption.layout.factoryAt, "late");
   assert.equal(adoption.layout.factoryDir, join(sandbox.repoRoot, "factory"));
@@ -106,12 +109,12 @@ test("adopting 004 moves the factory, then writes the lesson into factory/ and t
 
 test("adopting 003, or 004 once the factory is factory/, does not move anything", async (t) => {
   const sandbox = await at003(t);
-  const at3 = await adoptLesson(await resolveLayout(sandbox.repoRoot), lessonOf(sandbox, "003"), { courseRoot: sandbox.course.root });
+  const at3 = await adoptLesson(await resolveLayout(sandbox.repoRoot, disk), lessonOf(sandbox, "003"), { courseRoot: sandbox.course.root, probe: disk });
   assert.equal(at3.moved, false);
   assert.equal(at3.layout.factoryAt, "early");
   assert.deepEqual(at3.result.written.slice(0, 1), ["tetris/.factory/spec/README.md"]);
   git(sandbox.repoRoot, "mv", "tetris/.factory", "factory");
-  const at4 = await adoptLesson(await resolveLayout(sandbox.repoRoot), lessonOf(sandbox, "004"), { courseRoot: sandbox.course.root });
+  const at4 = await adoptLesson(await resolveLayout(sandbox.repoRoot, disk), lessonOf(sandbox, "004"), { courseRoot: sandbox.course.root, probe: disk });
   assert.equal(at4.moved, false);
   assert.equal(await exists(join(sandbox.repoRoot, "tetris/.factory")), false);
 });
@@ -122,17 +125,17 @@ test("a refused move writes nothing: not a git repo, factory/ already there, or 
   t.after(() => bare.cleanup());
   const before = await tree(bare.repoRoot);
   await assert.rejects(
-    adoptLesson(await resolveLayout(bare.repoRoot), lessonOf(bare, "004"), { courseRoot: bare.course.root }),
+    adoptLesson(await resolveLayout(bare.repoRoot, disk), lessonOf(bare, "004"), { courseRoot: bare.course.root, probe: disk }),
     /could not move tetris\/\.factory to factory\//,
   );
   assert.deepEqual(await tree(bare.repoRoot), before);
 
   // factory/ turns up after the layout was read.
   const raced = await at003(t);
-  const layout = await resolveLayout(raced.repoRoot);
+  const layout = await resolveLayout(raced.repoRoot, disk);
   await mkdir(join(raced.repoRoot, "factory"));
   const racedBefore = await tree(raced.repoRoot);
-  await assert.rejects(adoptLesson(layout, lessonOf(raced, "004"), { courseRoot: raced.course.root }), /factory\/ already exists/);
+  await assert.rejects(adoptLesson(layout, lessonOf(raced, "004"), { courseRoot: raced.course.root, probe: disk }), /factory\/ already exists/);
   assert.deepEqual(await tree(raced.repoRoot), racedBefore);
 
   // spec/ is a file: the spec check refuses before the move.
@@ -140,7 +143,7 @@ test("a refused move writes nothing: not a git repo, factory/ already there, or 
   await rm(join(badSpec.factoryRoot, "spec"), { recursive: true });
   await writeFile(join(badSpec.factoryRoot, "spec"), "not a folder\n");
   const badBefore = await tree(badSpec.repoRoot);
-  await assert.rejects(adoptLesson(await resolveLayout(badSpec.repoRoot), lessonOf(badSpec, "004"), { courseRoot: badSpec.course.root }));
+  await assert.rejects(adoptLesson(await resolveLayout(badSpec.repoRoot, disk), lessonOf(badSpec, "004"), { courseRoot: badSpec.course.root, probe: disk }));
   assert.deepEqual(await tree(badSpec.repoRoot), badBefore);
 });
 
@@ -148,14 +151,14 @@ test("a copy that fails after the move leaves factory/ at 003 Done, and a retry 
   const sandbox = await at003(t);
   const failing = { afterMovedAside: () => Promise.reject(new Error("disk full")) };
   await assert.rejects(
-    adoptLesson(await resolveLayout(sandbox.repoRoot), lessonOf(sandbox, "004"), { courseRoot: sandbox.course.root, hooks: failing }),
+    adoptLesson(await resolveLayout(sandbox.repoRoot, disk), lessonOf(sandbox, "004"), { courseRoot: sandbox.course.root, probe: disk, hooks: failing }),
     /disk full/,
   );
   assert.equal(await exists(join(sandbox.repoRoot, "tetris/.factory")), false);
   assert.equal(await readFile(join(sandbox.repoRoot, "factory/ITERATION"), "utf8"), "003 Done\n");
   assert.match(await readFile(join(sandbox.repoRoot, "factory/spec/README.md"), "utf8"), /Homework 3/);
 
-  const retry = await adoptLesson(await resolveLayout(sandbox.repoRoot), lessonOf(sandbox, "004"), { courseRoot: sandbox.course.root });
+  const retry = await adoptLesson(await resolveLayout(sandbox.repoRoot, disk), lessonOf(sandbox, "004"), { courseRoot: sandbox.course.root, probe: disk });
   assert.equal(retry.moved, false);
   assert.match(await readFile(join(sandbox.repoRoot, "factory/spec/README.md"), "utf8"), /Homework 4/);
   assert.equal(await readlink(join(sandbox.repoRoot, "factory/.claude/skills")), "../../.agents/skills");
@@ -169,7 +172,7 @@ test("a real .claude/skills folder is left alone, with a note", async (t) => {
   await writeFile(join(skills, "mine/SKILL.md"), "mine\n");
   git(sandbox.repoRoot, "add", "-A", "tetris/.factory/.claude");
   git(sandbox.repoRoot, "commit", "-q", "-m", "My own skills");
-  const adoption = await adoptLesson(await resolveLayout(sandbox.repoRoot), lessonOf(sandbox, "004"), { courseRoot: sandbox.course.root });
+  const adoption = await adoptLesson(await resolveLayout(sandbox.repoRoot, disk), lessonOf(sandbox, "004"), { courseRoot: sandbox.course.root, probe: disk });
   assert.equal(adoption.moved, true);
   assert.match(adoption.note ?? "", /\.claude\/skills is a folder/);
   assert.equal((await lstat(join(sandbox.repoRoot, "factory/.claude/skills"))).isDirectory(), true);

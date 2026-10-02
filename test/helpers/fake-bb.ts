@@ -6,6 +6,7 @@ import { SKILL_ID } from "../../shared/constants.ts";
 import type { Course } from "../../shared/model.ts";
 import { registerTutor } from "../../server/coach/register.ts";
 import { createProgressStore } from "../../server/progress/store.ts";
+import { createDiskAccess } from "./disk-access.ts";
 import type { TutorRuntime } from "../../server/coach/runtime.ts";
 
 export const PROJECT_ID = "prj_factory";
@@ -260,6 +261,7 @@ export async function makeTutorHost(
     env: options.env ?? {},
     featureConfigFile: options.featureConfigFile ?? "/nonexistent/tutor/config.json",
     now: () => NOW,
+    access: () => createDiskAccess(),
   });
   return { ...host, rt, threads, running, sent, tabs, tabConflicts, tabWriteError, forkRefusal, archiveRefusal, beforeList, addThread };
 }

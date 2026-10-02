@@ -17,10 +17,10 @@ import { formatProgressCard, type ProgressCard } from "../../shared/directives.t
 import { ruleKeyOfExample } from "../../shared/keys.ts";
 import type { Course, ExampleProgress, Lesson, IterationState, ProgressFile, Rule, StudentState } from "../../shared/model.ts";
 import type { ToolParameters } from "../../shared/tools.ts";
-import { carryOver } from "../progress/carry-over.ts";
+import { carryOver } from "../../layouts/progress/carry-over.ts";
 import { progressFor } from "../progress/current.ts";
 import { needsFactoryMove } from "../progress/factory-move.ts";
-import type { Layout } from "../progress/layout.ts";
+import type { Layout } from "../../layouts/capstone-factory/detect.ts";
 import type { World } from "./world.ts";
 
 const LATE_FACTORY = STARTER_LAYOUT.lateFactory;

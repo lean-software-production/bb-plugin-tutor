@@ -202,12 +202,12 @@ export function registerRpc(rt: TutorRuntime): void {
     listCandidateProjects: async () => {
       const world = await rt.world.load();
       return {
-        projects: await listCandidates(bb.sdk, world.coursePath, world.course?.coachPath ?? null, world.projectHint),
+        projects: await listCandidates(bb.sdk, rt.access, world.coursePath, world.course?.coachPath ?? null, world.projectHint),
       };
     },
 
     confirmWorkspace: async ({ projectId }) => {
-      const { workspace } = await resolveWorkspace(bb.sdk, projectId);
+      const { workspace } = await resolveWorkspace(bb.sdk, projectId, rt.access);
       if (workspace.status !== "found") {
         throw new Error("That project has no folder on this machine, so Tutor cannot coach in it.");
       }

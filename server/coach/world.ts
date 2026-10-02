@@ -1,17 +1,26 @@
 // Everything a handler needs, re-derived from disk and BB on each call: the
-// course, the workspace, where its factory is (layout.ts), and the
-// student's state. Nothing here comes from thread metadata.
+// course, the workspace, where its factory is (layouts/capstone-factory), and
+// the student's state. Nothing here comes from thread metadata. The workspace
+// is reached only through the WorkspaceAccess for its machine.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { resolveCurrent, type CurrentPointer } from "../../shared/derive.ts";
 import type { Course, StudentState } from "../../shared/model.ts";
 import type { CourseSource, ProgressStore } from "../../shared/ports.ts";
 import type { Workspace } from "../../shared/rpc.ts";
+import { capstoneProgress, resolveLayout, type Layout } from "../../layouts/capstone-factory/detect.ts";
 import { overlaps, realPath } from "../paths.ts";
-import { resolveLayout, type Layout } from "../progress/layout.ts";
-import { resolveCoachFile } from "./coach-file.ts";
+import type { WorkspaceAccess } from "../workspace/access.ts";
 import { resolveWorkspace, workspaceSetting } from "../workspace/workspace-project.ts";
+import { resolveCoachFile } from "./coach-file.ts";
 import { readFeatureConfig, resolveCoursePath, resolveProjectHint, type Env } from "./course-path.ts";
 import type { TutorSettings } from "./settings.ts";
+
+/**
+ * The machine asked about the Feature's project hint while there is no
+ * workspace yet: the one the server shares with the Feature (the Codespace).
+ * Until Task 8 every machine is the local disk; Task 8 decides how to name it.
+ */
+const FEATURE_HOST = "local";
 
 /** Page loads fire several calls at once; they share one course read. */
 const COURSE_TTL_MS = 3000;
@@ -42,6 +51,8 @@ export interface WorldDeps {
   env: Env;
   featureConfigFile: string;
   now: () => Date;
+  /** How the server reaches the workspace on a machine. */
+  access: (hostId: string) => WorkspaceAccess;
 }
 
 export interface WorldSource {
@@ -80,19 +91,26 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
       // A config this plugin can't read stops Tutor: no course, so every RPC and tool refuses with its message.
       const [courseResult, resolved] = await Promise.all([
         config.error === undefined ? loadCourse(coursePath) : Promise.resolve<CourseResult>({ course: null, error: config.error }),
-        resolveWorkspace(bb.sdk, workspaceSetting(values)),
+        resolveWorkspace(bb.sdk, workspaceSetting(values), deps.access),
       ]);
       // Re-checked on every load, not just at confirmWorkspace: a project whose folder now
       // leads into the course would have the coach write spec/, stand-ins/ and the seed into the course.
       const { workspace, hostId } =
-        resolved.workspace.status === "found" && overlaps(await realPath(resolved.workspace.root), await realPath(coursePath))
+        resolved.workspace.status === "found" &&
+        resolved.hostId !== null &&
+        overlaps(await deps.access(resolved.hostId).realPath(resolved.workspace.root), await realPath(coursePath))
           ? { workspace: { status: "missing" as const, projectId: resolved.workspace.projectId }, hostId: null }
           : resolved;
-      const layout = workspace.status === "found" ? await resolveLayout(workspace.root) : null;
-      const read = layout === null ? EMPTY_STUDENT : await deps.store.read(layout.factoryDir);
+      const access = workspace.status === "found" && hostId !== null ? deps.access(hostId) : null;
+      const layout = workspace.status === "found" && access !== null ? await resolveLayout(workspace.root, access) : null;
+      const read = layout === null || access === null ? EMPTY_STUDENT : await deps.store.read(access, capstoneProgress(layout));
       const student = layout === null || layout.problems.length === 0 ? read : { ...read, problems: [...layout.problems, ...read.problems] };
       const coachPath =
-        courseResult.course === null ? null : await resolveCoachFile(courseResult.course.coachPath, layout?.factoryDir ?? null);
+        courseResult.course === null
+          ? null
+          : access === null
+            ? courseResult.course.coachPath
+            : await resolveCoachFile(courseResult.course.coachPath, layout?.factoryDir ?? null, access);
       if (courseResult.course !== null) lastCoach = coachPath;
       lastLayout = layout;
       return {
@@ -105,7 +123,7 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
         layout,
         student,
         pointer: courseResult.course === null ? null : resolveCurrent(courseResult.course, student),
-        projectHint: await resolveProjectHint(deps.env, config),
+        projectHint: await resolveProjectHint(deps.env, config, access ?? deps.access(FEATURE_HOST)),
       };
     },
     lastCoachPath: () => lastCoach,
