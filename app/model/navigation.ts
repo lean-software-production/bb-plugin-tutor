@@ -18,6 +18,15 @@ export interface NavigationItemLike {
   icon: NavigationIconLike;
   action: { kind: string; pluginId?: string; panelId?: string };
   isDisabled: boolean;
+  /**
+   * False when the student hid this item through BB's customize editor. BB's own navigation
+   * keeps hidden items reachable in an overflow menu; Tutor's simplified nav has no menu to put
+   * one in (it already drops Plugins and Skills outright, never offering them back), so it drops
+   * hidden items too rather than building new UI just to reinstate a reachability guarantee BB's
+   * own "Customize" entry point already gives the student (through the setting that turns this
+   * simplified nav off).
+   */
+  isVisible: boolean;
   shortcut: NavigationShortcutLike | null;
 }
 
@@ -26,7 +35,7 @@ const HIDDEN_IDS: ReadonlySet<string> = new Set(["__bb__/extensions", "__bb__/sk
 const HIDDEN_ACTIONS: ReadonlySet<string> = new Set(["open-extensions", "open-skills"]);
 
 export function simplifyNavigation<T extends NavigationItemLike>(items: readonly T[]): T[] {
-  return items.filter((item) => !HIDDEN_IDS.has(item.id) && !HIDDEN_ACTIONS.has(item.action.kind));
+  return items.filter((item) => item.isVisible && !HIDDEN_IDS.has(item.id) && !HIDDEN_ACTIONS.has(item.action.kind));
 }
 
 export interface SettingsStateLike {

@@ -9,17 +9,11 @@ import {
   useSettings,
 } from "@get-bb/plugin-sdk/app";
 import type { ExperimentalSidebarNavigationItem, ExperimentalSidebarNavigationProps } from "@get-bb/plugin-sdk/app";
-import { PLUGIN_ID, SLOT_IDS } from "../../shared/constants.ts";
 import { FALLBACK_ICON, navigationIconName, simpleNavigationEnabled, simplifyNavigation } from "../model/navigation.ts";
-import { CourseAccessory } from "./Home.tsx";
 
 /** New thread and Search are actions; like BB, only destinations show as the current page. */
 function isDestination(item: ExperimentalSidebarNavigationItem): boolean {
   return item.action.kind === "open-plugin-panel";
-}
-
-function isCourseRow(item: ExperimentalSidebarNavigationItem): boolean {
-  return item.action.kind === "open-plugin-panel" && item.action.pluginId === PLUGIN_ID && item.action.panelId === SLOT_IDS.navPanel;
 }
 
 function NavItem({
@@ -32,6 +26,10 @@ function NavItem({
   onActivate: (openInSplit: boolean) => void;
 }) {
   const { splitProps } = experimental_useSidebarNavigationSplit(item.id);
+  // A loading item is a remembered panel whose bundle hasn't registered yet; activating it does
+  // nothing, so disable it like BB's own rows do rather than offer a dead click.
+  const isDisabled = item.isDisabled || item.isLoading;
+  const Accessory = item.experimental_Accessory;
   return (
     <li>
       <button
@@ -40,14 +38,14 @@ function NavItem({
         aria-current={isActive ? "page" : undefined}
         aria-keyshortcuts={item.shortcut?.ariaKeyShortcuts}
         title={item.shortcut === null ? undefined : `${item.label} (${item.shortcut.label})`}
-        disabled={item.isDisabled}
+        disabled={isDisabled}
         {...splitProps}
         // Like BB's own rows: Cmd/Ctrl-click opens the destination in a split.
         onClick={(event) => onActivate(event.metaKey || event.ctrlKey)}
       >
         <Icon name={navigationIconName(item.icon)} fallback={FALLBACK_ICON} aria-hidden className="tp-nav-icon" />
         <span className="tp-nav-label">{item.label}</span>
-        {isCourseRow(item) ? <CourseAccessory /> : null}
+        {Accessory ? <Accessory /> : null}
       </button>
     </li>
   );
@@ -56,6 +54,8 @@ function NavItem({
 export function SimpleNavigation({ experimental_Original: Original }: ExperimentalSidebarNavigationProps) {
   const settings = useSettings();
   const { items, activeItemId, actions } = experimental_useSidebarNavigation();
+  // experimental_Original is deprecated in favour of experimental_useSidebarNavigation, but it
+  // is still the only way to render BB's own navigation unmodified.
   if (!simpleNavigationEnabled(settings)) return <Original />;
   return (
     <ul className="tutor-nav">

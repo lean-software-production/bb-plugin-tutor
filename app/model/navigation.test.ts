@@ -4,7 +4,7 @@ import { navigationIconName, simpleNavigationEnabled, simplifyNavigation, type N
 
 /** A navigation item with the fields simplifyNavigation and its tests need; the rest default. */
 function item(fields: Partial<NavigationItemLike> & Pick<NavigationItemLike, "id" | "icon" | "action">): NavigationItemLike {
-  return { label: fields.id, isDisabled: false, shortcut: null, ...fields };
+  return { label: fields.id, isDisabled: false, isVisible: true, shortcut: null, ...fields };
 }
 
 // The items bb-app 0.44.0 passes to an experimental_sidebarNavigation component.
@@ -38,6 +38,19 @@ test("the extension and skills rows are matched by action as well as id, so a re
     item({ id: "resources/skills", icon: { kind: "host", name: "extensions" }, action: { kind: "open-skills" } }),
   ];
   assert.deepEqual(simplifyNavigation(renamed), []);
+});
+
+test("an item the student hid through BB's customize editor is dropped, not just the Plugins/Skills rows", () => {
+  const items: NavigationItemLike[] = [
+    item({ id: "tutor/course", icon: { kind: "plugin", pluginId: "tutor", icon: "FileText" }, action: { kind: "open-plugin-panel", pluginId: "tutor", panelId: "course" } }),
+    item({
+      id: "automations/automations",
+      icon: { kind: "plugin", pluginId: "automations", icon: "Clock" },
+      action: { kind: "open-plugin-panel", pluginId: "automations", panelId: "automations" },
+      isVisible: false,
+    }),
+  ];
+  assert.deepEqual(simplifyNavigation(items).map((i) => i.id), ["tutor/course"]);
 });
 
 test("simple navigation is on only once settings have loaded and the setting is not false", () => {
