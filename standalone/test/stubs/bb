@@ -14,7 +14,7 @@
 # quoted header or URL (the line can't be parsed).
 # `machine list --json`: a single manual machine, with `status` — the real
 # API's field, not a boolean — taken from STUB_MACHINE_STATUS (default
-# connected).
+# connected); STUB_MACHINE_LIST_JSON, when set, is printed instead.
 # `project create ... --json`: {"id":"prj_stub"}.
 # `provider models pi ... --json`: one row per id in STUB_PROVIDER_MODELS
 # (space-separated provider/model ids; default openrouter/moonshotai/kimi-k2.6),
@@ -79,6 +79,10 @@ case "${1:-} ${2:-}" in
     printf ']\n'
     ;;
   "machine list")
+    if [ -n "${STUB_MACHINE_LIST_JSON:-}" ]; then
+      printf '%s\n' "$STUB_MACHINE_LIST_JSON"
+      exit 0
+    fi
     printf '[{"id":"stub-machine-id","machineProviderId":"manual","createdAt":1,"status":"%s"}]\n' "${STUB_MACHINE_STATUS:-connected}"
     ;;
 esac

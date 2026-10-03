@@ -21,7 +21,7 @@ PI_PACKAGE=@earendil-works/pi-coding-agent
 PI_VERSION=0.85.1
 # Provider credentials, by name, that the machine service must not inherit
 # from the systemd user manager (amendment 4). Only names are ever read.
-KEY_PATTERN='(_API_KEY|_AUTH_TOKEN|_OAUTH_TOKEN)$|^HF_TOKEN$|^AWS_(ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN)$'
+KEY_PATTERN='(_API_KEY|_AUTH_TOKEN|_OAUTH_TOKEN)$|^HF_TOKEN$|^AWS_(ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN|BEARER_TOKEN_BEDROCK)$|^GOOGLE_APPLICATION_CREDENTIALS$'
 
 # say: one line to stdout, the student's voice; never names BB.
 say() {
@@ -433,13 +433,18 @@ machine_id() {
   json=$(tutor_bb_json machine list --json) || return 1
   printf '%s' "$json" | node -e '
     let raw = ""; process.stdin.on("data", (c) => (raw += c)).on("end", () => {
-      const data = JSON.parse(raw);
-      const rows = Array.isArray(data) ? data : (data.machines ?? data.hosts ?? []);
-      const manual = rows.filter((row) => (row.machineProviderId ?? row.provider ?? row.providerId) === "manual");
-      manual.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
-      if (manual[0] === undefined) process.exit(1);
-      console.log(manual[0].id);
-    });'
+      try {
+        const data = JSON.parse(raw);
+        const rows = Array.isArray(data) ? data : (data.machines ?? data.hosts ?? []);
+        const manual = rows.filter((row) => (row.machineProviderId ?? row.provider ?? row.providerId) === "manual");
+        manual.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+        if (manual[0] === undefined) process.exit(1);
+        console.log(manual[0].id);
+      } catch (error) {
+        console.error(String(error));
+        process.exit(1);
+      }
+    });' 2>>"$TUTOR_HOME/logs/launcher.log"
 }
 
 # machine_connected: whether the enrolled machine (config's machine_id)
@@ -459,7 +464,7 @@ machine_connected() {
         } catch {
           process.exit(1);
         }
-      });'
+      });' 2>>"$TUTOR_HOME/logs/launcher.log"
 }
 
 # machine_wait_connected: poll machine_connected until the enrolled machine
@@ -491,27 +496,45 @@ machine_create_abort() {
 # machine_installer_run: one attempt at enrolling this computer as a BB
 # machine. `bb machine create` runs in the background (output ->
 # enrol.out, 0600) because it blocks until the machine connects; the
-# enrolment line it prints is polled for, up to 60 s. The header
-# ("X-BB-Enrollment: <token>") is extracted straight from enrol.out into a
-# 0600 file with sed — the token is never held in a variable passed to a
-# command, and never reaches argv, stdout/stderr or any log. BB's installer
-# is downloaded with `curl -H @header`, run with its output in install.log,
-# and deleted as soon as it has run: its body holds the token too
-# (amendment 3). Every exit path cleans up enrol.out and enrol.header, and
-# restores the caller's umask (the 0600 files are written under a private
-# one, which must not leak into later steps such as the workspace or git
-# init).
+# enrolment line it prints is polled for, up to TUTOR_ENROL_TIMEOUT
+# seconds (default 60). The header ("X-BB-Enrollment: <token>") is
+# extracted from enrol.out into a 0600 file with sed. The token sits in
+# the shell variable $line, but only ever passes through printf, a
+# builtin, so it never reaches an external command's argv, stdout/stderr
+# or any log. BB's installer is downloaded with `curl -H @header`, run
+# with its output in install.log, and deleted as soon as it has run: its
+# body holds the token too (amendment 3). Once the installer has worked,
+# the create gets up to TUTOR_MACHINE_TIMEOUT seconds (default 60) to
+# finish before it is killed.
+#
+# The body runs in a subshell, so its private umask (the 0600 files) and
+# its traps stay inside it. On every exit — success, failure, Ctrl-C or
+# TERM — a trap deletes enrol.out, enrol.header and the installer, and
+# kills the create if it is still running.
 #
 # Exit status: 0 success; 2 the enrolment expired or create failed (the
-# caller retries once); 1 any other failure.
-machine_installer_run() {
+# caller retries once); 3 the create never finished; 1 any other
+# failure; 130/143 interrupted.
+machine_installer_run() (
   mkdir -p "$TUTOR_HOME" "$TUTOR_HOME/logs"
   out="$TUTOR_HOME/enrol.out"
   header="$TUTOR_HOME/enrol.header"
   installer="$TUTOR_HOME/machine-installer.sh"
   installlog="$TUTOR_HOME/install.log"
   port=$(tutor_bb_port)
-  caller_umask=$(umask)
+  create_pid=""
+
+  # shellcheck disable=SC2329 # invoked by the EXIT trap below
+  mir_cleanup() {
+    if [ -n "$create_pid" ]; then
+      machine_create_abort "$create_pid"
+      create_pid=""
+    fi
+    rm -f "$header" "$out" "$installer"
+  }
+  trap mir_cleanup EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
 
   umask 077
   : >"$out"
@@ -540,59 +563,48 @@ machine_installer_run() {
     waited=$((waited + 1))
     sleep 1
   done
-
-  if [ -z "$line" ]; then
-    machine_create_abort "$create_pid"
-    rm -f "$out"
-    umask "$caller_umask"
-    return 1
-  fi
+  [ -n "$line" ] || exit 1
 
   printf '%s\n' "$line" | sed -n "s/.*['\"]\\(X-BB-Enrollment:[^'\"]*\\)['\"].*/\\1/p" >"$header"
   chmod 600 "$header"
   url=$(printf '%s\n' "$line" | grep -o 'https\{0,1\}://[^ '"'"'"|]*' | head -n 1) || url=""
+  { [ -s "$header" ] && [ -n "$url" ]; } || exit 1
 
-  if [ ! -s "$header" ] || [ -z "$url" ]; then
-    machine_create_abort "$create_pid"
-    rm -f "$header" "$out"
-    umask "$caller_umask"
-    return 1
-  fi
-
-  if ! curl -fsSL -H @"$header" "$url" -o "$installer"; then
-    machine_create_abort "$create_pid"
-    rm -f "$header" "$out" "$installer"
-    umask "$caller_umask"
-    return 1
-  fi
+  curl -fsSL -H @"$header" "$url" -o "$installer" 2>>"$TUTOR_HOME/logs/launcher.log" || exit 1
   chmod 600 "$installer"
 
   install_status=0
   sh "$installer" >"$installlog" 2>&1 || install_status=$?
   rm -f "$installer" # its body holds the enrolment token too (amendment 3)
 
-  create_status=0
-  wait "$create_pid" || create_status=$?
-
-  rm -f "$header" "$out"
-  umask "$caller_umask"
-
   if [ "$install_status" -ne 0 ]; then
+    # The create would wait forever for a machine that isn't coming: the
+    # trap kills it.
     if grep -qi expired "$installlog" 2>/dev/null; then
-      return 2
+      exit 2
     fi
-    return 1
+    exit 1
   fi
 
-  [ "$create_status" -eq 0 ] || return 2
+  waited=0
+  limit=${TUTOR_MACHINE_TIMEOUT:-60}
+  while kill -0 "$create_pid" 2>/dev/null; do
+    [ "$waited" -lt "$limit" ] || exit 3
+    waited=$((waited + 1))
+    sleep 1
+  done
+  create_status=0
+  wait "$create_pid" || create_status=$?
+  create_pid=""
 
-  return 0
-}
+  [ "$create_status" -eq 0 ] || exit 2
+  exit 0
+)
 
 # machine_enrol: enrol this computer as a BB machine. Retries once, from
 # `bb machine create` (the --key tutor-machine idempotency key reuses the
 # creation), if the enrolment expires or the background create fails; a
-# second failure gives up.
+# second failure gives up. Interrupted (Ctrl-C, TERM), it stops there.
 machine_enrol() {
   attempt=1
   while [ "$attempt" -le 2 ]; do
@@ -602,6 +614,12 @@ machine_enrol() {
       id=$(machine_id) || fail "Couldn't find the enrolled machine. Run tutor up again."
       config_set machine_id "$id"
       return 0
+    fi
+    if [ "$status" -gt 128 ]; then
+      exit "$status"
+    fi
+    if [ "$status" -eq 3 ]; then
+      fail "Tutor's machine never connected. Run \`$TUTOR_NAME logs\`."
     fi
     if [ "$status" -eq 2 ] && [ "$attempt" -eq 1 ]; then
       attempt=$((attempt + 1))
@@ -962,7 +980,7 @@ json_project_id() {
       } catch {
         process.exit(1);
       }
-    });'
+    });' 2>>"$TUTOR_HOME/logs/launcher.log"
 }
 
 # project_ensure: the project for TUTOR_WORKSPACE on the enrolled machine,
@@ -1035,7 +1053,7 @@ first_model() {
       } catch {
         process.exit(1);
       }
-    });'
+    });' 2>>"$TUTOR_HOME/logs/launcher.log"
 }
 
 # login_fail <message>: say it on stderr and return 1, without exiting, so
@@ -1143,8 +1161,10 @@ cmd_up() {
   done
   [ -n "$up_port" ] || up_port=$(tutor_bb_port)
   case "$up_port" in
-    "" | *[!0-9]*) fail "--port needs a port number." ;;
+    "" | *[!0-9]* | 0*) fail "--port needs a port number from 1 to 65535." ;;
   esac
+  [ "${#up_port}" -le 5 ] && [ "$up_port" -le 65535 ] \
+    || fail "--port needs a port number from 1 to 65535."
 
   os_kind >/dev/null
   check_prereqs
@@ -1267,6 +1287,22 @@ cmd_logs() {
   return 0
 }
 
+# purge_check: fail unless $TUTOR_HOME is safe to delete whole — it isn't
+# /, isn't home itself, and holds Tutor's config file (TUTOR_HOME comes from
+# the environment, so it could name anything).
+purge_check() {
+  [ -e "$TUTOR_HOME" ] || return 0
+  pc_real=$(cd "$TUTOR_HOME" 2>/dev/null && pwd -P) || pc_real=""
+  pc_home=$(cd "$HOME" 2>/dev/null && pwd -P) || pc_home=$HOME
+  case "$pc_real" in
+    "" | / | "$pc_home")
+      fail "Tutor won't delete $TUTOR_HOME: it isn't Tutor's own folder. Nothing was removed."
+      ;;
+  esac
+  [ -f "$TUTOR_HOME/config" ] \
+    || fail "Tutor won't delete $TUTOR_HOME: it has no Tutor config in it. Nothing was removed."
+}
+
 # cmd_uninstall [--purge]: remove the enrolment (bb machine remove,
 # best-effort — the server may be down), the machine's own service file and
 # drop-in/plist, and the tutor server's service file; with --purge also the
@@ -1281,6 +1317,8 @@ cmd_uninstall() {
       *) fail "Usage: $TUTOR_NAME uninstall [--purge]" ;;
     esac
   done
+  # Before anything is removed: --purge deletes $TUTOR_HOME whole.
+  [ "$un_purge" -eq 0 ] || purge_check
 
   mkdir -p "$TUTOR_HOME/logs"
   un_port=$(tutor_bb_port)
@@ -1365,11 +1403,12 @@ main() {
     uninstall)
       cmd_uninstall "$@"
       ;;
-    help)
+    help | -h | --help)
       print_help
       ;;
     *)
-      print_help
+      print_help >&2
+      exit 1
       ;;
   esac
 }

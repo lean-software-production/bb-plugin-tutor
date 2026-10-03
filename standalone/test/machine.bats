@@ -78,3 +78,40 @@ load helper
   touch "$TUTOR_TEST_HOME/after-enrol"
   [ "$(stat -c %a "$TUTOR_TEST_HOME/after-enrol" 2>/dev/null || stat -f %Lp "$TUTOR_TEST_HOME/after-enrol")" = 644 ]
 }
+
+# --- final review: M1, M3, M4 ---
+
+@test "an interrupted enrolment leaves no credential behind and stops the create" {
+  for sig in INT TERM; do
+    rm -f "$STUB_LOG/bb.pid" "$STUB_LOG/.installer-expired-remaining"
+    STUB_BB_CREATE_BLOCKS_FOREVER=1 STUB_INSTALLER_SIGNAL=$sig run machine_installer_run
+    [ "$status" -ne 0 ]
+    [ ! -e "$TUTOR_HOME/machine-installer.sh" ]; [ ! -e "$TUTOR_HOME/enrol.header" ]; [ ! -e "$TUTOR_HOME/enrol.out" ]
+    pid=$(cat "$STUB_LOG/bb.pid")
+    sleep 0.3
+    ! kill -0 "$pid" 2>/dev/null || false
+  done
+}
+
+@test "a create that never finishes after the installer ran is given up on, with what to do" {
+  start=$(date +%s)
+  STUB_BB_CREATE_BLOCKS_FOREVER=1 TUTOR_MACHINE_TIMEOUT=1 run machine_enrol
+  [ "$status" -eq 1 ]
+  [ $(( $(date +%s) - start )) -lt 8 ]
+  [[ "$output" == *"Run \`tutor logs\`"* ]]
+  pid=$(cat "$STUB_LOG/bb.pid")
+  sleep 0.3
+  ! kill -0 "$pid" 2>/dev/null || false
+}
+
+@test "a failed installer doesn't wait on the create" {
+  start=$(date +%s)
+  STUB_BB_CREATE_BLOCKS_FOREVER=1 STUB_INSTALLER_EXPIRED_TIMES=5 run machine_installer_run
+  [ "$status" -ne 0 ]
+  [ $(( $(date +%s) - start )) -lt 5 ]
+}
+
+@test "an unreadable machine list fails quietly: no stack trace, no bb" {
+  STUB_MACHINE_LIST_JSON='this is not json' run machine_id
+  [ "$status" -eq 1 ]; [ -z "$output" ]
+}
