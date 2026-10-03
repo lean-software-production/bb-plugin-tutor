@@ -5,7 +5,7 @@
 # `machine create`: writes its own pid to $STUB_LOG/bb.pid (so a test can
 # confirm it was killed, not left running), then writes an enrolment line
 # (with STUB_ENROL_TOKEN, default stub-enrol-token) to its own stdout —
-# never to $STUB_LOG — then, only when STUB_BB_CREATE_BLOCKS_UNTIL_INSTALLED
+# never to $STUB_LOG; its URL is $BB_SERVER_URL's — then, only when STUB_BB_CREATE_BLOCKS_UNTIL_INSTALLED
 # =1, blocks until $HOME/.stub-installed exists (proving the launcher can't
 # deadlock waiting on it synchronously, and must kill it if it gives up
 # first). STUB_BB_NO_ENROL_LINE=1 prints nothing (the line never appears);
@@ -14,6 +14,10 @@
 # `machine list --json`: a single manual machine, with `status` — the real
 # API's field, not a boolean — taken from STUB_MACHINE_STATUS (default
 # connected).
+# `project create ... --json`: {"id":"prj_stub"}.
+# `provider models pi ... --json`: one row per id in STUB_PROVIDER_MODELS
+# (space-separated provider/model ids; default openrouter/moonshotai/kimi-k2.6),
+# routeProviderId being the part before the first "/".
 . "$(cd "$(dirname "$0")" && pwd)/lib.sh"
 stub_init "bb" "$@"
 
@@ -26,7 +30,7 @@ case "${1:-} ${2:-}" in
     elif [ "${STUB_BB_BAD_ENROL_LINE:-}" = 1 ]; then
       printf 'X-BB-Enrollment: %s no-url-here\n' "$token"
     else
-      printf "Run: curl -H 'X-BB-Enrollment: %s' http://127.0.0.1:47386/install.sh | sh\n" "$token"
+      printf "Run: curl -H 'X-BB-Enrollment: %s' %s/install.sh | sh\n" "$token" "${BB_SERVER_URL:-http://127.0.0.1:47386}"
     fi
     if [ "${STUB_BB_CREATE_BLOCKS_UNTIL_INSTALLED:-}" = 1 ]; then
       i=0
@@ -37,6 +41,18 @@ case "${1:-} ${2:-}" in
       done
     fi
     exit 0
+    ;;
+  "project create")
+    echo '{"id":"prj_stub","name":"stub"}'
+    ;;
+  "provider models")
+    printf '['
+    sep=""
+    for model in ${STUB_PROVIDER_MODELS-openrouter/moonshotai/kimi-k2.6}; do
+      printf '%s{"id":"%s","routeProviderId":"%s"}' "$sep" "$model" "${model%%/*}"
+      sep=","
+    done
+    printf ']\n'
     ;;
   "machine list")
     printf '[{"id":"stub-machine-id","machineProviderId":"manual","createdAt":1,"status":"%s"}]\n' "${STUB_MACHINE_STATUS:-connected}"

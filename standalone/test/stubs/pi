@@ -1,5 +1,23 @@
 #!/bin/sh
-# Placeholder stub for later launcher tasks: logs argv, quiet, exit 0 unless
-# listed in $STUB_MISSING. Behaviour is scripted per-test via STUB_<NAME>_*.
-. "$(cd "$(dirname "$0")" && pwd)/lib.sh"
-stub_init "pi" "$@"
+# Tutor's pi. Logs "PI_CODING_AGENT_DIR=<value or unset> <argv>" so a test can
+# see which pi folder every call used.
+#
+# `--version`: answers at once (BB probes it; amendment 5).
+# `auth check --provider <p>`: signed in when STUB_PI_SIGNED_IN is unset or
+# names <p>; "0" means signed in to nothing.
+# Anything else (the interactive login) exits 0 at once.
+# Self-contained (no lib.sh): the launcher runs it through the
+# $TUTOR_HOME/bin/pi symlink, where lib.sh isn't beside it.
+printf 'PI_CODING_AGENT_DIR=%s %s\n' "${PI_CODING_AGENT_DIR-unset}" "$*" >>"$STUB_LOG/pi"
+case " ${STUB_MISSING:-} " in *" pi "*) exit 127 ;; esac
+
+case "${1:-} ${2:-}" in
+  "--version "*) echo "0.85.1" ;;
+  "auth check")
+    signed_in=${STUB_PI_SIGNED_IN-any}
+    [ "$signed_in" = any ] && exit 0
+    [ "${3:-}" = --provider ] && [ "${4:-}" = "$signed_in" ] && exit 0
+    exit 1
+    ;;
+esac
+exit 0

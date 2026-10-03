@@ -29,8 +29,15 @@ setup() {
   cp "$STUBS_DIR/bb-server" "$TUTOR_HOME/server/npm/node_modules/.bin/"
   chmod +x "$TUTOR_HOME/server/npm/node_modules/.bin/bb" "$TUTOR_HOME/server/npm/node_modules/.bin/bb-server"
 
-  # Each test opts in to a stub's behaviour; start clean.
-  unset STUB_UNAME STUB_NODE_VERSION STUB_MISSING
+  # Each test opts in to a stub's behaviour; start clean. Exported (though
+  # unset), so a plain `STUB_UNAME=Darwin` in a test reaches the stubs.
+  unset STUB_UNAME STUB_NODE_VERSION STUB_MISSING STUB_SYSTEMD_ENV STUB_PI_SIGNED_IN STUB_PROVIDER_MODELS
+  export STUB_UNAME STUB_NODE_VERSION STUB_MISSING STUB_SYSTEMD_ENV STUB_PI_SIGNED_IN STUB_PROVIDER_MODELS
+
+  # macOS's PlistBuddy lives at /usr/libexec/PlistBuddy; use the stub.
+  export PLISTBUDDY=PlistBuddy
+  # Don't wait between retries of the model list.
+  export TUTOR_MODEL_RETRY_SLEEP=0
 
   export TUTOR_SOURCE_ONLY=1
   # shellcheck disable=SC1090
@@ -45,4 +52,21 @@ teardown() {
 # shell, so `run tutor ...` exercises main() without a subprocess.
 tutor() {
   main "$@"
+}
+
+# make_stub_machine_unit [port]: the systemd user unit BB's installer writes
+# for the machine (amendment 9's name; it mentions the machine directory).
+make_stub_machine_unit() {
+  local port=${1:-47386}
+  mkdir -p "$HOME/.config/systemd/user"
+  printf '[Service]\nExecStart=%s/.bb-machines/127.0.0.1-%s/bin/daemon\n' "$HOME" "$port" \
+    >"$HOME/.config/systemd/user/bb-host-daemon-127-0-0-1-$port-stubhost.service"
+}
+
+# make_stub_machine_plist [port]: the launchd plist BB's installer writes.
+make_stub_machine_plist() {
+  local port=${1:-47386}
+  mkdir -p "$HOME/Library/LaunchAgents"
+  printf '<plist><dict><key>Label</key><string>stub.machine</string><string>%s/.bb-machines/127.0.0.1-%s/bin/daemon</string></dict></plist>\n' "$HOME" "$port" \
+    >"$HOME/Library/LaunchAgents/stub.machine-$port.plist"
 }

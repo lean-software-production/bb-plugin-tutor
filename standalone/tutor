@@ -14,6 +14,12 @@ TUTOR_VERSION=0.0.0-dev
 BB_VERSION=0.44.0
 TUTOR_PORT_DEFAULT=47386
 TUTOR_HOME="${TUTOR_HOME:-$HOME/.tutor}"
+# Tutor's own pi (spike constants PI_PACKAGE / PI_VERSION).
+PI_PACKAGE=@earendil-works/pi-coding-agent
+PI_VERSION=0.85.1
+# Provider credentials, by name, that the machine service must not inherit
+# from the systemd user manager (amendment 4). Only names are ever read.
+KEY_PATTERN='(_API_KEY|_AUTH_TOKEN|_OAUTH_TOKEN)$|^HF_TOKEN$|^AWS_(ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN)$'
 
 # say: one line to stdout, the student's voice; never names BB.
 say() {
@@ -130,6 +136,16 @@ tutor_bb() {
   port=$(tutor_bb_port)
   mkdir -p "$TUTOR_HOME/logs"
   BB_SERVER_URL="http://127.0.0.1:$port" "$TUTOR_HOME/server/npm/node_modules/.bin/bb" "$@" >>"$TUTOR_HOME/logs/launcher.log" 2>&1
+}
+
+# tutor_bb_json <args...>: like tutor_bb, but its stdout comes back to the
+# caller (and is logged too); stderr goes to the log only.
+tutor_bb_json() {
+  port=$(tutor_bb_port)
+  mkdir -p "$TUTOR_HOME/logs"
+  bb_json=$(BB_SERVER_URL="http://127.0.0.1:$port" "$TUTOR_HOME/server/npm/node_modules/.bin/bb" "$@" 2>>"$TUTOR_HOME/logs/launcher.log") || return 1
+  printf '%s\n' "$bb_json" >>"$TUTOR_HOME/logs/launcher.log"
+  printf '%s' "$bb_json"
 }
 
 # server_prepare_dirs: create $TUTOR_HOME/server (the bb-server data dir),
@@ -295,10 +311,7 @@ plugin_install() {
 # standalone/spike/lib.sh's machine_id. Doesn't go through tutor_bb, which
 # only logs its output — the JSON is needed back.
 machine_id() {
-  port=$(tutor_bb_port)
-  mkdir -p "$TUTOR_HOME/logs"
-  json=$(BB_SERVER_URL="http://127.0.0.1:$port" "$TUTOR_HOME/server/npm/node_modules/.bin/bb" machine list --json 2>>"$TUTOR_HOME/logs/launcher.log") || return 1
-  printf '%s\n' "$json" >>"$TUTOR_HOME/logs/launcher.log"
+  json=$(tutor_bb_json machine list --json) || return 1
   printf '%s' "$json" | node -e '
     let raw = ""; process.stdin.on("data", (c) => (raw += c)).on("end", () => {
       const data = JSON.parse(raw);
@@ -310,20 +323,14 @@ machine_id() {
     });'
 }
 
-# machine_wait_connected: poll `bb machine list --json` until the enrolled
-# machine (config's machine_id) shows status "connected" — the real API
-# reports a status string, not a boolean — up to TUTOR_MACHINE_TIMEOUT
-# seconds (default 60; tests set it low).
-machine_wait_connected() {
+# machine_connected: whether the enrolled machine (config's machine_id)
+# shows status "connected" in `bb machine list --json` right now — the real
+# API reports a status string, not a boolean. False when none is enrolled.
+machine_connected() {
   id=$(config_get machine_id)
-  [ -n "$id" ] || fail "No machine is enrolled yet. Run tutor up again."
-  mkdir -p "$TUTOR_HOME/logs"
-  port=$(tutor_bb_port)
-  timeout=${TUTOR_MACHINE_TIMEOUT:-60}
-  waited=0
-  while [ "$waited" -lt "$timeout" ]; do
-    json=$(BB_SERVER_URL="http://127.0.0.1:$port" "$TUTOR_HOME/server/npm/node_modules/.bin/bb" machine list --json 2>>"$TUTOR_HOME/logs/launcher.log") || json=""
-    if printf '%s' "$json" | TUTOR_MACHINE_ID="$id" node -e '
+  [ -n "$id" ] || return 1
+  json=$(tutor_bb_json machine list --json) || json=""
+  printf '%s' "$json" | TUTOR_MACHINE_ID="$id" node -e '
       let raw = ""; process.stdin.on("data", (c) => (raw += c)).on("end", () => {
         try {
           const data = JSON.parse(raw);
@@ -334,7 +341,17 @@ machine_wait_connected() {
           process.exit(1);
         }
       });'
-    then
+}
+
+# machine_wait_connected: poll machine_connected until the enrolled machine
+# is connected, up to TUTOR_MACHINE_TIMEOUT seconds (default 60; tests set
+# it low).
+machine_wait_connected() {
+  [ -n "$(config_get machine_id)" ] || fail "No machine is enrolled yet. Run tutor up again."
+  timeout=${TUTOR_MACHINE_TIMEOUT:-60}
+  waited=0
+  while [ "$waited" -lt "$timeout" ]; do
+    if machine_connected; then
       return 0
     fi
     waited=$((waited + 1))
@@ -475,6 +492,411 @@ machine_enrol() {
   done
 }
 
+# pi_install: install the pinned pi under $TUTOR_HOME/pi-npm, link its bin
+# as $TUTOR_HOME/bin/pi (BB_PI_BRIDGE_COMMAND, which BB probes with
+# --version: amendment 5), and make Tutor's private pi folder,
+# $TUTOR_HOME/pi (PI_CODING_AGENT_DIR), mode 0700. Skipped when already
+# installed at PI_VERSION.
+pi_install() {
+  mkdir -p "$TUTOR_HOME/bin" "$TUTOR_HOME/logs"
+  if [ ! -d "$TUTOR_HOME/pi" ]; then
+    mkdir -m 700 "$TUTOR_HOME/pi"
+  fi
+  chmod 700 "$TUTOR_HOME/pi"
+  marker="$TUTOR_HOME/pi-npm/.pi-version"
+  if [ ! -f "$marker" ] || [ "$(cat "$marker")" != "$PI_VERSION" ] || [ ! -x "$TUTOR_HOME/bin/pi" ]; then
+    mkdir -p "$TUTOR_HOME/pi-npm"
+    npm install --prefix "$TUTOR_HOME/pi-npm" "$PI_PACKAGE@$PI_VERSION" >>"$TUTOR_HOME/logs/launcher.log" 2>&1 \
+      || fail "Tutor's pi failed to install. Run \`tutor logs\`."
+    printf '%s' "$PI_VERSION" >"$marker"
+  fi
+  ln -sf "$TUTOR_HOME/pi-npm/node_modules/.bin/pi" "$TUTOR_HOME/bin/pi"
+}
+
+# machine_service_file: the systemd user unit (Linux) or launchd plist
+# (macOS) BB's installer wrote for this port's machine — the one whose text
+# names .bb-machines/127.0.0.1-<port> (spike: MACHINE_UNIT_GLOB, amendment
+# 9). Fails when there is none.
+machine_service_file() {
+  msf_port=$(tutor_bb_port)
+  case "$(os_kind)" in
+    linux) msf_dir="$HOME/.config/systemd/user"; msf_ext=service ;;
+    macos) msf_dir="$HOME/Library/LaunchAgents"; msf_ext=plist ;;
+  esac
+  [ -d "$msf_dir" ] || return 1
+  for msf_file in "$msf_dir"/*."$msf_ext"; do
+    [ -f "$msf_file" ] || continue
+    if grep -qF ".bb-machines/127.0.0.1-$msf_port" "$msf_file" 2>/dev/null; then
+      printf '%s\n' "$msf_file"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# provider_key_names: the names, space-separated, of the provider
+# credentials the systemd user manager holds (KEY_PATTERN). Values pass
+# through `cut` and are dropped there: they are never held, printed or
+# logged.
+provider_key_names() {
+  systemctl --user show-environment 2>>"$TUTOR_HOME/logs/launcher.log" \
+    | cut -d= -f1 | grep -E "$KEY_PATTERN" | tr '\n' ' ' | sed 's/ *$//' || true
+}
+
+# plist_value <string>: a value for a PlistBuddy -c command, single-quoted
+# when it holds a space (PlistBuddy splits its command on whitespace).
+plist_value() {
+  case "$1" in
+    *" "*) printf "'%s'" "$1" ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
+# machine_env_apply: give the machine service Tutor's pi, as absolute paths:
+# PI_CODING_AGENT_DIR=$TUTOR_HOME/pi and BB_PI_BRIDGE_COMMAND=$TUTOR_HOME/bin/pi.
+# Linux: a drop-in, <unit>.d/tutor.conf, that also unsets every provider
+# credential the user manager holds (amendment 4; recomputed on every run);
+# daemon-reload and restart only when its content changed. macOS: the
+# plist's EnvironmentVariables (PlistBuddy), then bootout + bootstrap when a
+# value changed; launchd can't unset a variable, so keys are left to
+# `tutor status`. Prints nothing.
+machine_env_apply() {
+  mkdir -p "$TUTOR_HOME/logs"
+  service=$(machine_service_file) || fail "Tutor's machine service is missing. Run \`tutor up\` again."
+  pi_dir="$TUTOR_HOME/pi"
+  pi_bin="$TUTOR_HOME/bin/pi"
+
+  case "$(os_kind)" in
+    linux)
+      dropin_dir="$service.d"
+      dropin="$dropin_dir/tutor.conf"
+      mkdir -p "$dropin_dir"
+      keys=$(provider_key_names)
+      {
+        printf '[Service]\n'
+        printf 'Environment=%s\n' "$(systemd_quote "PI_CODING_AGENT_DIR=$pi_dir")"
+        printf 'Environment=%s\n' "$(systemd_quote "BB_PI_BRIDGE_COMMAND=$pi_bin")"
+        if [ -n "$keys" ]; then
+          printf 'UnsetEnvironment=%s\n' "$keys"
+        fi
+      } >"$dropin.new"
+      if [ -f "$dropin" ] && cmp -s "$dropin.new" "$dropin"; then
+        rm -f "$dropin.new"
+        return 0
+      fi
+      mv "$dropin.new" "$dropin"
+      systemctl --user daemon-reload >>"$TUTOR_HOME/logs/launcher.log" 2>&1
+      systemctl --user restart "$(basename "$service")" >>"$TUTOR_HOME/logs/launcher.log" 2>&1 \
+        || fail "Tutor's machine service didn't restart. Run \`tutor logs\`."
+      ;;
+    macos)
+      pb=${PLISTBUDDY:-/usr/libexec/PlistBuddy}
+      changed=0
+      if ! "$pb" -c 'Print :EnvironmentVariables' "$service" >/dev/null 2>&1; then
+        "$pb" -c 'Add :EnvironmentVariables dict' "$service" >>"$TUTOR_HOME/logs/launcher.log" 2>&1
+      fi
+      for env_name in PI_CODING_AGENT_DIR BB_PI_BRIDGE_COMMAND; do
+        case "$env_name" in
+          PI_CODING_AGENT_DIR) env_value=$pi_dir ;;
+          BB_PI_BRIDGE_COMMAND) env_value=$pi_bin ;;
+        esac
+        current=$("$pb" -c "Print :EnvironmentVariables:$env_name" "$service" 2>/dev/null) || current=""
+        [ "$current" = "$env_value" ] && continue
+        "$pb" -c "Delete :EnvironmentVariables:$env_name" "$service" >/dev/null 2>&1 || true
+        "$pb" -c "Add :EnvironmentVariables:$env_name string $(plist_value "$env_value")" "$service" >>"$TUTOR_HOME/logs/launcher.log" 2>&1
+        changed=1
+      done
+      [ "$changed" -eq 1 ] || return 0
+      # launchd reads the plist when it loads it: reload, don't just kickstart.
+      launchctl bootout "gui/$(id -u)" "$service" >>"$TUTOR_HOME/logs/launcher.log" 2>&1 || true
+      launchctl bootstrap "gui/$(id -u)" "$service" >>"$TUTOR_HOME/logs/launcher.log" 2>&1 \
+        || fail "Tutor's machine service didn't restart. Run \`tutor logs\`."
+      ;;
+  esac
+}
+
+# machine_service_start: start the enrolled machine's service (enabled by
+# BB's installer, so normally running from login to logout: amendment 8).
+machine_service_start() {
+  service=$(machine_service_file) || fail "Tutor's machine service is missing. Run \`tutor up\` again."
+  mkdir -p "$TUTOR_HOME/logs"
+  case "$(os_kind)" in
+    linux)
+      systemctl --user start "$(basename "$service")" >>"$TUTOR_HOME/logs/launcher.log" 2>&1 \
+        || fail "Tutor's machine service didn't start. Run \`tutor logs\`."
+      ;;
+    macos)
+      # Already loaded is fine: bootstrap then fails, and the wait decides.
+      launchctl bootstrap "gui/$(id -u)" "$service" >>"$TUTOR_HOME/logs/launcher.log" 2>&1 || true
+      ;;
+  esac
+}
+
+# canonical_path <path>: <path> with its deepest existing ancestor resolved
+# physically (symlinks followed) and the rest appended as given.
+canonical_path() {
+  cp_head=$1
+  cp_tail=""
+  while [ ! -d "$cp_head" ]; do
+    cp_tail="/$(basename "$cp_head")$cp_tail"
+    cp_head=$(dirname "$cp_head")
+  done
+  printf '%s%s' "$(cd "$cp_head" && pwd -P)" "$cp_tail"
+}
+
+# workspace_prepare <folder>: make <folder> the workspace, setting
+# TUTOR_WORKSPACE to its absolute path. Refuses (Decision 18) home itself
+# and anything inside ~/.tutor or ~/.bb-machines (which holds the course
+# content too), and a folder that is neither empty nor a Tutor workspace
+# (one with .tutor/, or holding only .git). Creates it if missing and
+# git-inits it when it has no .git. Never deletes anything.
+workspace_prepare() {
+  ws=$1
+  case "$ws" in
+    /*) ;;
+    *) ws="$(pwd)/$ws" ;;
+  esac
+  while [ "${ws%/}" != "$ws" ] && [ "$ws" != / ]; do ws=${ws%/}; done
+
+  ws_real=$(canonical_path "$ws")
+  home_real=$(canonical_path "$HOME")
+  tutor_real=$(canonical_path "$TUTOR_HOME")
+  case "$ws_real/" in
+    "$home_real/" | / | "$home_real/.tutor/"* | "$home_real/.bb-machines/"* | "$tutor_real/"*)
+      fail "Tutor keeps its own files there, so it can't be your course folder. Pick a folder of its own, such as ~/my-course."
+      ;;
+  esac
+
+  if [ -e "$ws" ] && [ ! -d "$ws" ]; then
+    fail "$ws is a file, not a folder. Pick a folder for your course, such as ~/my-course."
+  fi
+  if [ -d "$ws" ] && [ ! -d "$ws/.tutor" ]; then
+    for entry in "$ws"/* "$ws"/.[!.]* "$ws"/..?*; do
+      [ -e "$entry" ] || [ -L "$entry" ] || continue
+      [ "$entry" = "$ws/.git" ] && continue
+      fail "$ws already has files in it. Pick an empty folder, or one Tutor set up before."
+    done
+  fi
+
+  mkdir -p "$ws" "$TUTOR_HOME/logs"
+  if [ ! -e "$ws/.git" ]; then
+    git init --quiet "$ws" >>"$TUTOR_HOME/logs/launcher.log" 2>&1 \
+      || fail "Tutor couldn't set up git in $ws. Run \`tutor logs\`."
+  fi
+  TUTOR_WORKSPACE=$ws
+}
+
+# json_project_id: the project id ("id", or "project.id") in the JSON on
+# stdin, or fail.
+json_project_id() {
+  node -e '
+    let raw = ""; process.stdin.on("data", (c) => (raw += c)).on("end", () => {
+      try {
+        const data = JSON.parse(raw);
+        const id = data.id ?? data.project?.id;
+        if (typeof id !== "string" || id === "") process.exit(1);
+        console.log(id);
+      } catch {
+        process.exit(1);
+      }
+    });'
+}
+
+# project_ensure: the project for TUTOR_WORKSPACE on the enrolled machine,
+# set as Tutor's workspaceProject. Created once; a later up for the same
+# folder reuses config's project_id.
+project_ensure() {
+  ws=$TUTOR_WORKSPACE
+  project_id=$(config_get project_id)
+  if [ -z "$project_id" ] || [ "$(config_get workspace)" != "$ws" ]; then
+    json=$(tutor_bb_json project create --name "$(basename "$ws")" --root "$ws" --machine "$(config_get machine_id)" --json) \
+      || fail "Tutor couldn't add your course folder. Run \`tutor logs\`."
+    project_id=$(printf '%s' "$json" | json_project_id) \
+      || fail "Tutor couldn't add your course folder. Run \`tutor logs\`."
+  fi
+  tutor_bb plugin config tutor set workspaceProject "$project_id" \
+    || fail "Tutor couldn't choose your course folder. Run \`tutor logs\`."
+  config_set workspace "$ws"
+  config_set project_id "$project_id"
+}
+
+# pi_ready [provider]: whether Tutor's pi is signed in to <provider>
+# (default: config's provider; none recorded means not ready) — PI_READY,
+# amendment 6.
+pi_ready() {
+  ready_provider=${1:-$(config_get provider)}
+  [ -n "$ready_provider" ] || return 1
+  [ -x "$TUTOR_HOME/bin/pi" ] || return 1
+  mkdir -p "$TUTOR_HOME/logs"
+  PI_CODING_AGENT_DIR="$TUTOR_HOME/pi" "$TUTOR_HOME/bin/pi" auth check --provider "$ready_provider" \
+    </dev/null >>"$TUTOR_HOME/logs/launcher.log" 2>&1
+}
+
+# first_model <provider>: the id of the first of <provider>'s models in the
+# machine's pi model list (rows whose routeProviderId is <provider>), or
+# fail.
+first_model() {
+  fm_machine=$(config_get machine_id)
+  [ -n "$fm_machine" ] || fm_machine=$(machine_id) || return 1
+  json=$(tutor_bb_json provider models pi --machine "$fm_machine" --json) || return 1
+  printf '%s' "$json" | TUTOR_PROVIDER="$1" node -e '
+    let raw = ""; process.stdin.on("data", (c) => (raw += c)).on("end", () => {
+      try {
+        const data = JSON.parse(raw);
+        const rows = Array.isArray(data) ? data : (data.models ?? []);
+        const row = rows.find((r) => r.routeProviderId === process.env.TUTOR_PROVIDER && typeof r.id === "string");
+        if (row === undefined) process.exit(1);
+        console.log(row.id);
+      } catch {
+        process.exit(1);
+      }
+    });'
+}
+
+# login_fail <message>: say it on stderr and return 1, without exiting, so
+# a caller can carry on.
+login_fail() {
+  say "$1" >&2
+  return 1
+}
+
+# cmd_login [--provider <p>] [--model <m>]: run Tutor's pi interactively
+# (stdin is the terminal) with PI_CODING_AGENT_DIR=$TUTOR_HOME/pi, so the
+# student signs it in with /login; then record the provider (--provider, or
+# asked), check pi is signed in to it, and pin coach threads to a model of
+# it: --model, else the first in the machine's model list. BB caches that
+# list, so it is asked a few times (TUTOR_MODEL_RETRIES, default 5, every
+# TUTOR_MODEL_RETRY_SLEEP seconds, default 3) before leaving the model to pi.
+cmd_login() {
+  login_provider=""
+  login_model=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --provider) [ $# -ge 2 ] || login_fail "--provider needs a provider name." || return 1; login_provider=$2; shift 2 ;;
+      --model) [ $# -ge 2 ] || login_fail "--model needs a model name." || return 1; login_model=$2; shift 2 ;;
+      *) login_fail "Usage: $TUTOR_NAME login [--provider <name>] [--model <name>]" || return 1 ;;
+    esac
+  done
+
+  pi_install
+  say "Tutor opens pi to sign in. Type /login, pick your provider and sign in, then type /quit."
+  PI_CODING_AGENT_DIR="$TUTOR_HOME/pi" "$TUTOR_HOME/bin/pi" \
+    || login_fail "Signing in didn't finish. Run \`$TUTOR_NAME login\` again." || return 1
+
+  if [ -z "$login_provider" ]; then
+    printf 'Which provider did you sign in to (for example openrouter or anthropic)? '
+    read -r login_provider || login_provider=""
+  fi
+  case "$login_provider" in
+    "" | *[!A-Za-z0-9._-]*)
+      login_fail "Tutor needs the provider's name, such as openrouter. Run \`$TUTOR_NAME login\` again." || return 1
+      ;;
+  esac
+  pi_ready "$login_provider" \
+    || login_fail "Tutor's pi isn't signed in to $login_provider. Run \`$TUTOR_NAME login\` again." || return 1
+  config_set provider "$login_provider"
+
+  if [ -n "$login_model" ]; then
+    case "$login_model" in
+      "$login_provider"/*) ;;
+      *) login_model="$login_provider/$login_model" ;;
+    esac
+  else
+    tries=${TUTOR_MODEL_RETRIES:-5}
+    try=1
+    while :; do
+      login_model=$(first_model "$login_provider") && break
+      login_model=""
+      [ "$try" -lt "$tries" ] || break
+      try=$((try + 1))
+      sleep "${TUTOR_MODEL_RETRY_SLEEP:-3}"
+    done
+  fi
+
+  config_set model "$login_model"
+  if [ -z "$login_model" ]; then
+    tutor_bb plugin config tutor set coachModel "" || true
+    say "Signed in to $login_provider. Tutor couldn't list its models yet, so the coach uses pi's default model. Run \`$TUTOR_NAME login --provider $login_provider\` later to choose one."
+    return 0
+  fi
+  tutor_bb plugin config tutor set coachModel "$login_model" \
+    || login_fail "Tutor couldn't set the coach's model. Run \`$TUTOR_NAME logs\`." || return 1
+  say "Signed in to $login_provider. The coach uses $login_model."
+}
+
+# cmd_open: open Tutor in the browser (xdg-open on Linux, open on macOS),
+# always saying the address too.
+cmd_open() {
+  url="http://127.0.0.1:$(tutor_bb_port)"
+  mkdir -p "$TUTOR_HOME/logs"
+  case "$(os_kind)" in
+    linux) opener=xdg-open ;;
+    macos) opener=open ;;
+  esac
+  "$opener" "$url" >>"$TUTOR_HOME/logs/launcher.log" 2>&1 || true
+  say "Tutor is open at $url"
+}
+
+# cmd_up [--port <n>] [folder]: start or resume everything, then open the
+# browser. Safe to run again: what is done is skipped, what changed is
+# repaired.
+cmd_up() {
+  up_port=""
+  up_folder=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --server) fail "$TUTOR_NAME up --server is not available yet." ;;
+      --port)
+        [ $# -ge 2 ] || fail "--port needs a port number."
+        up_port=$2
+        shift 2
+        ;;
+      --port=*) up_port=${1#--port=}; shift ;;
+      -*) fail "Usage: $TUTOR_NAME up [--port <n>] [folder]" ;;
+      *) up_folder=$1; shift ;;
+    esac
+  done
+  [ -n "$up_port" ] || up_port=$(tutor_bb_port)
+  case "$up_port" in
+    "" | *[!0-9]*) fail "--port needs a port number." ;;
+  esac
+
+  os_kind >/dev/null
+  check_prereqs
+  # Every later call to the server reads the port from config.
+  config_set port "$up_port"
+
+  [ -n "$up_folder" ] || up_folder=$(config_get workspace)
+  [ -n "$up_folder" ] || fail "Say where your course goes, for example: $TUTOR_NAME up ~/my-course"
+  workspace_prepare "$up_folder"
+
+  say "Starting Tutor's server..."
+  server_install
+  server_service_write "$up_port"
+  server_start >>"$TUTOR_HOME/logs/launcher.log" 2>&1
+  server_wait_healthy "$up_port"
+  server_configure "$up_port"
+  plugin_install
+
+  if machine_connected; then
+    :
+  elif [ -n "$(config_get machine_id)" ] && machine_service_file >/dev/null; then
+    machine_service_start # enrolled before, just not running (after a stop)
+  else
+    say "Connecting Tutor to this computer..."
+    machine_enrol
+  fi
+  pi_install
+  machine_env_apply
+  machine_wait_connected
+  project_ensure
+
+  if ! pi_ready; then
+    say "Run \`$TUTOR_NAME login\` to connect Tutor to a model provider."
+  fi
+  cmd_open
+}
+
 print_help() {
   say "Usage: $TUTOR_NAME <command> [options]"
   say ""
@@ -498,14 +920,15 @@ main() {
 
   case "$cmd" in
     up)
-      if [ "${1:-}" = "--server" ]; then
-        fail "$TUTOR_NAME up --server is not available yet."
-      fi
-      os_kind >/dev/null
-      check_prereqs
-      say "$TUTOR_NAME up: not implemented yet."
+      cmd_up "$@"
       ;;
-    login | open | status | stop | logs | uninstall)
+    login)
+      cmd_login "$@"
+      ;;
+    open)
+      cmd_open
+      ;;
+    status | stop | logs | uninstall)
       say "$TUTOR_NAME $cmd: not implemented yet."
       ;;
     help)

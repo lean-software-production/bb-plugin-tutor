@@ -9,6 +9,10 @@
 # saying the enrolment expired. The remaining count is tracked in a file
 # under $STUB_LOG so it survives across the launcher's retries.
 #
+# The fake installer also writes the machine's service file, as BB's does:
+# a systemd user unit on Linux, a launchd plist on macOS (by STUB_UNAME),
+# each naming .bb-machines/127.0.0.1-<port>, <port> taken from the URL.
+#
 # STUB_CURL_HOOK, if set, is eval'd and its output appended to
 # $STUB_LOG/curl-hook — used to observe state (e.g. the header file's mode)
 # at the moment curl runs.
@@ -25,18 +29,33 @@ fi
 
 out=""
 prev=""
+port=47386
 for arg in "$@"; do
   if [ "$prev" = "-o" ]; then
     out="$arg"
   fi
+  case "$arg" in
+    http://127.0.0.1:*) port=${arg#http://127.0.0.1:}; port=${port%%/*} ;;
+  esac
   prev="$arg"
 done
 
 if [ -n "$out" ]; then
-  cat >"$out" <<'INSTALLER'
-#!/bin/sh
+  {
+    echo '#!/bin/sh'
+    echo "port=$port"
+    cat <<'INSTALLER'
 echo "installer says hello"
 touch "$HOME/.stub-installed"
+if [ "${STUB_UNAME:-Linux}" = Darwin ]; then
+  mkdir -p "$HOME/Library/LaunchAgents"
+  printf '<plist><string>%s/.bb-machines/127.0.0.1-%s/daemon</string></plist>\n' "$HOME" "$port" \
+    >"$HOME/Library/LaunchAgents/stub.machine-$port.plist"
+else
+  mkdir -p "$HOME/.config/systemd/user"
+  printf '[Service]\nExecStart=%s/.bb-machines/127.0.0.1-%s/daemon\n' "$HOME" "$port" \
+    >"$HOME/.config/systemd/user/bb-host-daemon-127-0-0-1-$port-stubhost.service"
+fi
 state="$STUB_LOG/.installer-expired-remaining"
 if [ ! -f "$state" ]; then
   printf '%s' "${STUB_INSTALLER_EXPIRED_TIMES:-0}" >"$state"
@@ -50,5 +69,6 @@ if [ "$remaining" -gt 0 ] 2>/dev/null; then
 fi
 exit 0
 INSTALLER
+  } >"$out"
   chmod +x "$out"
 fi

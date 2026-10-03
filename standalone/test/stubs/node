@@ -9,14 +9,20 @@ stub_init node "$@"
 case "${1:-}" in
   --version|-v) echo "${STUB_NODE_VERSION:-v24.0.0}" ;;
   *)
-    self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+    # POSIX (dash has no `type -a`): walk PATH, skipping this stub's folder.
+    self_dir="$(cd "$(dirname "$0")" && pwd -P)"
     found=""
-    for candidate in $(type -a node 2>/dev/null | sed -n 's/^node is \(\/.*\)$/\1/p'); do
-      candidate_real="$(cd "$(dirname "$candidate")" && pwd)/$(basename "$candidate")"
-      [ "$candidate_real" = "$self" ] && continue
-      found="$candidate"
+    saved_ifs=$IFS
+    IFS=:
+    for dir in $PATH; do
+      [ -n "$dir" ] || continue
+      [ -f "$dir/node" ] && [ -x "$dir/node" ] || continue
+      dir_real="$(cd "$dir" 2>/dev/null && pwd -P)" || continue
+      [ "$dir_real" = "$self_dir" ] && continue
+      found="$dir/node"
       break
     done
+    IFS=$saved_ifs
     [ -n "$found" ] || { echo "node stub: no real node found on PATH" >&2; exit 1; }
     exec "$found" "$@"
     ;;
