@@ -5,7 +5,7 @@ import { FACTORY_FILES, TOOL_NAMES, type ToolName } from "../../shared/constants
 import { findLesson, findRule } from "../../shared/derive.ts";
 import { toolParameterSchemas, type ToolParameters } from "../../shared/tools.ts";
 import type { IterationState, Lesson, ProgressFile } from "../../shared/model.ts";
-import { lessonSpecBundle, standInsBundle } from "../content/make-bundle.ts";
+import { adoptionSizeError, lessonSpecBundle, standInsBundle } from "../content/make-bundle.ts";
 import { overlaps, realPath } from "../paths.ts";
 import { isoSeconds } from "../progress/time.ts";
 import { WorkspaceUnreachableError, WriteConflictError } from "../workspace/access.ts";
@@ -94,11 +94,16 @@ async function adoptOnMachine(rt: TutorRuntime, state: CoachState, lesson: Lesso
   if (state.layout.id !== "capstone-factory") throw new Error("Only a capstone course's lessons are adopted into the workspace.");
   if (outcome.progress === undefined || outcome.iteration === undefined) throw new Error(`Adopting lesson ${lesson.id} needs its progress and ITERATION.`);
   await refuseSeedsInCourse(rt, state, lesson);
+  const spec = await lessonSpecBundle(lesson.dir);
+  const standIns = await standInsBundle(state.course.root);
+  // Each part is capped on its own; together they must still fit in one host call.
+  const tooBig = adoptionSizeError(lesson.id, { spec, standIns, seedSpec: lesson.seedSpec });
+  if (tooBig !== null) throw new Error(tooBig);
   const adopted = await rt.host.adoptLesson(state.hostId, {
     root: state.layout.layout.projectRoot,
     lesson: { id: lesson.id, seedSpec: lesson.seedSpec },
-    spec: await lessonSpecBundle(lesson.dir),
-    standIns: await standInsBundle(state.course.root),
+    spec,
+    standIns,
     progress: outcome.progress,
     iteration: outcome.iteration,
     progressSha256: state.student.progressSha256 ?? null,

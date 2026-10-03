@@ -71,3 +71,22 @@ export async function standInsBundle(courseRoot: string): Promise<Bundle | null>
   const stats = await lstat(dir).catch(() => null);
   return stats?.isDirectory() === true ? bundleFolder(dir) : null;
 }
+
+/**
+ * Why an adoption is too big to send in one host call, or null. The spec,
+ * stand-ins and seed are each capped by bundleFolder, but they travel
+ * together, under the 32 MiB host-call limit, so their sum is capped at
+ * `limit` too (MAX_BUNDLE_BYTES, leaving room for the rest of the call).
+ */
+export function adoptionSizeError(
+  lessonId: string,
+  parts: { spec: Bundle; standIns: Bundle | null; seedSpec: string | null },
+  limit: number = MAX_BUNDLE_BYTES,
+): string | null {
+  const size =
+    bundleBytes(parts.spec) +
+    (parts.standIns === null ? 0 : bundleBytes(parts.standIns)) +
+    (parts.seedSpec === null ? 0 : Buffer.byteLength(JSON.stringify(parts.seedSpec), "utf8"));
+  if (size <= limit) return null;
+  return `Lesson ${lessonId}'s spec, stand-ins and seed come to ${size} bytes together, over the ${limit} bytes Tutor can send to your machine in one go. The course is too big for this version of Tutor.`;
+}
