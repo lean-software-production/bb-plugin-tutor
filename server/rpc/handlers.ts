@@ -230,13 +230,15 @@ export function registerRpc(rt: TutorRuntime): void {
 
     listCandidateProjects: async () => {
       const world = await rt.world.load();
+      const course = world.available.find((entry) => entry.id !== BUILTIN_COURSE_ID);
       return {
         projects: await listCandidates(
           bb.sdk,
           rt.access,
           world.coursePath,
-          world.available.find((course) => course.id !== BUILTIN_COURSE_ID)?.coachPath ?? null,
+          course?.coachPath ?? null,
           world.projectHint,
+          course?.layout ?? null,
         ),
       };
     },

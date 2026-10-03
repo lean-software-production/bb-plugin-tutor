@@ -1,6 +1,7 @@
 // What each coach tool does, as pure functions over the re-derived world.
 // They return the text for the coach and the files to write; tools.ts checks
 // the caller and performs the writes.
+import { relative } from "node:path";
 import { STARTER_LAYOUT } from "../../shared/constants.ts";
 import {
   countExamples,
@@ -91,7 +92,7 @@ export function layoutError(state: CoachState): string | null {
 }
 
 /**
- * No progress is recorded for the current lesson: spec/PROGRESS.yaml is
+ * No progress is recorded for the current lesson: its progress file is
  * missing or about another lesson. A file that could not be read or parsed is
  * not "none": its marks are unknown, and adopting again would overwrite them.
  */
@@ -99,10 +100,21 @@ export function unrecorded(state: CoachState): boolean {
   return state.progress === null && state.student.progressUnreadable !== true;
 }
 
-/** Why nothing can change the lesson's progress while spec/PROGRESS.yaml is damaged. */
-export function unreadableProgressText(lessonId: string): string {
+/**
+ * The progress file's path, relative to the workspace, for this course's
+ * layout: `.tutor/progress.yaml` for Lesson 0, `.tutor/courses/<id>/progress.yaml`
+ * for a layoutless course, and `spec/PROGRESS.yaml`, unchanged, for the
+ * capstone-factory layout.
+ */
+export function progressFileText(state: Pick<CoachState, "root" | "layout">): string {
+  if (state.layout.id === "capstone-factory") return state.layout.progress.progressFile;
+  return `${relative(state.root, state.layout.progress.dir)}/${state.layout.progress.progressFile}`;
+}
+
+/** Why nothing can change the lesson's progress while its progress file is damaged. */
+export function unreadableProgressText(progressPath: string, lessonId: string): string {
   return (
-    `spec/PROGRESS.yaml could not be read, so Lesson ${lessonId}'s marks are unknown. ` +
+    `${progressPath} could not be read, so Lesson ${lessonId}'s marks are unknown. ` +
     "Help the student repair it (tutor_status names the problem; git may have a good copy). " +
     "Don't adopt the lesson again: that would replace the file and lose its marks."
   );
@@ -174,7 +186,7 @@ function sectionHeader(line: string): string {
 /** The progress to change, refusing when the lesson is not under way. */
 function underWay(state: CoachState): ProgressFile | { error: string } {
   const { lesson, pointer } = state;
-  if (state.progress === null && state.student.progressUnreadable === true) return { error: unreadableProgressText(lesson.id) };
+  if (state.progress === null && state.student.progressUnreadable === true) return { error: unreadableProgressText(progressFileText(state), lesson.id) };
   if (pointer.iterationStatus === "not-started" || state.progress === null) {
     return { error: `Lesson ${lesson.id} has not been adopted yet. Call tutor_adopt_iteration first.` };
   }
@@ -277,7 +289,7 @@ export function adoptAction(state: CoachState, input: ToolParameters<"tutor_adop
   if (lesson === undefined || !targets.includes(input.iteration)) {
     const current = `The student is on lesson ${state.pointer.lessonId} (${state.pointer.iterationStatus}).`;
     const allowed = targets.length === 0 ? "Nothing can be adopted now." : `You can adopt: ${targets.join(", ")}.`;
-    const damaged = state.student.progressUnreadable === true ? ` ${unreadableProgressText(state.pointer.lessonId)}` : "";
+    const damaged = state.student.progressUnreadable === true ? ` ${unreadableProgressText(progressFileText(state), state.pointer.lessonId)}` : "";
     return { error: `Lesson ${input.iteration} cannot be adopted now. ${current} ${allowed}${damaged}` };
   }
   const { layout: course } = state;
@@ -287,7 +299,10 @@ export function adoptAction(state: CoachState, input: ToolParameters<"tutor_adop
   const carried = Object.keys(progress.examples).length;
   const total = lessonExamples(lesson).length;
   const summary = `Adopted lesson ${lesson.id} "${lesson.title}": ${total} examples, ${carried} carried over as passing.`;
-  if (lesson.builtin) return { text: `${summary}\nThis lesson lives in Tutor only: nothing was copied into spec/.`, progress };
+  if (lesson.builtin) {
+    const dir = `${relative(state.root, course.progress.dir)}/`;
+    return { text: `${summary}\nThis lesson lives in Tutor only: nothing was copied into ${dir}.`, progress };
+  }
   const iteration = { iteration: lesson.id, status: "WIP" as const };
   if (course.id === null) {
     return { text: `${summary} Its spec is in the course; nothing was copied into your workspace.`, progress, iteration };
@@ -354,7 +369,7 @@ export function completeAction(state: CoachState, input: ToolParameters<"tutor_c
     lessonId: lesson.id,
   });
   const caveat = open > 0 ? `\nNote: ${open} examples are not marked passing or skipped.` : "";
-  const commit = lesson.builtin ? "" : `\nCommit the implementation, ITERATION and spec/PROGRESS.yaml with the message "Implement homework ${lesson.id}".`;
+  const commit = lesson.builtin ? "" : `\nCommit the implementation, ITERATION and ${progressFileText(state)} with the message "Implement homework ${lesson.id}".`;
   const outcome: Outcome = {
     text: `Lesson ${lesson.id} is complete.${caveat}${commit}\n${echo(line)}`,
     progress: { ...progress, summary: input.summary },

@@ -10,7 +10,7 @@ import { ErrorNotice, Loading, Notice, SketchPage } from "./common.tsx";
 import { Button, Character, Highlight, Panel, Tick } from "./sketch/index.ts";
 
 const COURSE_METHOD =
-  "Each lesson is a spec: a plain description of what your factory should do next. Your coach works through it with you, one Rule at a time, in the repo where your factory lives.";
+  "Your coach works through each lesson with you, one Rule at a time, in the workspace you pick below.";
 
 export function WelcomePage() {
   const rpc = useTutorRpc();
@@ -84,19 +84,16 @@ function Picker({
       <p className="tp-dek">
         {view.mode === "confirm"
           ? `${description === null ? "" : `${description} `}${COURSE_METHOD}`
-          : "Your coach needs a factory repo to work in. None of the projects in this Codespace has one yet."}
+          : "Your coach needs a folder to work in. Run `tutor up <folder>` to make one, or pick a project below."}
       </p>
       {view.mode === "setup" ? (
         <Panel dashed wash={false} className="tp-howto">
           <p className="tp-eyebrow">Set one up</p>
           <ol>
             <li>
-              Fork <code>capstone-project-starter</code> and clone your fork here, usually into{" "}
-              <code>/workspaces/capstone-project-starter</code>.
+              Pick the folder you'll work in, then run <code>tutor up &lt;folder&gt;</code> there.
             </li>
-            <li>
-              Add the clone's folder to BB as a project, then come back here.
-            </li>
+            <li>Come back here once it's done.</li>
           </ol>
           <Button secondary onClick={() => queryCache.invalidate((key) => key === QUERY_KEYS.candidates)}>
             Check again
@@ -105,7 +102,9 @@ function Picker({
       ) : null}
       {listed.length === 0 ? null : (
         <>
-          <p className="tp-eyebrow tp-pick-label">{view.mode === "setup" ? "Or use one of these projects anyway" : "Your workspace"}</p>
+          <p className="tp-eyebrow tp-pick-label">
+            {view.mode === "setup" ? "Or use one of these projects anyway" : "Pick the folder you'll work in"}
+          </p>
           <div className="tp-picker" role="radiogroup" aria-label="Workspace">
             {listed.map((project) => (
               <Panel

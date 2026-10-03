@@ -13,8 +13,33 @@ should all use these names. Where a course's own files keep an older word, the t
   `course.yaml`. The first course is `lean-software-production/tutorial`. The engine holds no
   lesson content of its own, except the built-in Lesson 0.
 
-- **Tutor** — The course engine. It comes in two parts: the BB plugin `bb-plugin-tutor`, and the
-  devcontainer feature `tutor`, which installs and configures that plugin in a course Codespace.
+- **Course layout** — What a course expects to find in the workspace, declared by `course.yaml`'s
+  `layout` (`layouts/state.ts`). A course with no layout (Lesson 0, and any course.yaml that
+  doesn't set one) needs nothing there and keeps its progress under `.tutor/courses/<id>/`. The
+  one declared layout is `capstone-factory`: see *Factory* and *Repo*. A lesson of a course with a
+  layout waits for "layout ready" before it can be adopted, with the layout's own reason when it
+  isn't.
+
+- **Tutor** — The course engine. The BB plugin `bb-plugin-tutor`, coaching a student through a
+  course's lessons via the `tutor` skill and its `tutor_*` tools.
+
+- **Tutor server** — The `bb-server` process the `tutor` launcher installs and runs for the
+  student, with the Tutor plugin and Lesson 0 built in. It holds no hosts of its own: every
+  coach thread runs on the enrolled *Machine*.
+
+- **Machine** — The BB host daemon the launcher enrols with the Tutor server, running on the same
+  computer. It runs the coach threads' pi agent and reaches the workspace on disk; the server
+  reaches the workspace only through it (`server/workspace/access.ts`).
+
+- **Workspace** — The folder the student builds in: a BB project's folder, on a machine, that the
+  student picked or that `tutor up <folder>` created. Tutor adds only `.git` (`tutor up`) or
+  `.tutor/` (Lesson 0) to it, and never deletes it. The `workspaceProject` setting names the BB
+  project; `World.workspace` (`shared/rpc.ts`) is its live status.
+
+- **Built-in course** — Tutor's own course, shipped with the plugin (`server/course/builtin/`,
+  `BUILTIN_COURSE_ID`). Its one lesson is Lesson 0, "Using your tutor"; it needs only the
+  workspace and keeps its progress in `.tutor/progress.yaml`. It is always the first course in
+  `World.courses`, whatever course the student is working through.
 
 - **Lesson** — One step of a course: a folder `docs/iterations/NNN-*/` holding its README,
   `FACTORY.md` and Gherkin `.feature` files. Lessons are numbered `000`, `001`, and so on.
@@ -76,17 +101,17 @@ should all use these names. Where a course's own files keep an older word, the t
   open the coach thread instead. It replaces the "lesson page", which used to embed the coach
   chat below the lesson.
 
-- **Factory** — The folder where the student builds their software factory. In the student's fork
-  of `capstone-project-starter` it is the *factory folder*, `tetris/.factory` through lesson 003
-  and `factory/` from 004 (see *the move*). `tetris/` is the codebase the factory builds, with the
-  sample seed in `tetris/seeds/`. The factory holds `ITERATION`, `spec/` (with the progress file)
-  and the fetched `stand-ins/`. Before v0.2.0 the factory folder itself was the BB project; that
-  setup still works.
+- **Factory** — Belongs to the `capstone-factory` course layout. The folder where the student
+  builds their software factory. In the student's fork of `capstone-project-starter` it is the
+  *factory folder*, `tetris/.factory` through lesson 003 and `factory/` from 004 (see *the move*).
+  `tetris/` is the codebase the factory builds, with the sample seed in `tetris/seeds/`. The
+  factory holds `ITERATION`, `spec/` (with the progress file) and the fetched `stand-ins/`. Before
+  v0.2.0 the factory folder itself was the BB project; that setup still works.
 
-- **Repo** — The student's fork of `capstone-project-starter`, and since v0.2.0 the BB project:
-  the *factory project* (the `factoryProject` setting) is the repo's top folder. Coach threads
-  start there and `cd` into the factory folder. The starter's skills, `coach-me` among them, are in
-  its `.agents/skills/`.
+- **Repo** — Belongs to the `capstone-factory` course layout. The student's fork of
+  `capstone-project-starter`, and since v0.2.0 the BB project: the repo's top folder is the
+  *workspace*. Coach threads start there and `cd` into the factory folder. The starter's skills,
+  `coach-me` among them, are in its `.agents/skills/`.
 
 - **Factory folder** — Where the factory is inside the repo: `tetris/.factory`, then `factory/`.
   Tutor finds it on every read (`server/progress/layout.ts`); `factory/` wins when both exist.

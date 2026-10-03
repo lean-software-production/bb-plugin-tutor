@@ -14,6 +14,7 @@ import {
   layoutError,
   markAction,
   otherLessonError,
+  progressFileText,
   type CoachState,
   type Outcome,
 } from "./actions.ts";
@@ -220,4 +221,34 @@ test("a layoutless course adopts a lesson without copying anything into the work
   assert.deepEqual(outcome.iteration, { iteration: "001", status: "WIP" });
   assert.equal(outcome.progress?.iteration, "001");
   assert.match(outcome.text, new RegExp(`^Adopted lesson 001 "${lesson.title}": .* Its spec is in the course; nothing was copied into your workspace\\.$`));
+});
+
+test("progressFileText names each layout's own progress file, capstone wording unchanged", () => {
+  assert.equal(progressFileText(stateOf()), "spec/PROGRESS.yaml");
+  assert.equal(progressFileText(builtinStateOf(fixtureFreshStudent)), ".tutor/progress.yaml");
+  const layoutless = coachStateOf(makeWorld(fixtureFreshStudent, undefined, fixtureLayoutlessCourse), fixtureLayoutlessCourse.id);
+  assert.ok(!("error" in layoutless), "error" in layoutless ? layoutless.error : "");
+  assert.equal(progressFileText(layoutless), `.tutor/courses/${fixtureLayoutlessCourse.id}/progress.yaml`);
+});
+
+test("Lesson 0's adopt line and a damaged progress file name .tutor/, not spec/", () => {
+  const builtin = adoptAction(builtinStateOf(fixtureFreshStudent), { iteration: "000" }, NOW);
+  assert.ok("text" in builtin, "error" in builtin ? builtin.error : "");
+  assert.match(builtin.text, /nothing was copied into \.tutor\/\./);
+
+  const damaged: StudentState = { iteration: null, progress: null, progressUnreadable: true, problems: ["unreadable"] };
+  const state = builtinStateOf(damaged);
+  assert.equal(state.progress, null);
+  const refused = focusAction(state, { rule: "whatever" }, true);
+  assert.ok("error" in refused);
+  assert.match(refused.error, /^\.tutor\/progress\.yaml could not be read/);
+});
+
+test("a layoutless course's complete commit names its own progress file, not spec/PROGRESS.yaml", () => {
+  const state = coachStateOf(makeWorld(fixtureStudent, undefined, fixtureLayoutlessCourse), fixtureLayoutlessCourse.id);
+  assert.ok(!("error" in state), "error" in state ? state.error : "");
+  const outcome = completeAction(state, { iteration: "002", summary: "It checks its work." });
+  assert.ok("text" in outcome, "error" in outcome ? outcome.error : "");
+  assert.match(outcome.text, new RegExp(`Commit the implementation, ITERATION and \\.tutor/courses/${fixtureLayoutlessCourse.id}/progress\\.yaml`));
+  assert.doesNotMatch(outcome.text, /spec\/PROGRESS\.yaml/);
 });

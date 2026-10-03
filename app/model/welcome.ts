@@ -3,9 +3,9 @@
 import type { Workspace, CandidateProject } from "../../shared/rpc.ts";
 
 export interface WelcomeView {
-  /** "confirm" when some project looks like a factory repo; "setup" otherwise. */
+  /** "confirm" when some project qualifies as the workspace; "setup" otherwise. */
   mode: "confirm" | "setup";
-  /** Projects that look like a factory repo, best first. */
+  /** Projects that qualify, best first. */
   detected: CandidateProject[];
   /** Everything else, offered behind "Use a different project". */
   others: CandidateProject[];

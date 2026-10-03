@@ -31,5 +31,5 @@ you work out why.
 - **Side chats** for side questions, in the thread's right panel.
 - **Progress cards** and **term chips** in the coach's replies.
 
-When every Example has passed, the coach closes the lesson and lesson 1 is
-ready to start.
+When every Example has passed, your coach closes the lesson. Add a course
+from the outline whenever you're ready.

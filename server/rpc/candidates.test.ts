@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { describeCandidate, rankCandidates, type ProjectProbe } from "./candidates.ts";
 
-const context = { coursePath: "/workspaces/tutorial", coachName: "coach-me" };
+const context = { coursePath: "/workspaces/tutorial", coachName: "coach-me", layoutId: "capstone-factory" as const };
 
 // capstone-project-starter's tetris/.factory/AGENTS.md names the coach-me skill, not a file.
 const STARTER_AGENTS = `# Agent instructions
@@ -24,6 +24,7 @@ function probe(overrides: Partial<ProjectProbe>): ProjectProbe {
     rootExists: true,
     iterationText: null,
     agentsText: null,
+    hasTutorDir: false,
     ...overrides,
   };
 }
@@ -67,4 +68,25 @@ test("the feature's hinted folder comes first, then qualifying projects, then by
     "/w/gamma",
   );
   assert.deepEqual(ranked.map((candidate) => candidate.projectId), ["c", "b", "a"]);
+});
+
+test("without the capstone-factory layout, every standard project qualifies, with .tutor/ ones ranked first", () => {
+  const layoutless = { coursePath: "/workspaces/tutorial", coachName: "coach-me", layoutId: null };
+  const plain = describeCandidate(probe({ root: "/workspaces/p" }), layoutless);
+  assert.deepEqual([plain.qualifies, plain.detail], [true, "a folder to work in"]);
+  const already = describeCandidate(probe({ root: "/workspaces/p", hasTutorDir: true }), layoutless);
+  assert.deepEqual([already.qualifies, already.detail], [true, ".tutor/ · already set up"]);
+  // The course itself and overlapping folders still never qualify.
+  assert.equal(describeCandidate(probe({ root: "/workspaces/tutorial/" }), layoutless).qualifies, false);
+  assert.equal(describeCandidate(probe({ root: "/workspaces/tutorial/docs" }), layoutless).qualifies, false);
+
+  const ranked = rankCandidates(
+    [
+      { projectId: "a", name: "alpha", root: "/w/alpha", qualifies: true, detail: "" },
+      { projectId: "b", name: "beta", root: "/w/beta", qualifies: true, detail: "" },
+    ],
+    null,
+    new Set(["b"]),
+  );
+  assert.deepEqual(ranked.map((candidate) => candidate.projectId), ["b", "a"]);
 });
