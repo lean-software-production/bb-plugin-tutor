@@ -39,7 +39,7 @@ check_workspace() {
   mkdir -p "$WORKSPACE"
   [ -d "$WORKSPACE/.git" ] || git -C "$WORKSPACE" init -q
   local project
-  project=$(sbb plugin config tutor get workspaceProject --json 2>/dev/null | json 'v.value ?? ""' 2>/dev/null) || project=""
+  project=$(sbb plugin config tutor --json 2>/dev/null | json 'v.values?.workspaceProject ?? ""' 2>/dev/null) || project=""
   if [ -z "$project" ]; then
     project=$(sbb project create --name "$(basename "$WORKSPACE")" --root "$WORKSPACE" --machine "$mid" --json | json 'v.id ?? v.project?.id')
     sbb plugin config tutor set workspaceProject "$project" >/dev/null
