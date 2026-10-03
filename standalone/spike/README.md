@@ -17,6 +17,12 @@ Run it once on Linux and once on macOS. Write what you find in
   - its files are in `~/.bb-machines/127.0.0.1-47399/`;
   - its service is a systemd user unit on Linux, or a launchd agent on macOS.
 
+On Linux, the drop-in that sets those two variables also `UnsetEnvironment=`s every provider
+credential the systemd user manager would pass on (found by name: `*_API_KEY`, `*_AUTH_TOKEN`,
+`*_OAUTH_TOKEN`, `HF_TOKEN`, the AWS keys). Without it, a key exported by your desktop session,
+such as `OPENCODE_API_KEY`, reaches coach threads. launchd can't unset a variable, so on macOS
+check 9 just reports what the agent sees.
+
 It doesn't touch a BB you already run (38886), a real Tutor (47386), or `~/.pi`, which check 5
 verifies. `teardown.sh` removes all of it. Override the defaults with `SPIKE_HOME`, `SPIKE_PORT`,
 `BB_VERSION` and `PI_VERSION`.
@@ -28,12 +34,13 @@ printed, logged or passed as an argument.
 
 ```sh
 sh standalone/spike/setup.sh                    # server, machine, Tutor's pi on the machine
-sh standalone/spike/check-pi-env.sh before-login   # checks 1, 2, 4
+sh standalone/spike/check-pi-env.sh before-login   # checks 1, 2, 9, 4
 sh standalone/spike/check-pi-env.sh login          # in pi: /login to a provider your ~/.pi lacks, then /quit
 SPIKE_PROVIDER=<that provider> sh standalone/spike/check-pi-env.sh after-login   # checks 5, 6, 7
 sh standalone/spike/check-pi-env.sh rewrite        # check 3: does a reinstall keep the variables? repairs after
 # reboot the computer, then:
 sh standalone/spike/check-pi-env.sh after-reboot   # check 8
+sh standalone/spike/check-pi-env.sh keys           # check 9 on its own, any time
 sh standalone/spike/teardown.sh                    # keeps results in ~/tutor-spike-results-<os>
 ```
 
@@ -57,7 +64,8 @@ the end-to-end test replays it.
 | 5 | Log in against Tutor's pi dir | `auth.json` lands there, and `~/.pi/agent/auth.json` is byte-identical |
 | 6 | The machine's pi model list includes a provider only Tutor's pi is signed in to | Discovery reads Tutor's pi dir |
 | 7 | A pi thread spawned on the machine | It starts pi through `BB_PI_BRIDGE_COMMAND` with Tutor's pi dir |
-| 8 | Checks 1 and 7 after a reboot | They survive a reboot |
+| 8 | Checks 1, 9 and 7 after a reboot | They survive a reboot |
+| 9 | The machine daemon's environment has no provider credential (`*_API_KEY`, `*_AUTH_TOKEN`, `*_OAUTH_TOKEN`, `HF_TOKEN`, AWS keys); names only are read | Coach threads can only use what Tutor's pi was signed in to |
 
 What to change in the plan when a check fails is in Task 1's table in the plan.
 

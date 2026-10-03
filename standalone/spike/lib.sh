@@ -21,6 +21,12 @@ PI_DIR="$SPIKE_HOME/pi"
 LOGS="$SPIKE_HOME/logs"
 RESULTS="$SPIKE_HOME/results.txt"
 
+# Environment variables that hand a model provider a credential: every
+# *_API_KEY, *_AUTH_TOKEN and *_OAUTH_TOKEN pi reads (OPENCODE_API_KEY,
+# OPENROUTER_API_KEY, ANTHROPIC_API_KEY, ANTHROPIC_OAUTH_TOKEN, …), HF_TOKEN and
+# the AWS credentials (Bedrock). Matched by name, so new providers are covered.
+KEY_PATTERN='(_API_KEY|_AUTH_TOKEN|_OAUTH_TOKEN)$|^HF_TOKEN$|^AWS_(ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN)$'
+
 # The bb CLI talks to whatever BB_SERVER_URL names. Inside a BB thread it is
 # already set (to your real BB), so always pin it to the spike server.
 spike_bb() {

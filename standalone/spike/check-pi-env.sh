@@ -6,7 +6,8 @@
 #   check-pi-env.sh login          runs Tutor's pi against $SPIKE_HOME/pi: type /login, then /quit
 #   check-pi-env.sh after-login    checks 5, 6, 7   (needs SPIKE_PROVIDER, see below)
 #   check-pi-env.sh rewrite        check 3: re-run BB's installer, see what survives, repair
-#   check-pi-env.sh after-reboot   check 8: checks 1 and 7 again after a reboot
+#   check-pi-env.sh after-reboot   check 8: checks 1, 9 and 7 again after a reboot
+#   check-pi-env.sh keys           check 9: provider credentials in the machine daemon's environment
 #
 # SPIKE_PROVIDER: a pi provider you sign in to with `login` but NOT in your own
 # ~/.pi (for example openai-codex when ~/.pi only has anthropic). Check 6 uses
@@ -38,6 +39,28 @@ check_env() {
     result "$label" PASS "the machine daemon's environment has PI_CODING_AGENT_DIR and BB_PI_BRIDGE_COMMAND"
   else
     result "$label" FAIL "the machine daemon's environment lacks one or both variables"
+  fi
+}
+
+# Check 9: the machine daemon's environment holds no provider credential.
+# Only variable names are read and printed, never their values.
+check_keys() {
+  label=$1
+  case "$(os_kind)" in
+    linux)
+      pid=$(systemctl --user show -p MainPID --value "$(machine_unit_name)")
+      names=$(tr '\0' '\n' <"/proc/$pid/environ" | cut -d= -f1)
+      ;;
+    macos)
+      names=$(launchctl print "gui/$(id -u)/$(machine_label)" 2>/dev/null | sed -n '/environment = {/,/}/p' \
+        | sed -n 's/^[[:space:]]*\([A-Za-z_][A-Za-z0-9_]*\) => .*/\1/p')
+      ;;
+  esac
+  found=$(printf '%s\n' "$names" | grep -E "$KEY_PATTERN" | tr '\n' ' ' | sed 's/ $//' || true)
+  if [ -z "$found" ]; then
+    result "$label" PASS "no provider credential in the machine daemon's environment"
+  else
+    result "$label" FAIL "provider credentials in the machine daemon's environment: $found"
   fi
 }
 
@@ -78,6 +101,7 @@ before_login() {
   restart_machine
   sleep 3
   check_env 2
+  check_keys 9
   # Check 4: Tutor's pi sees no credentials before login. API keys in your
   # shell's environment would still show models; note any in the document.
   if [ -f "$PI_DIR/auth.json" ]; then
@@ -164,10 +188,12 @@ rewrite() {
   say "Repairing with apply-env.sh (what tutor up will do):"
   sh "$(dirname "$0")/apply-env.sh"
   check_env 3
+  check_keys 3
 }
 
 after_reboot() {
   check_env 8
+  check_keys 8
   check_thread 8
 }
 
@@ -177,5 +203,6 @@ case "${1:-}" in
   after-login) after_login ;;
   rewrite) rewrite ;;
   after-reboot) after_reboot ;;
-  *) sed -n '2,14p' "$0"; exit 2 ;;
+  keys) check_keys 9 ;;
+  *) sed -n '2,/^set -eu/p' "$0" | sed '$d'; exit 2 ;;
 esac
