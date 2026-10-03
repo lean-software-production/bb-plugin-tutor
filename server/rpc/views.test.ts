@@ -38,7 +38,7 @@ test("no factory project: each course's lessons are listed from a fresh start, w
 test("a course that will not load still gives an overview, with the built-in course and why", () => {
   const world = makeWorld();
   const overview = buildOverview(
-    { ...world, available: world.available.slice(0, 1), courses: world.courses.slice(0, 1), courseErrors: [{ source: "/x", error: "No course at /x." }] },
+    { ...world, allCourses: world.allCourses.slice(0, 1), courses: world.courses.slice(0, 1), courseErrors: [{ source: "/x", error: "No course at /x." }] },
     records,
   );
   assert.deepEqual(overview.courses.map((entry) => entry.course.id), ["tutor"]);

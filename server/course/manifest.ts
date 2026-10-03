@@ -7,6 +7,8 @@ import type { LayoutId } from "../../layouts/state.ts";
 import { CourseLoadError } from "../../shared/ports.ts";
 import { isInside } from "../paths.ts";
 import { readYaml } from "./yaml-file.ts";
+import { PINNED_REF, PINNED_REF_MESSAGE } from "../content/catalog.ts";
+import type { CourseStarter } from "../../shared/model.ts";
 
 export interface LessonEntry {
   id: string;
@@ -26,6 +28,8 @@ export interface CourseManifest {
   coachPath: string | null;
   /** Absolute; the file named by `lexicon`, or null when there is none. */
   lexiconPath: string | null;
+  /** The repo whose files Tutor seeds into the workspace when the course is added (Task 13); null for none. */
+  starter: CourseStarter | null;
   lessons: LessonEntry[];
 }
 
@@ -41,6 +45,14 @@ const courseYamlSchema = z.object({
   layout: z.enum(["capstone-factory"], { error: "should be capstone-factory, or left out" }).optional(),
   coach: text.optional(),
   lexicon: text.optional(),
+  starter: z
+    .object({
+      repo: text.refine((value) => !value.startsWith("-"), "should be a repository URL"),
+      ref: z.string().regex(PINNED_REF, PINNED_REF_MESSAGE),
+      /** Top-level entries of the starter left out of the seed, besides .git, .devcontainer and .github. */
+      exclude: z.array(text).optional(),
+    })
+    .optional(),
   lessons: z
     .array(z.object({ id: lessonIdSchema, title: text, set: z.string().optional(), dir: text }))
     .min(1, "should list at least one lesson"),
@@ -79,6 +91,7 @@ export function parseCourseYaml(source: string, root: string, displayPath: strin
     layout: course.layout ?? null,
     coachPath: course.coach === undefined ? null : inside(course.coach, ["coach"]),
     lexiconPath: course.lexicon === undefined ? null : inside(course.lexicon, ["lexicon"]),
+    starter: course.starter === undefined ? null : { repo: course.starter.repo, ref: course.starter.ref, exclude: course.starter.exclude ?? [] },
     lessons: course.lessons.map((lesson, index) => ({
       id: lesson.id,
       title: lesson.title,

@@ -11,7 +11,8 @@ import { adoptionTargets } from "../coach/actions.ts";
 import { coachThreadOf } from "../coach/auth.ts";
 import { recordCoachThread, recordedCoachThread } from "../coach/coach-record.ts";
 import { resolveWorkspace } from "../workspace/workspace-project.ts";
-import { coachThreadLockKey } from "../coach/lock-keys.ts";
+import { coachThreadLockKey, workspaceLockKey } from "../coach/lock-keys.ts";
+import { addCourse, CONFIGURED_COURSE_TEXT } from "../coach/add-course.ts";
 import {
   coachThreadPrompt,
   factoryWhere,
@@ -234,12 +235,12 @@ export function registerRpc(rt: TutorRuntime): void {
 
     getLexicon: async () => {
       const world = await rt.world.load();
-      return { entries: lexiconOf(world.available) };
+      return { entries: lexiconOf(world.allCourses) };
     },
 
     listCandidateProjects: async () => {
       const world = await rt.world.load();
-      const course = world.available.find((entry) => entry.id !== BUILTIN_COURSE_ID);
+      const course = world.allCourses.find((entry) => entry.id !== BUILTIN_COURSE_ID);
       return {
         projects: await listCandidates(
           bb.sdk,
@@ -261,7 +262,7 @@ export function registerRpc(rt: TutorRuntime): void {
       // The coach writes spec/, stand-ins/ and ../seeds/ beside the factory, so it must never be the course checkout.
       const { coursePath } = await rt.world.load();
       // The workspace's real folder is the machine's to say; the course checkout is the server's.
-      if (overlaps(await rt.access(hostId).realPath(workspace.root), await realPath(coursePath))) {
+      if (coursePath !== null && overlaps(await rt.access(hostId).realPath(workspace.root), await realPath(coursePath))) {
         throw new Error("That project's folder is, or shares a folder with, the course. Pick the repo you build your factory in.");
       }
       // settings.onChange publishes the workspace signal.
@@ -358,6 +359,20 @@ export function registerRpc(rt: TutorRuntime): void {
         mode: "queue-if-active",
       });
       return { threadId: coachThread.threadId };
+    },
+
+    fetchCourse: async ({ courseId }) => {
+      const first = await loadWorld();
+      // Decision 12, before anything else: a configured course is all this Tutor teaches.
+      if (first.coursePath !== null) throw new Error(CONFIGURED_COURSE_TEXT);
+      const { root } = requireWorkspace(first);
+      // Fetch, load, seed and publish under the workspace lock, as the coach tools write.
+      const added = await rt.locks.run(workspaceLockKey(root), async () => addCourse(rt, await loadWorld(), courseId));
+      return {
+        courseId: added.course.id,
+        firstLessonId: added.firstLessonId,
+        seeded: added.seeded ?? { written: 0, kept: [] },
+      };
     },
 
     heartbeat: async () => {

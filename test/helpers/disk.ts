@@ -10,7 +10,8 @@
 import { execFileSync } from "node:child_process";
 import { chmod, mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
+import { pathToFileURL } from "node:url";
 import { fixtureCourse } from "../../shared/fixtures.ts";
 import { FACTORY_FILES } from "../../shared/constants.ts";
 import type { Course, ProgressFile } from "../../shared/model.ts";
@@ -127,4 +128,81 @@ export async function makeRepoSandbox(options: RepoSandboxOptions = {}): Promise
   if (options.iteration !== undefined) await writeFile(join(factoryRoot, FACTORY_FILES.iteration), `${options.iteration}\n`);
   const course = await writeCourse(join(root, "tutorial"), options.course);
   return { root, course, repoRoot, codebaseRoot, factoryRoot, cleanup: () => rm(root, { recursive: true, force: true }) };
+}
+
+/** A temp folder holding only an empty git repo: a standalone student's workspace before Tutor adds anything. */
+export async function emptyGitWorkspace(): Promise<string> {
+  const ws = await mkdtemp(join(tmpdir(), "tutor-ws-"));
+  git(ws, "init", "-q", "-b", "main");
+  return ws;
+}
+
+export interface FixtureCourseRepoOptions {
+  /** course.yaml's layout; none unless given. */
+  layout?: "capstone-factory";
+  /** Give the course a starter repo (tetris/.factory/AGENTS.md and the coach-me skill). */
+  starter?: boolean;
+  /** The catalog entry's and course's id: "fixture" unless given. */
+  id?: string;
+}
+
+export interface FixtureCourseRepo {
+  /** A courseCatalog setting naming the course by its file:// URL, at its v1 tag. */
+  catalogJson: string;
+  courseRepo: string;
+  starterRepo: string | null;
+  /** The course repo's v1 commit. */
+  courseSha: string;
+  cleanup(): Promise<void>;
+}
+
+/**
+ * fixtureCourse as a git repo with a course.yaml (its `layout` and `starter`),
+ * and, with `starter`, a starter repo it names by file:// URL: both committed
+ * and tagged v1. Nothing here touches the network.
+ */
+export async function makeFixtureCourseRepo(options: FixtureCourseRepoOptions = {}): Promise<FixtureCourseRepo> {
+  const id = options.id ?? "fixture";
+  const root = await mkdtemp(join(tmpdir(), "tutor-course-repo-"));
+  const courseRepo = join(root, "course");
+  const course = await writeCourse(courseRepo);
+  let starterRepo: string | null = null;
+  if (options.starter === true) {
+    starterRepo = join(root, "starter");
+    await mkdir(join(starterRepo, "tetris/.factory"), { recursive: true });
+    await writeFile(join(starterRepo, "tetris/.factory/AGENTS.md"), "# Agent instructions\n\nSkills, in `.agents/skills/` at the repository's root: **coach-me**.\n");
+    await mkdir(join(starterRepo, ".agents/skills/coach-me"), { recursive: true });
+    await writeFile(join(starterRepo, ".agents/skills/coach-me/SKILL.md"), "---\nname: coach-me\n---\nWalk the student through their next homework iteration.\n");
+    // Left out of the seed: a starter's own CI and devcontainer are not the student's.
+    await mkdir(join(starterRepo, ".github"), { recursive: true });
+    await writeFile(join(starterRepo, ".github/ci.yml"), "on: push\n");
+    git(starterRepo, "init", "-q", "-b", "main");
+    git(starterRepo, "add", "-A");
+    git(starterRepo, "commit", "-q", "-m", "Starter");
+    git(starterRepo, "tag", "v1");
+  }
+  const lessons = course.lessons
+    .map((lesson) => `  - id: "${lesson.id}"\n    title: ${JSON.stringify(lesson.title)}\n    dir: ${relative(courseRepo, lesson.dir)}\n`)
+    .join("");
+  const yaml =
+    `id: ${id}\n` +
+    `title: ${JSON.stringify(course.title)}\n` +
+    `description: ${JSON.stringify(course.description ?? "")}\n` +
+    (options.layout === undefined ? "" : `layout: ${options.layout}\n`) +
+    "coach: .agents/coach-me.md\n" +
+    (starterRepo === null ? "" : `starter:\n  repo: ${pathToFileURL(starterRepo).href}\n  ref: v1\n`) +
+    `lessons:\n${lessons}`;
+  await writeFile(join(courseRepo, "course.yaml"), yaml);
+  git(courseRepo, "init", "-q", "-b", "main");
+  git(courseRepo, "add", "-A");
+  git(courseRepo, "commit", "-q", "-m", "Course");
+  git(courseRepo, "tag", "v1");
+  const catalog = [{ id, title: course.title, description: course.description ?? "", repo: pathToFileURL(courseRepo).href, ref: "v1" }];
+  return {
+    catalogJson: JSON.stringify(catalog),
+    courseRepo,
+    starterRepo,
+    courseSha: git(courseRepo, "rev-parse", "HEAD").trim(),
+    cleanup: () => rm(root, { recursive: true, force: true }),
+  };
 }

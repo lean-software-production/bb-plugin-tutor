@@ -1,4 +1,4 @@
-// The six coach tools. Each call re-derives the world, re-checks the calling
+// The seven coach tools. Each call re-derives the world, re-checks the calling
 // thread with BB, runs the pure action, then writes the files it returned.
 import type { PluginAgentToolContext, PluginAgentToolResult, PluginRowLabels } from "@get-bb/plugin-sdk";
 import { FACTORY_FILES, TOOL_NAMES, type ToolName } from "../../shared/constants.ts";
@@ -22,6 +22,7 @@ import {
   type Outcome,
 } from "./actions.ts";
 import { authorizeCaller, type Caller } from "./auth.ts";
+import { addCourse, addedCourseText } from "./add-course.ts";
 import { workspaceLockKey } from "./lock-keys.ts";
 import type { TutorRuntime } from "./runtime.ts";
 import { sideChatAnchor, sideChatSeed } from "./prompts.ts";
@@ -35,6 +36,8 @@ type Action<Name extends ToolName> = (
   input: ToolParameters<Name>,
   caller: Caller,
   now: string,
+  /** The world the state came from, read under the workspace lock. */
+  world: World,
 ) => Outcome | Promise<Outcome>;
 
 interface ToolSpec<Name extends ToolName> {
@@ -145,7 +148,7 @@ function register<Name extends ToolName>(rt: TutorRuntime, spec: ToolSpec<Name>)
         if (otherLesson !== null) return refusal(otherLesson);
         const notReady = spec.needsLayout ? layoutError(state) : null;
         if (notReady !== null) return refusal(notReady);
-        const outcome = await spec.action(state, input, caller, isoSeconds(rt.now()));
+        const outcome = await spec.action(state, input, caller, isoSeconds(rt.now()), world);
         if ("error" in outcome) return refusal(outcome.error);
         const note = await applyOutcome(rt, state, outcome, caller);
         return note === null ? outcome.text : `${outcome.text}\n${note}`;
@@ -272,5 +275,22 @@ export function registerCoachTools(rt: TutorRuntime): void {
     lesson: "any",
     needsLayout: false,
     action: (state, input, caller) => sideChat(rt, state, input, caller),
+  });
+  register(rt, {
+    name: TOOL_NAMES.fetchCourse,
+    description:
+      "Add a course the student asked for: fetch it, put its starter files in the workspace (only files that aren't there yet; the student's own are kept), and list its lessons after Lesson 0 in the outline. Calling it again finishes a setup that was interrupted. Does not commit: tell the student to commit the starter before its first lesson.",
+    label: { pending: "Adding the course", completed: "Added the course" },
+    // Any coach thread can add a course, whatever lesson it coaches; it touches no lesson's progress.
+    lesson: "any",
+    needsLayout: false,
+    action: async (_state, input, _caller, _now, world) => {
+      try {
+        return { text: addedCourseText(await addCourse(rt, world, input.course)) };
+      } catch (cause) {
+        if (cause instanceof WorkspaceUnreachableError || cause instanceof WriteConflictError) throw cause;
+        return { error: cause instanceof Error ? cause.message : String(cause) };
+      }
+    },
   });
 }

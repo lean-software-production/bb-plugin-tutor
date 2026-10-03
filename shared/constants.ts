@@ -14,6 +14,7 @@ export const TOOL_NAMES = {
   adoptIteration: "tutor_adopt_iteration",
   completeIteration: "tutor_complete_iteration",
   sideChat: "tutor_side_chat",
+  fetchCourse: "tutor_fetch_course",
 } as const;
 export type ToolName = (typeof TOOL_NAMES)[keyof typeof TOOL_NAMES];
 export const ALL_TOOL_NAMES: readonly ToolName[] = Object.values(TOOL_NAMES);
@@ -73,6 +74,8 @@ export const SETTING_KEYS = {
   simpleNavigation: "simpleNavigation",
   /** `type: "string"`; the agent provider coach threads use. Empty means BB's default. */
   coachProvider: "coachProvider",
+  /** `type: "string"`; a JSON course catalog replacing the built-in one (server/content/catalog.ts). Empty means the built-in one. */
+  courseCatalog: "courseCatalog",
 } as const;
 
 /**

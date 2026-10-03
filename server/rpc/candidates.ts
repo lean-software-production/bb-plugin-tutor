@@ -38,7 +38,8 @@ export interface ProjectProbe {
 }
 
 interface CandidateContext {
-  coursePath: string;
+  /** The configured course's folder, which no workspace may share; null without one (Decision 12). */
+  coursePath: string | null;
   /**
    * The coach file's name without its extension, which a coach-me-made
    * AGENTS.md names: "coach-me" matches both coach-me.md and the starter's
@@ -52,8 +53,8 @@ interface CandidateContext {
 export function describeCandidate(probe: ProjectProbe, context: CandidateContext): CandidateProject {
   const base = { projectId: probe.projectId, name: probe.name, root: probe.root };
   if (probe.root === null || !probe.rootExists) return { ...base, qualifies: false, detail: "no folder on this machine" };
-  if (resolve(probe.root) === resolve(context.coursePath)) return { ...base, qualifies: false, detail: "the course itself" };
-  if (overlaps(probe.root, context.coursePath)) return { ...base, qualifies: false, detail: "shares a folder with the course" };
+  if (context.coursePath !== null && resolve(probe.root) === resolve(context.coursePath)) return { ...base, qualifies: false, detail: "the course itself" };
+  if (context.coursePath !== null && overlaps(probe.root, context.coursePath)) return { ...base, qualifies: false, detail: "shares a folder with the course" };
   if (context.layoutId !== "capstone-factory") {
     return { ...base, qualifies: true, detail: probe.hasTutorDir ? ".tutor/ · already set up" : "a folder to work in" };
   }
@@ -171,7 +172,7 @@ async function probe(project: ProjectWithSources, accessFor: AccessFor): Promise
 export async function listCandidates(
   sdk: Sdk,
   accessFor: AccessFor,
-  coursePath: string,
+  coursePath: string | null,
   coachPath: string | null,
   projectHint: string | null,
   layoutId: "capstone-factory" | null = null,

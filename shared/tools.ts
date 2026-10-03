@@ -68,6 +68,14 @@ export const toolParameterSchemas = {
       .describe("The side question, as the student asked it: the side chat's agent reads it before the student's first message."),
     rule: ruleKeySchema.optional().describe("The Rule the side chat is about, if any."),
   }),
+  [TOOL_NAMES.fetchCourse]: z.object({
+    course: z
+      .string()
+      .trim()
+      .min(1)
+      .max(64)
+      .describe("The id of the course to add, as the outline's \"Add the course\" lists it (software-factory for Build a software factory)."),
+  }),
 } satisfies Record<ToolName, z.ZodType>;
 
 export type ToolParameters<Name extends ToolName> = z.infer<(typeof toolParameterSchemas)[Name]>;

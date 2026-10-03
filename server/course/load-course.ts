@@ -50,6 +50,7 @@ export async function loadCourse(coursePath: string): Promise<Course> {
     lexicon: await readLexicon(manifest.lexiconPath, display),
     source,
     layout: manifest.layout,
+    starter: manifest.starter,
   };
 }
 
@@ -88,6 +89,7 @@ async function readManifest(root: string, display: DisplayPath, guard: PathGuard
       description: null,
       // Only the capstone uses the ledger format, so a ledger course is laid out as its factory.
       layout: "capstone-factory",
+      starter: null,
       coachPath: await ifPresent(join(root, COURSE_FILES.defaultCoach)),
       lexiconPath: await ifPresent(join(root, COURSE_FILES.defaultLexicon)),
       lessons: parseLedger(ledger, dirname(ledgerPath), display(ledgerPath), root),
@@ -137,6 +139,7 @@ export async function loadBuiltinCourse(): Promise<Course> {
     lexicon: [],
     source: "course.yaml",
     layout: null,
+    starter: null,
   };
 }
 

@@ -374,6 +374,7 @@ export const fixtureBuiltinCourse: Course = {
   lexicon: [],
   source: "course.yaml",
   layout: null,
+  starter: null,
 };
 
 export const fixtureCourse: Course = {
@@ -386,6 +387,7 @@ export const fixtureCourse: Course = {
   lexicon: fixtureLexicon,
   source: "ledger",
   layout: "capstone-factory",
+  starter: null,
 };
 
 /** A course.yaml course with no layout: it needs nothing in the workspace, and keeps its progress under .tutor/courses/<id>. */
@@ -604,6 +606,7 @@ export const fixtureCourseOverview: CourseOverview = {
 export const fixtureOverview: Overview = {
   workspace: fixtureWorkspace,
   courses: [fixtureBuiltinCourseOverview, fixtureCourseOverview],
+  available: [],
   courseErrors: [],
   threads: fixtureThreads,
 };
@@ -631,6 +634,7 @@ export const fixtureOverviewNoFactory: Overview = {
   workspace: { status: "unset" },
   // No workspace, so the factory isn't there yet: the course's own lessons wait for it.
   courses: [preview(fixtureBuiltinCourseOverview, true), preview(fixtureCourseOverview, false)],
+  available: [],
   courseErrors: [],
   threads: [],
 };

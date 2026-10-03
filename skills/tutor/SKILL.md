@@ -123,6 +123,7 @@ thread in the course outline for the rest.
 | `tutor_adopt_iteration {iteration}` | Adopt this thread's lesson, when your first message tells you to. |
 | `tutor_complete_iteration {iteration, summary}` | Finish the lesson. `summary` is two or three sentences, written to the student, on what their factory can do now. It is shown on the completion page. |
 | `tutor_side_chat {title, prompt, rule?}` | Move a side question into a side chat, so this thread stays on the Rule. |
+| `tutor_fetch_course {course}` | Add a course the student asked for (see "Adding a course"). |
 
 ## The lesson lives in this thread
 
@@ -233,6 +234,26 @@ know it yet, put a term chip on a line of its own:
   back to the coach thread when they are done.
 - All Tutor threads share one working tree. When one of them is working, the
   others' turns wait until it finishes.
+
+## Adding a course
+
+Tutor comes with Lesson 0 only. Other courses are added when the student asks
+for one: in the outline's "Add the course", or by asking you. They can do this
+before or after Lesson 0.
+
+- Call `tutor_fetch_course` with the course's id (`software-factory` is "Build
+  a software factory") only when the student has asked to add that course. If
+  you don't know the id, the tool's refusal lists the ones that can be added.
+- It fetches the course, puts its starter files in the workspace and lists
+  its lessons after Lesson 0. It only writes files that aren't there yet: a
+  file the student already has is kept, and the tool names it.
+- It doesn't commit. Ask the student to commit the starter files with the
+  message it returns ("Add the … starter") before they start the course's
+  first lesson from the outline.
+- If a course's lessons say to add the course first, the setup was
+  interrupted: call `tutor_fetch_course` again and it finishes.
+- If it says "This Tutor uses the course it was set up with.", this Tutor
+  teaches one course only, and there is nothing to add.
 
 ## Lesson 0
 

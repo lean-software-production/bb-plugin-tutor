@@ -132,6 +132,10 @@ export const currentStateSchema = z.object({
 });
 export type CurrentState = z.infer<typeof currentStateSchema>;
 
+/** A course Tutor can fetch and add (server/content/catalog.ts), not fetched yet. */
+export const availableCourseSchema = z.object({ id: z.string(), title: z.string(), description: z.string() });
+export type AvailableCourse = z.infer<typeof availableCourseSchema>;
+
 /** One course in the overview, with the student's place in it. */
 export const courseOverviewSchema = z.object({
   course: courseInfoSchema,
@@ -150,6 +154,8 @@ export const overviewSchema = z.object({
   workspace: workspaceSchema,
   /** Tutor's built-in course first, then the configured course. Before there is a workspace, they show what is ahead. */
   courses: z.array(courseOverviewSchema),
+  /** Courses that can be added ("Add the course"): catalog entries not fetched yet. Empty when a configured course wins (Decision 12). */
+  available: z.array(availableCourseSchema),
   /** Courses that could not be loaded, by path, with the reason. */
   courseErrors: z.array(z.object({ source: z.string(), error: z.string() })),
   threads: z.array(tutorThreadSchema),
@@ -306,6 +312,21 @@ export const rpcContract = defineRpcContract({
    * activity file, at most every 30 s; `recorded` is false when throttled or
    * when BB's data dir is unknown.
    */
+  /**
+   * Adds a course from the catalog (Decision 11): fetches it into BB's data
+   * dir, seeds its starter into the workspace (writing only what is absent),
+   * and lists its lessons after Lesson 0. Calling it again finishes a seed
+   * that was interrupted. Refused when a configured course wins (Decision 12).
+   */
+  fetchCourse: {
+    input: z.object({ courseId: z.string().min(1).max(64) }),
+    output: z.object({
+      courseId: z.string(),
+      firstLessonId: lessonIdSchema,
+      /** written: the starter's files now in the workspace; kept: files already there with other content, left as they were. */
+      seeded: z.object({ written: z.number().int().nonnegative(), kept: z.array(z.string()) }),
+    }),
+  },
   heartbeat: {
     input: z.null(),
     output: z.object({ recorded: z.boolean() }),

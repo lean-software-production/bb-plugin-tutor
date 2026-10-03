@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { createDiskAccess } from "../../test/helpers/disk-access.ts";
-import { readFeatureConfig, resolveCoursePath, resolveFactoryHint, resolveProjectHint } from "./course-path.ts";
+import { readFeatureConfig, resolveConfiguredCourse, resolveCoursePath, resolveFactoryHint, resolveProjectHint } from "./course-path.ts";
 
 const disk = createDiskAccess();
 
@@ -15,6 +15,16 @@ test("course path: setting, then env, then config file, then the default", () =>
   assert.equal(resolveCoursePath("  ", env, config), "/env/course");
   assert.equal(resolveCoursePath(undefined, {}, config), "/config/course");
   assert.equal(resolveCoursePath(undefined, {}, {}), "/workspaces/tutorial");
+});
+
+test("a configured course: one that is named wins even when missing; the default counts only if it exists", async () => {
+  const none = async () => false;
+  const all = async () => true;
+  assert.equal(await resolveConfiguredCourse("/setting/course", {}, {}, none), "/setting/course");
+  assert.equal(await resolveConfiguredCourse(undefined, { TUTOR_COURSE_PATH: "/env/course" }, {}, none), "/env/course");
+  assert.equal(await resolveConfiguredCourse(undefined, {}, { course: "/config/course" }, none), "/config/course");
+  assert.equal(await resolveConfiguredCourse(" ", {}, {}, none), null);
+  assert.equal(await resolveConfiguredCourse(undefined, {}, {}, all), "/workspaces/tutorial");
 });
 
 test("factory hint: env, then config file, else none", () => {

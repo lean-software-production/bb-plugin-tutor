@@ -1,7 +1,8 @@
 // Where the course and the student's repo are, as the tutor feature describes them.
 // Course path precedence: coursePath setting > TUTOR_COURSE_PATH >
-// `course` in the feature's config file > /workspaces/tutorial.
-import { readFile } from "node:fs/promises";
+// `course` in the feature's config file > /workspaces/tutorial, which counts
+// as configured only if it exists (Decision 12).
+import { readFile, stat } from "node:fs/promises";
 import { DEFAULT_COURSE_PATH, ENV_VARS, FEATURE_CONFIG_SCHEMA_VERSION } from "../../shared/constants.ts";
 import { findRepoRoot } from "../../layouts/capstone-factory/detect.ts";
 import { followedKind, type LayoutProbe } from "../../layouts/types.ts";
@@ -65,6 +66,29 @@ export async function readFeatureConfig(path: string): Promise<FeatureConfig> {
 
 export function resolveCoursePath(setting: string | undefined, env: Env, config: FeatureConfig): string {
   return nonEmpty(setting) ?? nonEmpty(env[ENV_VARS.coursePath]) ?? config.course ?? DEFAULT_COURSE_PATH;
+}
+
+/** Whether `path` is a folder on the server. */
+export async function directoryExists(path: string): Promise<boolean> {
+  return (await stat(path).catch(() => null))?.isDirectory() === true;
+}
+
+/**
+ * The configured course's folder (Decision 12): the coursePath setting,
+ * TUTOR_COURSE_PATH or the Feature config's `course`, which win even when
+ * missing (that is an error the student sees), else DEFAULT_COURSE_PATH if it
+ * exists. Null when none applies: a standalone Tutor, which offers courses to
+ * fetch instead.
+ */
+export async function resolveConfiguredCourse(
+  setting: string | undefined,
+  env: Env,
+  config: FeatureConfig,
+  exists: (path: string) => Promise<boolean> = directoryExists,
+): Promise<string | null> {
+  const named = nonEmpty(setting) ?? nonEmpty(env[ENV_VARS.coursePath]) ?? config.course;
+  if (named !== undefined) return named;
+  return (await exists(DEFAULT_COURSE_PATH)) ? DEFAULT_COURSE_PATH : null;
 }
 
 /** The factory hint alone: TUTOR_FACTORY_PATH, then the config's `factory`. */

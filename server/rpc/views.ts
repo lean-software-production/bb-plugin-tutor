@@ -53,7 +53,7 @@ export function courseViews(world: World): CourseView[] {
   if (world.workspace.status === "found") {
     return world.courses.map(({ course, student, pointer, layout }) => ({ course, student, pointer, ready: layout.ready }));
   }
-  return world.available.map((course) => ({
+  return world.allCourses.map((course) => ({
     course,
     student: NOTHING_RECORDED,
     pointer: resolveCurrent(course, NOTHING_RECORDED),
@@ -187,6 +187,7 @@ export function buildOverview(world: World, threads: readonly TutorThreadRecord[
   return {
     workspace: world.workspace,
     courses: views.map((view) => courseOverview(view, found, shown)),
+    available: world.fetchable,
     courseErrors: world.courseErrors,
     threads: shown.map(publicThread),
   };

@@ -20,7 +20,7 @@ import { NOT_A_TUTOR_THREAD } from "../server/coach/auth.ts";
 import { WorkspaceUnreachableError, WriteConflictError, type WorkspaceAccess } from "../server/workspace/access.ts";
 import { formatProgress, parseProgress } from "../layouts/progress/progress-yaml.ts";
 import { createDiskAccess } from "./helpers/disk-access.ts";
-import { makeSandbox, makeRepoSandbox, type Sandbox } from "./helpers/disk.ts";
+import { emptyGitWorkspace, makeFixtureCourseRepo, makeSandbox, makeRepoSandbox, type Sandbox } from "./helpers/disk.ts";
 import { allPassing, callTool, makeTutorHost, PROJECT_ID, type TutorHost } from "./helpers/fake-bb.ts";
 import { createCourseSource } from "../server/course/index.ts";
 import { THREAD_PAGE_SIZE } from "../server/coach/threads.ts";
@@ -117,6 +117,7 @@ test("every tool refuses threads Tutor did not spawn, whatever their metadata sa
     tutor_adopt_iteration: { iteration: "000" },
     tutor_complete_iteration: { iteration: "000", summary: "x" },
     tutor_side_chat: { title: "t", prompt: "p" },
+    tutor_fetch_course: { course: "software-factory" },
   };
   for (const name of ALL_TOOL_NAMES) {
     const result = await tool(host, name, inputs[name], "thr_foreign");
@@ -1391,4 +1392,138 @@ test("the Feature's project hint is resolved on BB's own host, and left as it is
   assert.deepEqual([...new Set(askedWithHost)], ["host_1"]);
   assert.equal((await standalone.rt.world.load()).projectHint, sandbox.factoryRoot);
   assert.deepEqual(asked, [], "nothing was probed");
+});
+
+// ---------------------------------------------------------------------------
+// Adding a course (Task 13): fetched on request into BB's data dir, its starter seeded into the workspace.
+// ---------------------------------------------------------------------------
+
+interface Added {
+  courseId: string;
+  firstLessonId: string;
+  seeded: { written: number; kept: string[] };
+}
+
+/** A standalone Tutor: no configured course, an empty git workspace, the fixture course in the catalog, and BB's data dir. */
+async function standalone(
+  t: TestContext,
+  options: { layout?: "capstone-factory"; starter?: boolean; onHostCall?: (method: string, input: unknown) => unknown } = {},
+): Promise<{ host: TutorHost; ws: string; dataDir: string }> {
+  const repo = await makeFixtureCourseRepo({ layout: options.layout ?? "capstone-factory", starter: options.starter ?? true });
+  const dataDir = await mkdtemp(join(tmpdir(), "bbdata-"));
+  const ws = await emptyGitWorkspace();
+  const host = await makeTutorHost(null, ws, { workspaceProject: PROJECT_ID, courseCatalog: repo.catalogJson }, {
+    dataDir,
+    ...(options.onHostCall === undefined ? {} : { onHostCall: options.onHostCall }),
+  });
+  t.after(async () => {
+    await host.harness.lifecycle.dispose();
+    await repo.cleanup();
+    await rm(dataDir, { recursive: true, force: true });
+    await rm(ws, { recursive: true, force: true });
+  });
+  return { host, ws, dataDir };
+}
+
+test("nothing from a course is on the computer until it is added; adding it seeds the workspace and lists its lessons after Lesson 0", async (t) => {
+  const { host, ws, dataDir } = await standalone(t, { layout: "capstone-factory", starter: true });
+  assert.deepEqual(await readdir(join(dataDir, "content")).catch(() => []), []);
+  const before = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.deepEqual(before.available.map((entry) => entry.id), ["fixture"]);
+  assert.deepEqual(before.courseErrors, []);
+  assert.deepEqual(before.courses.map((entry) => entry.course.id), ["tutor"]);
+  const added = (await host.harness.behavior.callRpc("fetchCourse", { courseId: "fixture" })) as Added;
+  assert.deepEqual(added, { courseId: "fixture", firstLessonId: "001", seeded: { written: 2, kept: [] } });
+  const after = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.deepEqual(after.courses.map((entry) => entry.course.id), ["tutor", "fixture"]);
+  assert.deepEqual(after.available, []);
+  assert.ok((await readdir(join(ws, "tetris"))).includes(".factory"));
+  assert.equal(after.courses[1]?.layout.ready, true);
+  // The starter's CI is not the student's, and the course itself stays on the server.
+  assert.deepEqual((await readdir(ws)).sort(), [".agents", ".git", ".tutor", "tetris"]);
+  assert.deepEqual(await readdir(join(dataDir, "content")), ["fixture"]);
+  const { threadId } = (await host.harness.behavior.callRpc("startNextLesson", { courseId: "fixture", lessonId: "001" })) as { threadId: string };
+  assert.ok(threadId);
+});
+
+test("with a configured course, fetching is refused and nothing is offered", async (t) => {
+  const repo = await makeFixtureCourseRepo({ layout: "capstone-factory", starter: true });
+  const dataDir = await mkdtemp(join(tmpdir(), "bbdata-"));
+  const sandbox = await makeSandbox();
+  const host = await makeTutorHost(sandbox.course, sandbox.factoryRoot, { factoryProject: PROJECT_ID, coursePath: sandbox.course.root, courseCatalog: repo.catalogJson }, { dataDir });
+  t.after(async () => {
+    await host.harness.lifecycle.dispose();
+    await sandbox.cleanup();
+    await repo.cleanup();
+    await rm(dataDir, { recursive: true, force: true });
+  });
+  const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.deepEqual(overview.available, []);
+  assert.deepEqual(overview.courses.map((entry) => entry.course.id), ["tutor", "software-factory"]);
+  await assert.rejects(host.harness.behavior.callRpc("fetchCourse", { courseId: "fixture" }), /This Tutor uses the course it was set up with\./);
+  assert.deepEqual(await readdir(join(dataDir, "content")).catch(() => []), []);
+});
+
+test("with no course configured and nothing at the default course folder, there is no course error; a configured folder that is missing still is one", async (t) => {
+  const ws = await emptyGitWorkspace();
+  t.after(() => rm(ws, { recursive: true, force: true }));
+  const host = await makeTutorHost(null, ws, { workspaceProject: PROJECT_ID });
+  t.after(() => host.harness.lifecycle.dispose());
+  const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.deepEqual(overview.courseErrors, []);
+  assert.deepEqual(overview.available.map((entry) => entry.id), ["software-factory"]);
+  const configured = await makeTutorHost(null, ws, { workspaceProject: PROJECT_ID, coursePath: join(ws, "no-course-here") });
+  t.after(() => configured.harness.lifecycle.dispose());
+  const missing = (await configured.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.match(missing.courseErrors.map((entry) => entry.error).join(" "), /There is no course folder at .*no-course-here/);
+  assert.deepEqual(missing.available, []);
+});
+
+test("a fetched course whose seed did not finish asks for the course to be added, and adding it again finishes the seed", async (t) => {
+  let failSeeds = 1;
+  const { host, ws } = await standalone(t, {
+    onHostCall: (method) => {
+      if (method === "seedWorkspace" && failSeeds > 0) {
+        failSeeds -= 1;
+        throw new Error("The connection to the machine dropped.");
+      }
+      return undefined;
+    },
+  });
+  await assert.rejects(host.harness.behavior.callRpc("fetchCourse", { courseId: "fixture" }), /connection to the machine dropped/);
+  const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.deepEqual(overview.courses.map((entry) => [entry.course.id, entry.layout.ready]), [["tutor", true], ["fixture", false]]);
+  const refused = host.harness.behavior.callRpc("startNextLesson", { courseId: "fixture", lessonId: "001" });
+  await assert.rejects(refused, (cause: Error) => {
+    assert.match(cause.message, /Add the course/);
+    assert.doesNotMatch(cause.message, /Restore it from git/);
+    return true;
+  });
+  const added = (await host.harness.behavior.callRpc("fetchCourse", { courseId: "fixture" })) as Added;
+  assert.equal(added.seeded.written, 2);
+  assert.ok((await readdir(join(ws, ".tutor/seeds"))).includes("fixture.json"));
+  const after = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.equal(after.courses[1]?.layout.ready, true);
+});
+
+test("tutor_fetch_course adds a course from Lesson 0's coach thread and tells the coach to commit the starter, naming files it kept", async (t) => {
+  const { host, ws } = await standalone(t);
+  // The student already has an AGENTS.md of their own where the starter puts one.
+  await mkdir(join(ws, "tetris/.factory"), { recursive: true });
+  await writeFile(join(ws, "tetris/.factory/AGENTS.md"), "# Mine\n");
+  const { threadId } = (await host.harness.behavior.callRpc("openCoach", { courseId: "tutor", lessonId: "000" })) as { threadId: string };
+  const result = await tool(host, "tutor_fetch_course", { course: "fixture" }, threadId);
+  assert.ok(!isError(result), text(result));
+  assert.match(
+    text(result),
+    /^Added "Build a software factory"\. Its lessons follow Lesson 0 in the outline\. 1 starter files are now in your workspace; commit them \("Add the Build a software factory starter"\) before you start its first lesson\./,
+  );
+  assert.match(text(result), /These files were already there and were kept: tetris\/\.factory\/AGENTS\.md/);
+  assert.equal(await readFile(join(ws, "tetris/.factory/AGENTS.md"), "utf8"), "# Mine\n");
+  const unknown = await tool(host, "tutor_fetch_course", { course: "nope" }, threadId);
+  assert.ok(isError(unknown));
+  assert.match(text(unknown), /no course "nope"/);
+  // Not a Tutor thread: refused like every tool.
+  host.addThread({ id: "thr_stranger" });
+  assert.ok(isError(await tool(host, "tutor_fetch_course", { course: "fixture" }, "thr_stranger")));
 });

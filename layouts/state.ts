@@ -11,8 +11,13 @@ import type { LayoutProbe, ProgressLocation } from "./types.ts";
 
 export type LayoutId = "capstone-factory";
 
+/**
+ * A fetched course whose starter is not all in the workspace yet (its seed
+ * marker is not complete) is not ready either, whatever its layout, and says
+ * NOT_READY: adding the course again finishes the seed (server/coach/world.ts).
+ */
 export type CourseLayoutState =
-  | { id: null; ready: true; progress: ProgressLocation; problems: []; blocked: null }
+  | { id: null; ready: boolean; progress: ProgressLocation; problems: []; blocked: null }
   | { id: "capstone-factory"; ready: boolean; layout: Layout; progress: ProgressLocation; problems: string[]; blocked: string | null };
 
 /** What a lesson of a course whose layout isn't ready says instead of starting. */

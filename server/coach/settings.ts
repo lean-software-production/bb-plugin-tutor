@@ -30,6 +30,12 @@ const descriptors = {
     label: "Coach agent",
     description: "The agent provider coach threads use, such as pi. Empty uses BB's default.",
   },
+  [SETTING_KEYS.courseCatalog]: {
+    type: "string",
+    label: "Course catalog",
+    description:
+      "The courses you can add, as JSON: a list of { id, title, description, repo, ref }, each ref a tag or a full SHA. Leave empty for Tutor's own list.",
+  },
 } as const;
 
 export type TutorSettings = PluginSettingsHandle<typeof descriptors>;

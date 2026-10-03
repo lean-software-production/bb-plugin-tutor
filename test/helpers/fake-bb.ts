@@ -10,9 +10,8 @@ import hostEntry from "../../host.ts";
 import { SKILL_ID } from "../../shared/constants.ts";
 import { lessonExamples } from "../../shared/derive.ts";
 import type { Course, ExampleProgress, Lesson } from "../../shared/model.ts";
-import { CourseLoadError } from "../../shared/ports.ts";
 import type { PluginAgentToolResult } from "@get-bb/plugin-sdk";
-import { loadBuiltinCourse } from "../../server/course/load-course.ts";
+import { loadBuiltinCourse, loadCourse } from "../../server/course/load-course.ts";
 import { registerTutor } from "../../server/coach/register.ts";
 import { createProgressStore } from "../../server/progress/store.ts";
 import type { WorkspaceAccess } from "../../server/workspace/access.ts";
@@ -341,16 +340,16 @@ export async function makeTutorHost(
   });
   const rt = await registerTutor(host.bb, {
     courseSource: {
-      loadCourse: async (path) => {
-        if (course === null) throw new CourseLoadError(`There is no course folder at ${path}.`);
-        return course;
-      },
+      // Without a configured course, the courses Tutor reads are fetched ones, read from disk for real.
+      loadCourse: async (path) => (course === null ? loadCourse(path) : course),
       loadBuiltin: loadBuiltinCourse,
     },
     store: createProgressStore(),
     env: options.env ?? {},
     featureConfigFile: options.featureConfigFile ?? "/nonexistent/tutor/config.json",
     now: () => NOW,
+    // The configured course stands in for whatever folder is named, the default one included; without one, nothing is at the default.
+    courseExists: async () => course !== null,
     access:
       options.access === "machine"
         ? ((client) => (hostId: string) => createMachineAccess(host.bb, client, hostId))(createHostClient(host.bb))
