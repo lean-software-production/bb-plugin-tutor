@@ -31,10 +31,9 @@ function parentsOf(path: string): string[] {
   return parents;
 }
 
-/** Validates every entry before anything is written: safe paths, links staying inside, no duplicate paths, and no entry's path running through another entry that is a symbolic link. */
+/** Validates every entry before anything is written: safe paths, links staying inside, no duplicate paths, and no entry's path running through another entry (a file or a symbolic link, neither of which can also be a folder). */
 function validate(bundle: Bundle): void {
   const seen = new Set<string>();
-  const linkPaths = new Set<string>();
   for (const entry of bundle.entries) {
     const badPath = unsafePath(entry.path);
     if (badPath !== null) throw new Error(`Bundle entry refused: ${badPath}.`);
@@ -43,13 +42,14 @@ function validate(bundle: Bundle): void {
     if (entry.kind === "symlink") {
       const badLink = escapingLink(entry.path, entry.target);
       if (badLink !== null) throw new Error(`Bundle entry refused: ${badLink}.`);
-      linkPaths.add(entry.path);
     }
   }
+  // Every entry is a file or a link, never a folder, so none of them can also
+  // be a parent segment of another entry's path.
   for (const entry of bundle.entries) {
     for (const parent of parentsOf(entry.path)) {
-      if (linkPaths.has(parent)) {
-        throw new Error(`Bundle entry refused: ${entry.path} runs through ${parent}, which the bundle itself writes as a symbolic link.`);
+      if (seen.has(parent)) {
+        throw new Error(`Bundle entry refused: ${entry.path} runs through ${parent}, which the bundle itself writes as a file or a symbolic link, not a folder.`);
       }
     }
   }
@@ -83,9 +83,22 @@ async function writeOneFile(root: string, entry: Extract<BundleEntry, { kind: "f
   const absolute = join(root, entry.path);
   await mkdir(dirname(absolute), { recursive: true });
   const data = Buffer.from(entry.base64, "base64");
+  const mode = entry.executable ? 0o755 : 0o644;
+  // The leaf itself, never followed: "w" opens whatever a symbolic link
+  // there points at, so a link in the way is removed and replaced rather
+  // than written through.
+  const leaf = await lstat(absolute).catch((cause) => {
+    if (isMissing(cause)) return null;
+    throw cause;
+  });
+  if (leaf?.isSymbolicLink() === true) {
+    if (onlyIfAbsent) return "kept";
+    await rm(absolute, { force: true });
+    await writeFile(absolute, data, { flag: "wx", mode });
+    return "written";
+  }
   try {
-    // "wx" never follows a symbolic link created since the check that path wasn't one.
-    await writeFile(absolute, data, { flag: onlyIfAbsent ? "wx" : "w", mode: entry.executable ? 0o755 : 0o644 });
+    await writeFile(absolute, data, { flag: onlyIfAbsent ? "wx" : "w", mode });
     return "written";
   } catch (cause) {
     if (!onlyIfAbsent || !isExists(cause)) throw cause;

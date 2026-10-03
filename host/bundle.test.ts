@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { lstat, mkdir, mkdtemp, readdir, readFile, readlink, rm, symlink, writeFile } from "node:fs/promises";
+import { lstat, mkdtemp, readdir, readFile, readlink, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -154,5 +154,67 @@ test("writeBundle refuses a bundle where one entry's path has another entry, a s
     assert.deepEqual(await readdir(target), []);
   } finally {
     await rm(target, { recursive: true, force: true });
+  }
+});
+
+test("writeBundle refuses a bundle where one entry's path has another entry, a plain file, as a parent, writing nothing", async () => {
+  const target = await tempTarget();
+  try {
+    const bundle: Bundle = {
+      entries: [
+        { kind: "file", path: "a", executable: false, base64: Buffer.from("leaf\n", "utf8").toString("base64") },
+        { kind: "file", path: "a/b", executable: false, base64: Buffer.from("under a file\n", "utf8").toString("base64") },
+      ],
+    };
+    await assert.rejects(writeBundle(target, bundle, { onlyIfAbsent: false }));
+    assert.deepEqual(await readdir(target), []);
+  } finally {
+    await rm(target, { recursive: true, force: true });
+  }
+});
+
+test("writeBundle never writes through a pre-existing leaf symbolic link: the link is replaced by a plain file, the thing it pointed at is untouched", async () => {
+  const target = await tempTarget();
+  const outside = await mkdtemp(join(tmpdir(), "outside-"));
+  try {
+    await writeFile(join(outside, "secret.txt"), "the student's secret\n");
+    await symlink(join(outside, "secret.txt"), join(target, "alias.txt"));
+
+    const bundle: Bundle = {
+      entries: [{ kind: "file", path: "alias.txt", executable: false, base64: Buffer.from("course content\n", "utf8").toString("base64") }],
+    };
+    const result = await writeBundle(target, bundle, { onlyIfAbsent: false });
+
+    assert.deepEqual(result.written, ["alias.txt"]);
+    assert.equal((await lstat(join(target, "alias.txt"))).isSymbolicLink(), false);
+    assert.equal(await readFile(join(target, "alias.txt"), "utf8"), "course content\n");
+    assert.equal(await readFile(join(outside, "secret.txt"), "utf8"), "the student's secret\n");
+  } finally {
+    await rm(target, { recursive: true, force: true });
+    await rm(outside, { recursive: true, force: true });
+  }
+});
+
+test("onlyIfAbsent never writes through, or reads through, a pre-existing leaf symbolic link: it is reported as kept and left exactly as it was", async () => {
+  const target = await tempTarget();
+  const outside = await mkdtemp(join(tmpdir(), "outside-"));
+  try {
+    await writeFile(join(outside, "secret.txt"), "the student's secret\n");
+    await symlink(join(outside, "secret.txt"), join(target, "alias.txt"));
+
+    const bundle: Bundle = {
+      entries: [{ kind: "file", path: "alias.txt", executable: false, base64: Buffer.from("course content\n", "utf8").toString("base64") }],
+    };
+    const result = await writeBundle(target, bundle, { onlyIfAbsent: true });
+
+    assert.deepEqual(result.kept, ["alias.txt"]);
+    assert.deepEqual(result.written, []);
+    assert.deepEqual(result.same, []);
+    assert.equal((await lstat(join(target, "alias.txt"))).isSymbolicLink(), true);
+    assert.equal(await readlink(join(target, "alias.txt")), join(outside, "secret.txt"));
+    assert.equal(await readFile(join(outside, "secret.txt"), "utf8"), "the student's secret\n");
+  } finally {
+    await rm(target, { recursive: true, force: true });
+    await rm(outside, { recursive: true, force: true });
   }
 });
