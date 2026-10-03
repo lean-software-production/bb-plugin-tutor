@@ -7,9 +7,10 @@ import { adoptIntoWorkspace, ProgressConflictError } from "./layouts/capstone-fa
 import { hostContract } from "./host/contract.ts";
 import { inspect, localProbe } from "./host/inspect.ts";
 import { createHostLock } from "./host/lock.ts";
+import { seedWorkspace } from "./host/seed.ts";
 
-/** One adoption of a workspace at a time, keyed on its real folder. */
-const adoptions = createHostLock();
+/** One adoption or seed of a workspace at a time, keyed on its real folder, so the two never race. */
+const workspaceLocks = createHostLock();
 
 export default experimental_defineHostEntry({
   contract: hostContract,
@@ -17,7 +18,7 @@ export default experimental_defineHostEntry({
     inspect: (input) => inspect(input),
     adoptLesson: async (input) => {
       const key = await realpath(input.root).catch(() => resolve(input.root));
-      return adoptions.run(key, async () => {
+      return workspaceLocks.run(key, async () => {
         try {
           return await adoptIntoWorkspace(input, localProbe);
         } catch (cause) {
@@ -27,6 +28,9 @@ export default experimental_defineHostEntry({
         }
       });
     },
-    // seedWorkspace: Task 11
+    seedWorkspace: async (input) => {
+      const key = await realpath(input.root).catch(() => resolve(input.root));
+      return workspaceLocks.run(key, () => seedWorkspace(input));
+    },
   },
 });

@@ -4,6 +4,8 @@ import { z } from "zod";
 import { bundleSchema } from "../shared/bundle.ts";
 import { iterationStateSchema, lessonIdSchema, progressFileSchema } from "../shared/model.ts";
 
+export const courseIdSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/);
+
 export const pathKindSchema = z.enum(["folder", "link", "file", "none"]);
 
 export const hostContract = {
@@ -41,7 +43,20 @@ export const hostContract = {
       z.object({ conflict: z.literal(true) }),
     ]),
   },
-  // seedWorkspace: Task 11
+  /**
+   * Seeds the workspace at `root` from a course's starter bundle, resumably
+   * (host/seed.ts): writes only what is absent, keeping and reporting any
+   * file the student already changed, never overwriting it. A marker at
+   * `.tutor/seeds/<courseId>.json` records that the seed for `ref` finished;
+   * a later call for the same `ref` returns at once with `written: []`. A
+   * marker for a different `ref` means the course moved on, and the call
+   * seeds again with `onlyIfAbsent`, so a newer starter never overwrites the
+   * student's work.
+   */
+  seedWorkspace: {
+    input: z.object({ root: z.string().startsWith("/"), courseId: courseIdSchema, ref: z.string(), bundle: bundleSchema }),
+    output: z.object({ written: z.array(z.string()), same: z.array(z.string()), kept: z.array(z.string()), complete: z.literal(true) }),
+  },
 } as const;
 
 export type HostContract = typeof hostContract;
@@ -50,3 +65,5 @@ export type InspectOutput = z.infer<HostContract["inspect"]["output"]>;
 export type AdoptLessonInput = z.infer<HostContract["adoptLesson"]["input"]>;
 /** What an adoption that went ahead returns. */
 export type AdoptLessonOutput = Exclude<z.infer<HostContract["adoptLesson"]["output"]>, { conflict: true }>;
+export type SeedWorkspaceInput = z.infer<HostContract["seedWorkspace"]["input"]>;
+export type SeedWorkspaceOutput = z.infer<HostContract["seedWorkspace"]["output"]>;

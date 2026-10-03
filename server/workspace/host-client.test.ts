@@ -49,3 +49,38 @@ test("adoptLesson's conflict is a WriteConflictError, and a machine that is not 
   );
   await assert.rejects(refused.adoptLesson("host_1", input), /Lesson 002 has no feature files/);
 });
+
+test("seedWorkspace is one call on the workspace's machine, with the caller's timeout", async () => {
+  const calls: unknown[] = [];
+  const output = { written: ["README.md"], same: [], kept: [], complete: true as const };
+  const client = createHostClient(
+    fakeBb(async (method, sent, options) => {
+      calls.push({ method, sent, options });
+      return output;
+    }),
+  );
+  const seedInput = { root: "/w/repo", courseId: "tetris", ref: "v1", bundle: { entries: [] } };
+  assert.deepEqual(await client.seedWorkspace("host_1", seedInput, { timeoutMs: 120_000 }), output);
+  assert.deepEqual(calls, [{ method: "seedWorkspace", sent: seedInput, options: { hostId: "host_1", timeoutMs: 120_000 } }]);
+});
+
+test("seedWorkspace's machine that is not connected is unreachable, and the host's refusal otherwise", async () => {
+  const offline = createHostClient(
+    fakeBb(async () => {
+      throw Object.assign(new Error("HTTP 502: Host is not connected"), { status: 502, code: "host_unavailable" });
+    }),
+  );
+  await assert.rejects(
+    offline.seedWorkspace("host_1", { root: "/w/repo", courseId: "tetris", ref: "v1", bundle: { entries: [] } }, { timeoutMs: 120_000 }),
+    WorkspaceUnreachableError,
+  );
+  const refused = createHostClient(
+    fakeBb(async () => {
+      throw new Error("Bundle entry refused: ../x is absolute.");
+    }),
+  );
+  await assert.rejects(
+    refused.seedWorkspace("host_1", { root: "/w/repo", courseId: "tetris", ref: "v1", bundle: { entries: [] } }, { timeoutMs: 120_000 }),
+    /Bundle entry refused/,
+  );
+});

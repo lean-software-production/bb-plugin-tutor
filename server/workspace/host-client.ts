@@ -1,6 +1,14 @@
 // The server's typed client for the plugin's own host entry (host.ts) on a machine.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { hostContract, type AdoptLessonInput, type AdoptLessonOutput, type InspectInput, type InspectOutput } from "../../host/contract.ts";
+import {
+  hostContract,
+  type AdoptLessonInput,
+  type AdoptLessonOutput,
+  type InspectInput,
+  type InspectOutput,
+  type SeedWorkspaceInput,
+  type SeedWorkspaceOutput,
+} from "../../host/contract.ts";
 import { WriteConflictError } from "./access.ts";
 import { onMachine } from "./machine-access.ts";
 
@@ -16,6 +24,14 @@ export interface TutorHostClient {
    * connected, and the host's refusal otherwise.
    */
   adoptLesson(hostId: string, input: AdoptLessonInput): Promise<AdoptLessonOutput>;
+  /**
+   * Seeds a workspace from a course's starter bundle on the machine,
+   * resumably (host/seed.ts). `timeoutMs` is the caller's: a starter's files
+   * can be many and large, so Tutor's own call (Task 13) passes longer than
+   * the default. Throws WorkspaceUnreachableError when the machine is not
+   * connected, and the host's refusal otherwise.
+   */
+  seedWorkspace(hostId: string, input: SeedWorkspaceInput, options: { timeoutMs: number }): Promise<SeedWorkspaceOutput>;
 }
 
 export function createHostClient(bb: BbPluginApi): TutorHostClient {
@@ -27,5 +43,6 @@ export function createHostClient(bb: BbPluginApi): TutorHostClient {
       if ("conflict" in output) throw new WriteConflictError("The progress file changed since Tutor read it.");
       return output;
     },
+    seedWorkspace: (hostId, input, options) => onMachine(() => client.call("seedWorkspace", input, { hostId, timeoutMs: options.timeoutMs })),
   };
 }
