@@ -14,11 +14,11 @@ should all use these names. Where a course's own files keep an older word, the t
   lesson content of its own, except the built-in Lesson 0.
 
 - **Course layout** — What a course expects to find in the workspace, declared by `course.yaml`'s
-  `layout` (`layouts/state.ts`). A course with no layout (Lesson 0, and any course.yaml that
-  doesn't set one) needs nothing there and keeps its progress under `.tutor/courses/<id>/`. The
-  one declared layout is `capstone-factory`: see *Factory* and *Repo*. A lesson of a course with a
-  layout waits for "layout ready" before it can be adopted, with the layout's own reason when it
-  isn't.
+  `layout` (`layouts/state.ts`). A `course.yaml` that doesn't set a layout needs nothing there and
+  keeps its progress under `.tutor/courses/<id>/` (the built-in course is its own special case: see
+  *Built-in course*). The one declared layout is `capstone-factory`: see *Factory* and *Repo*. A
+  lesson of a course with a layout waits for "layout ready" before it can be adopted, with the
+  layout's own reason when it isn't.
 
 - **Tutor** — The course engine. The BB plugin `bb-plugin-tutor`, coaching a student through a
   course's lessons via the `tutor` skill and its `tutor_*` tools.
