@@ -108,3 +108,9 @@ setup_done() { tutor up "$HOME/my-course" >/dev/null; : >"$STUB_LOG/bb"; : >"$ST
   run purge_check
   [ "$status" -eq 0 ]
 }
+
+@test "bb never inherits a BB terminal's variables: only BB_SERVER_URL, the tutor server's" {
+  BB_CLI=/elsewhere/bb BB_THREAD_ID=thr_x BB_SERVER_URL=http://127.0.0.1:1 tutor_bb plugin list --json
+  BB_CLI=/elsewhere/bb BB_THREAD_ID=thr_x tutor_bb_json plugin list --json >/dev/null
+  [ "$(sort -u "$STUB_LOG/bb-env")" = "BB_SERVER_URL " ]
+}

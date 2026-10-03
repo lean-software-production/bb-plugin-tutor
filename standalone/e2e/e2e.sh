@@ -47,8 +47,14 @@ check() {
 quiet() { "$@" >/dev/null; }
 info() { printf 'info — %s\n' "$*" | tee -a "$RESULTS"; }
 
-# bb against the tutor server, never a BB the shell already points at.
-bbx() { BB_SERVER_URL="http://127.0.0.1:$PORT" "$TUTOR_HOME/server/npm/node_modules/.bin/bb" "$@"; }
+# bb against the tutor server, never a BB the shell already points at. Inside
+# a BB thread every BB_* variable names that BB (BB_CLI re-runs another bb,
+# BB_THREAD_ID makes `thread tell` send as a thread the tutor server lacks).
+bbx() {
+  local unset=() name
+  while read -r name; do unset+=(-u "$name"); done < <(compgen -e | grep '^BB_' || true)
+  env "${unset[@]}" BB_SERVER_URL="http://127.0.0.1:$PORT" "$TUTOR_HOME/server/npm/node_modules/.bin/bb" "$@"
+}
 rpc() { # rpc <method> <json input> → stdout JSON
   local input="$E2E_DIR/rpc-input.json"
   printf '%s' "$2" >"$input"

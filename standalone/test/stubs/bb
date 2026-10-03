@@ -28,6 +28,7 @@
 # print STUB_BB_FAIL_STDOUT, if set, on stdout, say why on stderr, and exit 1.
 . "$(cd "$(dirname "$0")" && pwd)/lib.sh"
 stub_init "bb" "$@"
+env | sed -n 's/^\(BB_[A-Za-z0-9_]*\)=.*/\1/p' | sort | tr '\n' ' ' >>"$STUB_LOG/bb-env"; echo >>"$STUB_LOG/bb-env"
 
 if [ -n "${STUB_BB_FAIL:-}" ] && [ "${1:-} ${2:-}" = "$STUB_BB_FAIL" ]; then
   [ -z "${STUB_BB_FAIL_STDOUT:-}" ] || printf '%s\n' "$STUB_BB_FAIL_STDOUT"

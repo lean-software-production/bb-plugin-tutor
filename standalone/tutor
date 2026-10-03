@@ -131,13 +131,27 @@ tutor_bb_port() {
   printf '%s' "$port"
 }
 
-# tutor_bb <args...>: run the installed bb CLI against the tutor server,
-# logging its output. BB_SERVER_URL always wins over any inherited value
-# (amendment 1), and never touches localhost.
+# bb_run <port> <args...>: the installed bb CLI against the tutor server on
+# <port>, with no inherited BB_* variable: in a BB terminal they name that BB
+# (BB_CLI re-runs its own bb, BB_THREAD_ID sends as its thread). BB_SERVER_URL
+# always wins (amendment 1), and never says localhost. With BB_RUN_EXEC=1 (in
+# a subshell) bb replaces the subshell, so its pid is the subshell's.
+bb_run() {
+  bbr_port=$1
+  shift
+  set -- "BB_SERVER_URL=http://127.0.0.1:$bbr_port" "$TUTOR_HOME/server/npm/node_modules/.bin/bb" "$@"
+  for bb_var in $(env | sed -n 's/^\(BB_[A-Za-z0-9_]*\)=.*/\1/p'); do
+    set -- -u "$bb_var" "$@"
+  done
+  if [ "${BB_RUN_EXEC:-}" = 1 ]; then exec env "$@"; fi
+  env "$@"
+}
+
+# tutor_bb <args...>: bb_run against the tutor server, logging its output.
 tutor_bb() {
   port=$(tutor_bb_port)
   mkdir -p "$TUTOR_HOME/logs"
-  BB_SERVER_URL="http://127.0.0.1:$port" "$TUTOR_HOME/server/npm/node_modules/.bin/bb" "$@" >>"$TUTOR_HOME/logs/launcher.log" 2>&1
+  bb_run "$port" "$@" >>"$TUTOR_HOME/logs/launcher.log" 2>&1
 }
 
 # tutor_bb_json <args...>: like tutor_bb, but its stdout comes back to the
@@ -147,7 +161,7 @@ tutor_bb_json() {
   port=$(tutor_bb_port)
   mkdir -p "$TUTOR_HOME/logs"
   bbj_status=0
-  bb_json=$(BB_SERVER_URL="http://127.0.0.1:$port" "$TUTOR_HOME/server/npm/node_modules/.bin/bb" "$@" 2>>"$TUTOR_HOME/logs/launcher.log") \
+  bb_json=$(bb_run "$port" "$@" 2>>"$TUTOR_HOME/logs/launcher.log") \
     || bbj_status=$?
   printf '%s\n' "$bb_json" >>"$TUTOR_HOME/logs/launcher.log"
   [ "$bbj_status" -eq 0 ] || return 1
@@ -598,10 +612,7 @@ machine_installer_run() (
   chmod 600 "$out"
   rm -f "$header" "$installer"
 
-  (
-    BB_SERVER_URL="http://127.0.0.1:$port" "$TUTOR_HOME/server/npm/node_modules/.bin/bb" \
-      machine create --provider manual --key tutor-machine
-  ) >"$out" 2>&1 &
+  (BB_RUN_EXEC=1 bb_run "$port" machine create --provider manual --key tutor-machine) >"$out" 2>&1 &
   create_pid=$!
 
   line=""
