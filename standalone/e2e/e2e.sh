@@ -151,7 +151,9 @@ stage_lesson0() {
   check "and no provider key in its environment" has_line "$last" "keys: "
   local model; model=$(config_get model)
   check "tutor login chose a model (else run: tutor login --provider <p> --model <m>)" test -n "$model"
-  check "pinned to the model chosen at tutor login ($model)" contains "$last" "--model $model "
+  # BB passes the model either whole or split into --provider and --model.
+  check "pinned to the model chosen at tutor login ($model)" \
+    contains "$last" "--model $model \|--provider ${model%%/*} --model ${model#*/} "
   check "~/.pi is unchanged" test "$(own_pi_sum)" = "$(cat "$E2E_DIR/own-pi.cksum")"
   for _ in $(seq 1 120); do [ -f "$WS/.tutor/progress.yaml" ] && break; sleep 2; done
   if [ -f "$WS/.tutor/progress.yaml" ]; then
