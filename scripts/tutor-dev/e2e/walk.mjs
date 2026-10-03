@@ -194,7 +194,7 @@ step("01 first run asks to confirm the detected factory", async () => {
 
 step("02 confirm lands on Lesson 0's start page; the outline is one tree of lessons", async () => {
   await page.getByText("Start the course →").click();
-  await page.waitForURL(/\/plugins\/tutor\/course\/start\/000/, { timeout: 30000 });
+  await page.waitForURL(/\/plugins\/tutor\/course\/start\/(tutor\/)?000/, { timeout: 30000 });
   await page.getByText("Start with your coach →").waitFor({ timeout: 30000 });
   const config = JSON.parse(bb("plugin", "config", "tutor", "--json"));
   check(/^proj_/.test(config.values.factoryProject ?? ""), `factoryProject is set (${config.values.factoryProject})`);

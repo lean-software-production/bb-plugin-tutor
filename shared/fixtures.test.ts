@@ -8,10 +8,12 @@ import {
   overviewSchema,
 } from "./rpc.ts";
 import {
+  fixtureBuiltinCourse,
   fixtureCandidates,
   fixtureCompletion,
   fixtureCourse,
   fixtureCourseTo004,
+  fixtureLesson0Student,
   fixtureLessonDetail,
   fixtureOverview,
   fixtureOverviewNoFactory,
@@ -19,9 +21,11 @@ import {
 } from "./fixtures.ts";
 
 test("fixtures satisfy their schemas", () => {
+  courseSchema.parse(fixtureBuiltinCourse);
   courseSchema.parse(fixtureCourse);
   courseSchema.parse(fixtureCourseTo004);
   progressFileSchema.parse(fixtureStudent.progress);
+  progressFileSchema.parse(fixtureLesson0Student.progress);
   overviewSchema.parse(fixtureOverview);
   overviewSchema.parse(fixtureOverviewNoFactory);
   lessonDetailSchema.parse(fixtureLessonDetail);
@@ -38,7 +42,7 @@ test("fixture keys are unique within each lesson", () => {
 });
 
 test("an unchanged example keeps its hash across lessons", () => {
-  const [, one, two] = fixtureCourse.lessons;
+  const [one, two] = fixtureCourse.lessons;
   const inOne = one?.features[0]?.rules[0]?.examples[0];
   const inTwo = two?.features[0]?.rules[0]?.examples[0];
   assert.equal(inTwo?.change, "unchanged");

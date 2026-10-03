@@ -21,6 +21,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { coachThreadMetadataSchema } from "../../shared/model.ts";
 import type { Workspace } from "../../shared/rpc.ts";
+import { threadCourse } from "./threads.ts";
 
 type Sdk = BbPluginApi["sdk"];
 type Thread = Awaited<ReturnType<Sdk["threads"]["get"]>>;
@@ -31,7 +32,7 @@ export interface Caller {
   isCoachThread: boolean;
   /** The coach thread a side chat or side thread belongs to; the caller itself when it is the coach thread. */
   coachThreadId: string;
-  /** The course and lesson the coach thread coaches, from its Tutor metadata. Side chats inherit them. */
+  /** The course and lesson the coach thread coaches, from its Tutor metadata (Lesson 0: the built-in course). Side chats inherit them. */
   courseId: string;
   lessonId: string;
 }
@@ -98,7 +99,7 @@ export async function authorizeCaller(
     threadId: thread.id,
     isCoachThread: coachThread.id === thread.id,
     coachThreadId: coachThread.id,
-    courseId: metadata.data.course,
+    courseId: threadCourse(metadata.data.course, metadata.data.lesson),
     lessonId: metadata.data.lesson,
   };
 }

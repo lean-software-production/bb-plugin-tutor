@@ -1,6 +1,7 @@
 // Wires Tutor's backend into BB: settings, coach tools, configure scoping,
 // the dispatch guard, thread events and the RPC handlers.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import { coachThreadMetadataSchema } from "../../shared/model.ts";
 import { createActivityRecorder, resolveDataDir } from "../activity/heartbeat.ts";
 import { registerRpc } from "../rpc/handlers.ts";
 import { createCoachRegistry } from "./coach-registry.ts";
@@ -12,9 +13,9 @@ import { createKeyedLock } from "./keyed-lock.ts";
 import type { TutorRuntime } from "./runtime.ts";
 import { defineTutorSettings } from "./settings.ts";
 import { createStateSignals } from "./signals.ts";
-import { listTutorThreads } from "./threads.ts";
+import { listTutorThreads, threadCourse } from "./threads.ts";
 import { registerCoachTools } from "./tools.ts";
-import { createWorldSource, type WorldDeps } from "./world.ts";
+import { createWorldSource, methodCourse, type WorldDeps } from "./world.ts";
 
 export async function registerTutor(bb: BbPluginApi, deps: WorldDeps): Promise<TutorRuntime> {
   const settings = defineTutorSettings(bb);
@@ -40,13 +41,24 @@ export async function registerTutor(bb: BbPluginApi, deps: WorldDeps): Promise<T
   };
 
   registerCoachTools(rt);
-  bb.agents.configure((context) =>
-    coachConfiguration(context, bb.pluginId, {
-      coachPath: rt.world.lastCoachPath(),
-      factory: factoryWhere(rt.world.lastLayout()),
+  bb.agents.configure((context) => {
+    // The thread's course: its own Tutor metadata, else (a side chat BB made) its coach thread's.
+    const metadata = coachThreadMetadataSchema.safeParse(context.pluginMetadata);
+    const forkOf = context.origin.kind === "fork" ? context.thread.sourceThreadId : null;
+    const courseId = metadata.success
+      ? threadCourse(metadata.data.course, metadata.data.lesson)
+      : forkOf === null
+        ? undefined
+        : rt.coaches.courseOf(forkOf);
+    const courses = rt.world.lastCourses();
+    const loaded = courses.find((entry) => entry.course.id === courseId);
+    const method = loaded === undefined ? null : methodCourse(courses, loaded);
+    return coachConfiguration(context, bb.pluginId, {
+      coachPath: method?.coachPath ?? null,
+      factory: factoryWhere(method?.layout ?? null),
       coachLesson: (threadId) => rt.coaches.lessonOf(threadId),
-    }),
-  );
+    });
+  });
   bb.experimental_hooks.on("message.dispatch", async (context) => {
     const decision = await decideDispatch(bb.sdk, bb.pluginId, context, deps.now().getTime());
     if (decision.action === "wait") bb.log.info(`[tutor] holding ${context.thread.id}: ${decision.reason}`);

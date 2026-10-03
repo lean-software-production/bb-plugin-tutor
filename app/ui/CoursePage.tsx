@@ -5,8 +5,10 @@
 import { useEffect } from "react";
 import type { PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
 import { formatRoute } from "../../shared/routes.ts";
+import type { TutorRoute } from "../../shared/routes.ts";
 import { useCourseNavigate, useLiveRefresh, useOverview } from "../hooks.ts";
-import { parseCoursePath } from "../model/course-route.ts";
+import { parseCoursePath, routeCourse } from "../model/course-route.ts";
+import { lessonLabel } from "../model/format.ts";
 import { homeDecision } from "../model/home.ts";
 import { routeStore } from "../state/app-state.ts";
 import { ErrorNotice, Loading, SketchPage } from "./common.tsx";
@@ -29,10 +31,32 @@ export function CoursePage({ subPath }: PluginNavPanelProps) {
     case "welcome":
       return <WelcomePage />;
     case "start":
-      return <StartPage key={route.lessonId} lessonId={route.lessonId} ruleKey={ruleKey} />;
     case "complete":
-      return <CompletionPage key={route.lessonId} lessonId={route.lessonId} />;
+      return <LessonRoute route={route} ruleKey={ruleKey} />;
   }
+}
+
+/** A lesson's page, once its course is known: a link from before courses names none (routeCourse). */
+function LessonRoute({ route, ruleKey }: { route: Extract<TutorRoute, { kind: "start" | "complete" }>; ruleKey: string | null }) {
+  const overview = useOverview();
+  const courseId = route.courseId ?? (overview.data === null ? null : routeCourse(null, route.lessonId, overview.data.courses));
+  if (courseId === null) {
+    return (
+      <SketchPage>
+        {overview.data === null && overview.status !== "error" ? (
+          <Loading label="Opening your course…" />
+        ) : (
+          <ErrorNotice message={overview.error ?? `We can't find ${lessonLabel(route.lessonId).toLowerCase()} in your courses.`} />
+        )}
+      </SketchPage>
+    );
+  }
+  const key = `${courseId}/${route.lessonId}`;
+  return route.kind === "start" ? (
+    <StartPage key={key} courseId={courseId} lessonId={route.lessonId} ruleKey={ruleKey} />
+  ) : (
+    <CompletionPage key={key} courseId={courseId} lessonId={route.lessonId} />
+  );
 }
 
 function CourseHome() {

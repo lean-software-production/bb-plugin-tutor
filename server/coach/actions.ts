@@ -1,7 +1,7 @@
 // What each coach tool does, as pure functions over the re-derived world.
 // They return the text for the coach and the files to write; tools.ts checks
 // the caller and performs the writes.
-import { BUILTIN_LESSON_ID, STARTER_LAYOUT } from "../../shared/constants.ts";
+import { STARTER_LAYOUT } from "../../shared/constants.ts";
 import {
   countExamples,
   findExample,
@@ -21,7 +21,7 @@ import { carryOver } from "../../layouts/progress/carry-over.ts";
 import { progressFor } from "../progress/current.ts";
 import { needsFactoryMove } from "../progress/factory-move.ts";
 import { notReadyText, type CourseLayoutState } from "../../layouts/state.ts";
-import type { World } from "./world.ts";
+import { findCourse, methodCourse, type World } from "./world.ts";
 
 const LATE_FACTORY = STARTER_LAYOUT.lateFactory;
 
@@ -53,26 +53,30 @@ export type Outcome =
       reached?: string;
     };
 
-export function coachStateOf(world: World): CoachState | { error: string } {
-  if (world.course === null || world.pointer === null) {
-    return { error: `The course could not be loaded: ${world.courseError ?? "unknown error"}` };
-  }
-  if (world.workspace.status !== "found" || world.hostId === null || world.layout === null) {
+/** The coach's view of one course: the caller's, from its coach thread's metadata (Lesson 0's is the built-in course). */
+export function coachStateOf(world: World, courseId: string): CoachState | { error: string } {
+  if (world.workspace.status !== "found" || world.hostId === null) {
     return { error: "No workspace is set up yet. The student confirms it on the Course page." };
   }
-  const lesson = findLesson(world.course, world.pointer.lessonId);
-  if (lesson === undefined) return { error: `Lesson ${world.pointer.lessonId} is not in this course.` };
+  const loaded = findCourse(world, courseId);
+  if (loaded === undefined) {
+    const why = world.courseErrors.map((entry) => entry.error).join(" ");
+    return { error: `The course "${courseId}" isn't loaded${why === "" ? "" : `: ${why}`}` };
+  }
+  const { course, pointer, student } = loaded;
+  const lesson = findLesson(course, pointer.lessonId);
+  if (lesson === undefined) return { error: `Lesson ${pointer.lessonId} is not in this course.` };
   return {
-    course: world.course,
-    coachPath: world.coachPath,
+    course,
+    coachPath: methodCourse(world.courses, loaded).coachPath,
     projectId: world.workspace.projectId,
     root: world.workspace.root,
-    layout: world.layout,
+    layout: loaded.layout,
     hostId: world.hostId,
     lesson,
-    pointer: world.pointer,
-    student: world.student,
-    progress: progressFor(world.student, lesson.id),
+    pointer,
+    student,
+    progress: progressFor(student, lesson.id),
   };
 }
 
@@ -252,17 +256,16 @@ export function markAction(state: CoachState, input: ToolParameters<"tutor_mark_
 }
 
 /**
- * The lessons tutor_adopt_iteration accepts now. `unrecorded`: there is no
- * progress for the current lesson. A WIP lesson without any was set going
- * outside Tutor, as fetch-iteration does, and its own coach adopts it again;
- * otherwise nothing could start its spec/PROGRESS.yaml.
+ * The lessons of this course tutor_adopt_iteration accepts now: its first
+ * lesson while nothing is adopted (Lesson 0 in the built-in course), and the
+ * lesson after a Done one. `unrecorded`: there is no progress for the current
+ * lesson. A WIP lesson without any was set going outside Tutor, as
+ * fetch-iteration does, and its own coach adopts it again; otherwise nothing
+ * could start its spec/PROGRESS.yaml. Each course starts from its own
+ * progress: nothing carries over from another course.
  */
 export function adoptionTargets(course: Course, pointer: CurrentPointer, unrecorded = false): string[] {
-  const firstReal = course.lessons.find((lesson) => !lesson.builtin)?.id;
-  if (pointer.lessonId === BUILTIN_LESSON_ID) {
-    const targets = firstReal === undefined ? [] : [firstReal];
-    return pointer.iterationStatus === "not-started" ? [BUILTIN_LESSON_ID, ...targets] : targets;
-  }
+  if (pointer.iterationStatus === "not-started") return findLesson(course, pointer.lessonId) === undefined ? [] : [pointer.lessonId];
   if (pointer.iterationStatus !== "Done") return pointer.iterationStatus === "WIP" && unrecorded ? [pointer.lessonId] : [];
   const next = nextLesson(course, pointer.lessonId);
   return next === undefined ? [] : [next.id];

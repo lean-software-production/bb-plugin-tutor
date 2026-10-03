@@ -1,5 +1,6 @@
 // Pure builders for the read-side RPC payloads, from the re-derived world and
-// the Tutor threads in the factory project.
+// the Tutor threads in the workspace project: one entry per course, Tutor's
+// built-in course first.
 import {
   countExamples,
   exampleStatus,
@@ -8,18 +9,22 @@ import {
   lessonExamples,
   lessonStatus,
   nextLesson,
+  resolveCurrent,
   ruleStatus,
+  type CurrentPointer,
   type ProgressMap,
 } from "../../shared/derive.ts";
-import type { Course, Lesson } from "../../shared/model.ts";
-import type { Completion, CurrentState, FeatureOutline, LessonDetail, Overview, TutorThread } from "../../shared/rpc.ts";
+import { BUILTIN_COURSE_ID } from "../../shared/constants.ts";
+import type { Course, Lesson, StudentState } from "../../shared/model.ts";
+import type { Completion, CourseOverview, CurrentState, FeatureOutline, LessonDetail, Overview, TutorThread } from "../../shared/rpc.ts";
 import { progressFor, recordedProgress } from "../progress/current.ts";
 import { findCoachThread, type TutorThreadRecord } from "../coach/threads.ts";
-import type { World } from "../coach/world.ts";
+import { findCourse, type LoadedCourse, type World } from "../coach/world.ts";
 
 export function publicThread(record: TutorThreadRecord): TutorThread {
   return {
     id: record.id,
+    courseId: record.courseId,
     lessonId: record.lessonId,
     role: record.role,
     ruleKey: record.ruleKey,
@@ -29,20 +34,61 @@ export function publicThread(record: TutorThreadRecord): TutorThread {
   };
 }
 
-export function requireCourse(world: World): Course {
-  if (world.course === null) throw new Error(`The course could not be loaded: ${world.courseError ?? "unknown error"}`);
-  return world.course;
+/**
+ * One course as the pages show it: as the workspace has it, or, before there
+ * is a workspace, a preview with nothing recorded (a course with a layout
+ * isn't ready then: there is nowhere to find it).
+ */
+export interface CourseView {
+  course: Course;
+  student: StudentState;
+  pointer: CurrentPointer;
+  ready: boolean;
+}
+
+const NOTHING_RECORDED: StudentState = { iteration: null, progress: null, problems: [] };
+
+/** Every course to show, built-in first. */
+export function courseViews(world: World): CourseView[] {
+  if (world.workspace.status === "found") {
+    return world.courses.map(({ course, student, pointer, layout }) => ({ course, student, pointer, ready: layout.ready }));
+  }
+  return world.available.map((course) => ({
+    course,
+    student: NOTHING_RECORDED,
+    pointer: resolveCurrent(course, NOTHING_RECORDED),
+    ready: course.layout === null,
+  }));
+}
+
+function noCourse(world: World, courseId: string): Error {
+  const why = world.courseErrors.map((entry) => entry.error).join(" ");
+  return new Error(why === "" ? `There is no course "${courseId}".` : `The course "${courseId}" could not be loaded: ${why}`);
+}
+
+/** The course to show, workspace or not. */
+export function requireCourseView(world: World, courseId: string): CourseView {
+  const view = courseViews(world).find((entry) => entry.course.id === courseId);
+  if (view === undefined) throw noCourse(world, courseId);
+  return view;
+}
+
+/** The course as the workspace has it; call once the workspace is known to be there. */
+export function requireCourse(world: World, courseId: string): LoadedCourse {
+  const loaded = findCourse(world, courseId);
+  if (loaded === undefined) throw noCourse(world, courseId);
+  return loaded;
 }
 
 export function requireLesson(course: Course, lessonId: string): Lesson {
   const lesson = findLesson(course, lessonId);
-  if (lesson === undefined) throw new Error(`There is no lesson ${lessonId} in this course.`);
+  if (lesson === undefined) throw new Error(`There is no lesson ${lessonId} in "${course.title}".`);
   return lesson;
 }
 
 /** Progress entries recorded for `lesson`, current or from the history, else none. */
-function progressMap(world: World, lessonId: string): ProgressMap {
-  return recordedProgress(world.student, lessonId)?.examples ?? {};
+function progressMap(student: StudentState, lessonId: string): ProgressMap {
+  return recordedProgress(student, lessonId)?.examples ?? {};
 }
 
 function latest(values: readonly (string | undefined)[]): string | null {
@@ -84,112 +130,125 @@ function lastNote(lesson: Lesson, progress: ProgressMap): CurrentState["lastNote
 }
 
 /** The lesson's features and Rules against what is recorded, with the Rules its coach thread has reached. */
-function lessonOutline(world: World, lesson: Lesson, coachThread: TutorThreadRecord | undefined): FeatureOutline[] {
-  const focus = progressFor(world.student, lesson.id)?.focus ?? null;
-  return outline(lesson, progressMap(world, lesson.id), focus, new Set(coachThread?.reachedRules ?? []));
+function lessonOutline(student: StudentState, lesson: Lesson, coachThread: TutorThreadRecord | undefined): FeatureOutline[] {
+  const focus = progressFor(student, lesson.id)?.focus ?? null;
+  return outline(lesson, progressMap(student, lesson.id), focus, new Set(coachThread?.reachedRules ?? []));
 }
 
-function currentState(world: World, course: Course, threads: readonly TutorThreadRecord[]): CurrentState | null {
-  if (world.workspace.status !== "found" || world.pointer === null) return null;
-  const lesson = findLesson(course, world.pointer.lessonId);
+function currentState(view: CourseView, threads: readonly TutorThreadRecord[]): CurrentState | null {
+  const { course, student, pointer } = view;
+  const lesson = findLesson(course, pointer.lessonId);
   if (lesson === undefined) return null;
-  const progress = progressMap(world, lesson.id);
-  const focus = progressFor(world.student, lesson.id)?.focus ?? null;
+  const progress = progressMap(student, lesson.id);
+  const focus = progressFor(student, lesson.id)?.focus ?? null;
   const coachThread = findCoachThread(threads, course.id, lesson.id);
   return {
     lessonId: lesson.id,
-    iterationStatus: world.pointer.iterationStatus,
+    iterationStatus: pointer.iterationStatus,
     focus,
     focusRuleName: focus === null ? null : (findRule(lesson, focus)?.name ?? null),
     counts: countExamples(lessonExamples(lesson), progress),
-    outline: lessonOutline(world, lesson, coachThread),
+    outline: lessonOutline(student, lesson, coachThread),
     coachThreadId: coachThread?.id ?? null,
     lastNote: lastNote(lesson, progress),
   };
 }
 
-export function buildOverview(world: World, threads: readonly TutorThreadRecord[]): Overview {
-  const course = world.course;
-  const pointer = world.pointer;
-  if (course === null || pointer === null) {
-    return {
-      course: null,
-      courseError: world.courseError,
-      workspace: world.workspace,
-      layout: { id: null, ready: true },
-      lessons: [],
-      current: null,
-      threads: [],
-    };
-  }
-  // Without a workspace a course with a layout has nowhere to find it: not ready.
-  const layoutReady = world.layout?.ready ?? course.layout === null;
-  const courseThreads =
-    world.workspace.status === "found" ? threads.filter((thread) => thread.courseId === course.id) : [];
+function courseOverview(view: CourseView, workspaceFound: boolean, threads: readonly TutorThreadRecord[]): CourseOverview {
+  const { course, student, pointer, ready } = view;
   return {
     course: { id: course.id, title: course.title, description: course.description },
-    courseError: null,
-    workspace: world.workspace,
-    layout: { id: course.layout, ready: layoutReady },
+    builtin: course.id === BUILTIN_COURSE_ID,
+    layout: { id: course.layout, ready },
     lessons: course.lessons.map((lesson) => {
-      const coachThread = findCoachThread(courseThreads, course.id, lesson.id);
+      const coachThread = findCoachThread(threads, course.id, lesson.id);
       return {
         id: lesson.id,
         title: lesson.title,
         set: lesson.set,
         builtin: lesson.builtin,
         status: lessonStatus(course, pointer, lesson.id),
-        counts: countExamples(lessonExamples(lesson), progressMap(world, lesson.id)),
+        counts: countExamples(lessonExamples(lesson), progressMap(student, lesson.id)),
         coachThreadId: coachThread?.id ?? null,
-        outline: lessonOutline(world, lesson, coachThread),
-        needsLayout: !lesson.builtin && !layoutReady,
+        outline: lessonOutline(student, lesson, coachThread),
+        needsLayout: !lesson.builtin && !ready,
       };
     }),
-    current: currentState(world, course, courseThreads),
-    threads: courseThreads.map(publicThread),
+    current: workspaceFound ? currentState(view, threads) : null,
   };
 }
 
-export function buildLessonDetail(world: World, lessonId: string, threads: readonly TutorThreadRecord[]): LessonDetail {
-  const course = requireCourse(world);
+export function buildOverview(world: World, threads: readonly TutorThreadRecord[]): Overview {
+  const found = world.workspace.status === "found";
+  const views = courseViews(world);
+  const ids = new Set(views.map((view) => view.course.id));
+  // Threads of the courses shown (Lesson 0's whatever course they name: threadCourse).
+  const shown = found ? threads.filter((thread) => ids.has(thread.courseId)) : [];
+  return {
+    workspace: world.workspace,
+    courses: views.map((view) => courseOverview(view, found, shown)),
+    courseErrors: world.courseErrors,
+    threads: shown.map(publicThread),
+  };
+}
+
+export function buildLessonDetail(world: World, courseId: string, lessonId: string, threads: readonly TutorThreadRecord[]): LessonDetail {
+  const { course, student, pointer } = requireCourseView(world, courseId);
   const lesson = requireLesson(course, lessonId);
-  const pointer = world.pointer;
-  const isCurrent = pointer?.lessonId === lesson.id;
-  const status = pointer === null ? "ahead" : lessonStatus(course, pointer, lesson.id);
-  const current = progressFor(world.student, lesson.id);
+  const isCurrent = pointer.lessonId === lesson.id;
+  const status = lessonStatus(course, pointer, lesson.id);
+  const current = progressFor(student, lesson.id);
   const coachThread = findCoachThread(threads, course.id, lesson.id);
   return {
     lesson,
     status,
-    iterationStatus: isCurrent && pointer !== null ? pointer.iterationStatus : null,
+    iterationStatus: isCurrent ? pointer.iterationStatus : null,
     focus: current?.focus ?? null,
-    progress: status === "ahead" ? {} : progressMap(world, lesson.id),
+    progress: status === "ahead" ? {} : progressMap(student, lesson.id),
     coachThreadId: coachThread?.id ?? null,
     reachedRules: coachThread?.reachedRules ?? [],
   };
 }
 
+/**
+ * The lesson after `lesson`: the next in its course, or, after the built-in
+ * course's Lesson 0, the first lesson of the course that follows it.
+ */
+function nextAfter(world: World, view: CourseView, lesson: Lesson): { view: CourseView; lesson: Lesson } | null {
+  const next = nextLesson(view.course, lesson.id);
+  if (next !== undefined) return { view, lesson: next };
+  if (view.course.id !== BUILTIN_COURSE_ID) return null;
+  const following = courseViews(world).find((entry) => entry.course.id !== BUILTIN_COURSE_ID && entry.course.lessons.length > 0);
+  const first = following?.course.lessons[0];
+  return following === undefined || first === undefined ? null : { view: following, lesson: first };
+}
+
 /** `bbSideChats`: side chats of the lesson's coach thread that BB made, which are not Tutor's threads. */
 export function buildCompletion(
   world: World,
+  courseId: string,
   lessonId: string,
   threads: readonly TutorThreadRecord[],
   bbSideChats = 0,
 ): Completion {
-  const course = requireCourse(world);
+  const view = requireCourseView(world, courseId);
+  const { course, student, pointer } = view;
   const lesson = requireLesson(course, lessonId);
-  if (world.pointer === null || lessonStatus(course, world.pointer, lesson.id) !== "done") {
+  if (world.workspace.status !== "found" || lessonStatus(course, pointer, lesson.id) !== "done") {
     throw new Error(`Lesson ${lesson.id} is not complete yet.`);
   }
-  const progress = recordedProgress(world.student, lesson.id);
+  const progress = recordedProgress(student, lesson.id);
   // Carry-over into the next lesson comes from what passed in this one (its history entry once it is past).
   const passingHashes = new Set(
     Object.values(progress?.examples ?? {})
       .filter((entry) => entry.status === "passing")
       .map((entry) => entry.hash),
   );
-  const next = nextLesson(course, lesson.id);
+  const after = nextAfter(world, view, lesson);
+  const next = after?.lesson;
+  // Nothing carries over from one course into another.
   const nextExamples = next === undefined ? [] : lessonExamples(next);
+  const carries = after?.view === view;
   return {
     lesson: { id: lesson.id, title: lesson.title, set: lesson.set },
     counts: countExamples(lessonExamples(lesson), progress?.examples ?? {}),
@@ -200,19 +259,20 @@ export function buildCompletion(
     adoptedAt: progress?.adopted ?? null,
     summary: progress?.summary ?? null,
     next:
-      next === undefined
+      after === null || next === undefined
         ? null
         : {
+            courseId: after.view.course.id,
             id: next.id,
-            status: lessonStatus(course, world.pointer, next.id),
+            status: lessonStatus(after.view.course, after.view.pointer, next.id),
             title: next.title,
             set: next.set,
             dek: next.dek,
             rules: next.features.reduce((sum, feature) => sum + feature.rules.length, 0),
             examples: nextExamples.length,
-            carryOver: nextExamples.filter((example) => passingHashes.has(example.hash)).length,
+            carryOver: carries ? nextExamples.filter((example) => passingHashes.has(example.hash)).length : 0,
             fresh: nextExamples.filter((example) => example.change !== "unchanged").length,
-            factoryDiff: next.factoryDiff,
+            factoryDiff: carries ? next.factoryDiff : null,
           },
   };
 }

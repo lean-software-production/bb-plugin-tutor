@@ -23,7 +23,7 @@ test("replaces only spec/'s README.md, FACTORY.md and features/, leaving everyth
     await writeFile(join(spec, "features/old.feature"), "Feature: old\n");
     await writeFile(join(spec, "NOTES.md"), "the student's notes\n");
 
-    const lesson = sandbox.course.lessons[2];
+    const lesson = sandbox.course.lessons[1];
     assert.ok(lesson !== undefined);
     const result = await copyLessonSpec(sandbox.factoryRoot, lesson, { courseRoot: sandbox.course.root });
 
@@ -42,8 +42,8 @@ test("replaces only spec/'s README.md, FACTORY.md and features/, leaving everyth
 test("a lesson without FACTORY.md removes the previous spec/FACTORY.md", async () => {
   const sandbox = await makeSandbox();
   try {
-    const first = sandbox.course.lessons[1];
-    const second = sandbox.course.lessons[2];
+    const first = sandbox.course.lessons[0];
+    const second = sandbox.course.lessons[1];
     assert.ok(first !== undefined && second !== undefined);
     await copyLessonSpec(sandbox.factoryRoot, first, { courseRoot: sandbox.course.root });
     await rm(join(second.dir, "FACTORY.md"));
@@ -58,7 +58,7 @@ test("a lesson without FACTORY.md removes the previous spec/FACTORY.md", async (
 test("copies the sample seed to ../seeds/tetris.md unless it is already there, never into the factory", async () => {
   const sandbox = await makeSandbox();
   try {
-    const lesson = sandbox.course.lessons[1];
+    const lesson = sandbox.course.lessons[0];
     assert.ok(lesson !== undefined && lesson.seedSpec !== null);
     const seed = join(sandbox.codebaseRoot, "seeds/tetris.md");
     const first = await copyLessonSpec(sandbox.factoryRoot, lesson, { courseRoot: sandbox.course.root });
@@ -83,7 +83,7 @@ test("in a starter clone whose factory moved to factory/, the seed lands in tetr
   try {
     await rename(sandbox.factoryRoot, join(sandbox.repoRoot, "factory"));
     const layout = await resolveLayout(sandbox.repoRoot, createDiskAccess());
-    const lesson = sandbox.course.lessons[1];
+    const lesson = sandbox.course.lessons[0];
     assert.ok(lesson !== undefined && lesson.seedSpec !== null);
     await rm(join(sandbox.codebaseRoot, "seeds/.gitkeep"));
 
@@ -105,7 +105,7 @@ test("in a starter clone whose factory moved to factory/, the seed lands in tetr
 test("a lesson without a seed creates no ../seeds/", async () => {
   const sandbox = await makeSandbox();
   try {
-    const lesson = sandbox.course.lessons[2];
+    const lesson = sandbox.course.lessons[1];
     assert.ok(lesson !== undefined && lesson.seedSpec === null);
     await copyLessonSpec(sandbox.factoryRoot, lesson, { courseRoot: sandbox.course.root });
     assert.equal(await readdir(join(sandbox.codebaseRoot, "seeds")).catch(() => null), null);
@@ -121,7 +121,7 @@ test("refuses a spec/ that is a symbolic link, and deletes nothing through it", 
     await mkdir(src, { recursive: true });
     await writeFile(join(src, "main.ts"), "the student's code\n");
     await symlink("src", join(sandbox.factoryRoot, "spec"));
-    const lesson = sandbox.course.lessons[2];
+    const lesson = sandbox.course.lessons[1];
     assert.ok(lesson !== undefined);
 
     await assert.rejects(copyLessonSpec(sandbox.factoryRoot, lesson, { courseRoot: sandbox.course.root }), /spec\/ .*symbolic link/);
@@ -138,7 +138,7 @@ test("refuses a ../seeds/ that is a symbolic link, and a seed that is one, writi
     await mkdir(outside, { recursive: true });
     const seeds = join(sandbox.codebaseRoot, "seeds");
     await symlink(outside, seeds);
-    const lesson = sandbox.course.lessons[1];
+    const lesson = sandbox.course.lessons[0];
     assert.ok(lesson !== undefined && lesson.seedSpec !== null);
 
     await assert.rejects(copyLessonSpec(sandbox.factoryRoot, lesson, { courseRoot: sandbox.course.root }), /seeds\/ .*symbolic link/);
@@ -160,8 +160,8 @@ test("refuses a ../seeds/ that is a symbolic link, and a seed that is one, writi
 test("refuses a factory that is its repo's top folder, since ../seeds would be outside the repo, leaving spec/ unchanged", async () => {
   const sandbox = await makeSandbox();
   try {
-    const first = sandbox.course.lessons[1];
-    const second = sandbox.course.lessons[2];
+    const first = sandbox.course.lessons[0];
+    const second = sandbox.course.lessons[1];
     assert.ok(first !== undefined && second !== undefined);
     await copyLessonSpec(sandbox.factoryRoot, first, { courseRoot: sandbox.course.root });
     const spec = join(sandbox.factoryRoot, "spec");
@@ -181,7 +181,7 @@ test("refuses a factory that is its repo's top folder, since ../seeds would be o
 test("refuses a ../seeds/ that is inside the course, or holds it", async () => {
   const sandbox = await makeSandbox();
   try {
-    const lesson = sandbox.course.lessons[1];
+    const lesson = sandbox.course.lessons[0];
     assert.ok(lesson !== undefined && lesson.seedSpec !== null);
 
     // A factory inside the course: ../seeds is course/tetris/seeds.
@@ -211,7 +211,7 @@ test("refreshes stand-ins/ wholesale from the course's, keeping modes and links 
     await mkdir(join(standIns, "old-dir"), { recursive: true });
     await writeFile(join(standIns, "old-dir/stale"), "stale\n");
     await writeFile(join(standIns, "README.md"), "an old README\n");
-    const lesson = sandbox.course.lessons[2];
+    const lesson = sandbox.course.lessons[1];
     assert.ok(lesson !== undefined);
 
     await copyLessonSpec(sandbox.factoryRoot, lesson, { courseRoot: sandbox.course.root });
@@ -231,7 +231,7 @@ test("refuses a stand-ins/ that is a symbolic link before touching anything", as
     await mkdir(outside, { recursive: true });
     await writeFile(join(outside, "keep.txt"), "not a stand-in\n");
     await symlink(outside, join(sandbox.factoryRoot, "stand-ins"));
-    const lesson = sandbox.course.lessons[1];
+    const lesson = sandbox.course.lessons[0];
     assert.ok(lesson !== undefined);
 
     await assert.rejects(copyLessonSpec(sandbox.factoryRoot, lesson, { courseRoot: sandbox.course.root }), /stand-ins\/ .*symbolic link/);
@@ -250,7 +250,7 @@ test("a course without stand-ins/ leaves the factory's stand-ins/ alone", async 
     const standIns = join(sandbox.factoryRoot, "stand-ins");
     await mkdir(standIns);
     await writeFile(join(standIns, "mine"), "the student's stand-in\n");
-    const lesson = sandbox.course.lessons[2];
+    const lesson = sandbox.course.lessons[1];
     assert.ok(lesson !== undefined);
 
     const result = await copyLessonSpec(sandbox.factoryRoot, lesson, { courseRoot: sandbox.course.root });
@@ -274,7 +274,7 @@ test("a stand-ins/ refresh first recovers what a crashed one left, never followi
     await mkdir(join(standIns, ".tutor-adopting"));
     await writeFile(join(standIns, ".tutor-adopting/half"), "half\n");
     await symlink(outside, join(standIns, ".tutor-staging-zz"));
-    const lesson = sandbox.course.lessons[2];
+    const lesson = sandbox.course.lessons[1];
     assert.ok(lesson !== undefined);
 
     await copyLessonSpec(sandbox.factoryRoot, lesson, { courseRoot: sandbox.course.root });
@@ -288,8 +288,8 @@ test("a stand-ins/ refresh first recovers what a crashed one left, never followi
 test("refuses a lesson with no feature files, keeping the previous spec snapshot", async () => {
   const sandbox = await makeSandbox();
   try {
-    const first = sandbox.course.lessons[1];
-    const second = sandbox.course.lessons[2];
+    const first = sandbox.course.lessons[0];
+    const second = sandbox.course.lessons[1];
     assert.ok(first !== undefined && second !== undefined);
     await copyLessonSpec(sandbox.factoryRoot, first, { courseRoot: sandbox.course.root });
     await rm(join(second.dir, "features"), { recursive: true });
@@ -304,8 +304,8 @@ test("refuses a lesson with no feature files, keeping the previous spec snapshot
 test("refuses a lesson whose README.md went missing after the course loaded, keeping the previous spec snapshot", async () => {
   const sandbox = await makeSandbox();
   try {
-    const first = sandbox.course.lessons[1];
-    const second = sandbox.course.lessons[2];
+    const first = sandbox.course.lessons[0];
+    const second = sandbox.course.lessons[1];
     assert.ok(first !== undefined && second !== undefined);
     await copyLessonSpec(sandbox.factoryRoot, first, { courseRoot: sandbox.course.root });
     const spec = join(sandbox.factoryRoot, "spec");
@@ -330,8 +330,8 @@ async function filesUnder(dir: string): Promise<string[]> {
 test("a swap whose rollback can't put the old files back keeps them and says where they are", async () => {
   const sandbox = await makeSandbox();
   try {
-    const first = sandbox.course.lessons[1];
-    const second = sandbox.course.lessons[2];
+    const first = sandbox.course.lessons[0];
+    const second = sandbox.course.lessons[1];
     assert.ok(first !== undefined && second !== undefined);
     await copyLessonSpec(sandbox.factoryRoot, first, { courseRoot: sandbox.course.root });
     const spec = join(sandbox.factoryRoot, "spec");
@@ -361,8 +361,8 @@ test("a swap whose rollback can't put the old files back keeps them and says whe
 test("a swap's rollback never overwrites a file written in spec/ during the swap", async () => {
   const sandbox = await makeSandbox();
   try {
-    const first = sandbox.course.lessons[1];
-    const second = sandbox.course.lessons[2];
+    const first = sandbox.course.lessons[0];
+    const second = sandbox.course.lessons[1];
     assert.ok(first !== undefined && second !== undefined);
     await copyLessonSpec(sandbox.factoryRoot, first, { courseRoot: sandbox.course.root });
     const spec = join(sandbox.factoryRoot, "spec");
@@ -393,8 +393,8 @@ test("a swap's rollback never overwrites a file written in spec/ during the swap
 test("an adoption first recovers what a crashed one left in spec/, restoring missing files and clearing the rest", async () => {
   const sandbox = await makeSandbox();
   try {
-    const first = sandbox.course.lessons[1];
-    const second = sandbox.course.lessons[2];
+    const first = sandbox.course.lessons[0];
+    const second = sandbox.course.lessons[1];
     assert.ok(first !== undefined && second !== undefined);
     await copyLessonSpec(sandbox.factoryRoot, first, { courseRoot: sandbox.course.root });
     const spec = join(sandbox.factoryRoot, "spec");
@@ -430,7 +430,7 @@ test("an adoption first recovers what a crashed one left in spec/, restoring mis
 test("recovery never follows a leftover that is a symbolic link", async () => {
   const sandbox = await makeSandbox();
   try {
-    const lesson = sandbox.course.lessons[2];
+    const lesson = sandbox.course.lessons[1];
     assert.ok(lesson !== undefined);
     const outside = join(sandbox.root, "outside");
     await mkdir(join(outside, "features"), { recursive: true });

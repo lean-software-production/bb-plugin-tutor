@@ -17,7 +17,9 @@ export function WelcomePage() {
   const overview = useOverview();
   const candidates = useQuery(QUERY_KEYS.candidates, () => rpc.call("listCandidateProjects", null));
   const outlineMounted = useStore(outlineMountedStore);
-  const course = overview.data?.course ?? null;
+  // The course a first run sets up: the one after Tutor's built-in course, else the built-in one.
+  const courses = overview.data?.courses ?? [];
+  const course = (courses.find((entry) => !entry.builtin) ?? courses[0])?.course ?? null;
 
   return (
     <SketchPage roomy edge={<Character name="waver" className="tp-edge tp-edge--waver" />}>

@@ -1,9 +1,9 @@
 import { basename, dirname, join } from "node:path";
 import { resolveCurrent } from "../../shared/derive.ts";
-import { fixtureWorkspace, fixtureCourse, fixtureStudent } from "../../shared/fixtures.ts";
+import { fixtureBuiltinCourse, fixtureCourse, fixtureLesson0Student, fixtureStudent, fixtureWorkspace } from "../../shared/fixtures.ts";
 import type { Course, StudentState } from "../../shared/model.ts";
 import type { Workspace } from "../../shared/rpc.ts";
-import type { World } from "../../server/coach/world.ts";
+import { builtinLayout, type LoadedCourse, type World } from "../../server/coach/world.ts";
 import { capstoneProgress, type Layout } from "../../layouts/capstone-factory/detect.ts";
 import type { CourseLayoutState } from "../../layouts/state.ts";
 
@@ -55,22 +55,36 @@ export function courseLayout(course: Course, root: string, layout: Layout = lega
   return { id: course.layout, ready: layout.blocked === null, layout, progress: capstoneProgress(layout), problems: layout.problems, blocked: layout.blocked };
 }
 
+/**
+ * A world with the built-in course (Lesson 0, its student `lesson0`) and
+ * `course` (its student `student`), in `workspace`. Without a workspace no
+ * course is loaded into it, as world.ts does: only `available`.
+ */
 export function makeWorld(
   student: StudentState = fixtureStudent,
   workspace: Workspace = fixtureWorkspace,
   course: Course = fixtureCourse,
+  lesson0: StudentState = fixtureLesson0Student,
 ): World {
-  const effective = workspace.status === "found" ? student : { iteration: null, progress: null, problems: [] };
+  const found = workspace.status === "found";
+  const courses: LoadedCourse[] = found
+    ? [
+        { course: fixtureBuiltinCourse, layout: builtinLayout(workspace.root), student: lesson0, pointer: resolveCurrent(fixtureBuiltinCourse, lesson0), coachPath: fixtureBuiltinCourse.coachPath },
+        { course, layout: courseLayout(course, workspace.root), student, pointer: resolveCurrent(course, student), coachPath: course.coachPath },
+      ]
+    : [];
   return {
     coursePath: course.root,
-    course,
-    courseError: null,
-    coachPath: course.coachPath,
     workspace,
-    hostId: workspace.status === "found" ? "host_1" : null,
-    layout: workspace.status === "found" ? courseLayout(course, workspace.root) : null,
-    student: effective,
-    pointer: resolveCurrent(course, effective),
+    hostId: found ? "host_1" : null,
+    available: [fixtureBuiltinCourse, course],
+    courses,
+    courseErrors: [],
     projectHint: null,
   };
+}
+
+/** `world` with one loaded course changed. */
+export function withCourse(world: World, courseId: string, change: Partial<LoadedCourse>): World {
+  return { ...world, courses: world.courses.map((entry) => (entry.course.id === courseId ? { ...entry, ...change } : entry)) };
 }

@@ -134,8 +134,14 @@ export const COURSE_FILES = {
   standIns: "stand-ins",
 } as const;
 
-/** Lesson 0, "Using your tutor": shipped with the plugin, prepended to every course. */
+/** Lesson 0, "Using your tutor": shipped with the plugin as the one lesson of Tutor's built-in course. Other courses may not use its id. */
 export const BUILTIN_LESSON_ID = "000";
+
+/** Tutor's built-in course (server/course/builtin/), listed before every other course. */
+export const BUILTIN_COURSE_ID = "tutor";
+
+/** Where the built-in course keeps its progress in the workspace: .tutor/progress.yaml, with no ITERATION. */
+export const BUILTIN_PROGRESS = { dir: ".tutor", file: "progress.yaml" } as const;
 
 /** Title of a lesson's coach thread. Students read "lesson" for lesson (docs/tutor/GLOSSARY.md). */
 export function coachThreadTitle(lessonId: string): string {

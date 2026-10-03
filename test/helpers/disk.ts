@@ -12,7 +12,9 @@ import { chmod, mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fixtureCourse } from "../../shared/fixtures.ts";
-import type { Course } from "../../shared/model.ts";
+import { FACTORY_FILES } from "../../shared/constants.ts";
+import type { Course, ProgressFile } from "../../shared/model.ts";
+import { formatProgress } from "../../layouts/progress/progress-yaml.ts";
 
 export interface Sandbox {
   root: string;
@@ -79,6 +81,10 @@ export function git(dir: string, ...args: string[]): string {
 }
 
 export interface RepoSandboxOptions {
+  /** The capstone's progress file, tetris/.factory/spec/PROGRESS.yaml, as an older Tutor left it. */
+  progress?: Omit<ProgressFile, "examples"> & { examples?: ProgressFile["examples"] };
+  /** tetris/.factory/ITERATION's text, without its newline ("001 WIP"). */
+  iteration?: string;
   /** A real git repo with the starter committed, instead of an empty .git folder. */
   git?: boolean;
   /** The course to write: fixtureCourse unless given (fixtureCourseTo004 for the factory's move). */
@@ -111,6 +117,11 @@ export async function makeRepoSandbox(options: RepoSandboxOptions = {}): Promise
   } else {
     await mkdir(join(repoRoot, ".git"));
   }
+  if (options.progress !== undefined) {
+    await mkdir(join(factoryRoot, "spec"), { recursive: true });
+    await writeFile(join(factoryRoot, FACTORY_FILES.progress), formatProgress({ examples: {}, ...options.progress }, null));
+  }
+  if (options.iteration !== undefined) await writeFile(join(factoryRoot, FACTORY_FILES.iteration), `${options.iteration}\n`);
   const course = await writeCourse(join(root, "tutorial"), options.course);
   return { root, course, repoRoot, codebaseRoot, factoryRoot, cleanup: () => rm(root, { recursive: true, force: true }) };
 }

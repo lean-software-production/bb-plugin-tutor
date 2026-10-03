@@ -12,18 +12,18 @@ import { Chips, ErrorNotice, InlineText, Loading, SketchPage } from "./common.ts
 import { LessonDone } from "./LessonComplete.tsx";
 import { Button, Highlight } from "./sketch/index.ts";
 
-export function CompletionPage({ lessonId }: { lessonId: string }) {
+export function CompletionPage({ courseId, lessonId }: { courseId: string; lessonId: string }) {
   const rpc = useTutorRpc();
   const goCourse = useCourseNavigate();
   const nextRef = useRef<HTMLDivElement>(null);
-  const completion = useQuery(QUERY_KEYS.completion(lessonId), () => rpc.call("getCompletion", { lessonId }));
+  const completion = useQuery(QUERY_KEYS.completion(courseId, lessonId), () => rpc.call("getCompletion", { courseId, lessonId }));
   if (completion.data === null) {
     return (
       <SketchPage>
         {completion.status === "error" ? (
           <>
             <ErrorNotice message={completion.error} />
-            <Button secondary onClick={() => goCourse({ kind: "start", lessonId })}>
+            <Button secondary onClick={() => goCourse({ kind: "start", courseId, lessonId })}>
               Back to the lesson
             </Button>
           </>
@@ -68,8 +68,8 @@ function NextLesson({ next }: { next: NextLessonView }) {
   const goCourse = useCourseNavigate();
   const start = useAction(async () => {
     const { threadId } = next.started
-      ? await rpc.call("openCoach", { lessonId: next.id })
-      : await rpc.call("startNextLesson", { lessonId: next.id });
+      ? await rpc.call("openCoach", { courseId: next.courseId, lessonId: next.id })
+      : await rpc.call("startNextLesson", { courseId: next.courseId, lessonId: next.id });
     refreshAll();
     navigate.toThread(threadId);
   });
@@ -100,7 +100,7 @@ function NextLesson({ next }: { next: NextLessonView }) {
         <Button disabled={start.pending} onClick={() => void start.run()}>
           {start.pending ? "Starting…" : next.startLabel}
         </Button>
-        <Button secondary onClick={() => goCourse({ kind: "start", lessonId: next.id })}>
+        <Button secondary onClick={() => goCourse({ kind: "start", courseId: next.courseId, lessonId: next.id })}>
           Read the features first
         </Button>
       </div>

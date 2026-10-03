@@ -12,6 +12,8 @@ export interface Stat {
 }
 
 export interface NextLessonView {
+  /** Its course: after Lesson 0, the course that follows it. */
+  courseId: string;
   id: string;
   eyebrow: string;
   title: string;
@@ -58,6 +60,7 @@ export function completionView(completion: Completion, now: number): CompletionV
       next === null
         ? null
         : {
+            courseId: next.courseId,
             id: next.id,
             eyebrow: nextEyebrow(next, lesson.set),
             title: next.title,
@@ -76,7 +79,7 @@ export function completionView(completion: Completion, now: number): CompletionV
                   },
             started: next.status !== "ahead",
             startLabel: `${next.status === "ahead" ? "Start" : "Continue"} ${lessonLabel(next.id).toLowerCase()} with your coach →`,
-            startPath: formatRoute({ kind: "start", lessonId: next.id }),
+            startPath: formatRoute({ kind: "start", courseId: next.courseId, lessonId: next.id }),
           },
   };
 }

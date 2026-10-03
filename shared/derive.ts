@@ -90,10 +90,11 @@ export interface CurrentPointer {
 }
 
 /**
- * Where the student is. ITERATION is canonical (decision 1) whenever it
- * names a lesson of this course. Otherwise PROGRESS.yaml on Lesson 0 means
- * Lesson 0 is under way, and Done once every one of its Examples is passing
- * or skipped. Anything else means nothing has been adopted yet.
+ * Where the student is in one course. ITERATION is canonical (decision 1)
+ * whenever it names a lesson of this course. Otherwise, in the built-in
+ * course, progress on Lesson 0 means Lesson 0 is under way, and Done once
+ * every one of its Examples is passing or skipped. Anything else means
+ * nothing has been adopted yet: the course's first lesson, not started.
  */
 export function resolveCurrent(course: Course, student: StudentState): CurrentPointer {
   const fromIteration = student.iteration;
@@ -106,7 +107,7 @@ export function resolveCurrent(course: Course, student: StudentState): CurrentPo
     const done = counts.total > 0 && counts.passing + counts.skipped === counts.total;
     return { lessonId: BUILTIN_LESSON_ID, iterationStatus: done ? "Done" : "WIP" };
   }
-  return { lessonId: BUILTIN_LESSON_ID, iterationStatus: "not-started" };
+  return { lessonId: course.lessons[0]?.id ?? BUILTIN_LESSON_ID, iterationStatus: "not-started" };
 }
 
 /** Lessons before the current one are done; the current one is done once its status is Done. */

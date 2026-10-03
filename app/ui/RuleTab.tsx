@@ -5,7 +5,8 @@
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import type { PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
-import { useAction, useLiveRefresh, useOpenRule, useQuery, useTutorRpc } from "../hooks.ts";
+import { useAction, useLiveRefresh, useOpenRule, useOverview, useQuery, useTutorRpc } from "../hooks.ts";
+import { routeCourse } from "../model/course-route.ts";
 import { parseRuleTabParams, ruleTabTarget, ruleTabView } from "../model/rule-tab.ts";
 import { QUERY_KEYS } from "../state/app-state.ts";
 import { stepTone } from "../sketch/step-colour.ts";
@@ -19,22 +20,29 @@ export function RuleTab({ threadId, params }: PluginThreadPanelProps) {
   const rpc = useTutorRpc();
   const navigate = useBbNavigate();
   const openRule = useOpenRule();
-  const redirect = useAction(async (lessonId: string, ruleKey: string) => {
-    await rpc.call("redirectFocus", { lessonId, ruleKey });
+  const redirect = useAction(async (courseId: string, lessonId: string, ruleKey: string) => {
+    await rpc.call("redirectFocus", { courseId, lessonId, ruleKey });
     toast.success("We've asked your coach to work on this Rule next.");
   });
   const context = useQuery(QUERY_KEYS.threadContext(threadId), () => rpc.call("getThreadContext", { threadId }));
   const thread = context.data?.thread ?? null;
-  const target = context.data === null ? null : ruleTabTarget(parseRuleTabParams(params), thread);
+  const overview = useOverview();
+  const found = context.data === null ? null : ruleTabTarget(parseRuleTabParams(params), thread);
+  // A tab from before courses names no course: the one a link from then would mean (routeCourse).
+  const courseId = found === null ? null : (found.courseId ?? routeCourse(null, found.lessonId, overview.data?.courses ?? []));
+  const target = found === null || courseId === null ? null : { ...found, courseId };
   const lessonId = target?.lessonId ?? null;
-  // The fetcher only runs for a non-null key, so lessonId is set whenever it is called.
-  const detail = useQuery(lessonId === null ? null : QUERY_KEYS.lessonDetail(lessonId), () =>
-    rpc.call("getLessonDetail", { lessonId: lessonId ?? "" }),
+  // The fetcher only runs for a non-null key, so courseId and lessonId are set whenever it is called.
+  const detail = useQuery(lessonId === null || courseId === null ? null : QUERY_KEYS.lessonDetail(courseId, lessonId), () =>
+    rpc.call("getLessonDetail", { courseId: courseId ?? "", lessonId: lessonId ?? "" }),
   );
 
   const body = () => {
     if (context.data === null) {
       return context.status === "error" ? <ErrorNotice message={context.error} /> : <Loading label="Loading…" />;
+    }
+    if (target === null && found !== null && overview.data === null) {
+      return overview.status === "error" ? <ErrorNotice message={overview.error} /> : <Loading label="Loading…" />;
     }
     if (target === null) {
       return (
@@ -100,7 +108,7 @@ export function RuleTab({ threadId, params }: PluginThreadPanelProps) {
             </Button>
           ) : null}
           {canRedirect ? (
-            <Button secondary disabled={redirect.pending} onClick={() => void redirect.run(target.lessonId, ruleKey)}>
+            <Button secondary disabled={redirect.pending} onClick={() => void redirect.run(target.courseId, target.lessonId, ruleKey)}>
               Work on this Rule next
             </Button>
           ) : null}

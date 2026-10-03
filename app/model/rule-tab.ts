@@ -10,21 +10,29 @@ import { percent } from "./format.ts";
 import { ruleNumbers } from "./lesson.ts";
 
 const LESSON_ID = /^\d{3}$/;
+/** As the RPC contract's lessonRef allows. */
+const MAX_COURSE_ID = 64;
 
 export interface RuleTabParams {
+  /** Absent from tabs opened before courses: the thread's course, else routeCourse, says which. */
+  courseId: string | null;
   lessonId: string | null;
   ruleKey: string | null;
 }
 
 export function parseRuleTabParams(params: unknown): RuleTabParams {
-  if (params === null || typeof params !== "object" || Array.isArray(params)) return { lessonId: null, ruleKey: null };
+  if (params === null || typeof params !== "object" || Array.isArray(params)) return { courseId: null, lessonId: null, ruleKey: null };
   const record = params as Record<string, unknown>;
+  const courseId =
+    typeof record.courseId === "string" && record.courseId !== "" && record.courseId.length <= MAX_COURSE_ID ? record.courseId : null;
   const lessonId = typeof record.lessonId === "string" && LESSON_ID.test(record.lessonId) ? record.lessonId : null;
   const ruleKey = typeof record.ruleKey === "string" && RULE_KEY_PATTERN.test(record.ruleKey) ? record.ruleKey : null;
-  return { lessonId, ruleKey };
+  return { courseId, lessonId, ruleKey };
 }
 
 export interface RuleTabTarget {
+  /** Null when neither the params nor the thread say: the caller resolves it (routeCourse). */
+  courseId: string | null;
   lessonId: string;
   /** Null means "whatever the lesson has in focus". */
   ruleKey: string | null;
@@ -34,8 +42,9 @@ export interface RuleTabTarget {
 export function ruleTabTarget(params: RuleTabParams, thread: TutorThread | null): RuleTabTarget | null {
   const lessonId = params.lessonId ?? thread?.lessonId ?? null;
   if (lessonId === null) return null;
-  const ownRule = thread !== null && thread.lessonId === lessonId ? thread.ruleKey : null;
-  return { lessonId, ruleKey: params.ruleKey ?? ownRule };
+  const own = thread !== null && thread.lessonId === lessonId;
+  const ownRule = own ? thread.ruleKey : null;
+  return { courseId: params.courseId ?? (own ? thread.courseId : null), lessonId, ruleKey: params.ruleKey ?? ownRule };
 }
 
 export interface RuleTabExample {
@@ -74,7 +83,7 @@ function detail(status: ExampleStatus, note: string | undefined, carried: boolea
 }
 
 export function ruleTabView(lessonDetail: LessonDetail, target: RuleTabTarget, fromSideChat: boolean): RuleTabView {
-  const startPath = formatRoute({ kind: "start", lessonId: lessonDetail.lesson.id });
+  const startPath = formatRoute({ kind: "start", courseId: target.courseId, lessonId: lessonDetail.lesson.id });
   const key = target.ruleKey ?? lessonDetail.focus;
   const rule = key === null ? undefined : findRule(lessonDetail.lesson, key);
   if (rule === undefined) return { kind: "no-rule", startPath };

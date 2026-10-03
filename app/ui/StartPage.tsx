@@ -1,4 +1,4 @@
-// The route `start/<id>[/<rule>]`. The coach lives in BB's own thread view,
+// The route `start/<course>/<id>[/<rule>]`. The coach lives in BB's own thread view,
 // with the lesson carried into it by the lesson card and Rule cards, so a
 // lesson that has a coach thread opens it (at the Rule's section when the
 // route names one). A lesson without one shows its start page: the lesson
@@ -36,10 +36,10 @@ function markRedirected(): void {
 }
 
 /** `ruleKey` is the Rule named in the URL. */
-export function StartPage({ lessonId, ruleKey }: { lessonId: string; ruleKey: string | null }) {
+export function StartPage({ courseId, lessonId, ruleKey }: { courseId: string; lessonId: string; ruleKey: string | null }) {
   const rpc = useTutorRpc();
   const overview = useOverview();
-  const detail = useQuery(QUERY_KEYS.lessonDetail(lessonId), () => rpc.call("getLessonDetail", { lessonId }));
+  const detail = useQuery(QUERY_KEYS.lessonDetail(courseId, lessonId), () => rpc.call("getLessonDetail", { courseId, lessonId }));
   if (detail.data === null) {
     return (
       <div className="tutor-sk tp-lt">
@@ -52,10 +52,18 @@ export function StartPage({ lessonId, ruleKey }: { lessonId: string; ruleKey: st
   if (detail.data.coachThreadId !== null) {
     return <ToCoach lessonId={lessonId} coachThreadId={detail.data.coachThreadId} ruleKey={ruleKey} reached={detail.data.reachedRules} />;
   }
-  const view = buildLesson(detail.data, overview.data?.lessons ?? [], Date.now());
+  const lessons = overview.data?.courses.find((entry) => entry.course.id === courseId)?.lessons ?? [];
+  const view = buildLesson(detail.data, lessons, Date.now());
   const start = coachStart(view.status, overview.data?.workspace.status ?? null);
   return (
-    <StartPageBody key={lessonId} view={view} start={start} urlRuleKey={ruleKey} staleError={detail.status === "error" ? detail.error : null} />
+    <StartPageBody
+      key={lessonId}
+      courseId={courseId}
+      view={view}
+      start={start}
+      urlRuleKey={ruleKey}
+      staleError={detail.status === "error" ? detail.error : null}
+    />
   );
 }
 
@@ -95,11 +103,13 @@ function ToCoach({
 }
 
 function StartPageBody({
+  courseId,
   view,
   start,
   urlRuleKey,
   staleError,
 }: {
+  courseId: string;
   view: LessonView;
   start: CoachStart;
   urlRuleKey: string | null;
@@ -124,12 +134,12 @@ function StartPageBody({
   }, [urlRuleKey]);
 
   const openCoach = useAction(async () => {
-    const { threadId } = await rpc.call("openCoach", { lessonId });
+    const { threadId } = await rpc.call("openCoach", { courseId, lessonId });
     refreshAll();
     navigate.toThread(threadId);
   });
 
-  const completeHref = coursePageHref(formatRoute({ kind: "complete", lessonId }));
+  const completeHref = coursePageHref(formatRoute({ kind: "complete", courseId, lessonId }));
   return (
     <div className="tutor-sk tp-lt">
       <header className="tutor-sk tp-lthd">
@@ -162,7 +172,7 @@ function StartPageBody({
                     onClick={(event) => {
                       if (!isPlainClick(event)) return;
                       event.preventDefault();
-                      goCourse({ kind: "complete", lessonId });
+                      goCourse({ kind: "complete", courseId, lessonId });
                     }}
                   >
                     <Tick /> You finished {lessonLabel(lessonId).toLowerCase()}. See what's next →

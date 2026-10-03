@@ -15,13 +15,15 @@ export interface CourseSource {
   /**
    * Reads the course at `coursePath` from disk: course.yaml when present,
    * otherwise the ledger table in docs/iterations/README.md. Returns a fully
-   * derived Course (Lesson 0 prepended; slugs, hashes, new/reworded changes,
+   * derived Course (its own lessons only; slugs, hashes, new/reworded changes,
    * suggestedRuleOrder, factoryDiff and lexicon filled in). Never caches:
    * callers decide when to re-read. Rejects with CourseLoadError when the path
    * is missing or holds neither a course.yaml nor a ledger; a malformed single
    * feature file is a CourseLoadError too, naming the file and line.
    */
   loadCourse(coursePath: string): Promise<Course>;
+  /** Tutor's built-in course (id "tutor", no layout): Lesson 0, shipped with the plugin. */
+  loadBuiltin(): Promise<Course>;
 }
 
 export interface ProgressStore {

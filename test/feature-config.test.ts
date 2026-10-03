@@ -9,6 +9,7 @@ import { test, type TestContext } from "node:test";
 import type { PluginAgentToolResult } from "@get-bb/plugin-sdk";
 import { findLesson, lessonExamples } from "../shared/derive.ts";
 import type { Overview } from "../shared/rpc.ts";
+import { createCourseSource } from "../server/course/index.ts";
 import { makeSandbox } from "./helpers/disk.ts";
 import { makeTutorHost, PROJECT_ID } from "./helpers/fake-bb.ts";
 
@@ -45,26 +46,28 @@ for (const config of [{ course: "/workspaces/tutorial" }, { schemaVersion: 1, co
   test(`a feature config with ${"schemaVersion" in config ? "schemaVersion 1" : "no schemaVersion"} loads the course`, async (t) => {
     const { host } = await setup(t, config);
     const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
-    assert.equal(overview.courseError, null);
-    assert.notEqual(overview.course, null);
+    assert.deepEqual(overview.courseErrors, []);
+    assert.deepEqual(overview.courses.map((entry) => entry.course.id), ["tutor", "software-factory"]);
   });
 }
 
 test("an unsupported schemaVersion stops Tutor: the course surfaces say why and the coach tools write nothing", async (t) => {
   const { sandbox, host, configFile } = await setup(t, { schemaVersion: 1, course: "/workspaces/tutorial" });
   // A coach thread from before the Feature was upgraded past this plugin.
-  const { threadId } = (await host.harness.behavior.callRpc("openCoach", { lessonId: "000" })) as { threadId: string };
+  const { threadId } = (await host.harness.behavior.callRpc("openCoach", { courseId: "tutor", lessonId: "000" })) as { threadId: string };
   await writeFile(configFile, JSON.stringify({ schemaVersion: 2, course: "/workspaces/tutorial" }));
   const before = await snapshot(sandbox.root);
 
   const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
-  assert.equal(overview.course, null);
-  assert.match(overview.courseError ?? "", /schemaVersion 2/);
-  assert.match(overview.courseError ?? "", /supports schemaVersion 1/);
-  assert.match(overview.courseError ?? "", /[Uu]pdate the Tutor plugin/);
-  await assert.rejects(host.harness.behavior.callRpc("openCoach", { lessonId: "000" }), /schemaVersion 2/);
+  assert.deepEqual(overview.courses, [], "not even the built-in course");
+  const error = overview.courseErrors.map((entry) => entry.error).join(" ");
+  assert.match(error, /schemaVersion 2/);
+  assert.match(error, /supports schemaVersion 1/);
+  assert.match(error, /[Uu]pdate the Tutor plugin/);
+  await assert.rejects(host.harness.behavior.callRpc("openCoach", { courseId: "tutor", lessonId: "000" }), /schemaVersion 2/);
 
-  const example = lessonExamples(findLesson(sandbox.course, "000") ?? assert.fail("lesson 000"))[0] ?? assert.fail("an Example");
+  const builtin = await createCourseSource().loadBuiltin();
+  const example = lessonExamples(findLesson(builtin, "000") ?? assert.fail("lesson 000"))[0] ?? assert.fail("an Example");
   const rule = example.key.split("/").slice(0, 2).join("/");
   const calls: [string, unknown][] = [
     ["tutor_status", {}],

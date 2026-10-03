@@ -20,7 +20,7 @@ import {
   type Outcome,
 } from "./actions.ts";
 import { authorizeCaller, type Caller } from "./auth.ts";
-import { factoryLockKey } from "./lock-keys.ts";
+import { workspaceLockKey } from "./lock-keys.ts";
 import type { TutorRuntime } from "./runtime.ts";
 import { sideChatAnchor, sideChatSeed } from "./prompts.ts";
 import { openSideChat } from "./side-chats.ts";
@@ -94,7 +94,8 @@ function register<Name extends ToolName>(rt: TutorRuntime, spec: ToolSpec<Name>)
       const run = async (world: World): Promise<PluginAgentToolResult> => {
         const caller = await authorizeCaller(rt.bb.sdk, rt.bb.pluginId, context.threadId, world.workspace);
         if ("error" in caller) return refusal(caller.error);
-        const state = coachStateOf(world);
+        // The caller's course: the tools act on the course its coach thread coaches.
+        const state = coachStateOf(world, caller.courseId);
         if ("error" in state) return refusal(state.error);
         const otherLesson = spec.lesson === "current" ? otherLessonError(state, caller) : null;
         if (otherLesson !== null) return refusal(otherLesson);
@@ -108,9 +109,9 @@ function register<Name extends ToolName>(rt: TutorRuntime, spec: ToolSpec<Name>)
       try {
         const world = await rt.world.load();
         if (world.workspace.status !== "found") return await run(world);
-        // Read-modify-write of the factory's files: re-read them once earlier calls have written.
+        // Read-modify-write of the workspace's files: re-read them once earlier calls have written.
         // Keyed on the project's folder, which stays put when the factory moves to factory/.
-        return await rt.locks.run(factoryLockKey(world.workspace.root), async () => run(await rt.world.load()));
+        return await rt.locks.run(workspaceLockKey(world.workspace.root), async () => run(await rt.world.load()));
       } catch (cause) {
         rt.bb.log.error(`[tutor] ${spec.name} failed: ${String(cause)}`);
         return refusal(`${spec.name} failed: ${cause instanceof Error ? cause.message : String(cause)}`);

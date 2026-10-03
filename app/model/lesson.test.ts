@@ -1,16 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fixtureCourse, fixtureLessonDetail, fixtureOverview, FIXTURE_NOW } from "../../shared/fixtures.ts";
+import { fixtureBuiltinCourse, fixtureCourse, fixtureLessonDetail, fixtureOverview, FIXTURE_NOW } from "../../shared/fixtures.ts";
 import type { Example, Lesson, Step } from "../../shared/model.ts";
 import type { LessonDetail } from "../../shared/rpc.ts";
 import { exampleLines, stepLines, stepTextTokens } from "./gherkin.ts";
 import { buildLesson, coachStart, foldsHiding, laterFoldId, marginNote } from "./lesson.ts";
 
 const NOW = Date.parse(FIXTURE_NOW);
-const lessons = fixtureOverview.lessons;
+const lessons = fixtureOverview.courses[1]?.lessons ?? [];
 
 function lesson(id: string): Lesson {
-  const found = fixtureCourse.lessons.find((candidate) => candidate.id === id);
+  const found = [...fixtureBuiltinCourse.lessons, ...fixtureCourse.lessons].find((candidate) => candidate.id === id);
   if (found === undefined) throw new Error(`no fixture lesson ${id}`);
   return found;
 }

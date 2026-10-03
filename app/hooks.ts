@@ -4,10 +4,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useBbNavigate, useRealtime, useRealtimeConnectionState, useRpc } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
-import { NAV_PANEL_PATH, REALTIME_CHANNELS } from "../shared/constants.ts";
+import { BUILTIN_COURSE_ID, BUILTIN_LESSON_ID, NAV_PANEL_PATH, REALTIME_CHANNELS } from "../shared/constants.ts";
 import type { TutorRoute } from "../shared/routes.ts";
 import type { RpcContract } from "../shared/rpc.ts";
-import { coursePath } from "./model/course-route.ts";
+import { coursePath, routeCourse } from "./model/course-route.ts";
 import { SIDE_CHAT_HINT } from "./model/side-chat.ts";
 import { jumpToRuleSection, type RuleTarget } from "./rule-jump.ts";
 import { withConnectionLossDetection } from "./model/rpc-errors.ts";
@@ -82,6 +82,24 @@ export function useOverview() {
   return useQuery(QUERY_KEYS.overview, () => rpc.call("getOverview", null));
 }
 
+/**
+ * The course of a lesson a message in `threadId` names (a directive): the
+ * thread's own course, from getThreadContext, when the thread is Tutor's;
+ * otherwise the course a link from before courses would mean (routeCourse).
+ * Null until it is known.
+ */
+export function useLessonCourse(threadId: string, lessonId: string | null): string | null {
+  const rpc = useTutorRpc();
+  const context = useQuery(QUERY_KEYS.threadContext(threadId), () => rpc.call("getThreadContext", { threadId }));
+  const overview = useOverview();
+  if (lessonId === null) return null;
+  const thread = context.data?.thread ?? null;
+  // Lesson 0 is the built-in course's in any thread; the thread's course holds its other lessons.
+  if (thread !== null && lessonId !== BUILTIN_LESSON_ID && thread.courseId !== BUILTIN_COURSE_ID) return thread.courseId;
+  if (context.status === "loading" && lessonId !== BUILTIN_LESSON_ID) return null;
+  return routeCourse(null, lessonId, overview.data?.courses ?? []);
+}
+
 export interface Action<A extends unknown[]> {
   run: (...args: A) => Promise<void>;
   pending: boolean;
@@ -148,11 +166,13 @@ export function useOpenRule(): (target: RuleTarget) => void {
  * coach thread with a pointer to its "Side chat" tab (a plugin cannot select
  * that tab itself).
  */
-export function useAskSideQuestion(onDone: () => void = () => undefined): Action<[lessonId: string, ruleKey: string | null]> {
+export function useAskSideQuestion(
+  onDone: () => void = () => undefined,
+): Action<[courseId: string, lessonId: string, ruleKey: string | null]> {
   const rpc = useTutorRpc();
   const navigate = useBbNavigate();
-  return useAction(async (lessonId: string, ruleKey: string | null) => {
-    const { coachThreadId } = await rpc.call("startSideChat", { lessonId, ruleKey });
+  return useAction(async (courseId: string, lessonId: string, ruleKey: string | null) => {
+    const { coachThreadId } = await rpc.call("startSideChat", { courseId, lessonId, ruleKey });
     refreshAll();
     navigate.toThread(coachThreadId);
     toast.success(SIDE_CHAT_HINT);

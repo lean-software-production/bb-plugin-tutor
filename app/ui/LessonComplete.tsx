@@ -66,14 +66,22 @@ export function LessonDone({ lessonId, completion, view, onNext }: LessonDonePro
 }
 
 /** In the coach thread: fetches its own stats, and "What's next" opens the completion page. */
-export function LessonComplete({ lessonId, anchorProps = {} }: { lessonId: string; anchorProps?: Record<string, string> }) {
+export function LessonComplete({
+  courseId,
+  lessonId,
+  anchorProps = {},
+}: {
+  courseId: string;
+  lessonId: string;
+  anchorProps?: Record<string, string>;
+}) {
   const rpc = useTutorRpc();
   const goCourse = useCourseNavigate();
-  const completion = useQuery(QUERY_KEYS.completion(lessonId), () => rpc.call("getCompletion", { lessonId }));
+  const completion = useQuery(QUERY_KEYS.completion(courseId, lessonId), () => rpc.call("getCompletion", { courseId, lessonId }));
   const view = completion.data === null ? null : completionView(completion.data, Date.now());
   return (
     <div className="tutor-sk tp-cardwrap" {...anchorProps}>
-      <LessonDone lessonId={lessonId} completion={completion.data} view={view} onNext={() => goCourse({ kind: "complete", lessonId })} />
+      <LessonDone lessonId={lessonId} completion={completion.data} view={view} onNext={() => goCourse({ kind: "complete", courseId, lessonId })} />
     </div>
   );
 }

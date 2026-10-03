@@ -3,7 +3,11 @@
 // like the real server's.
 import { createFakePluginHost, type FakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { SKILL_ID } from "../../shared/constants.ts";
-import type { Course } from "../../shared/model.ts";
+import { lessonExamples } from "../../shared/derive.ts";
+import type { Course, ExampleProgress, Lesson } from "../../shared/model.ts";
+import { CourseLoadError } from "../../shared/ports.ts";
+import type { PluginAgentToolResult } from "@get-bb/plugin-sdk";
+import { loadBuiltinCourse } from "../../server/course/load-course.ts";
 import { registerTutor } from "../../server/coach/register.ts";
 import { createProgressStore } from "../../server/progress/store.ts";
 import type { WorkspaceAccess } from "../../server/workspace/access.ts";
@@ -92,9 +96,24 @@ function httpError(status: number, code: string, message: string): Error {
   return Object.assign(new Error(message), { status, code });
 }
 
+/** Every Example of `lesson` passing, as its progress entries. */
+export function allPassing(lesson: Lesson, at = NOW.toISOString().replace(/\.\d{3}Z$/, "Z")): Record<string, ExampleProgress> {
+  return Object.fromEntries(lessonExamples(lesson).map((example) => [example.key, { status: "passing", hash: example.hash, at }]));
+}
+
+/** Calls a coach tool as `threadId`, in the workspace project. */
+export async function callTool(host: TutorHost, name: string, input: unknown, threadId: string): Promise<PluginAgentToolResult> {
+  return host.harness.behavior.callAgentTool(name, input, { threadId, projectId: PROJECT_ID });
+}
+
+/**
+ * A fake BB host running Tutor. `course` is the configured course, or null
+ * for none (Tutor then has its built-in course alone); the built-in course is
+ * the real one. `workspaceRoot` is the project's folder.
+ */
 export async function makeTutorHost(
-  course: Course,
-  factoryRoot: string,
+  course: Course | null,
+  workspaceRoot: string,
   settings: Record<string, string | boolean> = { factoryProject: PROJECT_ID },
   options: {
     dataDir?: string;
@@ -149,7 +168,7 @@ export async function makeTutorHost(
     createdAt: 1,
     updatedAt: 1,
     sources: [
-      { id: "src_1", projectId: PROJECT_ID, hostId: "host_1", type: "local_path", path: factoryRoot, isDefault: true, createdAt: 1, updatedAt: 1 },
+      { id: "src_1", projectId: PROJECT_ID, hostId: "host_1", type: "local_path", path: workspaceRoot, isDefault: true, createdAt: 1, updatedAt: 1 },
     ],
   };
 
@@ -264,7 +283,13 @@ export async function makeTutorHost(
     },
   });
   const rt = await registerTutor(host.bb, {
-    courseSource: { loadCourse: async () => course },
+    courseSource: {
+      loadCourse: async (path) => {
+        if (course === null) throw new CourseLoadError(`There is no course folder at ${path}.`);
+        return course;
+      },
+      loadBuiltin: loadBuiltinCourse,
+    },
     store: createProgressStore(),
     env: options.env ?? {},
     featureConfigFile: options.featureConfigFile ?? "/nonexistent/tutor/config.json",

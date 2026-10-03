@@ -1,6 +1,7 @@
-// The course outline, BB's sidebar thread list replaced: one tree of lessons,
-// each with its coach thread, the coach thread's Rules and its side chats,
-// then the project's other threads. BB still draws New thread, Search, the
+// The course outline, BB's sidebar thread list replaced: a tree of lessons
+// per course (Tutor's built-in course first), each lesson with its coach
+// thread, the coach thread's Rules and its side chats, then the project's
+// other threads. BB still draws New thread, Search, the
 // plugin nav rows and the footer around it.
 import { useEffect, useState } from "react";
 import type { MouseEvent } from "react";
@@ -96,19 +97,25 @@ function OutlineBody({ outline, go, onNavigate }: { outline: OutlineView; go: Go
     case "unset":
       return (
         <>
-          {outline.lessons.map((lesson, position) => (
-            <a
-              key={lesson.id}
-              className="tp-lesson-row tp-lesson-row--ahead"
-              href={coursePageHref(lesson.startPath)}
-              aria-label={`${lessonLabel(lesson.id)}, ${lesson.title}`}
-              data-lesson-id={lesson.id}
-              onClick={(event) => go(event, { kind: "start", lessonId: lesson.id })}
-            >
-              <StepBadge position={position} label={Number(lesson.id)} className="tp-n" />
-              <span className="tp-ltitle">{lesson.title}</span>
-            </a>
+          {outline.groups.map((group) => (
+            <div key={group.courseId} role="group" aria-label={group.title}>
+              <GroupLabel outline={outline} title={group.title} />
+              {group.lessons.map((lesson, position) => (
+                <a
+                  key={lesson.id}
+                  className="tp-lesson-row tp-lesson-row--ahead"
+                  href={coursePageHref(lesson.startPath)}
+                  aria-label={`${lessonLabel(lesson.id)}, ${lesson.title}`}
+                  data-lesson-id={lesson.id}
+                  onClick={(event) => go(event, { kind: "start", courseId: lesson.courseId, lessonId: lesson.id })}
+                >
+                  <StepBadge position={position} label={Number(lesson.id)} className="tp-n" />
+                  <span className="tp-ltitle">{lesson.title}</span>
+                </a>
+              ))}
+            </div>
           ))}
+          <CourseErrors errors={outline.errors} />
           <a className="tp-setup-card" href={coursePageHref("welcome")} onClick={(event) => go(event, { kind: "welcome" })}>
             {outline.status.missing ? "Your workspace is gone. Pick it again →" : "Pick your workspace →"}
           </a>
@@ -116,13 +123,40 @@ function OutlineBody({ outline, go, onNavigate }: { outline: OutlineView; go: Go
       );
     case "ready":
       return (
-        <ul className="tp-tree" aria-label="Lessons">
-          {outline.lessons.map((lesson, position) => (
-            <LessonBranch key={lesson.id} lesson={lesson} position={position} go={go} onNavigate={onNavigate} />
+        <>
+          {outline.groups.map((group) => (
+            <div key={group.courseId}>
+              <GroupLabel outline={outline} title={group.title} />
+              <ul className="tp-tree" aria-label={`Lessons of ${group.title}`}>
+                {group.lessons.map((lesson, position) => (
+                  <LessonBranch key={lesson.id} lesson={lesson} position={position} go={go} onNavigate={onNavigate} />
+                ))}
+              </ul>
+            </div>
           ))}
-        </ul>
+          <CourseErrors errors={outline.errors} />
+        </>
       );
   }
+}
+
+/** A course's name above its lessons, once there is more than one course to tell apart. */
+function GroupLabel({ outline, title }: { outline: OutlineView; title: string }) {
+  return outline.groups.length > 1 ? <div className="tp-other-project">{title}</div> : null;
+}
+
+/** Courses that could not be loaded while others could. */
+function CourseErrors({ errors }: { errors: readonly string[] }) {
+  return (
+    <>
+      {errors.map((error) => (
+        <div key={error} className="tp-outline-note tp-outline-note--error" role="alert">
+          {error}
+          <ReloadButton message={error} />
+        </div>
+      ))}
+    </>
+  );
 }
 
 function LessonBranch({ lesson, position, go, onNavigate }: { lesson: LessonNode; position: number; go: Go; onNavigate: () => void }) {
@@ -130,9 +164,9 @@ function LessonBranch({ lesson, position, go, onNavigate }: { lesson: LessonNode
   useEffect(() => {
     if (lesson.expandedByDefault) setOpen(true);
   }, [lesson.expandedByDefault]);
-  const childrenId = `tp-lesson-${lesson.id}`;
+  const childrenId = `tp-lesson-${lesson.courseId.replace(/[^\w-]/g, "_")}-${lesson.id}`;
   return (
-    <li className={`tp-lesson tp-lesson--${lesson.status}${lesson.isViewed ? " tp-lesson--viewed" : ""}`} data-lesson-id={lesson.id}>
+    <li className={`tp-lesson tp-lesson--${lesson.status}${lesson.isViewed ? " tp-lesson--viewed" : ""}`} data-lesson-id={lesson.id} data-course-id={lesson.courseId}>
       <button
         type="button"
         className="tp-lesson-head"
@@ -164,7 +198,7 @@ function LessonThreads({ lesson, go, onNavigate }: { lesson: LessonNode; go: Go;
   const openSideChat = useOpenSideChat();
   const askSide = useAskSideQuestion(onNavigate);
   const startCoach = useAction(async () => {
-    const { threadId } = await rpc.call("openCoach", { lessonId: lesson.id });
+    const { threadId } = await rpc.call("openCoach", { courseId: lesson.courseId, lessonId: lesson.id });
     refreshAll();
     navigate.toThread(threadId);
     onNavigate();
@@ -185,7 +219,7 @@ function LessonThreads({ lesson, go, onNavigate }: { lesson: LessonNode; go: Go;
           <a
             className="tp-th tp-th--page"
             href={coursePageHref(lesson.startPath)}
-            onClick={(event) => go(event, { kind: "start", lessonId: lesson.id })}
+            onClick={(event) => go(event, { kind: "start", courseId: lesson.courseId, lessonId: lesson.id })}
           >
             <span className="tp-ic" aria-hidden>
               ¶
@@ -232,7 +266,7 @@ function LessonThreads({ lesson, go, onNavigate }: { lesson: LessonNode; go: Go;
             type="button"
             className="tp-th tp-th--ask"
             disabled={askSide.pending}
-            onClick={() => void askSide.run(lesson.id, lesson.status === "current" ? focus : null)}
+            onClick={() => void askSide.run(lesson.courseId, lesson.id, lesson.status === "current" ? focus : null)}
           >
             <span className="tp-ic" aria-hidden>
               +

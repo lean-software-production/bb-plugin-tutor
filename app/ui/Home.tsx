@@ -6,7 +6,7 @@
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import type { PluginHomepageSectionProps } from "@get-bb/plugin-sdk/app";
 import { refreshAll, useAction, useCourseNavigate, useLiveRefresh, useOverview, useTutorRpc } from "../hooks.ts";
-import { continueView } from "../model/home.ts";
+import { activeCourse, continueView } from "../model/home.ts";
 import { ErrorNotice, InlineText } from "./common.tsx";
 import { Button, Character, Highlight, Meter, Panel } from "./sketch/index.ts";
 
@@ -17,15 +17,15 @@ export function ContinueSection(_props: PluginHomepageSectionProps) {
   const goCourse = useCourseNavigate();
   const overview = useOverview();
   const view = overview.data === null ? null : continueView(overview.data);
-  const lessonId = view?.kind === "continue" ? view.lessonId : null;
+  const lesson = view?.kind === "continue" ? { courseId: view.courseId, lessonId: view.lessonId } : null;
   const coachThreadId = view?.kind === "continue" ? view.coachThreadId : null;
   const toCoach = useAction(async () => {
     if (coachThreadId !== null) {
       navigate.toThread(coachThreadId);
       return;
     }
-    if (lessonId === null) return;
-    const { threadId } = await rpc.call("openCoach", { lessonId });
+    if (lesson === null) return;
+    const { threadId } = await rpc.call("openCoach", lesson);
     refreshAll();
     navigate.toThread(threadId);
   });
@@ -92,14 +92,14 @@ export function ContinueSection(_props: PluginHomepageSectionProps) {
           </p>
           <div className="tp-hs-acts">
             {view.complete ? (
-              <Button onClick={() => goCourse({ kind: "complete", lessonId: view.lessonId })}>See what's next →</Button>
+              <Button onClick={() => goCourse({ kind: "complete", courseId: view.courseId, lessonId: view.lessonId })}>See what's next →</Button>
             ) : (
               <Button disabled={toCoach.pending} onClick={() => void toCoach.run()}>
                 Continue with your coach →
               </Button>
             )}
             {view.coachThreadId === null ? (
-              <Button secondary onClick={() => goCourse({ kind: "start", lessonId: view.lessonId })}>
+              <Button secondary onClick={() => goCourse({ kind: "start", courseId: view.courseId, lessonId: view.lessonId })}>
                 Open the start page
               </Button>
             ) : null}
@@ -132,7 +132,7 @@ export function ContinueSection(_props: PluginHomepageSectionProps) {
 export function CourseAccessory() {
   useLiveRefresh();
   const overview = useOverview();
-  const current = overview.data?.current ?? null;
+  const current = overview.data === null ? null : (activeCourse(overview.data)?.current ?? null);
   if (current === null) return null;
   return (
     <span className="tutor-sk tp-accessory">

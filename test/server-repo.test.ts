@@ -12,6 +12,7 @@ import { findLesson, lessonExamples } from "../shared/derive.ts";
 import { fixtureCourseTo004 } from "../shared/fixtures.ts";
 import type { Course } from "../shared/model.ts";
 import type { Overview } from "../shared/rpc.ts";
+import { createCourseSource } from "../server/course/index.ts";
 import { git, makeRepoSandbox, type Sandbox } from "./helpers/disk.ts";
 import { makeTutorHost, PROJECT_ID, type TutorHost } from "./helpers/fake-bb.ts";
 
@@ -51,8 +52,9 @@ async function ok(host: TutorHost, name: string, input: unknown, threadId: strin
 
 async function coachFor(host: TutorHost, lessonId: string): Promise<string> {
   const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
-  const rpc = overview.current?.lessonId === lessonId || lessonId === "000" ? "openCoach" : "startNextLesson";
-  return ((await host.harness.behavior.callRpc(rpc, { lessonId })) as { threadId: string }).threadId;
+  const course = overview.courses.find((entry) => entry.lessons.some((lesson) => lesson.id === lessonId)) ?? assert.fail(`no lesson ${lessonId}`);
+  const rpc = course.current?.lessonId === lessonId || lessonId === "000" ? "openCoach" : "startNextLesson";
+  return ((await host.harness.behavior.callRpc(rpc, { courseId: course.course.id, lessonId })) as { threadId: string }).threadId;
 }
 
 /** Adopts `lessonId` with its own coach, passes every Example, completes it, and commits as the coach would. */
@@ -60,7 +62,7 @@ async function walk(setup: Setup, lessonId: string): Promise<string> {
   const { sandbox, host } = setup;
   const coach = await coachFor(host, lessonId);
   const adopted = await ok(host, "tutor_adopt_iteration", { iteration: lessonId }, coach);
-  const lesson = findLesson(sandbox.course, lessonId) ?? assert.fail(`no lesson ${lessonId}`);
+  const lesson = findLesson(lessonId === "000" ? await createCourseSource().loadBuiltin() : sandbox.course, lessonId) ?? assert.fail(`no lesson ${lessonId}`);
   for (const example of lessonExamples(lesson)) {
     await ok(host, "tutor_mark_example", { example: example.key, status: "passing", evidence: "$ ./factory\nok" }, coach);
   }
@@ -123,11 +125,11 @@ test("lessons 001-003 write into tetris/.factory and tetris/seeds; adopting 004 
 
   // Tutor reads the student from factory/ now; the older coach still works, spawned at the same folder.
   const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
-  assert.deepEqual([overview.current?.lessonId, overview.current?.iterationStatus], ["004", "WIP"]);
-  assert.equal(overview.current?.counts.passing, 1, "the unchanged Example carried over from 003");
+  assert.deepEqual([overview.courses[1]?.current?.lessonId, overview.courses[1]?.current?.iterationStatus], ["004", "WIP"]);
+  assert.equal(overview.courses[1]?.current?.counts.passing, 1, "the unchanged Example carried over from 003");
   const status = await ok(host, "tutor_status", {}, coach4);
   assert.match(status, /Factory: factory\/ \(in .*capstone-project-starter\)\./);
-  const coach3 = ((await host.harness.behavior.callRpc("openCoach", { lessonId: "003" })) as { threadId: string }).threadId;
+  const coach3 = ((await host.harness.behavior.callRpc("openCoach", { courseId: "software-factory", lessonId: "003" })) as { threadId: string }).threadId;
   assert.match(await ok(host, "tutor_status", {}, coach3), /Factory: factory\//);
   const config = await host.harness.behavior.resolveAgentConfiguration(
     makePluginAgentConfigurationContext({
@@ -164,7 +166,7 @@ test("a 004 set going outside Tutor, still in tetris/.factory, is adopted again 
   await writeFile(join(repo, "tetris/.factory/ITERATION"), "004 WIP\n");
   git(repo, "add", "-A");
   git(repo, "commit", "-q", "-m", "004 by hand");
-  const coach4 = ((await s.host.harness.behavior.callRpc("openCoach", { lessonId: "004" })) as { threadId: string }).threadId;
+  const coach4 = ((await s.host.harness.behavior.callRpc("openCoach", { courseId: "software-factory", lessonId: "004" })) as { threadId: string }).threadId;
   const adopted = await ok(s.host, "tutor_adopt_iteration", { iteration: "004" }, coach4);
   assert.match(adopted, /the factory now lives in factory\//);
   assert.equal(await readFile(join(repo, "factory/ITERATION"), "utf8"), "004 WIP\n");
@@ -196,16 +198,24 @@ test("without a course coach file, the coaching method is the starter's coach-me
   assert.match(String(spawn.prompt), /\.agents\/skills\/coach-me\/SKILL\.md/);
 });
 
-test("a repo with no factory folder refuses to adopt and says where the factory should be", async (t) => {
+test("a repo with no factory folder refuses to adopt the course's lessons and says where the factory should be; Lesson 0 goes ahead", async (t) => {
   const s = await setup(t);
   await rm(join(s.sandbox.repoRoot, "tetris/.factory"), { recursive: true });
-  const coach = await coachFor(s.host, "000");
-  const status = await ok(s.host, "tutor_status", {}, coach);
-  assert.match(status, /no factory folder/);
-  const refused = await tool(s.host, "tutor_adopt_iteration", { iteration: "000" }, coach);
+  await assert.rejects(
+    s.host.harness.behavior.callRpc("startNextLesson", { courseId: s.sandbox.course.id, lessonId: "001" }),
+    /no factory folder/,
+  );
+  // A coach thread for 001 from before the factory went missing.
+  s.host.addThread({ id: "thr_coach001", originPluginId: "tutor", metadata: { course: s.sandbox.course.id, lesson: "001", role: "coach" } });
+  assert.match(await ok(s.host, "tutor_status", {}, "thr_coach001"), /no factory folder/);
+  const refused = await tool(s.host, "tutor_adopt_iteration", { iteration: "001" }, "thr_coach001");
   assert.ok(isError(refused), text(refused));
   assert.match(text(refused), /no factory folder/);
   assert.deepEqual((await readdir(s.sandbox.repoRoot)).sort(), [".agents", ".git", "tetris"]);
+  // Lesson 0 keeps its progress in .tutor/, whatever the capstone's layout.
+  const coach = await coachFor(s.host, "000");
+  await ok(s.host, "tutor_adopt_iteration", { iteration: "000" }, coach);
+  assert.deepEqual((await readdir(s.sandbox.repoRoot)).sort(), [".agents", ".git", ".tutor", "tetris"]);
 });
 
 test("first run: the repo's top folder qualifies as the project", async (t) => {

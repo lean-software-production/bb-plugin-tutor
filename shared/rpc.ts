@@ -35,6 +35,8 @@ import {
  */
 export const tutorThreadSchema = z.object({
   id: threadIdSchema,
+  /** The course of its lesson. A Lesson 0 thread is the built-in course's, whatever course an older Tutor recorded. */
+  courseId: z.string(),
   lessonId: lessonIdSchema,
   role: z.enum(["coach", "sideChat"]),
   ruleKey: ruleKeySchema.nullable(),
@@ -128,17 +130,26 @@ export const currentStateSchema = z.object({
 });
 export type CurrentState = z.infer<typeof currentStateSchema>;
 
-/** Everything the outline, the home section and the first-run page need in one call. */
-export const overviewSchema = z.object({
-  course: courseInfoSchema.nullable(),
-  /** Why the course could not be loaded (course is then null). */
-  courseError: z.string().nullable(),
-  workspace: workspaceSchema,
-  /** The course's layout (layouts/state.ts) and whether the workspace has it. A course without one is ready; so is a missing course, with nothing to wait for. */
+/** One course in the overview, with the student's place in it. */
+export const courseOverviewSchema = z.object({
+  course: courseInfoSchema,
+  /** Tutor's built-in course (Lesson 0), listed first. */
+  builtin: z.boolean(),
+  /** The course's layout (layouts/state.ts) and whether the workspace has it. A course without one is ready. */
   layout: z.object({ id: z.enum(["capstone-factory"]).nullable(), ready: z.boolean() }),
   lessons: z.array(lessonSummarySchema),
-  /** Null while the course is missing or there is no workspace. */
+  /** Null while there is no workspace. */
   current: currentStateSchema.nullable(),
+});
+export type CourseOverview = z.infer<typeof courseOverviewSchema>;
+
+/** Everything the outline, the home section and the first-run page need in one call. */
+export const overviewSchema = z.object({
+  workspace: workspaceSchema,
+  /** Tutor's built-in course first, then the configured course. Before there is a workspace, they show what is ahead. */
+  courses: z.array(courseOverviewSchema),
+  /** Courses that could not be loaded, by path, with the reason. */
+  courseErrors: z.array(z.object({ source: z.string(), error: z.string() })),
   threads: z.array(tutorThreadSchema),
 });
 export type Overview = z.infer<typeof overviewSchema>;
@@ -171,6 +182,8 @@ export const completionSchema = z.object({
   summary: z.string().nullable(),
   next: z
     .object({
+      /** After Lesson 0, the next lesson is the first of the course that follows it. */
+      courseId: z.string(),
       id: lessonIdSchema,
       /** "ahead" until the student starts it; then the page continues it instead. */
       status: lessonStatusSchema,
@@ -210,7 +223,9 @@ export type StateChangedSignal = z.infer<typeof stateChangedSignalSchema>;
 // Contract
 // ---------------------------------------------------------------------------
 
-const lessonInput = z.object({ lessonId: lessonIdSchema });
+/** A lesson, named by its course: lesson ids repeat across courses. */
+export const lessonRefSchema = z.object({ courseId: z.string().min(1).max(64), lessonId: lessonIdSchema });
+export type LessonRef = z.infer<typeof lessonRefSchema>;
 
 export const rpcContract = defineRpcContract({
   getOverview: {
@@ -218,12 +233,12 @@ export const rpcContract = defineRpcContract({
     output: overviewSchema,
   },
   getLessonDetail: {
-    input: lessonInput,
+    input: lessonRefSchema,
     output: lessonDetailSchema,
   },
   /** Between lessons (screen 7). Fails unless the lesson is done. */
   getCompletion: {
-    input: lessonInput,
+    input: lessonRefSchema,
     output: completionSchema,
   },
   /** For the rule tab: null unless the thread is Tutor's, or a side chat BB made of a coach thread. */
@@ -246,7 +261,7 @@ export const rpcContract = defineRpcContract({
   },
   /** Finds the lesson's coach thread, or spawns it. Current or done lessons only. */
   openCoach: {
-    input: lessonInput,
+    input: lessonRefSchema,
     output: z.object({ threadId: threadIdSchema, created: z.boolean() }),
   },
   /**
@@ -254,7 +269,7 @@ export const rpcContract = defineRpcContract({
    * adopts the spec (tutor_adopt_iteration). Fails for any other lesson.
    */
   startNextLesson: {
-    input: lessonInput,
+    input: lessonRefSchema,
     output: z.object({ threadId: threadIdSchema }),
   },
   /**
@@ -263,7 +278,7 @@ export const rpcContract = defineRpcContract({
    * panel. A plugin cannot select that tab, so the frontend points to it.
    */
   startSideChat: {
-    input: z.object({ lessonId: lessonIdSchema, ruleKey: ruleKeySchema.nullable() }),
+    input: lessonRefSchema.extend({ ruleKey: ruleKeySchema.nullable() }),
     output: z.object({ coachThreadId: threadIdSchema, sideChatId: threadIdSchema }),
   },
   /**
@@ -281,7 +296,7 @@ export const rpcContract = defineRpcContract({
    * moves the focus (tutor_focus_rule), not the UI.
    */
   redirectFocus: {
-    input: z.object({ lessonId: lessonIdSchema, ruleKey: ruleKeySchema }),
+    input: lessonRefSchema.extend({ ruleKey: ruleKeySchema }),
     output: z.object({ threadId: threadIdSchema }),
   },
   /**

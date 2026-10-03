@@ -20,7 +20,6 @@ import { buildCompletion, buildLessonDetail, buildOverview } from "./views.ts";
 
 const records: TutorThreadRecord[] = fixtureThreads.map((thread, index) => ({
   ...thread,
-  courseId: "software-factory",
   projectId: "prj_factory",
   createdAt: 100 - index,
   reachedRules: thread.id === "thr_coach002" ? fixtureReachedRules : [],
@@ -32,26 +31,37 @@ test("the overview matches the fixture the frontend was built against", () => {
   assert.deepEqual(overview, fixtureOverview);
 });
 
-test("no factory project: lessons are listed from a fresh start, with no current state or threads", () => {
+test("no factory project: each course's lessons are listed from a fresh start, with no current state or threads", () => {
   assert.deepEqual(buildOverview(makeWorld(fixtureStudent, { status: "unset" }), records), fixtureOverviewNoFactory);
 });
 
-test("a missing course still gives an overview", () => {
-  const overview = buildOverview({ ...makeWorld(), course: null, pointer: null, courseError: "No course at /x." }, records);
-  assert.equal(overview.course, null);
-  assert.equal(overview.courseError, "No course at /x.");
-  assert.deepEqual(overview.lessons, []);
+test("a course that will not load still gives an overview, with the built-in course and why", () => {
+  const world = makeWorld();
+  const overview = buildOverview(
+    { ...world, available: world.available.slice(0, 1), courses: world.courses.slice(0, 1), courseErrors: [{ source: "/x", error: "No course at /x." }] },
+    records,
+  );
+  assert.deepEqual(overview.courses.map((entry) => entry.course.id), ["tutor"]);
+  assert.deepEqual(overview.courseErrors, [{ source: "/x", error: "No course at /x." }]);
+  assert.deepEqual(overview.threads, [], "the missing course's threads are not listed");
+});
+
+test("a Lesson 0 coach thread an older Tutor recorded under the course counts as the built-in course's", () => {
+  const old: TutorThreadRecord = { ...records[0]!, id: "thr_old0", courseId: "tutor", lessonId: "000", createdAt: 1 };
+  const overview = buildOverview(makeWorld(), [...records, old]);
+  assert.equal(overview.courses[0]?.lessons[0]?.coachThreadId, "thr_old0");
+  assert.equal(overview.threads.find((thread) => thread.id === "thr_old0")?.courseId, "tutor");
 });
 
 test("the current lesson carries progress, focus and its coach thread", () => {
-  const detail = buildLessonDetail(makeWorld(), "002", records);
+  const detail = buildLessonDetail(makeWorld(), fixtureCourse.id, "002", records);
   assert.deepEqual(lessonDetailSchema.parse(detail), detail);
   assert.deepEqual(detail, fixtureLessonDetail);
-  const ahead = buildLessonDetail(makeWorld(), "003", records);
+  const ahead = buildLessonDetail(makeWorld(), fixtureCourse.id, "003", records);
   assert.equal(ahead.status, "ahead");
   assert.deepEqual(ahead.progress, {});
   assert.equal(ahead.iterationStatus, null);
-  assert.throws(() => buildLessonDetail(makeWorld(), "009", records), /no lesson 009/);
+  assert.throws(() => buildLessonDetail(makeWorld(), fixtureCourse.id, "009", records), /no lesson 009/);
 });
 
 test("completion describes the finished lesson and what comes next", () => {
@@ -62,14 +72,14 @@ test("completion describes the finished lesson and what comes next", () => {
     progress: { ...progress, summary: "It checks its work." },
     problems: [],
   };
-  const completion = buildCompletion(makeWorld(done), "002", records);
+  const completion = buildCompletion(makeWorld(done), fixtureCourse.id, "002", records);
   assert.deepEqual(completionSchema.parse(completion), completion);
   assert.equal(completion.summary, "It checks its work.");
   assert.equal(completion.sideChats, 1);
   assert.equal(completion.adoptedAt, "2026-09-23T09:00:00Z");
   assert.equal(completion.next?.id, "003");
   assert.equal(completion.next?.factoryDiff?.length, fixtureCompletion.next?.factoryDiff === null ? 0 : 4);
-  assert.throws(() => buildCompletion(makeWorld(fixtureFreshStudent), "002", records), /not complete/);
+  assert.throws(() => buildCompletion(makeWorld(fixtureFreshStudent), fixtureCourse.id, "002", records), /not complete/);
 });
 
 test("a past lesson's completion counts carry-over from what was passing in that lesson", () => {
@@ -96,5 +106,12 @@ test("a past lesson's completion counts carry-over from what was passing in that
     },
     problems: [],
   };
-  assert.equal(buildCompletion(makeWorld(student), "001", records).next?.carryOver, expected);
+  assert.equal(buildCompletion(makeWorld(student), fixtureCourse.id, "001", records).next?.carryOver, expected);
+});
+
+test("after Lesson 0, what comes next is the first lesson of the course that follows it, with nothing carried over", () => {
+  const completion = buildCompletion(makeWorld(fixtureFreshStudent), "tutor", "000", records);
+  assert.deepEqual(completionSchema.parse(completion), completion);
+  assert.equal(completion.summary, "You know your way around.");
+  assert.deepEqual([completion.next?.courseId, completion.next?.id, completion.next?.status, completion.next?.carryOver], ["software-factory", "001", "current", 0]);
 });

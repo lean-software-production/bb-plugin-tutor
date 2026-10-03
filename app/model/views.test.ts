@@ -12,7 +12,7 @@ import {
   fixtureOverviewNoFactory,
   fixtureThreads,
 } from "../../shared/fixtures.ts";
-import type { Overview } from "../../shared/rpc.ts";
+import type { CourseOverview, Overview } from "../../shared/rpc.ts";
 import { CARD_KIT_TONES, progressCardView, termView } from "./cards.ts";
 import { completionView, doneRibbon, whatsNext } from "./completion.ts";
 import { continueView, doneLessonsLabel, homeDecision } from "./home.ts";
@@ -111,25 +111,35 @@ test("terms resolve against the lexicon; unknown ids fall back", () => {
 // Course root redirect and the BB home "Continue" section (5).
 // ---------------------------------------------------------------------------
 
-test("the course root sends the student where they are", () => {
-  assert.deepEqual(homeDecision(fixtureOverview), { kind: "redirect", route: { kind: "start", lessonId: "002" } });
+/** fixtureOverview with each course changed by `change`. */
+function eachCourse(change: (entry: CourseOverview) => CourseOverview): Overview {
+  return { ...fixtureOverview, courses: fixtureOverview.courses.map(change) };
+}
+
+test("the course root sends the student where they are: Lesson 0 first, then the course after it", () => {
+  assert.deepEqual(homeDecision(fixtureOverview), { kind: "redirect", route: { kind: "start", courseId: "software-factory", lessonId: "002" } });
   assert.deepEqual(homeDecision(fixtureOverviewNoFactory), { kind: "redirect", route: { kind: "welcome" } });
-  const done: Overview = {
-    ...fixtureOverview,
-    current: fixtureOverview.current === null ? null : { ...fixtureOverview.current, iterationStatus: "Done" },
-  };
-  assert.deepEqual(homeDecision(done), { kind: "redirect", route: { kind: "complete", lessonId: "002" } });
-  assert.deepEqual(homeDecision({ ...fixtureOverview, course: null, courseError: "No course.yaml or ledger." }), {
+  const done = eachCourse((entry) => (entry.builtin || entry.current === null ? entry : { ...entry, current: { ...entry.current, iterationStatus: "Done" } }));
+  assert.deepEqual(homeDecision(done), { kind: "redirect", route: { kind: "complete", courseId: "software-factory", lessonId: "002" } });
+  const onZero = eachCourse((entry) =>
+    !entry.builtin || entry.current === null
+      ? entry
+      : { ...entry, lessons: entry.lessons.map((lesson) => ({ ...lesson, status: "current" as const })), current: { ...entry.current, iterationStatus: "WIP" } },
+  );
+  assert.deepEqual(homeDecision(onZero), { kind: "redirect", route: { kind: "start", courseId: "tutor", lessonId: "000" } });
+  const alone: Overview = { ...fixtureOverview, courses: fixtureOverview.courses.filter((entry) => entry.builtin) };
+  assert.deepEqual(homeDecision(alone), { kind: "redirect", route: { kind: "complete", courseId: "tutor", lessonId: "000" } }, "Lesson 0 done, and no other course");
+  assert.deepEqual(homeDecision({ ...fixtureOverview, courses: [], courseErrors: [{ source: "/x", error: "No course.yaml or ledger." }] }), {
     kind: "error",
     message: "No course.yaml or ledger.",
   });
-  assert.deepEqual(homeDecision({ ...fixtureOverview, course: null, courseError: null }), {
+  assert.deepEqual(homeDecision({ ...fixtureOverview, courses: [] }), {
     kind: "error",
     message: "We couldn't load the course.",
   });
-  assert.deepEqual(homeDecision({ ...fixtureOverview, current: null }), {
+  assert.deepEqual(homeDecision(eachCourse((entry) => (entry.builtin ? entry : { ...entry, current: null }))), {
     kind: "redirect",
-    route: { kind: "start", lessonId: "000" },
+    route: { kind: "start", courseId: "software-factory", lessonId: "001" },
   });
 });
 
@@ -152,7 +162,7 @@ test("the Continue section reads from the overview alone", () => {
     courseTitle: "Build a software factory",
     missing: false,
   });
-  assert.equal(continueView({ ...fixtureOverview, course: null, courseError: null }).kind, "error");
+  assert.equal(continueView({ ...fixtureOverview, courses: [] }).kind, "error");
 });
 
 test("done lessons read as a range", () => {
@@ -184,7 +194,7 @@ test("the completion page recaps the lesson and introduces the next", () => {
   assert.equal(view.next?.diff?.title, "FACTORY.md — what changed since lesson 1");
   assert.equal(view.next?.started, false);
   assert.equal(view.next?.startLabel, "Start lesson 2 with your coach →");
-  assert.equal(view.next?.startPath, "start/002");
+  assert.equal(view.next?.startPath, "start/software-factory/002");
 
   const sameDay = completionView(
     {
@@ -246,23 +256,26 @@ test("first run confirms a detected factory, or explains how to set one up", () 
 // ---------------------------------------------------------------------------
 
 test("rule tab params are validated field by field", () => {
-  assert.deepEqual(parseRuleTabParams({ lessonId: "002", ruleKey: FOCUS }), { lessonId: "002", ruleKey: FOCUS });
-  assert.deepEqual(parseRuleTabParams({ lessonId: "2", ruleKey: "../etc" }), { lessonId: null, ruleKey: null });
-  assert.deepEqual(parseRuleTabParams(["002"]), { lessonId: null, ruleKey: null });
-  assert.deepEqual(parseRuleTabParams(null), { lessonId: null, ruleKey: null });
+  assert.deepEqual(parseRuleTabParams({ courseId: "software-factory", lessonId: "002", ruleKey: FOCUS }), { courseId: "software-factory", lessonId: "002", ruleKey: FOCUS });
+  assert.deepEqual(parseRuleTabParams({ lessonId: "002", ruleKey: FOCUS }), { courseId: null, lessonId: "002", ruleKey: FOCUS }, "a tab from before courses");
+  assert.deepEqual(parseRuleTabParams({ courseId: "x".repeat(65), lessonId: "2", ruleKey: "../etc" }), { courseId: null, lessonId: null, ruleKey: null });
+  assert.deepEqual(parseRuleTabParams(["002"]), { courseId: null, lessonId: null, ruleKey: null });
+  assert.deepEqual(parseRuleTabParams(null), { courseId: null, lessonId: null, ruleKey: null });
 });
 
 test("the rule tab targets explicit params, else the thread's own lesson and Rule", () => {
   const side = fixtureThreads[1] ?? null;
   const coach = fixtureThreads[0] ?? null;
-  assert.deepEqual(ruleTabTarget({ lessonId: null, ruleKey: null }, side), { lessonId: "002", ruleKey: FOCUS });
-  assert.deepEqual(ruleTabTarget({ lessonId: null, ruleKey: null }, coach), { lessonId: "002", ruleKey: null });
-  assert.deepEqual(ruleTabTarget({ lessonId: "001", ruleKey: null }, side), { lessonId: "001", ruleKey: null });
-  assert.equal(ruleTabTarget({ lessonId: null, ruleKey: null }, null), null);
+  const none = { courseId: null, lessonId: null, ruleKey: null };
+  assert.deepEqual(ruleTabTarget(none, side), { courseId: "software-factory", lessonId: "002", ruleKey: FOCUS });
+  assert.deepEqual(ruleTabTarget(none, coach), { courseId: "software-factory", lessonId: "002", ruleKey: null });
+  assert.deepEqual(ruleTabTarget({ ...none, lessonId: "001" }, side), { courseId: null, lessonId: "001", ruleKey: null }, "another lesson's course isn't the thread's to say");
+  assert.deepEqual(ruleTabTarget({ courseId: "software-factory", lessonId: "001", ruleKey: null }, side), { courseId: "software-factory", lessonId: "001", ruleKey: null });
+  assert.equal(ruleTabTarget(none, null), null);
 });
 
 test("the rule tab shows the Rule and its Examples", () => {
-  const view = ruleTabView(fixtureLessonDetail, { lessonId: "002", ruleKey: null }, false);
+  const view = ruleTabView(fixtureLessonDetail, { courseId: "software-factory", lessonId: "002", ruleKey: null }, false);
   assert.equal(view.kind, "rule");
   if (view.kind !== "rule") return;
   assert.equal(view.eyebrow, "Rule in focus · Validation");
@@ -272,16 +285,16 @@ test("the rule tab shows the Rule and its Examples", () => {
     view.examples.map((example) => example.detail),
     ["Passing", "Not yet — Crashed in the doer loop instead of retrying when the validator said no."],
   );
-  assert.equal(view.startPath, "start/002");
+  assert.equal(view.startPath, "start/software-factory/002");
   const keys = fixtureLessonDetail.lesson.features.flatMap((feature) => feature.rules.map((rule) => rule.key));
   assert.equal(view.number, keys.indexOf(FOCUS) + 1, "the Rule's number across the lesson, for its step badge");
 
-  const spun = ruleTabView(fixtureLessonDetail, { lessonId: "002", ruleKey: "planning/the-planner-writes-a-plan" }, true);
+  const spun = ruleTabView(fixtureLessonDetail, { courseId: "software-factory", lessonId: "002", ruleKey: "planning/the-planner-writes-a-plan" }, true);
   assert.equal(spun.kind === "rule" ? spun.eyebrow : null, "Spun off from · Planning");
   assert.equal(spun.kind === "rule" ? spun.examples[0]?.detail : null, "Passing · carried over");
   assert.equal(spun.kind === "rule" ? spun.number : null, 1);
-  assert.deepEqual(ruleTabView({ ...fixtureLessonDetail, focus: null }, { lessonId: "002", ruleKey: null }, false), {
+  assert.deepEqual(ruleTabView({ ...fixtureLessonDetail, focus: null }, { courseId: "software-factory", lessonId: "002", ruleKey: null }, false), {
     kind: "no-rule",
-    startPath: "start/002",
+    startPath: "start/software-factory/002",
   });
 });

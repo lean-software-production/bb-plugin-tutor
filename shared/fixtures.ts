@@ -1,12 +1,13 @@
 // Small, schema-valid fixtures so the backend and the frontend can build and
-// test before the content builder's real course loader lands. The course is a
-// cut-down "Build a software factory": Lesson 0, then 001–003, with the
-// student in the middle of 002. shared/fixtures.test.ts checks every fixture
+// test before the content builder's real course loader lands. Tutor's
+// built-in course holds Lesson 0, which the student has done; the course is a
+// cut-down "Build a software factory": 001–003, with the student in the
+// middle of 002. shared/fixtures.test.ts checks every fixture
 // against its schema, so they cannot drift from the contract.
 //
 // Hashes here are fake (a stable digest of the Example's name and steps, not
 // sha256 of the normalised text); only equality matters to the model.
-import { BUILTIN_LESSON_ID, coachThreadTitle } from "./constants.ts";
+import { BUILTIN_COURSE_ID, BUILTIN_LESSON_ID, coachThreadTitle } from "./constants.ts";
 import { countExamples, lessonExamples, ruleStatus } from "./derive.ts";
 import { exampleKey, featureSlugFromPath, ruleKey, uniqueSlugs } from "./keys.ts";
 import type {
@@ -25,6 +26,7 @@ import type {
   Workspace,
   CandidateProject,
   Completion,
+  CourseOverview,
   FeatureOutline,
   LessonDetail,
   Overview,
@@ -361,13 +363,26 @@ export const fixtureLexicon: LexiconEntry[] = [
   },
 ];
 
+/** Tutor's built-in course: Lesson 0 alone, with no layout and no lexicon. */
+export const fixtureBuiltinCourse: Course = {
+  id: BUILTIN_COURSE_ID,
+  title: "Using your tutor",
+  description: null,
+  root: "/usr/local/share/tutor/plugin/server/course/builtin",
+  coachPath: null,
+  lessons: [lesson0],
+  lexicon: [],
+  source: "course.yaml",
+  layout: null,
+};
+
 export const fixtureCourse: Course = {
   id: "software-factory",
   title: "Build a software factory",
   description: "Seven lessons, one factory.",
   root: FIXTURE_COURSE_ROOT,
   coachPath: `${FIXTURE_COURSE_ROOT}/.agents/coach-me.md`,
-  lessons: [lesson0, lesson1, lesson2, lesson3],
+  lessons: [lesson1, lesson2, lesson3],
   lexicon: fixtureLexicon,
   source: "ledger",
   layout: "capstone-factory",
@@ -388,7 +403,7 @@ export const fixtureLayoutlessCourse: Course = {
 export const fixtureCourseTo004: Course = { ...fixtureCourse, lessons: [...fixtureCourse.lessons, lesson4] };
 
 function examplesOf(lessonId: string): Example[] {
-  const found = fixtureCourse.lessons.find((h) => h.id === lessonId);
+  const found = [lesson0, ...fixtureCourse.lessons].find((h) => h.id === lessonId);
   if (found === undefined) throw new Error(`fixture lesson ${lessonId} missing`);
   return lessonExamples(found);
 }
@@ -430,6 +445,20 @@ export const fixtureStudent: StudentState = {
   problems: [],
 };
 
+/** Lesson 0, done: every Example passing, in .tutor/progress.yaml. */
+export const fixtureLesson0Student: StudentState = {
+  iteration: null,
+  progress: {
+    iteration: BUILTIN_LESSON_ID,
+    adopted: "2026-09-21T09:00:00Z",
+    summary: "You know your way around.",
+    examples: Object.fromEntries(
+      examplesOf(BUILTIN_LESSON_ID).map((example) => progressFor(example, { status: "passing", evidence: "seen in the outline", at: "2026-09-21T09:30:00Z" })),
+    ),
+  },
+  problems: [],
+};
+
 /** A factory repo nobody has coached yet. */
 export const fixtureFreshStudent: StudentState = { iteration: null, progress: null, problems: [] };
 
@@ -441,9 +470,10 @@ export const fixtureWorkspace: Workspace = {
 };
 
 export const fixtureThreads: TutorThread[] = [
-  { id: "thr_coach002", lessonId: "002", role: "coach", ruleKey: null, title: coachThreadTitle("002"), coachThreadId: "thr_coach002", fork: false },
+  { id: "thr_coach002", courseId: fixtureCourse.id, lessonId: "002", role: "coach", ruleKey: null, title: coachThreadTitle("002"), coachThreadId: "thr_coach002", fork: false },
   {
     id: "thr_side002",
+    courseId: fixtureCourse.id,
     lessonId: "002",
     role: "sideChat",
     ruleKey: fixtureStudent.progress?.focus ?? null,
@@ -451,7 +481,7 @@ export const fixtureThreads: TutorThread[] = [
     coachThreadId: "thr_coach002",
     fork: false,
   },
-  { id: "thr_coach001", lessonId: "001", role: "coach", ruleKey: null, title: coachThreadTitle("001"), coachThreadId: "thr_coach001", fork: false },
+  { id: "thr_coach001", courseId: fixtureCourse.id, lessonId: "001", role: "coach", ruleKey: null, title: coachThreadTitle("001"), coachThreadId: "thr_coach001", fork: false },
 ];
 
 /** The Rules the Lesson 002 coach thread has focused: its sections can be jumped to. */
@@ -465,14 +495,15 @@ interface OutlineInput {
 
 const NOTHING_RECORDED: OutlineInput = { progress: {}, focus: null, reached: [] };
 
-/** Lesson 002 is the one under way; the others have nothing recorded. */
+/** Lesson 002 is the one under way, and Lesson 0 is done; the others have nothing recorded. */
 function recorded(lessonId: string): OutlineInput {
+  if (lessonId === BUILTIN_LESSON_ID) return { progress: fixtureLesson0Student.progress?.examples ?? {}, focus: null, reached: [] };
   if (lessonId !== "002") return NOTHING_RECORDED;
   return { progress: fixtureStudent.progress?.examples ?? {}, focus: fixtureStudent.progress?.focus ?? null, reached: fixtureReachedRules };
 }
 
 function outline(lessonId: string, { progress, focus, reached }: OutlineInput = recorded(lessonId)): FeatureOutline[] {
-  const hw = fixtureCourse.lessons.find((h) => h.id === lessonId);
+  const hw = [lesson0, ...fixtureCourse.lessons].find((h) => h.id === lessonId);
   return (hw?.features ?? []).map((f) => ({
     slug: f.slug,
     name: f.name,
@@ -502,12 +533,42 @@ function outline(lessonId: string, { progress, focus, reached }: OutlineInput = 
 
 const coachByLesson: Readonly<Record<string, string>> = { "001": "thr_coach001", "002": "thr_coach002" };
 
-const statusByLesson = { "000": "done", "001": "done", "002": "current", "003": "ahead" } as const;
+const statusByLesson = { "001": "done", "002": "current", "003": "ahead" } as const;
 
-export const fixtureOverview: Overview = {
+/** The built-in course in the overview: Lesson 0 done, with no coach thread open. */
+export const fixtureBuiltinCourseOverview: CourseOverview = {
+  course: { id: fixtureBuiltinCourse.id, title: fixtureBuiltinCourse.title, description: fixtureBuiltinCourse.description },
+  builtin: true,
+  layout: { id: null, ready: true },
+  lessons: [
+    {
+      id: lesson0.id,
+      title: lesson0.title,
+      set: lesson0.set,
+      builtin: true,
+      status: "done",
+      counts: countExamples(lessonExamples(lesson0), fixtureLesson0Student.progress?.examples ?? {}),
+      coachThreadId: null,
+      outline: outline(lesson0.id),
+      needsLayout: false,
+    },
+  ],
+  current: {
+    lessonId: lesson0.id,
+    iterationStatus: "Done",
+    focus: null,
+    focusRuleName: null,
+    counts: countExamples(lessonExamples(lesson0), fixtureLesson0Student.progress?.examples ?? {}),
+    outline: outline(lesson0.id),
+    coachThreadId: null,
+    lastNote: null,
+  },
+};
+
+/** The capstone course in the overview: mid-way through 002. */
+export const fixtureCourseOverview: CourseOverview = {
   course: { id: fixtureCourse.id, title: fixtureCourse.title, description: fixtureCourse.description },
-  courseError: null,
-  workspace: fixtureWorkspace,
+  builtin: false,
   layout: { id: "capstone-factory", ready: true },
   lessons: fixtureCourse.lessons.map((hw) => ({
     id: hw.id,
@@ -538,24 +599,38 @@ export const fixtureOverview: Overview = {
             at: FIXTURE_NOW,
           },
   },
+};
+
+export const fixtureOverview: Overview = {
+  workspace: fixtureWorkspace,
+  courses: [fixtureBuiltinCourseOverview, fixtureCourseOverview],
+  courseErrors: [],
   threads: fixtureThreads,
 };
 
-/** First run: course loaded, no factory project yet. */
+/** A course before there is a workspace: nothing recorded, so each course's first lesson is where it starts. */
+function preview(entry: CourseOverview, ready: boolean): CourseOverview {
+  return {
+    ...entry,
+    layout: { id: entry.layout.id, ready },
+    lessons: entry.lessons.map((hw, index) => ({
+      ...hw,
+      status: index === 0 ? "current" : "ahead",
+      counts: countExamples(examplesOf(hw.id), {}),
+      coachThreadId: null,
+      outline: outline(hw.id, NOTHING_RECORDED),
+      needsLayout: !hw.builtin && !ready,
+    })),
+    current: null,
+  };
+}
+
+/** First run: courses loaded, no workspace yet. */
 export const fixtureOverviewNoFactory: Overview = {
-  ...fixtureOverview,
   workspace: { status: "unset" },
   // No workspace, so the factory isn't there yet: the course's own lessons wait for it.
-  layout: { id: "capstone-factory", ready: false },
-  lessons: fixtureOverview.lessons.map((hw) => ({
-    ...hw,
-    status: hw.id === BUILTIN_LESSON_ID ? "current" : "ahead",
-    counts: countExamples(examplesOf(hw.id), {}),
-    coachThreadId: null,
-    outline: outline(hw.id, NOTHING_RECORDED),
-    needsLayout: !hw.builtin,
-  })),
-  current: null,
+  courses: [preview(fixtureBuiltinCourseOverview, true), preview(fixtureCourseOverview, false)],
+  courseErrors: [],
   threads: [],
 };
 
@@ -577,6 +652,7 @@ export const fixtureCompletion: Completion = {
   adoptedAt: "2026-09-22T09:00:00Z",
   summary: "Your factory turns a seed into a plan and keeps a plan it already has.",
   next: {
+    courseId: fixtureCourse.id,
     id: "002",
     status: "ahead",
     title: lesson2.title,

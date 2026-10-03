@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { lstat, mkdir, readFile, readlink, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
-import { fixtureCourseTo004 } from "../../shared/fixtures.ts";
+import { fixtureBuiltinCourse, fixtureCourseTo004 } from "../../shared/fixtures.ts";
 import type { Lesson } from "../../shared/model.ts";
 import { git, makeRepoSandbox, type Sandbox } from "../../test/helpers/disk.ts";
 import { adoptLesson, checkFactoryMove, moveFactory, needsFactoryMove } from "./factory-move.ts";
@@ -67,7 +67,7 @@ test("the move at 004 is due only in a starter clone whose factory is still tetr
   const early = await resolveLayout(sandbox.repoRoot, disk);
   assert.equal(needsFactoryMove(early, lessonOf(sandbox, "003")), false);
   assert.equal(needsFactoryMove(early, lessonOf(sandbox, "004")), true);
-  assert.equal(needsFactoryMove(early, lessonOf(sandbox, "000")), false);
+  assert.equal(needsFactoryMove(early, fixtureBuiltinCourse.lessons[0] ?? assert.fail("no Lesson 0")), false);
   // A factory that is its own project (v0.1.0) is never moved.
   assert.equal(needsFactoryMove(await resolveLayout(sandbox.factoryRoot, disk), lessonOf(sandbox, "004")), false);
   git(sandbox.repoRoot, "mv", "tetris/.factory", "factory");

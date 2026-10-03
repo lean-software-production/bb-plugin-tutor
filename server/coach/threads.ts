@@ -4,7 +4,7 @@
 // and to know a verified coach thread's lesson (auth.ts); it is writable by
 // the thread's own agent, so it never decides whether a thread is Tutor's.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { coachThreadTitle } from "../../shared/constants.ts";
+import { BUILTIN_COURSE_ID, BUILTIN_LESSON_ID, coachThreadTitle } from "../../shared/constants.ts";
 import { RULE_KEY_PATTERN } from "../../shared/keys.ts";
 import {
   MAX_REACHED_RULES,
@@ -63,7 +63,6 @@ export interface ThreadRow {
 }
 
 export interface TutorThreadRecord extends TutorThread {
-  courseId: string;
   projectId: string;
   createdAt: number;
   /** Coach threads only: the Rules the coach has focused there, oldest first. */
@@ -91,6 +90,15 @@ export function reachedRulesOf(metadata: unknown): string[] {
   return [...new Set(keys)].slice(0, MAX_REACHED_RULES);
 }
 
+/**
+ * The course a thread's metadata names. Lesson 0 was part of every course
+ * before it became Tutor's built-in course, so a Lesson 0 thread belongs to
+ * the built-in course whatever course its metadata names.
+ */
+export function threadCourse(courseId: string, lessonId: string): string {
+  return lessonId === BUILTIN_LESSON_ID ? BUILTIN_COURSE_ID : courseId;
+}
+
 /** The thread as Tutor lists it, or null when its metadata is not Tutor's. */
 export function toTutorThread(row: ThreadRow, metadata: unknown): TutorThreadRecord | null {
   const parsed = coachThreadMetadataSchema.safeParse(metadata);
@@ -98,13 +106,13 @@ export function toTutorThread(row: ThreadRow, metadata: unknown): TutorThreadRec
   if (!parsed.success || role === null) return null;
   return {
     id: row.id,
+    courseId: threadCourse(parsed.data.course, parsed.data.lesson),
     lessonId: parsed.data.lesson,
     role,
     ruleKey: role === "coach" ? null : (parsed.data.ruleKey ?? null),
     title: row.title,
     coachThreadId: row.parentThreadId ?? row.sourceThreadId ?? row.id,
     fork: row.parentThreadId === null && row.sourceThreadId !== null,
-    courseId: parsed.data.course,
     projectId: row.projectId,
     createdAt: row.createdAt,
     reachedRules: role === "coach" ? reachedRulesOf(metadata) : [],
@@ -152,44 +160,52 @@ async function tutorThreadsOf(
   return records.filter((record) => record !== null).sort((a, b) => b.createdAt - a.createdAt);
 }
 
-/** The lesson's coach thread: the newest one wins. Side chats and side threads never do. */
+/**
+ * The lesson's coach thread: the newest one wins. Side chats and side threads
+ * never do. A Lesson 0 coach thread counts whatever course it names (threadCourse).
+ */
 export function findCoachThread(
   threads: readonly TutorThreadRecord[],
   courseId: string,
   lessonId: string,
 ): TutorThreadRecord | undefined {
   return threads
-    .filter((thread) => thread.role === "coach" && thread.courseId === courseId && thread.lessonId === lessonId)
+    .filter(
+      (thread) =>
+        thread.role === "coach" &&
+        thread.lessonId === lessonId &&
+        (lessonId === BUILTIN_LESSON_ID || threadCourse(thread.courseId, thread.lessonId) === courseId),
+    )
     .reduce<TutorThreadRecord | undefined>((newest, thread) => (newest === undefined || thread.createdAt > newest.createdAt ? thread : newest), undefined);
 }
 
 /**
- * The student's repo itself, so the coach edits the tree Tutor reads
- * spec/PROGRESS.yaml from. Side chats reuse the coach's environment.
+ * The student's workspace itself, so the coach edits the tree Tutor reads
+ * progress from. Side chats reuse the coach's environment.
  */
-function factoryEnvironment(factory: FactoryLocation) {
-  return { type: "host", hostId: factory.hostId, workspace: { type: "unmanaged", path: factory.root } } as const;
+function workspaceEnvironment(workspace: WorkspaceLocation) {
+  return { type: "host", hostId: workspace.hostId, workspace: { type: "unmanaged", path: workspace.root } } as const;
 }
 
-/** The factory repo: every Tutor thread works directly in it, never in a worktree of its own. */
-export interface FactoryLocation {
+/** The workspace's folder on its machine: every Tutor thread works directly in it, never in a worktree of its own. */
+export interface WorkspaceLocation {
   root: string;
   hostId: string;
 }
 
 export interface SpawnCoach {
   projectId: string;
-  factory: FactoryLocation;
+  workspace: WorkspaceLocation;
   courseId: string;
   lessonId: string;
   prompt: string;
 }
 
 export async function spawnCoachThread(sdk: Sdk, spawn: SpawnCoach): Promise<string> {
-  const pluginMetadata: CoachThreadMetadata = { course: spawn.courseId, lesson: spawn.lessonId, role: "coach" };
+  const pluginMetadata: CoachThreadMetadata = { course: threadCourse(spawn.courseId, spawn.lessonId), lesson: spawn.lessonId, role: "coach" };
   const thread = await sdk.threads.spawn({
     projectId: spawn.projectId,
-    environment: factoryEnvironment(spawn.factory),
+    environment: workspaceEnvironment(spawn.workspace),
     title: coachThreadTitle(spawn.lessonId),
     pluginMetadata,
     prompt: spawn.prompt,

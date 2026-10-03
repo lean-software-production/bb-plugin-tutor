@@ -52,16 +52,17 @@ async function ok(host: TutorHost, name: string, input: unknown, threadId: strin
 
 async function coachFor(host: TutorHost, lessonId: string): Promise<string> {
   const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
-  const rpc = overview.current?.lessonId === lessonId || lessonId === "000" ? "openCoach" : "startNextLesson";
-  return ((await host.harness.behavior.callRpc(rpc, { lessonId })) as { threadId: string }).threadId;
+  const course = overview.courses.find((entry) => entry.lessons.some((lesson) => lesson.id === lessonId)) ?? assert.fail(`no lesson ${lessonId}`);
+  const rpc = course.current?.lessonId === lessonId || lessonId === "000" ? "openCoach" : "startNextLesson";
+  return ((await host.harness.behavior.callRpc(rpc, { courseId: course.course.id, lessonId })) as { threadId: string }).threadId;
 }
 
-/** Every file under `dir` but .git, with a symlink's target or a file's contents; PROGRESS.yaml is Tutor's alone, and ITERATION is compared by lesson only. */
+/** Every file under `dir` but .git, with a symlink's target or a file's contents; PROGRESS.yaml and .tutor/ are Tutor's alone, and ITERATION is compared by lesson only. */
 async function tree(dir: string, prefix = ""): Promise<string[]> {
   const out: string[] = [];
   for (const entry of (await readdir(join(dir, prefix), { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) {
     const path = prefix === "" ? entry.name : `${prefix}/${entry.name}`;
-    if (path === ".git" || entry.name === "PROGRESS.yaml") continue;
+    if (path === ".git" || path === ".tutor" || entry.name === "PROGRESS.yaml") continue;
     if (entry.isSymbolicLink()) out.push(`${path} -> ${await readlink(join(dir, path))}`);
     else if (entry.isDirectory()) out.push(`${path}/`, ...(await tree(dir, path)));
     else if (entry.name === "ITERATION") out.push(`${path}: ${(await readFile(join(dir, path), "utf8")).split(" ")[0]}`);
@@ -93,6 +94,7 @@ describe("Tutor in a capstone-project-starter clone", { skip }, () => {
       await cp(from, to, { recursive: true, verbatimSymlinks: true });
     }
     const course: Course = await createCourseSource().loadCourse(courseRoot);
+    const builtin = await createCourseSource().loadBuiltin();
 
     // Tutor: the BB project is the clone's top folder; each lesson is adopted, passed, completed and committed.
     const host = await makeTutorHost(course, tutorRepo, undefined, { projectName: "capstone-project-starter" });
@@ -100,7 +102,7 @@ describe("Tutor in a capstone-project-starter clone", { skip }, () => {
     for (const id of ["000", "001", "002", "003"]) {
       const coach = await coachFor(host, id);
       await ok(host, "tutor_adopt_iteration", { iteration: id }, coach);
-      const lesson = findLesson(course, id) ?? assert.fail(`no lesson ${id}`);
+      const lesson = findLesson(id === "000" ? builtin : course, id) ?? assert.fail(`no lesson ${id}`);
       for (const example of lessonExamples(lesson)) {
         await ok(host, "tutor_mark_example", { example: example.key, status: "passing", evidence: "$ ./factory\nok" }, coach);
       }

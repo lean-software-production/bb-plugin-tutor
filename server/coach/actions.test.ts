@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { parseProgressCard } from "../../shared/directives.ts";
 import { findLesson, lessonExamples } from "../../shared/derive.ts";
-import { fixtureCourse, fixtureFreshStudent, fixtureLayoutlessCourse, fixtureStudent } from "../../shared/fixtures.ts";
+import { fixtureBuiltinCourse, fixtureCourse, fixtureFreshStudent, fixtureLayoutlessCourse, fixtureStudent } from "../../shared/fixtures.ts";
 import type { StudentState } from "../../shared/model.ts";
-import { courseLayout, makeWorld, repoLayout } from "../../test/helpers/world.ts";
+import { courseLayout, makeWorld, repoLayout, withCourse } from "../../test/helpers/world.ts";
 import {
   adoptAction,
   adoptionTargets,
@@ -21,7 +21,14 @@ import {
 const NOW = "2026-09-25T11:00:00Z";
 
 function stateOf(student: StudentState = fixtureStudent): CoachState {
-  const state = coachStateOf(makeWorld(student));
+  const state = coachStateOf(makeWorld(student), fixtureCourse.id);
+  assert.ok(!("error" in state));
+  return state;
+}
+
+/** The built-in course's state, Lesson 0's progress being `lesson0`. */
+function builtinStateOf(lesson0: StudentState): CoachState {
+  const state = coachStateOf(makeWorld(fixtureStudent, undefined, undefined, lesson0), fixtureBuiltinCourse.id);
   assert.ok(!("error" in state));
   return state;
 }
@@ -41,9 +48,12 @@ assert.ok(planFromSeed && keptPlan && rightFirstTime && wrongFirstTime && neverS
 const validationRule = lesson2.features[1]?.rules[0];
 assert.ok(validationRule !== undefined);
 
-test("coachStateOf refuses without a course or a workspace", () => {
-  assert.match((coachStateOf({ ...makeWorld(), course: null, courseError: "no ledger" }) as { error: string }).error, /no ledger/);
-  assert.match((coachStateOf(makeWorld(fixtureStudent, { status: "unset" })) as { error: string }).error, /No workspace/);
+test("coachStateOf refuses without the caller's course or a workspace", () => {
+  const noCourse = { ...makeWorld(), courses: makeWorld().courses.slice(0, 1), courseErrors: [{ source: "/x", error: "no ledger" }] };
+  assert.match((coachStateOf(noCourse, fixtureCourse.id) as { error: string }).error, /no ledger/);
+  assert.match((coachStateOf(makeWorld(fixtureStudent, { status: "unset" }), fixtureCourse.id) as { error: string }).error, /No workspace/);
+  const builtin = coachStateOf(noCourse, fixtureBuiltinCourse.id);
+  assert.ok(!("error" in builtin), "Lesson 0 needs no other course");
 });
 
 test("marking the last Example of a Rule passing gives a rule-passing card naming the next Rule", () => {
@@ -94,9 +104,12 @@ test("only the coach thread moves the focus, and the Rule card leads its next me
   assert.match(onCoach.text, /\n::tutor-progress\{kind="focus"[^\n]*\}$/);
 });
 
-test("adoption: Lesson 0 or the first lesson to begin with, then the one after a Done one", () => {
-  assert.deepEqual(adoptionTargets(fixtureCourse, { lessonId: "000", iterationStatus: "not-started" }), ["000", "001"]);
-  assert.deepEqual(adoptionTargets(fixtureCourse, { lessonId: "000", iterationStatus: "WIP" }), ["001"]);
+test("adoption: each course's first lesson to begin with, then the one after a Done one", () => {
+  assert.deepEqual(adoptionTargets(fixtureBuiltinCourse, { lessonId: "000", iterationStatus: "not-started" }), ["000"]);
+  assert.deepEqual(adoptionTargets(fixtureBuiltinCourse, { lessonId: "000", iterationStatus: "WIP" }), []);
+  assert.deepEqual(adoptionTargets(fixtureBuiltinCourse, { lessonId: "000", iterationStatus: "Done" }), []);
+  assert.deepEqual(adoptionTargets(fixtureCourse, { lessonId: "001", iterationStatus: "not-started" }), ["001"]);
+  assert.deepEqual(adoptionTargets(fixtureLayoutlessCourse, { lessonId: "001", iterationStatus: "not-started" }), ["001"]);
   assert.deepEqual(adoptionTargets(fixtureCourse, { lessonId: "002", iterationStatus: "WIP" }), []);
   assert.deepEqual(adoptionTargets(fixtureCourse, { lessonId: "002", iterationStatus: "Done" }), ["003"]);
   assert.deepEqual(adoptionTargets(fixtureCourse, { lessonId: "003", iterationStatus: "Done" }), []);
@@ -113,7 +126,7 @@ test("adopting a real lesson copies the spec and writes WIP; Lesson 0 writes pro
   assert.match(outcome.text, /stand-ins\/ is refreshed from the course, and ITERATION reads "003 WIP"\./);
   assert.match(outcome.text, /Commit spec\/, \.\.\/seeds\/ and ITERATION with the message "Adopt spec for iteration 003"/);
 
-  const builtin = adoptAction(stateOf(fixtureFreshStudent), { iteration: "000" }, NOW);
+  const builtin = adoptAction(builtinStateOf(fixtureFreshStudent), { iteration: "000" }, NOW);
   assert.ok("progress" in builtin);
   assert.equal(builtin.iteration, undefined);
   assert.equal(builtin.adopt, undefined);
@@ -136,7 +149,7 @@ test("completing writes Done and the summary; Lesson 0 needs every Example to ho
   assert.ok("error" in wrong);
 
   const onZero: StudentState = { iteration: null, progress: { iteration: "000", examples: {} }, problems: [] };
-  const zero = completeAction(stateOf(onZero), { iteration: "000", summary: "x" });
+  const zero = completeAction(builtinStateOf(onZero), { iteration: "000", summary: "x" });
   assert.ok("error" in zero && /Lesson 0/.test(zero.error));
 });
 
@@ -177,22 +190,26 @@ test("a WIP lesson whose spec/PROGRESS.yaml is damaged is never adopted again: t
 });
 
 test("a capstone course's lessons wait for its layout, with the layout's own reason; Lesson 0 does not", () => {
-  const world = makeWorld(fixtureStudent);
   const blocked = "This repo has no factory folder.";
-  const notReady = { ...world, layout: courseLayout(fixtureCourse, "/ws", { ...repoLayout("/ws"), problems: [blocked], blocked }) };
+  const layout = courseLayout(fixtureCourse, "/ws", { ...repoLayout("/ws"), problems: [blocked], blocked });
   // tutor_status still reads the state; only the tools that change progress refuse.
-  const current = coachStateOf(notReady);
+  const current = coachStateOf(withCourse(makeWorld(fixtureStudent), fixtureCourse.id, { layout }), fixtureCourse.id);
   assert.ok(!("error" in current), "error" in current ? current.error : "");
   assert.equal(layoutError(current), blocked);
-  const onZero = coachStateOf({ ...makeWorld(fixtureFreshStudent), layout: notReady.layout });
+  const fresh = withCourse(makeWorld(fixtureFreshStudent, undefined, undefined, fixtureFreshStudent), fixtureCourse.id, { layout });
+  const onZero = coachStateOf(fresh, fixtureBuiltinCourse.id);
   assert.ok(!("error" in onZero), "Lesson 0 works once a workspace is attached");
   assert.equal(layoutError(onZero), null);
-  const adopt = adoptAction(onZero, { iteration: "001" }, NOW);
+  const zero = adoptAction(onZero, { iteration: "000" }, NOW);
+  assert.ok("progress" in zero, "the capstone's missing factory never blocks Lesson 0");
+  const onOne = coachStateOf(fresh, fixtureCourse.id);
+  assert.ok(!("error" in onOne));
+  const adopt = adoptAction(onOne, { iteration: "001" }, NOW);
   assert.ok("error" in adopt && adopt.error === blocked);
 });
 
 test("a layoutless course adopts a lesson without copying anything into the workspace", () => {
-  const state = coachStateOf(makeWorld(fixtureFreshStudent, undefined, fixtureLayoutlessCourse));
+  const state = coachStateOf(makeWorld(fixtureFreshStudent, undefined, fixtureLayoutlessCourse), fixtureLayoutlessCourse.id);
   assert.ok(!("error" in state), "error" in state ? state.error : "");
   assert.equal(state.layout.id, null);
   const lesson = findLesson(fixtureLayoutlessCourse, "001");
