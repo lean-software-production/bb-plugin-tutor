@@ -25,7 +25,7 @@ Status: **Linux run in progress** (2026-10-03); macOS not run yet. This is Task 
 | 3 | After re-running BB's installer: service file rewritten? variables kept? (INFO) | | |
 | 4 | Tutor's pi has no credentials before login (INFO) | no `auth.json`; 96 models listed, from `OPENCODE_API_KEY` in the shell (see check 9) | |
 | 5 | Login writes to Tutor's pi dir; `~/.pi` unchanged | PASS (openrouter) | |
-| 6 | Model discovery on the machine reads Tutor's pi dir | PASS: the machine lists openrouter models, which only Tutor's pi is signed in to. But after `OPENCODE_API_KEY` was unset, BB's list still held 114 opencode/opencode-go models that pi itself no longer lists (420 openrouter only, with or without the key): suspected BB-side caching, re-check pending | |
+| 6 | Model discovery on the machine reads Tutor's pi dir | PASS: the machine lists openrouter models, which only Tutor's pi is signed in to. Right after `OPENCODE_API_KEY` was unset, BB still served a cached list with 114 opencode/opencode-go models; asked again later, it held `openrouter` only (419). BB caches the machine's pi model list for a while, so after `tutor login` or an environment repair the composer may show stale models briefly. Coach threads pin `coachModel`, so they don't depend on that list (amendment 4) | |
 | 7 | A pi thread starts pi through `BB_PI_BRIDGE_COMMAND` with Tutor's pi dir | PASS: the thread's pi ran through `tee-pi` with Tutor's pi dir, defaulting to `openrouter/moonshotai/kimi-k2.6` | |
 | 8 | Checks 1, 9 and 7 after a reboot | | |
 | 9 | No provider credential in the machine daemon's environment | First FAIL (`OPENCODE_API_KEY`, inherited from the systemd user manager); PASS after `apply-env.sh` added `UnsetEnvironment=` (82eb2e7) | |
