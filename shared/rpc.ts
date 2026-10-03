@@ -322,15 +322,12 @@ export const rpcContract = defineRpcContract({
     output: z.object({ threadId: threadIdSchema }),
   },
   /**
-   * The student is using BB (app/activity.ts). Stamps the tutor feature's
-   * activity file, at most every 30 s; `recorded` is false when throttled or
-   * when BB's data dir is unknown.
-   */
-  /**
    * Adds a course from the catalog (Decision 11): fetches it into BB's data
    * dir, seeds its starter into the workspace (writing only what is absent),
    * and lists its lessons after Lesson 0. Calling it again finishes a seed
-   * that was interrupted. Refused when a configured course wins (Decision 12).
+   * that was interrupted ("Finish adding the course"). `courseId` in the
+   * output is the id the course now goes by, its catalog id: navigate with it.
+   * Refused when a configured course wins (Decision 12).
    */
   fetchCourse: {
     input: z.object({ courseId: z.string().min(1).max(64) }),
@@ -341,6 +338,11 @@ export const rpcContract = defineRpcContract({
       seeded: z.object({ written: z.number().int().nonnegative(), kept: z.array(z.string()) }),
     }),
   },
+  /**
+   * The student is using BB (app/activity.ts). Stamps the tutor feature's
+   * activity file, at most every 30 s; `recorded` is false when throttled or
+   * when BB's data dir is unknown.
+   */
   heartbeat: {
     input: z.null(),
     output: z.object({ recorded: z.boolean() }),
