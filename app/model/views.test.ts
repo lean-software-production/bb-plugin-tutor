@@ -15,7 +15,7 @@ import {
 } from "../../shared/fixtures.ts";
 import type { CourseOverview, Overview } from "../../shared/rpc.ts";
 import { CARD_KIT_TONES, progressCardView, termView } from "./cards.ts";
-import { completionView, doneRibbon, whatsNext } from "./completion.ts";
+import { completionView, courseOffer, doneRibbon, whatsNext } from "./completion.ts";
 import { activeCourse, addedCourseRoute, continueView, doneLessonsLabel, homeDecision } from "./home.ts";
 import { parseRuleTabParams, ruleTabTarget, ruleTabView } from "./rule-tab.ts";
 import { welcomeView } from "./welcome.ts";
@@ -236,6 +236,17 @@ test("adding a course lands on its first lesson under the id fetchCourse returns
     courseId: "software-factory",
     lessonId: "001",
   });
+});
+
+test("after the last lesson with nothing next, the completion page offers a course that can be added, or finished", () => {
+  assert.equal(courseOffer([]), null);
+  assert.deepEqual(courseOffer([{ id: "robotics", title: "Build a robot", description: "Six lessons.", unfinished: false }]), {
+    courseId: "robotics",
+    title: "Build a robot",
+    description: "Six lessons.",
+    action: "Add the course",
+  });
+  assert.equal(courseOffer([{ id: "robotics", title: "Build a robot", description: "", unfinished: true }])?.action, "Finish adding the course");
 });
 
 test("done lessons read as a range", () => {

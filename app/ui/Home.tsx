@@ -76,7 +76,7 @@ export function ContinueSection(_props: PluginHomepageSectionProps) {
             <p>
               {view.missing
                 ? "The workspace you chose has gone. Pick it again to carry on."
-                : "Pick the project your factory lives in. Then your coach can start."}
+                : "Pick the project you work in, your workspace. Then your coach can start."}
             </p>
             <Button onClick={() => goCourse({ kind: "welcome" })}>Set up the course →</Button>
           </div>

@@ -2,8 +2,9 @@
 // lesson's introduction.
 import { formatRoute } from "../../shared/routes.ts";
 import type { DiffLine } from "../../shared/model.ts";
-import type { Completion } from "../../shared/rpc.ts";
+import type { AvailableCourse, Completion } from "../../shared/rpc.ts";
 import { daysSince, lessonLabel, plural, setLabel } from "./format.ts";
+import { addCourseAction, type AddCourseAction } from "./home.ts";
 import type { Chip } from "./lesson.ts";
 
 export interface Stat {
@@ -109,4 +110,18 @@ export function whatsNext(view: CompletionView | null): WhatsNextView {
   const label = "What's next →";
   if (view === null) return { label, detail: null };
   return { label, detail: view.next === null ? "That was the last lesson" : `${lessonLabel(view.next.id)} · ${view.next.title}` };
+}
+
+/** A course to add (or finish adding) once there is no next lesson: the first of Overview.available, if any. */
+export interface CourseOffer {
+  courseId: string;
+  title: string;
+  description: string;
+  action: AddCourseAction;
+}
+
+export function courseOffer(available: readonly AvailableCourse[]): CourseOffer | null {
+  const course = available[0];
+  if (course === undefined) return null;
+  return { courseId: course.id, title: course.title, description: course.description, action: addCourseAction(course) };
 }

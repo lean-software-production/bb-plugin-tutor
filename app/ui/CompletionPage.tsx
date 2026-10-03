@@ -1,12 +1,13 @@
 // Between lessons: the lesson-complete panel the coach thread shows too
 // (LessonComplete.tsx), then the next lesson's introduction and "Start lesson
 // N", which spawns its coach thread (the first turn adopts the spec) and opens
-// it, or "Continue lesson N" once it has started.
+// it, or "Continue lesson N" once it has started. With no next lesson (Lesson 0
+// with nothing fetched yet), a course that can be added is offered instead.
 import { useRef } from "react";
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
-import { refreshAll, useAction, useCourseNavigate, useQuery, useTutorRpc } from "../hooks.ts";
-import { completionView } from "../model/completion.ts";
-import type { NextLessonView } from "../model/completion.ts";
+import { refreshAll, useAction, useAddCourse, useCourseNavigate, useOverview, useQuery, useTutorRpc } from "../hooks.ts";
+import { completionView, courseOffer } from "../model/completion.ts";
+import type { CourseOffer, NextLessonView } from "../model/completion.ts";
 import { QUERY_KEYS } from "../state/app-state.ts";
 import { Chips, ErrorNotice, InlineText, Loading, SketchPage } from "./common.tsx";
 import { LessonDone } from "./LessonComplete.tsx";
@@ -15,6 +16,7 @@ import { Button, Highlight } from "./sketch/index.ts";
 export function CompletionPage({ courseId, lessonId }: { courseId: string; lessonId: string }) {
   const rpc = useTutorRpc();
   const goCourse = useCourseNavigate();
+  const overview = useOverview();
   const nextRef = useRef<HTMLDivElement>(null);
   const completion = useQuery(QUERY_KEYS.completion(courseId, lessonId), () => rpc.call("getCompletion", { courseId, lessonId }));
   if (completion.data === null) {
@@ -34,6 +36,7 @@ export function CompletionPage({ courseId, lessonId }: { courseId: string; lesso
     );
   }
   const view = completionView(completion.data, Date.now());
+  const offer = courseOffer(overview.data?.available ?? []);
   // "What's next" here is the section under the panel: go to it and hand it the focus.
   const toNext = () => {
     const section = nextRef.current;
@@ -46,16 +49,18 @@ export function CompletionPage({ courseId, lessonId }: { courseId: string; lesso
         <LessonDone lessonId={lessonId} completion={completion.data} view={view} onNext={toNext} />
       </div>
       <div ref={nextRef} tabIndex={-1} className="tp-next-lesson">
-        {view.next === null ? (
+        {view.next !== null ? (
+          <NextLesson next={view.next} />
+        ) : offer !== null ? (
+          <AddCourse offer={offer} />
+        ) : (
           <>
             <p className="tp-eyebrow">That was the last lesson</p>
             <h1 className="sk-title tp-page-title">
               <Highlight>You finished the course.</Highlight>
             </h1>
-            <p className="tp-dek">Your factory, its spec and every conversation with your coach stay in your repo.</p>
+            <p className="tp-dek">Your work and every conversation with your coach stay in your workspace.</p>
           </>
-        ) : (
-          <NextLesson next={view.next} />
         )}
       </div>
     </SketchPage>
@@ -105,6 +110,26 @@ function NextLesson({ next }: { next: NextLessonView }) {
         </Button>
       </div>
       {start.error === null ? null : <ErrorNotice message={start.error} />}
+    </>
+  );
+}
+
+/** No next lesson, and a course to add: the same action as the outline's "Add the course". */
+function AddCourse({ offer }: { offer: CourseOffer }) {
+  const add = useAddCourse(offer.courseId);
+  return (
+    <>
+      <p className="tp-eyebrow">Your next course</p>
+      <h1 className="sk-title tp-page-title">
+        <Highlight>{offer.title}</Highlight>
+      </h1>
+      {offer.description === "" ? null : <p className="tp-dek">{offer.description}</p>}
+      <div className="tp-continue">
+        <Button disabled={add.pending} onClick={() => void add.run()}>
+          {add.pending ? "Adding the course…" : offer.action}
+        </Button>
+      </div>
+      {add.error === null ? null : <ErrorNotice message={add.error} />}
     </>
   );
 }
