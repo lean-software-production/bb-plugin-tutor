@@ -1,5 +1,15 @@
 #!/bin/sh
-# Placeholder stub for later launcher tasks: logs argv, quiet, exit 0 unless
-# listed in $STUB_MISSING. Behaviour is scripted per-test via STUB_<NAME>_*.
+# `ss -ltnp`: one LISTEN line on 127.0.0.1:$STUB_LISTEN_PORT (default 47386)
+# for pid $STUB_MAIN_PID (default 4242, matching the systemctl stub's
+# MainPID), plus — when $STUB_LISTEN is set — a second LISTEN line for the
+# same pid at that address, simulating a service that is also listening
+# somewhere other than loopback (Task 19's listening_check).
 . "$(cd "$(dirname "$0")" && pwd)/lib.sh"
 stub_init "ss" "$@"
+pid=${STUB_MAIN_PID:-4242}
+printf 'State  Recv-Q Send-Q Local-Address:Port  Peer-Address:Port Process\n'
+printf 'LISTEN 0      128    127.0.0.1:%s         0.0.0.0:*         users:(("node",pid=%s,fd=3))\n' \
+  "${STUB_LISTEN_PORT:-47386}" "$pid"
+if [ -n "${STUB_LISTEN:-}" ]; then
+  printf 'LISTEN 0      128    %s         0.0.0.0:*         users:(("node",pid=%s,fd=4))\n' "$STUB_LISTEN" "$pid"
+fi

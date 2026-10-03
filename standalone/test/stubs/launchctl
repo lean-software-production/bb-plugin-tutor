@@ -3,3 +3,18 @@
 # listed in $STUB_MISSING. Behaviour is scripted per-test via STUB_<NAME>_*.
 . "$(cd "$(dirname "$0")" && pwd)/lib.sh"
 stub_init "launchctl" "$@"
+
+# `print gui/<uid>/<label>`: the MainPID (STUB_MAIN_PID, default 4242) and,
+# when STUB_DAEMON_ENV is set, an "environment = { ... }" block built from
+# it — daemon_main_pid and daemon_env_names' macOS path (Task 19).
+if [ "${1:-}" = print ]; then
+  if [ -n "${STUB_DAEMON_ENV:-}" ]; then
+    printf 'environment = {\n'
+    printf '%s\n' "$STUB_DAEMON_ENV" | while IFS='=' read -r env_name env_value; do
+      [ -n "$env_name" ] || continue
+      printf '\t%s = %s\n' "$env_name" "$env_value"
+    done
+    printf '}\n'
+  fi
+  printf 'pid = %s\n' "${STUB_MAIN_PID:-4242}"
+fi

@@ -543,6 +543,101 @@ provider_key_names() {
     | cut -d= -f1 | grep -E "$KEY_PATTERN" | tr '\n' ' ' | sed 's/ *$//' || true
 }
 
+# plist_label <plist file>: the Label a launchd plist declares.
+plist_label() {
+  pb=${PLISTBUDDY:-/usr/libexec/PlistBuddy}
+  "$pb" -c 'Print :Label' "$1" 2>/dev/null
+}
+
+# daemon_main_pid <unit file name | plist path>: the running MainPID of a
+# user service — `systemctl --user show -p MainPID --value` on Linux,
+# `launchctl print`'s "pid = N" line on macOS. Empty/non-zero exit when the
+# service isn't running or can't be found.
+daemon_main_pid() {
+  dmp_target=$1
+  case "$(os_kind)" in
+    linux)
+      systemctl --user show -p MainPID --value "$dmp_target" 2>/dev/null
+      ;;
+    macos)
+      dmp_label=$(plist_label "$dmp_target") || return 1
+      [ -n "$dmp_label" ] || return 1
+      launchctl print "gui/$(id -u)/$dmp_label" 2>/dev/null \
+        | sed -n 's/^[[:space:]]*pid = \([0-9][0-9]*\).*/\1/p' | head -n 1
+      ;;
+  esac
+}
+
+# daemon_env_names: the names, space-separated, of provider credentials
+# (KEY_PATTERN) the enrolled machine's own running service still has in its
+# environment — read from the daemon itself (/proc/<MainPID>/environ on
+# Linux; launchd's "environment" block on macOS), never from the drop-in or
+# plist Tutor wrote. Values are dropped by `cut`/field-splitting before
+# anything is printed or logged. Empty (not a failure) when the service
+# isn't running or none match; fails only when no machine is enrolled.
+daemon_env_names() {
+  den_service=$(machine_service_file) || return 1
+  case "$(os_kind)" in
+    linux)
+      den_pid=$(daemon_main_pid "$(basename "$den_service")") || den_pid=""
+      [ -n "$den_pid" ] && [ "$den_pid" != 0 ] || { printf ''; return 0; }
+      cat "/proc/$den_pid/environ" 2>/dev/null | tr '\0' '\n' \
+        | cut -d= -f1 | grep -E "$KEY_PATTERN" | tr '\n' ' ' | sed 's/ *$//'
+      ;;
+    macos)
+      den_label=$(plist_label "$den_service") || den_label=""
+      [ -n "$den_label" ] || { printf ''; return 0; }
+      launchctl print "gui/$(id -u)/$den_label" 2>/dev/null \
+        | awk '/environment = \{/{f=1;next} /\}/{f=0} f' \
+        | sed -E 's/^[[:space:]]*//; s/[[:space:]]*=.*$//' \
+        | grep -E "$KEY_PATTERN" | tr '\n' ' ' | sed 's/ *$//'
+      ;;
+  esac
+}
+
+# listening_check: say whether the server and the machine daemon are
+# listening on 127.0.0.1 only (ss -ltnp on Linux, lsof -iTCP -sTCP:LISTEN
+# -P -n on macOS), restricted to their own MainPIDs.
+listening_check() {
+  lc_pids=""
+  lc_pid=$(daemon_main_pid tutor-server.service) || lc_pid=""
+  if [ -n "$lc_pid" ] && [ "$lc_pid" != 0 ]; then lc_pids="$lc_pid"; fi
+  lc_service=$(machine_service_file) || lc_service=""
+  if [ -n "$lc_service" ]; then
+    lc_pid2=$(daemon_main_pid "$(basename "$lc_service")") || lc_pid2=""
+    [ -n "$lc_pid2" ] && [ "$lc_pid2" != 0 ] && lc_pids="$lc_pids $lc_pid2"
+  fi
+
+  case "$(os_kind)" in
+    linux) lc_raw=$(ss -ltnp 2>/dev/null) || lc_raw="" ;;
+    macos) lc_raw=$(lsof -iTCP -sTCP:LISTEN -P -n 2>/dev/null) || lc_raw="" ;;
+  esac
+
+  lc_bad=""
+  for lc_p in $lc_pids; do
+    case "$(os_kind)" in
+      linux)
+        lc_addrs=$(printf '%s\n' "$lc_raw" | grep "pid=$lc_p" | awk '{print $4}')
+        ;;
+      macos)
+        lc_addrs=$(printf '%s\n' "$lc_raw" | awk -v p="$lc_p" '$2==p {print $9}' | sed 's#.*TCP ##; s/ (LISTEN)//')
+        ;;
+    esac
+    for lc_addr in $lc_addrs; do
+      case "$lc_addr" in
+        127.0.0.1:*) ;;
+        *) lc_bad="$lc_bad $lc_addr" ;;
+      esac
+    done
+  done
+
+  if [ -n "$lc_bad" ]; then
+    say "Listening: also on$lc_bad — this is unexpected"
+  else
+    say "Listening: 127.0.0.1 only"
+  fi
+}
+
 # plist_value <string>: a value for a PlistBuddy -c command, single-quoted
 # when it holds a space (PlistBuddy splits its command on whitespace).
 plist_value() {
@@ -939,6 +1034,141 @@ cmd_up() {
   cmd_open
 }
 
+# cmd_status: say the server's, the machine's, the workspace's, the model
+# provider's and the listening sockets' state, plus any provider credential
+# names (never values) still reaching Tutor's agents (amendment 4).
+cmd_status() {
+  mkdir -p "$TUTOR_HOME/logs"
+  st_port=$(tutor_bb_port)
+
+  if curl -fsS "http://127.0.0.1:$st_port/health" >/dev/null 2>&1; then
+    say "Server: healthy"
+  else
+    say "Server: stopped"
+  fi
+
+  if machine_connected; then
+    say "Machine: connected"
+  else
+    say "Machine: not connected"
+  fi
+
+  say "Workspace: $(config_get workspace)"
+
+  st_provider=$(config_get provider)
+  if [ -n "$st_provider" ] && pi_ready "$st_provider"; then
+    say "Model provider: $st_provider signed in"
+  elif [ -n "$st_provider" ]; then
+    say "Model provider: $st_provider not signed in — run \`$TUTOR_NAME login\`"
+  else
+    say "Model provider: not signed in — run \`$TUTOR_NAME login\`"
+  fi
+
+  st_keys=$(daemon_env_names) || st_keys=""
+  if [ -z "$st_keys" ]; then
+    say "Other model keys: none"
+  else
+    case "$(os_kind)" in
+      linux)
+        say "Other model keys: $st_keys reach Tutor's agents — run \`$TUTOR_NAME up\` to remove them."
+        ;;
+      macos)
+        say "Other model keys: $st_keys reach Tutor's agents — they come from your own launchd environment (\`launchctl getenv <name>\`) or your shell profile; remove them there."
+        ;;
+    esac
+  fi
+
+  listening_check
+}
+
+# cmd_stop: stop both services without removing anything — a later
+# `tutor up` starts them again.
+cmd_stop() {
+  mkdir -p "$TUTOR_HOME/logs"
+  sp_service=$(machine_service_file) || sp_service=""
+  case "$(os_kind)" in
+    linux)
+      if [ -n "$sp_service" ]; then
+        systemctl --user stop "$(basename "$sp_service")" >>"$TUTOR_HOME/logs/launcher.log" 2>&1 || true
+      fi
+      systemctl --user stop tutor-server.service >>"$TUTOR_HOME/logs/launcher.log" 2>&1 || true
+      ;;
+    macos)
+      if [ -n "$sp_service" ]; then
+        launchctl bootout "gui/$(id -u)" "$sp_service" >>"$TUTOR_HOME/logs/launcher.log" 2>&1 || true
+      fi
+      launchctl bootout "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.leansoftwareproduction.tutor-server.plist" \
+        >>"$TUTOR_HOME/logs/launcher.log" 2>&1 || true
+      ;;
+  esac
+  say "Tutor is stopped. Run \`$TUTOR_NAME up\` to start it again."
+}
+
+# cmd_logs: the last 200 lines of the server's, the machine's and the
+# installer's own logs. The one command allowed to say "bb" (common.md).
+cmd_logs() {
+  lg_port=$(tutor_bb_port)
+  tail -n 200 "$TUTOR_HOME/server/logs/server-stdio.log" 2>/dev/null || true
+  tail -n 200 "$HOME/.bb-machines/127.0.0.1-$lg_port/logs/host-daemon-stdio.log" 2>/dev/null || true
+  tail -n 200 "$TUTOR_HOME/install.log" 2>/dev/null || true
+  return 0
+}
+
+# cmd_uninstall [--purge]: remove the enrolment (bb machine remove,
+# best-effort — the server may be down), the machine's own service file and
+# drop-in/plist, and the tutor server's service file; with --purge also the
+# machine directory and ~/.tutor. Never the workspace, ~/.pi or the
+# student's own ~/.bb (amendment 3); ~/.bb/pi-bridge-sessions is left behind
+# on purpose, per the spike notes — it isn't Tutor's to delete.
+cmd_uninstall() {
+  un_purge=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --purge) un_purge=1; shift ;;
+      *) fail "Usage: $TUTOR_NAME uninstall [--purge]" ;;
+    esac
+  done
+
+  mkdir -p "$TUTOR_HOME/logs"
+  un_port=$(tutor_bb_port)
+  un_id=$(config_get machine_id)
+  if [ -n "$un_id" ]; then
+    tutor_bb machine remove "$un_id" --yes || true
+  fi
+
+  un_service=$(machine_service_file) || un_service=""
+  case "$(os_kind)" in
+    linux)
+      if [ -n "$un_service" ]; then
+        systemctl --user stop "$(basename "$un_service")" >>"$TUTOR_HOME/logs/launcher.log" 2>&1 || true
+        systemctl --user disable "$(basename "$un_service")" >>"$TUTOR_HOME/logs/launcher.log" 2>&1 || true
+        rm -rf "$un_service.d"
+        rm -f "$un_service"
+      fi
+      systemctl --user stop tutor-server.service >>"$TUTOR_HOME/logs/launcher.log" 2>&1 || true
+      systemctl --user disable tutor-server.service >>"$TUTOR_HOME/logs/launcher.log" 2>&1 || true
+      rm -f "$HOME/.config/systemd/user/tutor-server.service"
+      systemctl --user daemon-reload >>"$TUTOR_HOME/logs/launcher.log" 2>&1 || true
+      ;;
+    macos)
+      if [ -n "$un_service" ]; then
+        launchctl bootout "gui/$(id -u)" "$un_service" >>"$TUTOR_HOME/logs/launcher.log" 2>&1 || true
+        rm -f "$un_service"
+      fi
+      launchctl bootout "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.leansoftwareproduction.tutor-server.plist" \
+        >>"$TUTOR_HOME/logs/launcher.log" 2>&1 || true
+      rm -f "$HOME/Library/LaunchAgents/com.leansoftwareproduction.tutor-server.plist"
+      ;;
+  esac
+
+  if [ "$un_purge" -eq 1 ]; then
+    rm -rf "$TUTOR_HOME"
+    rm -rf "$HOME/.bb-machines/127.0.0.1-$un_port"
+  fi
+
+  say "Tutor is uninstalled."
+}
+
 print_help() {
   say "Usage: $TUTOR_NAME <command> [options]"
   say ""
@@ -970,8 +1200,17 @@ main() {
     open)
       cmd_open
       ;;
-    status | stop | logs | uninstall)
-      say "$TUTOR_NAME $cmd: not implemented yet."
+    status)
+      cmd_status
+      ;;
+    stop)
+      cmd_stop
+      ;;
+    logs)
+      cmd_logs
+      ;;
+    uninstall)
+      cmd_uninstall "$@"
       ;;
     help)
       print_help

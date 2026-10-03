@@ -1,5 +1,12 @@
 #!/bin/sh
-# Placeholder stub for later launcher tasks: logs argv, quiet, exit 0 unless
-# listed in $STUB_MISSING. Behaviour is scripted per-test via STUB_<NAME>_*.
+# `lsof -iTCP -sTCP:LISTEN -P -n`: the macOS equivalent of the ss stub —
+# one LISTEN line for pid $STUB_MAIN_PID (default 4242) on 127.0.0.1, plus a
+# second at $STUB_LISTEN when set (Task 19's listening_check).
 . "$(cd "$(dirname "$0")" && pwd)/lib.sh"
 stub_init "lsof" "$@"
+pid=${STUB_MAIN_PID:-4242}
+printf 'COMMAND PID  USER   FD   TYPE DEVICE SIZE/OFF NODE NAME\n'
+printf 'node    %s   user   20u  IPv4 0x0           0t0  TCP 127.0.0.1:%s (LISTEN)\n' "$pid" "${STUB_LISTEN_PORT:-47386}"
+if [ -n "${STUB_LISTEN:-}" ]; then
+  printf 'node    %s   user   21u  IPv4 0x0           0t0  TCP %s (LISTEN)\n' "$pid" "$STUB_LISTEN"
+fi

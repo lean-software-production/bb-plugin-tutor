@@ -12,4 +12,7 @@ fi
 if [ "${1:-} ${2:-}" = "--user show-environment" ] && [ -n "${STUB_SYSTEMD_ENV:-}" ]; then
   printf '%s\n' "$STUB_SYSTEMD_ENV"
 fi
+if [ "${1:-} ${2:-} ${3:-}" = "--user show -p" ] && [ "${4:-}" = MainPID ]; then
+  echo "${STUB_MAIN_PID:-4242}"
+fi
 exit 0
