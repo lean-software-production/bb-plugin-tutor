@@ -115,7 +115,7 @@ check_connected() {
 
 check_browser() {
   local code
-  code=$(curl -s -o /dev/null -m 10 -w '%{http_code} %{redirect_url}' "https://$PUBLIC_HOST/health") || code="none"
+  code=$(curl -s -o /dev/null -m 10 -w '%{http_code} %{redirect_url}' "https://$PUBLIC_HOST/health" | cut -d'?' -f1) || code="none"
   case "$code" in
     30[0-9]*cloudflareaccess.com*) result 8 PASS "https://$PUBLIC_HOST sends a visitor to Cloudflare Access ($code)" ;;
     200*) result 8 FAIL "https://$PUBLIC_HOST answers WITHOUT Access: stop cloudflared's route now" ;;

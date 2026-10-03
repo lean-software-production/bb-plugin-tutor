@@ -12,7 +12,7 @@ BOX=${BOX:-ew-admin@ew-lsp-001-tailnet}
 STUDENT=${STUDENT:-student-001}
 PORT=${PORT:-38888}                  # granted to this laptop in the tailnet policy
 TAILNET_IP=${TAILNET_IP:-100.124.90.17}
-PUBLIC_HOST=${PUBLIC_HOST:-$STUDENT-ew-lsp-001.ensembleworks.dev}
+PUBLIC_HOST=${PUBLIC_HOST:-$STUDENT-tutor.leansoftware.ai}
 BB_VERSION=${BB_VERSION:-0.45.0}
 
 SERVER_URL="http://$TAILNET_IP:$PORT"

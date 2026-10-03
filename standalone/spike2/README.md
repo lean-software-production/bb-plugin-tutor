@@ -12,7 +12,7 @@ Spike 2 tries this layout with one hand-made student (`student-001`) on `ew-lsp-
 
 | Leg | Route | Who lets you in |
 |---|---|---|
-| Browser | `https://student-001-ew-lsp-001.ensembleworks.dev` → cloudflared → `127.0.0.1:38888` | a Cloudflare Access app (bb has no auth of its own) |
+| Browser | `https://student-001-tutor.leansoftware.ai` → cloudflared → `127.0.0.1:38888` | a Cloudflare Access app (bb has no auth of its own) |
 | Machine | `http://100.124.90.17:38888` → `systemd-socket-proxyd` → `127.0.0.1:38888` | the tailnet policy, which already grants port 38888 to this laptop (`candace`) |
 
 **The scripts.**
@@ -25,7 +25,7 @@ Spike 2 tries this layout with one hand-made student (`student-001`) on `ew-lsp-
 
 - **The plugin build:** `standalone/e2e/e2e.sh build` writes `~/tutor-e2e/release/bb-plugin-tutor-<version>-built.tgz`.
 - **Port 38888 must be free on the box.** `box-setup.sh` refuses if anything else is listening on it.
-- **Cloudflare (step 2):** an API token with Access:Edit, and DNS for `ensembleworks.dev` in the LSP account, or the Zero Trust dashboard. Both are in 1Password `Shared` under the tag `ew-fleet`.
+- **Cloudflare (step 2):** an API token with Access:Edit, and DNS for `leansoftware.ai` in the LSP account, or the Zero Trust dashboard. Both are in 1Password `Shared` under the tag `ew-fleet`.
 
 ## Runbook
 
@@ -46,15 +46,15 @@ It does the following:
 Check 1 passes when the laptop gets an answer from `http://100.124.90.17:38888/health`.
 
 **2. The browser route.** This is done by hand, in this order, because bb has no authentication:
-1. **Access app first.** Create an Access app `ew-lsp-001-student-001` for `student-001-ew-lsp-001.ensembleworks.dev`. Attach the reusable "lean-software-production GitHub org" policy, as `ew-lsp-001-bb` does.
-2. **The CNAME.** Point `student-001-ew-lsp-001` in `ensembleworks.dev` at the tunnel. Use flarectl or the dashboard, not `cloudflared tunnel route dns`, because that targets the wrong zone (see the config's header).
+1. **Access app first.** Create an Access app `ew-lsp-001-student-001` for `student-001-tutor.leansoftware.ai`. Attach the reusable "lean-software-production GitHub org" policy, as `ew-lsp-001-bb` does.
+2. **The CNAME.** Point `student-001-tutor` in `leansoftware.ai` at the tunnel. Use flarectl or the dashboard, not `cloudflared tunnel route dns`, because that targets the wrong zone (see the config's header).
 3. **The ingress rule.** Add it in the infrastructure repo's `instances/ew-lsp-001/cloudflared-config.yml`, above the final `http_status:404`, then copy the file to `/etc/cloudflared/config.yml` on the box:
    ```yaml
    # SPIKE 2 (2026-10-03): a per-student Tutor server, hand-installed by
    # bb-plugin-tutor standalone/spike2. bb has no auth: the Access app
    # "ew-lsp-001-student-001" MUST exist before this route goes live.
    # Back out: standalone/spike2/teardown.sh, then this comment + the two lines below.
-   - hostname: student-001-ew-lsp-001.ensembleworks.dev
+   - hostname: student-001-tutor.leansoftware.ai
      service: http://localhost:38888
    ```
 4. `sudo systemctl restart cloudflared`. This briefly interrupts the box's other hostnames (canvas, bb, fabro).
