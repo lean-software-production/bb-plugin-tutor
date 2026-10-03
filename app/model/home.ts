@@ -59,6 +59,8 @@ export function homeDecision(overview: Overview): HomeDecision {
 export type ContinueView =
   | { kind: "error"; message: string }
   | { kind: "setup"; courseTitle: string; missing: boolean }
+  /** Lesson 0 is done, nothing has been fetched yet, and the catalog has something to add (Decision 16). */
+  | { kind: "add-course"; courseId: string; title: string; description: string }
   | {
       kind: "continue";
       courseId: string;
@@ -101,6 +103,11 @@ export function continueView(overview: Overview): ContinueView {
   const current = active?.current ?? null;
   if (overview.workspace.status !== "found" || active === null || current === null) {
     return { kind: "setup", courseTitle: setupTitle(overview), missing: overview.workspace.status === "missing" };
+  }
+  // Lesson 0 done, nothing fetched yet: suggest adding the course instead of only its own completion page.
+  if (active.builtin && current.iterationStatus === "Done") {
+    const course = overview.available[0];
+    if (course !== undefined) return { kind: "add-course", courseId: course.id, title: course.title, description: course.description };
   }
   const summary = active.lessons.find((lesson) => lesson.id === current.lessonId);
   const set = summary?.set ?? null;

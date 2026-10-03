@@ -29,6 +29,12 @@ export function ContinueSection(_props: PluginHomepageSectionProps) {
     refreshAll();
     navigate.toThread(threadId);
   });
+  const addCourse = useAction(async () => {
+    if (view?.kind !== "add-course") return;
+    const { firstLessonId } = await rpc.call("fetchCourse", { courseId: view.courseId });
+    refreshAll();
+    goCourse({ kind: "start", courseId: view.courseId, lessonId: firstLessonId });
+  });
 
   if (view === null) {
     return overview.status === "error" ? (
@@ -41,6 +47,25 @@ export function ContinueSection(_props: PluginHomepageSectionProps) {
     return (
       <div className="tutor-sk">
         <ErrorNotice message={view.message} />
+      </div>
+    );
+  }
+  if (view.kind === "add-course") {
+    return (
+      <div className="tutor-sk tp-hs-wrap">
+        <Panel tone="teal" className="tp-hs tp-hs--setup">
+          <div className="tp-hs-l">
+            <p className="tp-eyebrow">Your next course</p>
+            <h2 className="sk-title tp-hs-title">
+              <Highlight>{view.title}</Highlight>
+            </h2>
+            <p>{view.description}</p>
+            <Button disabled={addCourse.pending} onClick={() => void addCourse.run()}>
+              {addCourse.pending ? "Adding the course…" : "Add the course"}
+            </Button>
+            {addCourse.error === null ? null : <ErrorNotice message={addCourse.error} />}
+          </div>
+        </Panel>
       </div>
     );
   }

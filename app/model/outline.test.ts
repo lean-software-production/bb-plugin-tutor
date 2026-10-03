@@ -293,6 +293,18 @@ test("a Codespace on a capstone lesson with no Lesson 0 record opens that lesson
   assert.deepEqual(lessonsOf(outline).filter((lesson) => lesson.expandedByDefault).map((lesson) => [lesson.courseId, lesson.id]), [["software-factory", "003"]]);
 });
 
+test("the outline offers each course that can be added, catalog entries not fetched yet", () => {
+  const outline = buildOutline(
+    input({ overview: { ...overviewWithChat, available: [{ id: "robotics", title: "Build a robot", description: "Six lessons, one robot." }] } }),
+  );
+  assert.deepEqual(outline.addCourses, [{ courseId: "robotics", title: "Build a robot", description: "Six lessons, one robot." }]);
+});
+
+test("once a course is fetched, it has no Add row: available is empty while it is being taught", () => {
+  const outline = buildOutline(input());
+  assert.deepEqual(outline.addCourses, [], "fixtureOverview's available list is empty: software-factory is already a course");
+});
+
 test("a course not started yet offers no coach in the outline: its lessons are ahead", () => {
   const outline = buildOutline(input({ overview: fixtureOverviewNoFactory }));
   assert.ok(lessonsOf(outline).every((lesson) => !lesson.canStartCoach));

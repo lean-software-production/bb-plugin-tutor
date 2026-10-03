@@ -27,7 +27,7 @@ import {
 } from "../hooks.ts";
 import { lessonLabel } from "../model/format.ts";
 import { buildOutline } from "../model/outline.ts";
-import type { LessonNode, OutlineRule, OutlineView, SideRow, ThreadRow } from "../model/outline.ts";
+import type { AddCourseRow, LessonNode, OutlineRule, OutlineView, SideRow, ThreadRow } from "../model/outline.ts";
 import { outlineMountedStore, routeStore } from "../state/app-state.ts";
 import { ChangeBadge, ReloadButton, coursePageHref, isPlainClick } from "./common.tsx";
 import { Highlight, KitIcon, StepBadge, Tick } from "./sketch/index.ts";
@@ -117,14 +117,15 @@ function OutlineBody({ outline, go, onNavigate }: { outline: OutlineView; go: Go
     case "ready":
       return (
         <>
-          {outline.groups.map((group) => (
+          {outline.groups.map((group, position) => (
             <div key={group.courseId}>
               <GroupLabel outline={outline} title={group.title} />
               <ul className="tp-tree" aria-label={`Lessons of ${group.title}`}>
-                {group.lessons.map((lesson, position) => (
-                  <LessonBranch key={lesson.id} lesson={lesson} position={position} go={go} onNavigate={onNavigate} />
+                {group.lessons.map((lesson, lessonPosition) => (
+                  <LessonBranch key={lesson.id} lesson={lesson} position={lessonPosition} go={go} onNavigate={onNavigate} />
                 ))}
               </ul>
+              {position === 0 ? <AddCourseList addCourses={outline.addCourses} /> : null}
             </div>
           ))}
           <CourseErrors errors={outline.errors} />
@@ -137,10 +138,10 @@ function OutlineBody({ outline, go, onNavigate }: { outline: OutlineView; go: Go
 function LessonsAhead({ outline, go }: { outline: OutlineView; go: Go }) {
   return (
     <>
-      {outline.groups.map((group) => (
+      {outline.groups.map((group, position) => (
         <div key={group.courseId} role="group" aria-label={group.title}>
           <GroupLabel outline={outline} title={group.title} />
-          {group.lessons.map((lesson, position) => (
+          {group.lessons.map((lesson, lessonPosition) => (
             <a
               key={lesson.id}
               className="tp-lesson-row tp-lesson-row--ahead"
@@ -149,10 +150,11 @@ function LessonsAhead({ outline, go }: { outline: OutlineView; go: Go }) {
               data-lesson-id={lesson.id}
               onClick={(event) => go(event, { kind: "start", courseId: lesson.courseId, lessonId: lesson.id })}
             >
-              <StepBadge position={position} label={Number(lesson.id)} className="tp-n" />
+              <StepBadge position={lessonPosition} label={Number(lesson.id)} className="tp-n" />
               <span className="tp-ltitle">{lesson.title}</span>
             </a>
           ))}
+          {position === 0 ? <AddCourseList addCourses={outline.addCourses} /> : null}
         </div>
       ))}
     </>
@@ -162,6 +164,44 @@ function LessonsAhead({ outline, go }: { outline: OutlineView; go: Go }) {
 /** A course's name above its lessons, once there is more than one course to tell apart. */
 function GroupLabel({ outline, title }: { outline: OutlineView; title: string }) {
   return outline.groups.length > 1 ? <div className="tp-other-project">{title}</div> : null;
+}
+
+/** Catalog courses the student can add (Decision 16), right after the built-in course's group. */
+function AddCourseList({ addCourses }: { addCourses: readonly AddCourseRow[] }) {
+  return (
+    <>
+      {addCourses.map((course) => (
+        <AddCourseItem key={course.courseId} course={course} />
+      ))}
+    </>
+  );
+}
+
+function AddCourseItem({ course }: { course: AddCourseRow }) {
+  const rpc = useTutorRpc();
+  const goCourse = useCourseNavigate();
+  const add = useAction(async () => {
+    const { firstLessonId } = await rpc.call("fetchCourse", { courseId: course.courseId });
+    refreshAll();
+    goCourse({ kind: "start", courseId: course.courseId, lessonId: firstLessonId });
+  });
+  return (
+    <div className="tp-add-course" data-course-id={course.courseId}>
+      <div className="tp-add-course-text">
+        <span className="tp-add-course-title">{course.title}</span>
+        <span className="tp-add-course-desc">{course.description}</span>
+      </div>
+      <button type="button" className="tp-th tp-th--add" disabled={add.pending} onClick={() => void add.run()}>
+        <span className="tp-t">{add.pending ? "Adding the course…" : "Add the course"}</span>
+      </button>
+      {add.error === null ? null : (
+        <div className="tp-outline-note tp-outline-note--error" role="alert">
+          {add.error}
+          <ReloadButton message={add.error} />
+        </div>
+      )}
+    </div>
+  );
 }
 
 /** Courses that could not be loaded while others could. */

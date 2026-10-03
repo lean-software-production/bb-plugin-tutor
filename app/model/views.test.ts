@@ -210,6 +210,22 @@ test("the Continue section reads from the overview alone", () => {
   assert.equal(continueView({ ...fixtureOverview, courses: [] }).kind, "error");
 });
 
+test("after Lesson 0, BB home's Continue suggests adding the course when nothing has been fetched", () => {
+  const onlyBuiltin: Overview = {
+    ...fixtureOverview,
+    courses: fixtureOverview.courses.filter((entry) => entry.builtin),
+    available: [{ id: "robotics", title: "Build a robot", description: "Six lessons, one robot." }],
+  };
+  assert.deepEqual(continueView(onlyBuiltin), {
+    kind: "add-course",
+    courseId: "robotics",
+    title: "Build a robot",
+    description: "Six lessons, one robot.",
+  });
+  // A configured course wins (Decision 12): available stays empty, so today's behaviour holds (Lesson 0's own completion).
+  assert.deepEqual(continueView({ ...onlyBuiltin, available: [] }).kind, "continue");
+});
+
 test("done lessons read as a range", () => {
   assert.equal(doneLessonsLabel([]), null);
   assert.equal(doneLessonsLabel(["002", "001"]), "Lessons 1–2 done ✓");

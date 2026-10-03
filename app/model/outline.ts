@@ -118,6 +118,13 @@ export interface CourseGroup {
   lessons: LessonNode[];
 }
 
+/** A catalog course not fetched yet (Overview.available), offered as "Add the course" right after Lesson 0. */
+export interface AddCourseRow {
+  courseId: string;
+  title: string;
+  description: string;
+}
+
 export interface OutlineView {
   brand: string;
   status: OutlineStatus;
@@ -126,6 +133,8 @@ export interface OutlineView {
   /** Courses that could not be loaded, while others could: said under the tree. */
   errors: string[];
   others: OtherThreadGroup[];
+  /** Catalog courses the student can add (Decision 16: shown whether or not Lesson 0 is done). Empty once a course has been fetched. */
+  addCourses: AddCourseRow[];
 }
 
 /** BB's own thread URL, for a coach thread the sidebar has not listed yet. */
@@ -312,7 +321,12 @@ export function buildOutline(input: OutlineInput): OutlineView {
 
   const brand = courses.find((entry) => !entry.builtin)?.course.title ?? "Tutor";
   const errors = status.kind === "error" ? [] : (overview?.courseErrors ?? []).map((entry) => entry.error);
-  return { brand, status, groups, errors, others };
+  const addCourses: AddCourseRow[] = (overview?.available ?? []).map((course) => ({
+    courseId: course.id,
+    title: course.title,
+    description: course.description,
+  }));
+  return { brand, status, groups, errors, others, addCourses };
 }
 
 /** Non-course threads, grouped by project, children nested under their parent. */
