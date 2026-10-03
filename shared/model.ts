@@ -222,6 +222,11 @@ export interface StudentState {
    * is unknown rather than absent. Unset otherwise.
    */
   progressUnreadable?: true;
+  /**
+   * The sha256 of the progress file as it was read; unset when there was none.
+   * A write of this progress expects the file to still be this (compare-and-swap).
+   */
+  progressSha256?: string;
   /** Human-readable problems found while reading (malformed YAML, unknown id, …). */
   problems: string[];
 }

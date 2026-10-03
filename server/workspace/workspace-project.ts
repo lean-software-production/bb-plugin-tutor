@@ -5,6 +5,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type { Workspace } from "../../shared/rpc.ts";
 import { followedKind } from "../../layouts/types.ts";
 import { WorkspaceUnreachableError, type WorkspaceAccess } from "./access.ts";
+import { codeOf } from "./machine-access.ts";
 
 export type Sdk = BbPluginApi["sdk"];
 export type ProjectWithSources = Awaited<ReturnType<Sdk["projects"]["get"]>>;
@@ -50,13 +51,14 @@ export async function resolveWorkspace(sdk: Sdk, projectId: string | undefined, 
   const source = defaultSource(project);
   if (source === undefined) return missing;
   const unreachable: ResolvedWorkspace = { workspace: { status: "unreachable", projectId, projectName: project.name }, hostId: null };
-  // A machine BB has no connection to can't be asked anything: no probing.
+  // A machine BB has no connection to can't be asked anything: no probing. A machine BB no
+  // longer has (host_not_found) took the folder with it; any other failure to ask says nothing about the folder.
   const connected = await sdk.hosts.get({ hostId: source.hostId }).then(
-    (machine) => machine.status === "connected",
-    () => null,
+    (machine) => (machine.status === "connected" ? "yes" : "no"),
+    (cause: unknown) => (codeOf(cause) === "host_not_found" ? "gone" : "no"),
   );
-  if (connected === null) return missing;
-  if (!connected) return unreachable;
+  if (connected === "gone") return missing;
+  if (connected === "no") return unreachable;
   try {
     if (!(await pathExists(accessFor(source.hostId), source.path))) return missing;
   } catch (cause) {

@@ -104,7 +104,7 @@ export interface LessonView {
 
 const MAX_COMPASS_ITEMS = 6;
 
-export type CoachStart = "read-ahead" | "loading" | "set-up" | "start" | "revisit";
+export type CoachStart = "read-ahead" | "loading" | "set-up" | "unreachable" | "start" | "revisit";
 
 /**
  * What a lesson offers before its coach thread exists. A coach needs a
@@ -116,6 +116,8 @@ export function coachStart(status: LessonStatus, workspace: Workspace["status"] 
   if (status === "ahead") return "read-ahead";
   if (workspace === null) return "loading";
   if (workspace === "unset" || workspace === "missing") return "set-up";
+  // The workspace is there, on a machine that isn't connected: no coach can start until it is.
+  if (workspace === "unreachable") return "unreachable";
   return status === "current" ? "start" : "revisit";
 }
 

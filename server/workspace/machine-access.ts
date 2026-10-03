@@ -13,7 +13,7 @@ const INSPECT_PATHS = 256;
 const OFFLINE_CODES = new Set(["host_unavailable", "host_disconnected"]);
 
 /** A BB error's code: BbHttpError carries it as `code`, the server's ApiError in `body.code`. */
-function codeOf(cause: unknown): string | null {
+export function codeOf(cause: unknown): string | null {
   if (typeof cause !== "object" || cause === null) return null;
   const { code, body } = cause as { code?: unknown; body?: { code?: unknown } | null };
   if (typeof code === "string") return code;

@@ -202,6 +202,10 @@ test("previews and finished lessons have no focus and open every feature", () =>
 test("before a coach thread exists, a student without a workspace is sent to set one up instead of a start that must fail", () => {
   assert.equal(coachStart("current", "unset"), "set-up");
   assert.equal(coachStart("current", "missing"), "set-up");
+  // A machine that isn't connected: say so, rather than offer a start that must fail (or a set-up there's no need for).
+  assert.equal(coachStart("current", "unreachable"), "unreachable");
+  assert.equal(coachStart("done", "unreachable"), "unreachable");
+  assert.equal(coachStart("ahead", "unreachable"), "read-ahead");
   assert.equal(coachStart("done", "unset"), "set-up");
   assert.equal(coachStart("ahead", "unset"), "read-ahead");
   assert.equal(coachStart("current", "found"), "start");

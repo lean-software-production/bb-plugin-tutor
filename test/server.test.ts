@@ -17,7 +17,7 @@ import { findLesson, lessonExamples } from "../shared/derive.ts";
 import { fixtureCourse, fixtureLayoutlessCourse } from "../shared/fixtures.ts";
 import type { Completion, LessonDetail, Overview } from "../shared/rpc.ts";
 import { NOT_A_TUTOR_THREAD } from "../server/coach/auth.ts";
-import { WorkspaceUnreachableError, type WorkspaceAccess } from "../server/workspace/access.ts";
+import { WorkspaceUnreachableError, WriteConflictError, type WorkspaceAccess } from "../server/workspace/access.ts";
 import { formatProgress, parseProgress } from "../layouts/progress/progress-yaml.ts";
 import { createDiskAccess } from "./helpers/disk-access.ts";
 import { makeSandbox, makeRepoSandbox, type Sandbox } from "./helpers/disk.ts";
@@ -1147,16 +1147,22 @@ test("a host call that finds the machine offline makes the workspace unreachable
   await assert.rejects(openCoach(host, "000"), UNREACHABLE);
 });
 
-test("a progress file changed between read and write is retried once, then refused, and neither edit is lost", async (t) => {
+test("a progress file changed after the tool read it is retried once, then refused, and neither edit is lost", async (t) => {
   const sandbox = await makeSandbox();
   const disk = createDiskAccess();
-  // Runs before each write, as another writer getting in between Tutor's read and its write would.
-  let beforeWrite: ((path: string) => Promise<void>) | null = null;
+  const progressPath = join(sandbox.factoryRoot, ".tutor/progress.yaml");
+  // Every write of the progress file, and whether it was refused as a conflict.
+  const writes: ("written" | "conflict")[] = [];
   const access: WorkspaceAccess = {
     ...disk,
     async write(path, text, expected) {
-      await beforeWrite?.(path);
-      return disk.write(path, text, expected);
+      try {
+        await disk.write(path, text, expected);
+        if (path === progressPath) writes.push("written");
+      } catch (cause) {
+        if (path === progressPath && cause instanceof WriteConflictError) writes.push("conflict");
+        throw cause;
+      }
     },
   };
   const host = await makeTutorHost(sandbox.course, sandbox.factoryRoot, undefined, { access: () => access });
@@ -1164,7 +1170,6 @@ test("a progress file changed between read and write is retried once, then refus
     await host.harness.lifecycle.dispose();
     await sandbox.cleanup();
   });
-  const progressPath = join(sandbox.factoryRoot, ".tutor/progress.yaml");
   const coach = (await openCoach(host, "000")).threadId;
   await ok(host, "tutor_adopt_iteration", { iteration: "000" }, coach);
   const [first, second, third] = lessonExamples(findLesson(builtinCourse, "000") ?? assert.fail("lesson 000"));
@@ -1179,36 +1184,47 @@ test("a progress file changed between read and write is retried once, then refus
     progress.examples[example.key] = { status: "skipped", hash: example.hash, at: `2026-09-25T10:00:${String(edits).padStart(2, "0")}Z` };
     await writeFile(progressPath, formatProgress(progress, text));
   };
+  // The outside edit lands once the tool has loaded the world, before it writes: the window the
+  // world's read and the tool's write leave open (recordReachedRule's BB round trip is in it).
+  // A tool call loads the world once outside the workspace lock, then once per attempt inside it.
+  const load = host.rt.world.load.bind(host.rt.world);
+  let loads = 0;
+  let afterLoad: ((count: number) => Promise<void>) | null = null;
+  host.rt.world.load = async () => {
+    const world = await load();
+    loads += 1;
+    await afterLoad?.(loads);
+    return world;
+  };
 
-  // Once: the tool re-reads the file (with the outside edit) and writes again.
-  let conflicts = 0;
-  beforeWrite = async (path) => {
-    if (path !== progressPath) return;
-    beforeWrite = null;
-    conflicts += 1;
-    await outsideEdit(second);
+  // Once, after the first attempt's load: that attempt conflicts, the retry reloads (with the edit) and writes.
+  loads = 0;
+  writes.length = 0;
+  afterLoad = async (count) => {
+    if (count === 2) await outsideEdit(second);
   };
   await ok(host, "tutor_mark_example", { example: first.key, status: "passing", evidence: "seen in the outline" }, coach);
-  assert.equal(conflicts, 1);
+  assert.deepEqual(writes, ["conflict", "written"]);
+  assert.equal(loads, 3, "the retry loaded the world again");
   const once = await readProgress();
   assert.equal(once.examples[first.key]?.status, "passing", "the tool's mark");
   assert.equal(once.examples[second.key]?.status, "skipped", "the outside edit");
 
-  // Every time: the second conflict is refused, and the file keeps the outside edit.
-  beforeWrite = async (path) => {
-    if (path !== progressPath) return;
-    conflicts += 1;
-    await outsideEdit(third);
-  };
+  // After every load: the second conflict is refused, and the file keeps the outside edits.
+  loads = 0;
+  writes.length = 0;
+  afterLoad = () => outsideEdit(third);
   const refused = await tool(host, "tutor_mark_example", { example: second.key, status: "passing", evidence: "seen it" }, coach);
+  afterLoad = null;
   assert.ok(isError(refused));
   assert.equal(text(refused), "Your progress file changed while Tutor was writing it. Call tutor_status and try again.");
-  assert.equal(conflicts, 3);
+  assert.deepEqual(writes, ["conflict", "conflict"]);
   const after = await readProgress();
   assert.equal(after.examples[second.key]?.status, "skipped", "not marked: both attempts conflicted");
   assert.equal(after.examples[third.key]?.status, "skipped", "the outside edit");
   assert.equal(after.examples[first.key]?.status, "passing");
 });
+
 
 test("through the machine: sdk.files and the host entry's inspect carry Lesson 0's progress", async (t) => {
   const sandbox = await makeSandbox();

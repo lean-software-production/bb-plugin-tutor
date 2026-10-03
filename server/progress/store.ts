@@ -7,7 +7,7 @@ import type { ProgressLocation } from "../../layouts/types.ts";
 import { BUILTIN_LESSON_ID } from "../../shared/constants.ts";
 import type { IterationState, ProgressFile, StudentState } from "../../shared/model.ts";
 import type { ProgressStore } from "../../shared/ports.ts";
-import { WorkspaceUnreachableError, type WorkspaceAccess } from "../workspace/access.ts";
+import { WorkspaceUnreachableError, type FileText, type WorkspaceAccess } from "../workspace/access.ts";
 
 /**
  * The progress file's progress. `unreadable`: the file is there but could not
@@ -18,19 +18,19 @@ async function readProgressFile(
   access: WorkspaceAccess,
   at: ProgressLocation,
   problems: string[],
-): Promise<{ progress: ProgressFile | null; unreadable: boolean }> {
-  let text: string | null;
+): Promise<{ progress: ProgressFile | null; unreadable: boolean; sha256: string | null }> {
+  let file: FileText | null;
   try {
-    text = (await access.read(join(at.dir, at.progressFile)))?.text ?? null;
+    file = await access.read(join(at.dir, at.progressFile));
   } catch (cause) {
     if (cause instanceof WorkspaceUnreachableError) throw cause;
     problems.push(`${at.progressFile} could not be read (${(cause as Error).message}).`);
-    return { progress: null, unreadable: true };
+    return { progress: null, unreadable: true, sha256: null };
   }
-  if (text === null) return { progress: null, unreadable: false };
-  const parsed = parseProgress(text);
+  if (file === null) return { progress: null, unreadable: false, sha256: null };
+  const parsed = parseProgress(file.text);
   problems.push(...parsed.problems);
-  return { progress: parsed.progress, unreadable: parsed.progress === null };
+  return { progress: parsed.progress, unreadable: parsed.progress === null, sha256: file.sha256 };
 }
 
 /**
@@ -98,16 +98,19 @@ export function createProgressStore(): ProgressStore {
         if ("state" in parsed) iteration = parsed.state;
         else problems.push(parsed.problem);
       }
-      const { progress, unreadable } = await readProgressFile(access, at, problems);
-      return unreadable ? { iteration, progress, progressUnreadable: true, problems } : { iteration, progress, problems };
+      const { progress, unreadable, sha256 } = await readProgressFile(access, at, problems);
+      const state: StudentState = unreadable ? { iteration, progress, progressUnreadable: true, problems } : { iteration, progress, problems };
+      if (sha256 !== null) state.progressSha256 = sha256;
+      return state;
     },
 
-    async writeProgress(access: WorkspaceAccess, at: ProgressLocation, progress: ProgressFile): Promise<void> {
+    async writeProgress(access: WorkspaceAccess, at: ProgressLocation, progress: ProgressFile, expected: string | null): Promise<void> {
       await ownFolderOf(access, at.dir, at.progressFile);
       const path = join(at.dir, at.progressFile);
+      // The current text only keeps what formatProgress doesn't know (comments, unknown keys);
+      // the check is against the file `progress` was worked out from, however long ago that read was.
       const previous = await access.read(path);
-      // Written only if the file is still what was just read (or still absent).
-      await access.write(path, formatProgress(progress, previous?.text ?? null), previous?.sha256 ?? null);
+      await access.write(path, formatProgress(progress, previous?.text ?? null), expected);
     },
 
     async writeIteration(access: WorkspaceAccess, at: ProgressLocation, state: IterationState): Promise<void> {

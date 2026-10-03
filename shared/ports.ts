@@ -33,8 +33,12 @@ export interface ProgressStore {
    * `access`. Never throws for bad content.
    */
   read(access: WorkspaceAccess, at: ProgressLocation): Promise<StudentState>;
-  /** Writes the progress file whole, only if it is still what this call read (or still absent). */
-  writeProgress(access: WorkspaceAccess, at: ProgressLocation, progress: ProgressFile): Promise<void>;
+  /**
+   * Writes the progress file whole, only if its sha256 is still `expected`
+   * (the StudentState's progressSha256 this progress was worked out from), or
+   * it is still absent when `expected` is null. Otherwise WriteConflictError.
+   */
+  writeProgress(access: WorkspaceAccess, at: ProgressLocation, progress: ProgressFile, expected: string | null): Promise<void>;
   /** Writes the first ITERATION file as "<NNN> <WIP|Done>\n", then removes the older ones. Refuses Lesson 0. */
   writeIteration(access: WorkspaceAccess, at: ProgressLocation, state: IterationState): Promise<void>;
 }

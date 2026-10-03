@@ -8,7 +8,7 @@ import { WorkspaceUnreachableError, type WorkspaceAccess } from "./access.ts";
 import { resolveWorkspace, workspaceSetting, type Sdk } from "./workspace-project.ts";
 
 /** Just enough of the SDK for resolveWorkspace: one project whose default source is `path`, on a machine in `status`. */
-function sdkWith(path: string, status: "connected" | "disconnected" | "gone" = "connected"): Sdk {
+function sdkWith(path: string, status: "connected" | "disconnected" | "gone" | "failing" = "connected"): Sdk {
   const project = {
     id: "prj_1",
     name: "repo",
@@ -17,6 +17,7 @@ function sdkWith(path: string, status: "connected" | "disconnected" | "gone" = "
   const hosts = {
     get: async ({ hostId }: { hostId: string }) => {
       if (status === "gone") throw Object.assign(new Error("HTTP 404: Host not found"), { status: 404, code: "host_not_found" });
+      if (status === "failing") throw Object.assign(new Error("HTTP 503: Service Unavailable"), { status: 503, code: null });
       return { id: hostId, status };
     },
   };
@@ -55,6 +56,9 @@ test("a machine that is not connected is unreachable, asked nothing; one that is
   });
   assert.deepEqual(asked, []);
   assert.equal((await resolveWorkspace(sdkWith("/w", "gone"), "prj_1", access)).workspace.status, "missing");
+  // Any other failure to ask BB about the machine says nothing about the folder: not "gone".
+  assert.equal((await resolveWorkspace(sdkWith("/w", "failing"), "prj_1", access)).workspace.status, "unreachable");
+  assert.deepEqual(asked, []);
 });
 
 test("a probe that finds the machine offline is unreachable, not missing", async () => {

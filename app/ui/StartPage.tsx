@@ -5,6 +5,7 @@
 // (Sketchbook mockup "outline") and "Start with your coach".
 import { useCallback, useEffect, useState } from "react";
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
+import { WORKSPACE_UNREACHABLE_TEXT } from "../../shared/constants.ts";
 import { formatRoute } from "../../shared/routes.ts";
 import { refreshAll, useAction, useCourseNavigate, useOpenRule, useOverview, useQuery, useTutorRpc } from "../hooks.ts";
 import { lessonLabel } from "../model/format.ts";
@@ -226,6 +227,12 @@ function StartCoach({
             Your coach works in your workspace. Pick that project first, then come back to start with your coach.
           </p>
           <Button onClick={onSetUp}>Pick your workspace →</Button>
+        </div>
+      );
+    case "unreachable":
+      return (
+        <div className="tp-start">
+          <ErrorNotice message={WORKSPACE_UNREACHABLE_TEXT} />
         </div>
       );
     case "start":

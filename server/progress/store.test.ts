@@ -29,8 +29,10 @@ test("progress and iteration round-trip, and writes leave no temp files", async 
     const progress = fixtureStudent.progress;
     assert.ok(progress !== null);
     await store.writeIteration(disk, at(sandbox.factoryRoot), { iteration: "002", status: "WIP" });
-    await store.writeProgress(disk, at(sandbox.factoryRoot), progress);
-    assert.deepEqual(await store.read(disk, at(sandbox.factoryRoot)), fixtureStudent);
+    await store.writeProgress(disk, at(sandbox.factoryRoot), progress, null);
+    const { progressSha256, ...read } = await store.read(disk, at(sandbox.factoryRoot));
+    assert.deepEqual(read, fixtureStudent);
+    assert.equal(progressSha256, (await disk.read(join(sandbox.factoryRoot, "spec/PROGRESS.yaml")))?.sha256, "the sha of the file as read");
     assert.equal(await readFile(join(sandbox.factoryRoot, "ITERATION"), "utf8"), "002 WIP\n");
     assert.deepEqual((await readdir(sandbox.factoryRoot)).sort(), ["ITERATION", "spec"]);
     assert.deepEqual(await readdir(join(sandbox.factoryRoot, "spec")), ["PROGRESS.yaml"]);
@@ -158,7 +160,7 @@ test("refuses to write PROGRESS.yaml through a spec/ that is a symbolic link, an
     await symlink("src", join(sandbox.factoryRoot, "spec"));
     const progress = fixtureStudent.progress;
     assert.ok(progress !== null);
-    await assert.rejects(store.writeProgress(disk, at(sandbox.factoryRoot), progress), /symbolic link/);
+    await assert.rejects(store.writeProgress(disk, at(sandbox.factoryRoot), progress, null), /symbolic link/);
     await store.writeIteration(disk, at(sandbox.factoryRoot), { iteration: "002", status: "WIP" });
     assert.equal(await readFile(join(sandbox.factoryRoot, "ITERATION"), "utf8"), "002 WIP\n");
     assert.deepEqual(await readdir(join(sandbox.factoryRoot, "src")), ["ITERATION"]);
@@ -179,23 +181,25 @@ function recording(): { access: WorkspaceAccess; writes: { path: string; expecte
   };
 }
 
-test("PROGRESS.yaml is written only if it is still what the same call read", async () => {
+test("PROGRESS.yaml is written only if it is still what the caller read", async () => {
   const sandbox = await makeSandbox();
   try {
     const progress = fixtureStudent.progress;
     assert.ok(progress !== null);
     const { access, writes } = recording();
-    await store.writeProgress(access, at(sandbox.factoryRoot), progress);
-    await store.writeProgress(access, at(sandbox.factoryRoot), progress);
-    const read = await disk.read(join(sandbox.factoryRoot, "spec/PROGRESS.yaml"));
+    await store.writeProgress(access, at(sandbox.factoryRoot), progress, null);
+    const { progressSha256 } = await store.read(disk, at(sandbox.factoryRoot));
+    assert.ok(progressSha256 !== undefined);
+    await store.writeProgress(access, at(sandbox.factoryRoot), progress, progressSha256);
     assert.equal(writes[0]?.expected, null, "a new file must not exist yet");
-    assert.equal(writes[1]?.expected, read?.sha256, "a rewrite expects the text it read");
+    assert.equal(writes[1]?.expected, progressSha256, "a rewrite expects the sha the caller read");
     await store.writeIteration(access, at(sandbox.factoryRoot), { iteration: "002", status: "WIP" });
     assert.equal(writes[2]?.expected, undefined, "ITERATION is written without a check");
   } finally {
     await sandbox.cleanup();
   }
 });
+
 
 test("progress lives wherever the location says", async () => {
   const sandbox = await makeSandbox();
@@ -204,8 +208,9 @@ test("progress lives wherever the location says", async () => {
     assert.ok(progress !== null);
     const elsewhere: ProgressLocation = { dir: join(sandbox.factoryRoot, ".tutor/courses/x"), progressFile: "progress.yaml", iterationFiles: ["ITERATION"] };
     await store.writeIteration(disk, elsewhere, { iteration: "002", status: "WIP" });
-    await store.writeProgress(disk, elsewhere, progress);
-    assert.deepEqual(await store.read(disk, elsewhere), fixtureStudent);
+    await store.writeProgress(disk, elsewhere, progress, null);
+    const { progressSha256: _sha, ...read } = await store.read(disk, elsewhere);
+    assert.deepEqual(read, fixtureStudent);
     assert.deepEqual((await readdir(elsewhere.dir)).sort(), ["ITERATION", "progress.yaml"]);
     const noIteration: ProgressLocation = { ...elsewhere, iterationFiles: [] };
     assert.equal((await store.read(disk, noIteration)).iteration, null);
@@ -215,26 +220,26 @@ test("progress lives wherever the location says", async () => {
   }
 });
 
-test("PROGRESS.yaml changed by someone else between the read and the write is refused and left as they wrote it", async () => {
+test("PROGRESS.yaml changed by someone else since the caller read it is refused and left as they wrote it", async () => {
   const sandbox = await makeSandbox();
   try {
     const progress = fixtureStudent.progress;
     assert.ok(progress !== null);
     const path = join(sandbox.factoryRoot, "spec/PROGRESS.yaml");
-    await store.writeProgress(disk, at(sandbox.factoryRoot), progress);
+    await store.writeProgress(disk, at(sandbox.factoryRoot), progress, null);
+    const { progressSha256 } = await store.read(disk, at(sandbox.factoryRoot));
+    // Another writer changes the file after the caller's read, before its write.
     const theirs = 'iteration: "001"\nexamples: {}\n';
-    // Another writer changes the file just after the store reads it, so the sha it read is stale.
-    const racing: WorkspaceAccess = {
-      ...disk,
-      read: async (file) => {
-        const read = await disk.read(file);
-        if (file === path) await writeFile(path, theirs);
-        return read;
-      },
-    };
-    await assert.rejects(store.writeProgress(racing, at(sandbox.factoryRoot), progress), WriteConflictError);
+    await writeFile(path, theirs);
+    await assert.rejects(store.writeProgress(disk, at(sandbox.factoryRoot), progress, progressSha256 ?? null), WriteConflictError);
     assert.equal(await readFile(path, "utf8"), theirs);
+    // A file that appeared since the caller found none is a conflict too.
+    const fresh = at(join(sandbox.root, "elsewhere"));
+    await mkdir(join(sandbox.root, "elsewhere/spec"), { recursive: true });
+    await writeFile(join(sandbox.root, "elsewhere/spec/PROGRESS.yaml"), theirs);
+    await assert.rejects(store.writeProgress(disk, fresh, progress, null), WriteConflictError);
   } finally {
     await sandbox.cleanup();
   }
 });
+

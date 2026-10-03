@@ -81,7 +81,8 @@ async function applyOutcome(rt: TutorRuntime, state: CoachState, outcome: Outcom
     note = adoption.note;
   }
   if (outcome.iteration !== undefined) await rt.store.writeIteration(access, progressAt, outcome.iteration);
-  if (outcome.progress !== undefined) await rt.store.writeProgress(access, progressAt, outcome.progress);
+  // Only if the file is still what the world read: an edit since then is a conflict, not lost.
+  if (outcome.progress !== undefined) await rt.store.writeProgress(access, progressAt, outcome.progress, state.student.progressSha256 ?? null);
   if (outcome.iteration !== undefined || outcome.progress !== undefined) {
     rt.signals.publish(outcome.iteration === undefined ? "progress" : "iteration", outcome.progress?.iteration ?? null);
   }
