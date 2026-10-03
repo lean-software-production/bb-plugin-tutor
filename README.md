@@ -135,8 +135,12 @@ To build the same archive locally, run `scripts/release-archive.sh v<x.y.z> <out
   where coach threads run. Written by the first-run page. Tutor never creates projects.
 - `factoryProject` (project, read only): an older Tutor's workspace setting. It is still read
   when `workspaceProject` is unset, so existing Codespaces carry on, but Tutor never writes it.
-- `coachProvider` (string): the agent provider coach threads are pinned to, such as `pi`. Empty
-  uses BB's default. `tutor up` sets it to `pi`; the Codespace leaves it empty.
+- `coachProvider` (string): the agent provider coach threads are pinned to, such as `claude-code`,
+  `codex` or `pi`. Empty uses the first of Claude Code, Codex and pi that BB reports signed in
+  ("ready") on the workspace's machine, on that agent's default model; with none ready, BB's
+  default. `tutor up` sets it to `pi`; the Codespace leaves it empty.
+- `coachModel` (string): the model coach threads use, as `provider/model`. It applies only with
+  `coachProvider` set; `tutor login` sets it.
 - `courseCatalog` (string): the courses that can be added, as JSON: a list of
   `{ id, title, description, repo, ref }`, each `repo` an `https://` (or the operator's own
   `file://`) URL and each `ref` a tag or a full SHA. Empty uses Tutor's own catalog

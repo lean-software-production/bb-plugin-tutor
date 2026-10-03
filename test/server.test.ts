@@ -170,6 +170,76 @@ test("without a coachProvider setting, a coach thread spawns with no providerId 
   assert.equal("executionInputSources" in spawn, false);
 });
 
+// Without a coachProvider setting, the coach uses the agent the student has
+// already signed in to on the workspace's machine: Claude Code, then Codex, then pi.
+
+async function agentSetup(t: TestContext, providerStates: Parameters<typeof makeTutorHost>[3] extends infer O ? O extends { providerStates?: infer P } ? P : never : never, settings: Record<string, string> = { factoryProject: PROJECT_ID }): Promise<TutorHost> {
+  const sandbox = await makeSandbox();
+  const host = await makeTutorHost(sandbox.course, sandbox.factoryRoot, settings, { providerStates });
+  t.after(async () => {
+    await host.harness.lifecycle.dispose();
+    await sandbox.cleanup();
+  });
+  return host;
+}
+
+function spawned(host: TutorHost): Record<string, unknown> {
+  return (host.harness.inspection.sdk.callsTo("threads.spawn")[0] as [Record<string, unknown>])[0];
+}
+
+test("without a coachProvider setting, the coach uses Claude Code when it is ready on the workspace's machine", async (t) => {
+  const host = await agentSetup(t, [
+    { providerId: "pi", status: "ready" },
+    { providerId: "codex", status: "ready" },
+    { providerId: "claude-code", status: "ready" },
+  ]);
+  await openCoach(host, "000");
+  assert.equal(spawned(host).providerId, "claude-code");
+  assert.deepEqual(spawned(host).executionInputSources, { providerId: "explicit" });
+  assert.deepEqual(host.harness.inspection.sdk.callsTo("system.providerStates")[0], [{ hostId: "host_1" }]);
+});
+
+test("then Codex, then pi: an agent that is signed out, expired or missing is passed over", async (t) => {
+  const codex = await agentSetup(t, [
+    { providerId: "claude-code", status: "unauthenticated" },
+    { providerId: "codex", status: "ready" },
+    { providerId: "pi", status: "ready" },
+  ]);
+  await openCoach(codex, "000");
+  assert.equal(spawned(codex).providerId, "codex");
+
+  const pi = await agentSetup(t, [
+    { providerId: "claude-code", status: "not_installed" },
+    { providerId: "codex", status: "expired" },
+    { providerId: "pi", status: "ready" },
+  ]);
+  await openCoach(pi, "000");
+  assert.equal(spawned(pi).providerId, "pi");
+});
+
+test("with none of them ready, the coach is left to BB's default agent", async (t) => {
+  const host = await agentSetup(t, [
+    { providerId: "claude-code", status: "unauthenticated" },
+    { providerId: "opencode", status: "ready" },
+  ]);
+  await openCoach(host, "000");
+  assert.equal("providerId" in spawned(host), false);
+});
+
+test("a coachProvider setting wins: the machine's agents are not consulted", async (t) => {
+  const host = await agentSetup(t, [{ providerId: "claude-code", status: "ready" }], { factoryProject: PROJECT_ID, coachProvider: "pi" });
+  await openCoach(host, "000");
+  assert.equal(spawned(host).providerId, "pi");
+  assert.equal(host.harness.inspection.sdk.callsTo("system.providerStates").length, 0);
+});
+
+test("a coachModel setting applies only with a coachProvider setting: a chosen agent runs its own default model", async (t) => {
+  const host = await agentSetup(t, [{ providerId: "claude-code", status: "ready" }], { factoryProject: PROJECT_ID, coachModel: "openrouter/z-ai/glm-5.3-flash" });
+  await openCoach(host, "000");
+  assert.equal(spawned(host).providerId, "claude-code");
+  assert.equal("model" in spawned(host), false);
+});
+
 test("a coachProvider setting pins coach threads to that provider explicitly", async (t) => {
   const { host } = await setup(t, { factoryProject: PROJECT_ID, coachProvider: "pi" });
   await openCoach(host, "000");

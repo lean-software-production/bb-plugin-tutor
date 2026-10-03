@@ -23,6 +23,7 @@ import {
   type CoachThreadStart,
 } from "../coach/prompts.ts";
 import type { TutorRuntime } from "../coach/runtime.ts";
+import { readyCoachAgent } from "../coach/agent.ts";
 import { BB_REPLY_PREFIX, ensureSideChatTab, listSideChats, openSideChat } from "../coach/side-chats.ts";
 import {
   findCoachThread,
@@ -130,7 +131,8 @@ export function registerRpc(rt: TutorRuntime): void {
     );
   }
 
-  async function spawnCoach(course: Course, workspace: FoundWorkspace, lesson: Lesson, prompt: string, pin: CoachPin): Promise<string> {
+  async function spawnCoach(course: Course, workspace: FoundWorkspace, lesson: Lesson, prompt: string, settings: CoachPin): Promise<string> {
+    const pin = await resolvePin(settings, workspace.location.hostId);
     const threadId = await spawnCoachThread(bb.sdk, {
       projectId: workspace.projectId,
       workspace: workspace.location,
@@ -175,8 +177,19 @@ export function registerRpc(rt: TutorRuntime): void {
   }
 
   /**
-   * The coachProvider and coachModel settings, each null to leave BB's default alone: empty or unset means the
-   * Codespace's setup. The standalone launcher sets both at `tutor login`.
+   * What a new coach thread is pinned to. A coachProvider setting wins, with the coachModel setting. Without one,
+   * the coach uses the first agent the student has signed in to on the workspace's machine (agent.ts), on that
+   * agent's own default model: a coachModel names one agent's model, so it applies only with its coachProvider.
+   * With none ready, BB's default agent (the Codespace's setup).
+   */
+  async function resolvePin(settings: CoachPin, hostId: string): Promise<CoachPin> {
+    if (settings.providerId !== null) return settings;
+    return { providerId: await readyCoachAgent(bb.sdk, hostId, (message) => bb.log.warn(message)), model: null };
+  }
+
+  /**
+   * The coachProvider and coachModel settings, each null when empty or unset (resolvePin decides what that means).
+   * The standalone launcher sets both at `tutor login`.
    */
   function coachPinOf(world: World): CoachPin {
     return {

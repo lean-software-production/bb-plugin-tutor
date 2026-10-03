@@ -28,12 +28,13 @@ const descriptors = {
   [SETTING_KEYS.coachProvider]: {
     type: "string",
     label: "Coach agent",
-    description: "The agent provider coach threads use, such as pi. Empty uses BB's default.",
+    description:
+      "The agent provider coach threads use, such as claude-code, codex or pi. Empty uses the first of Claude Code, Codex and pi you have signed in to on your computer, else BB's default.",
   },
   [SETTING_KEYS.coachModel]: {
     type: "string",
     label: "Coach model",
-    description: "The model coach threads use, as provider/model. Empty uses the coach agent's default.",
+    description: "The model coach threads use, as provider/model. Applies only with a Coach agent set; empty uses the agent's default.",
   },
   [SETTING_KEYS.courseCatalog]: {
     type: "string",

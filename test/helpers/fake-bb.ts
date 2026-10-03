@@ -166,6 +166,8 @@ export async function makeTutorHost(
     serverHost?: boolean;
     /** Runs before each call to the host entry is dispatched: to watch the calls, or to fail one by throwing. */
     onHostCall?: (method: string, input: unknown) => unknown;
+    /** What sdk.system.providerStates says of each agent on a machine; without it, the call fails (as on an older BB). */
+    providerStates?: { providerId: string; status: "ready" | "unauthenticated" | "expired" | "not_installed" | "unknown" | "unsupported_version" }[];
   } = {},
 ): Promise<TutorHost> {
   const threads: FakeThread[] = [];
@@ -234,6 +236,26 @@ export async function makeTutorHost(
         list: async () => (options.serverHost === false ? [] : [makeHostResponse({ id: "host_1", machineProviderId: null })]),
       },
       files: diskFiles,
+      ...(options.providerStates === undefined
+        ? {}
+        : {
+            system: {
+              providerStates: async () => ({
+                providers: options.providerStates!.map((state) => ({
+                  accountEmail: null,
+                  canInstall: false,
+                  canUpdate: false,
+                  displayName: state.providerId,
+                  installedVersion: null,
+                  loginCommand: null,
+                  minimumSupportedVersion: null,
+                  planLabel: null,
+                  statusMessage: null,
+                  ...state,
+                })),
+              }),
+            },
+          }),
       projects: {
         get: async ({ projectId }) => {
           if (projectId !== PROJECT_ID) throw new Error(`HTTP 404: project ${projectId} not found`);
