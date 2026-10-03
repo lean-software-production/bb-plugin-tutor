@@ -36,8 +36,14 @@ export interface StatusCaller {
   otherLesson: string | null;
 }
 
+/** The coaching method, named for tutor_status: too long to repeat for the course's own (it's in the instructions already). */
+function coachMethodText(coach: CoachState["coach"]): string {
+  if (coach === null) return "(no coach file)";
+  return coach.kind === "workspace" ? `the file ${coach.relativePath} in this workspace` : "in your instructions above";
+}
+
 export function statusText(state: CoachState, caller: StatusCaller | null = null): string {
-  const { course, coachPath, lesson, pointer } = state;
+  const { course, coach, lesson, pointer } = state;
   const progress = state.progress?.examples ?? {};
   const focus = state.progress?.focus ?? null;
   const counts = countExamples(lessonExamples(lesson), progress);
@@ -49,7 +55,7 @@ export function statusText(state: CoachState, caller: StatusCaller | null = null
     }
   }
   lines.push(
-    `Course: ${course.title}. Coaching method: ${coachPath ?? "(no coach file)"}.`,
+    `Course: ${course.title}. Coaching method: ${coachMethodText(coach)}.`,
     factoryLine(state),
     `Lesson ${lesson.id} "${lesson.title}": ${pointer.iterationStatus}. ` +
       `${counts.passing}/${counts.total} passing, ${counts.notYet} not yet, ${counts.skipped} skipped, ${counts.pending} pending.`,

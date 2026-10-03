@@ -56,7 +56,7 @@ export async function registerTutor(bb: BbPluginApi, deps: WorldDeps): Promise<T
     const loaded = courses.find((entry) => entry.course.id === courseId);
     const method = loaded === undefined ? null : methodCourse(courses, loaded);
     return coachConfiguration(context, bb.pluginId, {
-      coachPath: method?.coachPath ?? null,
+      coach: method?.coach ?? null,
       factory: factoryWhere(method?.layout ?? null),
       coachLesson: (threadId) => rt.coaches.lessonOf(threadId),
     });

@@ -15,7 +15,7 @@ import { resolveCourseLayout, type CourseLayoutState } from "../../layouts/state
 import { overlaps, realPath } from "../paths.ts";
 import { WorkspaceUnreachableError, type WorkspaceAccess } from "../workspace/access.ts";
 import { resolveWorkspace, workspaceSetting, type ResolvedWorkspace } from "../workspace/workspace-project.ts";
-import { resolveCoachFile } from "./coach-file.ts";
+import { resolveCoachMethod, type CoachMethod } from "./coach-file.ts";
 import { readFeatureConfig, resolveCoursePath, resolveProjectHint, type Env, type FeatureConfig } from "./course-path.ts";
 import type { TutorSettings } from "./settings.ts";
 
@@ -43,8 +43,8 @@ export interface LoadedCourse {
   layout: CourseLayoutState;
   student: StudentState;
   pointer: CurrentPointer;
-  /** The coaching method's file: the course's coach file, else the starter's coach-me skill (coach-file.ts). */
-  coachPath: string | null;
+  /** The coaching method: the course's own coach file (inlined as text), else the starter's coach-me skill (coach-file.ts). */
+  coach: CoachMethod;
 }
 
 export interface World {
@@ -56,6 +56,8 @@ export interface World {
   hostId: string | null;
   /** Every course that loaded, built-in first, workspace or not: what the outline shows before setup. */
   available: Course[];
+  /** The agent provider coach threads are pinned to; empty means BB's default (settings.ts). */
+  coachProvider: string;
   /** Tutor's built-in course first, then the configured or fetched courses. Empty only while there is no workspace. */
   courses: LoadedCourse[];
   /** Courses that could not be loaded, by id or path, with the reason. */
@@ -163,8 +165,8 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
     const layout = await resolveCourseLayout(course.layout, root, courseDirOf(course), access);
     const read = await deps.store.read(access, layout.progress);
     const student = layout.problems.length === 0 ? read : { ...read, problems: [...layout.problems, ...read.problems] };
-    const coachPath = await resolveCoachFile(course.coachPath, layout.id === "capstone-factory" ? layout.layout.factoryDir : null, access);
-    return { course, layout, student, pointer: resolveCurrent(course, student), coachPath };
+    const coach = await resolveCoachMethod(course.coachPath, layout, root, access);
+    return { course, layout, student, pointer: resolveCurrent(course, student), coach };
   }
 
   async function readBuiltin(course: Course, root: string, access: WorkspaceAccess, others: readonly LoadedCourse[]): Promise<LoadedCourse> {
@@ -173,7 +175,8 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
     const capstone = others.find((entry) => entry.layout.id === "capstone-factory");
     const legacy = read.progress === null && read.progressUnreadable !== true && capstone !== undefined ? legacyLesson0(capstone.student) : null;
     const student = legacy === null ? read : { ...read, progress: legacy };
-    return { course, layout, student, pointer: resolveCurrent(course, student), coachPath: course.coachPath };
+    // The built-in course never has a coach file of its own; methodCourse borrows the next course's.
+    return { course, layout, student, pointer: resolveCurrent(course, student), coach: null };
   }
 
   /**
@@ -244,6 +247,7 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
         workspace,
         hostId,
         available,
+        coachProvider: values.coachProvider ?? "",
         courses,
         courseErrors,
         projectHint: await projectHint(config, hostId),

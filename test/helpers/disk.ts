@@ -46,7 +46,10 @@ async function writeCourse(courseRoot: string, source: Course = fixtureCourse): 
     }
     lessons.push({ ...lesson, dir });
   }
-  return { ...source, root: courseRoot, coachPath: join(courseRoot, ".agents/coach-me.md"), lessons };
+  const coachPath = join(courseRoot, ".agents/coach-me.md");
+  await mkdir(join(courseRoot, ".agents"), { recursive: true });
+  await writeFile(coachPath, "## Coaching process\nBaby steps, one Rule at a time.\n");
+  return { ...source, root: courseRoot, coachPath, lessons };
 }
 
 /**

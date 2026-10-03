@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { findCoachThread, listAllThreads, reachedRulesOf, THREAD_PAGE_SIZE, threadRole, toTutorThread, type ThreadRow } from "./threads.ts";
+import { findCoachThread, listAllThreads, reachedRulesOf, spawnCoachThread, THREAD_PAGE_SIZE, threadRole, toTutorThread, type Sdk, type ThreadRow } from "./threads.ts";
 
 function row(overrides: Partial<ThreadRow>): ThreadRow {
   return {
@@ -66,6 +66,23 @@ test("reached Rules come from the coach thread's metadata, leniently", () => {
   assert.deepEqual(coach?.reachedRules, ["a/b"]);
   const side = toTutorThread(row({ parentThreadId: "m" }), { course: "c", lesson: "002", role: "sideChat", reachedRules: ["a/b"] });
   assert.deepEqual(side?.reachedRules, []);
+});
+
+test("a coach thread is pinned to the provider explicitly, so BB keeps it", async () => {
+  const spawned: unknown[] = [];
+  const sdk = { threads: { spawn: async (args: unknown) => (spawned.push(args), { id: "thr_1" }) } } as unknown as Sdk;
+  await spawnCoachThread(sdk, { projectId: "p", workspace: { root: "/w", hostId: "h" }, courseId: "tutor", lessonId: "000", prompt: "x", providerId: "pi" });
+  assert.deepEqual((spawned[0] as { providerId: string; executionInputSources: unknown }).executionInputSources, { providerId: "explicit" });
+  assert.equal((spawned[0] as { providerId: string }).providerId, "pi");
+});
+
+test("without a coach provider, spawn passes none (the Codespace)", async () => {
+  const spawned: unknown[] = [];
+  const sdk = { threads: { spawn: async (args: unknown) => (spawned.push(args), { id: "thr_1" }) } } as unknown as Sdk;
+  await spawnCoachThread(sdk, { projectId: "p", workspace: { root: "/w", hostId: "h" }, courseId: "tutor", lessonId: "000", prompt: "x", providerId: null });
+  const args = spawned[0] as Record<string, unknown>;
+  assert.equal("providerId" in args, false);
+  assert.equal("executionInputSources" in args, false);
 });
 
 test("listing reads every page once, even when a new thread shifts the pages meanwhile", async () => {

@@ -48,7 +48,7 @@ In the course files a lesson may still be called a "homework" or "iteration"
 
 How you coach (what to ask, when to hint, when to let the student struggle) is
 the coaching method in your instructions: the course's own coach file, or
-whatever `tutor_status` names instead. Your first message gives its path, and
+whatever `tutor_status` names instead. Your first message gives it, and
 `tutor_status` repeats it. Read it at the start and follow its Coaching
 process and Rules. Tutor changes only a few things about how you carry them
 out:

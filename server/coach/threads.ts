@@ -14,7 +14,7 @@ import {
 } from "../../shared/model.ts";
 import type { TutorThread } from "../../shared/rpc.ts";
 
-type Sdk = BbPluginApi["sdk"];
+export type Sdk = BbPluginApi["sdk"];
 
 type ThreadListArgs = NonNullable<Parameters<Sdk["threads"]["list"]>[0]>;
 type ListedThread = Awaited<ReturnType<Sdk["threads"]["list"]>>[number];
@@ -199,6 +199,8 @@ export interface SpawnCoach {
   courseId: string;
   lessonId: string;
   prompt: string;
+  /** The coachProvider setting, or null to leave BB's default alone (settings.ts). */
+  providerId: string | null;
 }
 
 export async function spawnCoachThread(sdk: Sdk, spawn: SpawnCoach): Promise<string> {
@@ -209,6 +211,8 @@ export async function spawnCoachThread(sdk: Sdk, spawn: SpawnCoach): Promise<str
     title: coachThreadTitle(spawn.lessonId),
     pluginMetadata,
     prompt: spawn.prompt,
+    // Without a source, BB drops a providerId it was given no provenance for.
+    ...(spawn.providerId === null ? {} : { providerId: spawn.providerId, executionInputSources: { providerId: "explicit" } }),
   });
   return thread.id;
 }

@@ -14,7 +14,7 @@ test("lists the lesson, the focus and every Example key with its status", () => 
   assert.match(text, /^● validation\/a-task-is-finished-when-validation-is-satisfied — /m);
   assert.match(text, /! validation\/.*\/the-work-is-wrong-first-time — The work is wrong first time \(Crashed/);
   assert.match(text, /Lexicon ids for ::term: doer, assembly-line\./);
-  assert.match(text, /Coaching method: \/workspaces\/tutorial\/\.agents\/coach-me\.md/);
+  assert.match(text, /Coaching method: in your instructions above\./);
 });
 
 test("stays bounded however long the notes are", () => {
@@ -37,11 +37,11 @@ test("stays bounded however long the notes are", () => {
 });
 
 test("names the coaching method the world found, the starter's skill included", () => {
-  const skill = "/workspaces/capstone-project-starter/tetris/.agents/skills/coach-me/SKILL.md";
-  const withSkill = coachStateOf(withCourse(makeWorld(), fixtureCourse.id, { coachPath: skill }), fixtureCourse.id);
+  const skill = "tetris/.agents/skills/coach-me/SKILL.md";
+  const withSkill = coachStateOf(withCourse(makeWorld(), fixtureCourse.id, { coach: { kind: "workspace", relativePath: skill } }), fixtureCourse.id);
   assert.ok(!("error" in withSkill));
-  assert.match(statusText(withSkill), /Coaching method: \/workspaces\/capstone-project-starter\/tetris\/\.agents\/skills\/coach-me\/SKILL\.md\./);
-  const without = coachStateOf(withCourse(makeWorld(), fixtureCourse.id, { coachPath: null }), fixtureCourse.id);
+  assert.match(statusText(withSkill), /Coaching method: the file tetris\/\.agents\/skills\/coach-me\/SKILL\.md in this workspace\./);
+  const without = coachStateOf(withCourse(makeWorld(), fixtureCourse.id, { coach: null }), fixtureCourse.id);
   assert.ok(!("error" in without));
   assert.match(statusText(without), /Coaching method: \(no coach file\)\./);
 });

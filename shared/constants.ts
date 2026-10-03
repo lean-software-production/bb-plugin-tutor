@@ -71,6 +71,8 @@ export const SETTING_KEYS = {
   factoryProject: "factoryProject",
   /** `type: "boolean"`, default true; hides BB's Plugins and Skills navigation rows. */
   simpleNavigation: "simpleNavigation",
+  /** `type: "string"`; the agent provider coach threads use. Empty means BB's default. */
+  coachProvider: "coachProvider",
 } as const;
 
 /**

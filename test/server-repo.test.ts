@@ -195,7 +195,7 @@ test("without a course coach file, the coaching method is the starter's coach-me
   const s = await setup(t, { course: (course) => ({ ...course, coachPath: null }) });
   const coach = await coachFor(s.host, "000");
   const status = await ok(s.host, "tutor_status", {}, coach);
-  assert.match(status, new RegExp(`Coaching method: ${join(s.sandbox.repoRoot, ".agents/skills/coach-me/SKILL.md").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\.`));
+  assert.match(status, /Coaching method: the file \.agents\/skills\/coach-me\/SKILL\.md in this workspace\./);
   const [spawn] = s.host.harness.inspection.sdk.callsTo("threads.spawn")[0] as [Record<string, unknown>];
   assert.match(String(spawn.prompt), /\.agents\/skills\/coach-me\/SKILL\.md/);
 });

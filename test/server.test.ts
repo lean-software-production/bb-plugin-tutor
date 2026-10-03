@@ -160,6 +160,22 @@ test("openCoach spawns one coach thread per lesson in the factory, then finds it
   assert.ok(host.harness.inspection.realtimeSignals.some((signal) => (signal.payload as { reason: string }).reason === "threads"));
 });
 
+test("without a coachProvider setting, a coach thread spawns with no providerId (the Codespace)", async (t) => {
+  const { host } = await setup(t);
+  await openCoach(host, "000");
+  const [spawn] = host.harness.inspection.sdk.callsTo("threads.spawn")[0] as [Record<string, unknown>];
+  assert.equal("providerId" in spawn, false);
+  assert.equal("executionInputSources" in spawn, false);
+});
+
+test("a coachProvider setting pins coach threads to that provider explicitly", async (t) => {
+  const { host } = await setup(t, { factoryProject: PROJECT_ID, coachProvider: "pi" });
+  await openCoach(host, "000");
+  const [spawn] = host.harness.inspection.sdk.callsTo("threads.spawn")[0] as [Record<string, unknown>];
+  assert.equal(spawn.providerId, "pi");
+  assert.deepEqual(spawn.executionInputSources, { providerId: "explicit" });
+});
+
 test("the coach tools round-trip progress through the factory repo and carry passing Examples over", async (t) => {
   const { sandbox, host } = await setup(t);
   const root = sandbox.factoryRoot;
@@ -1005,7 +1021,7 @@ test("a capstone lesson waits for the layout, with its own message; a layoutless
   const ws = await mkdtemp(join(tmpdir(), "ws-"));
   t.after(() => rm(ws, { recursive: true, force: true }));
   await mkdir(join(ws, ".git"));
-  const capstone = await makeTutorHost({ ...fixtureCourse, layout: "capstone-factory" }, ws);
+  const capstone = await makeTutorHost({ ...fixtureCourse, layout: "capstone-factory", coachPath: null }, ws);
   t.after(() => capstone.harness.lifecycle.dispose());
   // An empty git repo has no factory folder: the capstone says so in its own words (detect.ts), not "Add the course".
   await assert.rejects(capstone.harness.behavior.callRpc("startNextLesson", { courseId: "software-factory", lessonId: "001" }), /This repo has no factory folder/);
@@ -1019,7 +1035,7 @@ test("a not-ready capstone still answers tutor_status with its problem, and won'
   const ws = await mkdtemp(join(tmpdir(), "ws-"));
   t.after(() => rm(ws, { recursive: true, force: true }));
   await mkdir(join(ws, ".git"));
-  const host = await makeTutorHost(fixtureCourse, ws);
+  const host = await makeTutorHost({ ...fixtureCourse, coachPath: null }, ws);
   t.after(() => host.harness.lifecycle.dispose());
   // Lesson 0 is not held up by the capstone's missing factory.
   const coach0 = (await openCoach(host, "000")).threadId;
@@ -1318,6 +1334,7 @@ test("refuses to adopt when ../seeds/ is, or holds, the course, writing nothing"
   const course = {
     ...sandbox.course,
     root: courseRoot,
+    coachPath: sandbox.course.coachPath === null ? null : sandbox.course.coachPath.replace(sandbox.course.root, courseRoot),
     lessons: sandbox.course.lessons.map((lesson) => ({ ...lesson, dir: lesson.dir.replace(sandbox.course.root, courseRoot) })),
   };
   await writeFile(join(sandbox.factoryRoot, "ITERATION"), "001 WIP\n");

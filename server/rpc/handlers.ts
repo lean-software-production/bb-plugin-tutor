@@ -125,13 +125,14 @@ export function registerRpc(rt: TutorRuntime): void {
     );
   }
 
-  async function spawnCoach(course: Course, workspace: FoundWorkspace, lesson: Lesson, prompt: string): Promise<string> {
+  async function spawnCoach(course: Course, workspace: FoundWorkspace, lesson: Lesson, prompt: string, providerId: string | null): Promise<string> {
     const threadId = await spawnCoachThread(bb.sdk, {
       projectId: workspace.projectId,
       workspace: workspace.location,
       courseId: course.id,
       lessonId: lesson.id,
       prompt,
+      providerId,
     });
     rt.coaches.remember([{ id: threadId, role: "coach", courseId: course.id, lessonId: lesson.id }]);
     rt.signals.publish("threads", lesson.id);
@@ -151,6 +152,7 @@ export function registerRpc(rt: TutorRuntime): void {
     course: Course,
     workspace: FoundWorkspace,
     lesson: Lesson,
+    providerId: string | null,
     prompt: () => string,
   ): Promise<{ threadId: string; created: boolean }> {
     return rt.locks.run(coachThreadLockKey(workspace.projectId, course.id, lesson.id), async () => {
@@ -158,10 +160,15 @@ export function registerRpc(rt: TutorRuntime): void {
       const listed = async () => findCoachThread(await listCoachThreads(bb.sdk, bb.pluginId, workspace.projectId), course.id, lesson.id);
       const found = (await listed())?.id ?? (await recordedCoachThread(bb, lessonCoach)) ?? (await listed())?.id;
       if (found !== undefined) rt.coaches.remember([{ id: found, role: "coach", courseId: course.id, lessonId: lesson.id }]);
-      const threadId = found ?? (await spawnCoach(course, workspace, lesson, prompt()));
+      const threadId = found ?? (await spawnCoach(course, workspace, lesson, prompt(), providerId));
       await recordCoachThread(bb, lessonCoach, threadId);
       return { threadId, created: found === undefined };
     });
+  }
+
+  /** The coachProvider setting, or null to leave BB's default alone: empty or unset means the Codespace's setup. */
+  function providerIdOf(world: World): string | null {
+    return world.coachProvider === "" ? null : world.coachProvider;
   }
 
   function startFor(loaded: LoadedCourse, lesson: Lesson): CoachThreadStart {
@@ -173,7 +180,7 @@ export function registerRpc(rt: TutorRuntime): void {
   /** The coach thread's first message for `lesson` of the course. */
   function promptFor(world: World, loaded: LoadedCourse, lesson: Lesson, start: CoachThreadStart, focus: Rule | null = null): string {
     const method = methodCourse(world.courses, loaded);
-    return coachThreadPrompt(loaded.course, method.coachPath, lesson, start, focus, factoryWhere(method.layout));
+    return coachThreadPrompt(loaded.course, method.coach, lesson, start, focus, factoryWhere(method.layout));
   }
 
   bb.rpc.register(rpcContract, {
@@ -271,7 +278,7 @@ export function registerRpc(rt: TutorRuntime): void {
       if (lessonStatus(loaded.course, loaded.pointer, lesson.id) === "ahead") {
         throw new Error(`Lesson ${lesson.id} has not started yet.`);
       }
-      return findOrSpawnCoach(loaded.course, workspace, lesson, () => promptFor(world, loaded, lesson, startFor(loaded, lesson)));
+      return findOrSpawnCoach(loaded.course, workspace, lesson, providerIdOf(world), () => promptFor(world, loaded, lesson, startFor(loaded, lesson)));
     },
 
     startNextLesson: async ({ courseId, lessonId }) => {
@@ -283,7 +290,7 @@ export function registerRpc(rt: TutorRuntime): void {
       if (lesson.builtin || !adoptionTargets(loaded.course, loaded.pointer).includes(lesson.id)) {
         throw new Error(`Lesson ${lesson.id} cannot be started yet: finish the lesson before it first.`);
       }
-      const { threadId } = await findOrSpawnCoach(loaded.course, workspace, lesson, () => promptFor(world, loaded, lesson, "adopt"));
+      const { threadId } = await findOrSpawnCoach(loaded.course, workspace, lesson, providerIdOf(world), () => promptFor(world, loaded, lesson, "adopt"));
       return { threadId };
     },
 
@@ -343,7 +350,7 @@ export function registerRpc(rt: TutorRuntime): void {
         throw new Error("You can only choose the next Rule in the lesson you are on.");
       }
       const rule = requireRule(lesson, ruleKey);
-      const coachThread = await findOrSpawnCoach(loaded.course, workspace, lesson, () => promptFor(world, loaded, lesson, startFor(loaded, lesson), rule));
+      const coachThread = await findOrSpawnCoach(loaded.course, workspace, lesson, providerIdOf(world), () => promptFor(world, loaded, lesson, startFor(loaded, lesson), rule));
       if (coachThread.created) return { threadId: coachThread.threadId };
       await bb.sdk.threads.send({
         threadId: coachThread.threadId,

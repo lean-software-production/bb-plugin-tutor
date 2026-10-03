@@ -22,14 +22,15 @@ import { carryOver } from "../../layouts/progress/carry-over.ts";
 import { progressFor } from "../progress/current.ts";
 import { needsFactoryMove } from "../../layouts/capstone-factory/factory-move.ts";
 import { notReadyText, type CourseLayoutState } from "../../layouts/state.ts";
+import type { CoachMethod } from "./coach-file.ts";
 import { findCourse, methodCourse, type World } from "./world.ts";
 
 const LATE_FACTORY = STARTER_LAYOUT.lateFactory;
 
 export interface CoachState {
   course: Course;
-  /** The coaching method's file (coach-file.ts), or null. */
-  coachPath: string | null;
+  /** The coaching method (coach-file.ts). */
+  coach: CoachMethod;
   projectId: string;
   /** The BB project's folder, where coach threads work: the student's repo, or (legacy) the factory itself. */
   root: string;
@@ -70,7 +71,7 @@ export function coachStateOf(world: World, courseId: string): CoachState | { err
   if (lesson === undefined) return { error: `Lesson ${pointer.lessonId} is not in this course.` };
   return {
     course,
-    coachPath: methodCourse(world.courses, loaded).coachPath,
+    coach: methodCourse(world.courses, loaded).coach,
     projectId: world.workspace.projectId,
     root: world.workspace.root,
     layout: loaded.layout,

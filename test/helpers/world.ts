@@ -3,6 +3,7 @@ import { resolveCurrent } from "../../shared/derive.ts";
 import { fixtureBuiltinCourse, fixtureCourse, fixtureLesson0Student, fixtureStudent, fixtureWorkspace } from "../../shared/fixtures.ts";
 import type { Course, StudentState } from "../../shared/model.ts";
 import type { Workspace } from "../../shared/rpc.ts";
+import type { CoachMethod } from "../../server/coach/coach-file.ts";
 import { builtinLayout, type LoadedCourse, type World } from "../../server/coach/world.ts";
 import { capstoneProgress, type Layout } from "../../layouts/capstone-factory/detect.ts";
 import type { CourseLayoutState } from "../../layouts/state.ts";
@@ -67,10 +68,12 @@ export function makeWorld(
   lesson0: StudentState = fixtureLesson0Student,
 ): World {
   const found = workspace.status === "found";
+  // A fixture stands in for the course's own coach file being read and inlined (world.ts does this for real).
+  const coachOf = (c: Course): CoachMethod => (c.coachPath === null ? null : { kind: "course", text: `Coaching method text for ${c.id}.` });
   const courses: LoadedCourse[] = found
     ? [
-        { course: fixtureBuiltinCourse, layout: builtinLayout(workspace.root), student: lesson0, pointer: resolveCurrent(fixtureBuiltinCourse, lesson0), coachPath: fixtureBuiltinCourse.coachPath },
-        { course, layout: courseLayout(course, workspace.root), student, pointer: resolveCurrent(course, student), coachPath: course.coachPath },
+        { course: fixtureBuiltinCourse, layout: builtinLayout(workspace.root), student: lesson0, pointer: resolveCurrent(fixtureBuiltinCourse, lesson0), coach: null },
+        { course, layout: courseLayout(course, workspace.root), student, pointer: resolveCurrent(course, student), coach: coachOf(course) },
       ]
     : [];
   return {
@@ -78,6 +81,7 @@ export function makeWorld(
     workspace,
     hostId: found ? "host_1" : null,
     available: [fixtureBuiltinCourse, course],
+    coachProvider: "",
     courses,
     courseErrors: [],
     projectHint: null,

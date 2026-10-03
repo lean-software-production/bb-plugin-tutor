@@ -25,6 +25,11 @@ const descriptors = {
       "Hide BB's Plugins and Skills rows from the sidebar navigation. Takes effect while Tutor's navigation is selected under Settings → Appearance → Navigation.",
     default: true,
   },
+  [SETTING_KEYS.coachProvider]: {
+    type: "string",
+    label: "Coach agent",
+    description: "The agent provider coach threads use, such as pi. Empty uses BB's default.",
+  },
 } as const;
 
 export type TutorSettings = PluginSettingsHandle<typeof descriptors>;

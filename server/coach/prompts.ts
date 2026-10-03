@@ -5,6 +5,7 @@ import { SKILL_ID, STARTER_LAYOUT, TOOL_NAMES } from "../../shared/constants.ts"
 import { formatLessonRef } from "../../shared/directives.ts";
 import { coachThreadMetadataSchema, type Course, type Lesson, type Rule } from "../../shared/model.ts";
 import type { CourseLayoutState } from "../../layouts/state.ts";
+import type { CoachMethod } from "./coach-file.ts";
 
 export type CoachThreadStart = "adopt" | "resume" | "revisit";
 
@@ -44,23 +45,30 @@ function factoryText(where: FactoryWhere): string {
   return `${here} ${move}`;
 }
 
-function method(coachPath: string | null): string {
-  const how =
-    coachPath === null
-      ? "There is no coach file, so coach one small step at a time."
-      : `Your coaching method is the coach file, ${coachPath}: follow its Coaching process and Rules, ` +
-        "using the tutor_* tools wherever it tells you to fetch an iteration or change ITERATION.";
-  return `${how} ${TOOLS_OWN_PROGRESS}`;
+const FOLLOW_IT = "follow its Coaching process and Rules, using the tutor_* tools wherever it tells you to fetch an iteration or change ITERATION.";
+
+/**
+ * How the coaching method reaches the coach: the course's own coach file is
+ * inlined as text (never sent as a server path, meaningless on the student's
+ * machine); the starter's coach-me skill, which stays in the workspace, is
+ * named by its path relative to it; with neither, there is none.
+ */
+function method(coach: CoachMethod): string {
+  if (coach === null) return `There is no coach file, so coach one small step at a time. ${TOOLS_OWN_PROGRESS}`;
+  if (coach.kind === "workspace") {
+    return `Your coaching method is the file ${coach.relativePath} in this workspace: ${FOLLOW_IT} ${TOOLS_OWN_PROGRESS}`;
+  }
+  return `Your coaching method is below: ${FOLLOW_IT} ${TOOLS_OWN_PROGRESS}\n\nCoaching method:\n${coach.text}`;
 }
 
 /**
- * The coach thread's first message. `coachPath` is the coaching method's file
+ * The coach thread's first message. `coach` is the coaching method
  * (coach-file.ts). The lesson card line sits on its own line, exactly as the
  * coach must write it, so the lesson leads the thread.
  */
 export function coachThreadPrompt(
   course: Course,
-  coachPath: string | null,
+  coach: CoachMethod,
   lesson: Lesson,
   start: CoachThreadStart,
   focus: Rule | null = null,
@@ -68,7 +76,7 @@ export function coachThreadPrompt(
 ): string {
   const lines = [
     `You are the coach for Lesson ${lesson.id} "${lesson.title}" of the course "${course.title}".`,
-    `Load the \`${SKILL_ID}\` skill and follow it. ${method(coachPath)}`,
+    `Load the \`${SKILL_ID}\` skill and follow it. ${method(coach)}`,
     ...(factory === null ? [] : [factoryText(factory)]),
     "Start your first reply with this line, exactly as written and on a line of its own. BB draws it as the lesson card: the lesson and its Rules.",
     formatLessonRef({ lessonId: lesson.id }),
@@ -129,7 +137,7 @@ export function sideChatTitle(rule: Rule | null): string {
 }
 
 export interface InstructionFacts {
-  coachPath: string | null;
+  coach: CoachMethod;
   /** Where the factory is in the repo the thread works in; null or absent when the project's folder is the factory. */
   factory?: FactoryWhere | null;
 }
@@ -167,7 +175,13 @@ export function coachInstructions(metadata: unknown, facts: InstructionFacts, pl
       );
     }
   }
-  if (facts.coachPath !== null) lines.push(`Coaching method: ${facts.coachPath}.`);
+  if (facts.coach !== null) {
+    lines.push(
+      facts.coach.kind === "workspace"
+        ? `Coaching method: the file ${facts.coach.relativePath} in this workspace.`
+        : `Coaching method:\n${facts.coach.text}`,
+    );
+  }
   if (facts.factory !== undefined && facts.factory !== null) lines.push(factoryText(facts.factory));
   lines.push(TOOLS_OWN_PROGRESS);
   return lines.join("\n");
