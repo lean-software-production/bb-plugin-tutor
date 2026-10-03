@@ -3,9 +3,9 @@
 // with a clear message when shellcheck isn't on PATH (ruling L2 — replaces
 // checkbashisms, which isn't available here). CI's launcher job also runs
 // `dash -n standalone/tutor` and `dash standalone/tutor help` directly under
-// dash: `npx bats standalone/test` sources the script into bats' own bash
-// process (see standalone/test/helper.bash), so it does not itself exercise
-// dash.
+// dash. Most of `npx bats standalone/test` sources the script into bats' own
+// bash process (see standalone/test/helper.bash); standalone/test/
+// subprocess.bats and install.bats run it as `sh`, which is dash on Ubuntu.
 import { execFileSync } from "node:child_process";
 import { test } from "node:test";
 
@@ -18,10 +18,10 @@ function hasShellcheck(): boolean {
   }
 }
 
-test("standalone/tutor passes shellcheck -s sh", (t) => {
+test("standalone/tutor and standalone/install.sh pass shellcheck -s sh", (t) => {
   if (!hasShellcheck()) {
     t.skip("shellcheck is not on PATH; install it to run this check locally");
     return;
   }
-  execFileSync("shellcheck", ["-s", "sh", "standalone/tutor"], { stdio: "inherit" });
+  execFileSync("shellcheck", ["-s", "sh", "standalone/tutor", "standalone/install.sh"], { stdio: "inherit" });
 });

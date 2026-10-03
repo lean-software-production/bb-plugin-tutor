@@ -1132,7 +1132,9 @@ cmd_up() {
   server_configure "$up_port"
   plugin_install
 
-  if machine_connected; then
+  # A machine service for this port must exist too: after `--port` changes
+  # the port, the machine enrolled for the old one isn't this one's.
+  if machine_service_file >/dev/null && machine_connected; then
     :
   elif [ -n "$(config_get machine_id)" ] && machine_service_file >/dev/null; then
     machine_service_start # enrolled before, just not running (after a stop)
