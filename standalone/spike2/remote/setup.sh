@@ -1,7 +1,7 @@
 # Runs ON THE BOX as root (box-setup.sh streams it over ssh). Idempotent.
-# Needs: STUDENT PORT TAILNET_IP BB_VERSION SERVER_URL PLUGIN_TGZ QUIET_PLUGINS.
+# Needs: STUDENT PORT TAILNET_IP BB_VERSION SERVER_URL PUBLIC_HOST PLUGIN_TGZ QUIET_PLUGINS.
 set -euo pipefail
-: "${STUDENT:?}" "${PORT:?}" "${TAILNET_IP:?}" "${BB_VERSION:?}" "${SERVER_URL:?}" "${PLUGIN_TGZ:?}"
+: "${STUDENT:?}" "${PORT:?}" "${TAILNET_IP:?}" "${BB_VERSION:?}" "${SERVER_URL:?}" "${PUBLIC_HOST:?}" "${PLUGIN_TGZ:?}"
 
 case "$TAILNET_IP" in 100.*) ;; *) echo "TAILNET_IP must be a tailnet (100.x) address" >&2; exit 1 ;; esac
 if ss -ltnH "sport = :$PORT" | grep -q . && ! systemctl is-active --quiet "tutor-$STUDENT.service"; then
@@ -35,7 +35,9 @@ fi
 # student's server is what gets squeezed, never the team's bb or the canvas.
 slice=""
 systemctl cat bbmachines.slice >/dev/null 2>&1 && slice="Slice=bbmachines.slice"
-cat >"/etc/systemd/system/tutor-$STUDENT.service" <<EOF
+unit="/etc/systemd/system/tutor-$STUDENT.service"
+before=$(cat "$unit" 2>/dev/null || true)
+cat >"$unit" <<EOF
 # Hand-installed by bb-plugin-tutor standalone/spike2 (Spike 2) -- NOT Ansible.
 # Back out: standalone/spike2/teardown.sh
 [Unit]
@@ -49,6 +51,9 @@ Group=$STUDENT
 WorkingDirectory=$H
 Environment=HOME=$H
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
+# bb-app >= 0.45 answers 403 forbidden_host unless Host is localhost, an IP or
+# this one hostname: the browser's, through cloudflared.
+Environment=BB_APP_URL=https://$PUBLIC_HOST
 ExecStart=/usr/local/bin/node $H/tutor/npm/node_modules/.bin/bb-server --data-dir $H/tutor/server --server-bind-host 127.0.0.1 --server-port $PORT
 $slice
 MemoryHigh=2G
@@ -93,6 +98,10 @@ EOF
 
 systemctl daemon-reload
 systemctl enable --now "tutor-$STUDENT.service" >/dev/null
+if [ -n "$before" ] && [ "$before" != "$(cat "$unit")" ]; then
+  systemctl restart "tutor-$STUDENT.service"
+  echo "restarted tutor-$STUDENT (its unit changed)"
+fi
 systemctl enable --now "tutor-$STUDENT-tailnet-proxy.socket" >/dev/null
 
 for _ in $(seq 1 60); do

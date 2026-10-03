@@ -20,7 +20,7 @@ PLUGIN_TGZ=${PLUGIN_TGZ:-$HOME/tutor-e2e/release/bb-plugin-tutor-$version-built.
 remote_tgz=/tmp/tutor-spike2-plugin.tgz
 scp -q -o BatchMode=yes "$PLUGIN_TGZ" "$BOX:$remote_tgz"
 on_box setup.sh STUDENT="$STUDENT" PORT="$PORT" TAILNET_IP="$TAILNET_IP" BB_VERSION="$BB_VERSION" \
-  SERVER_URL="$SERVER_URL" PLUGIN_TGZ="$remote_tgz" QUIET_PLUGINS="'$QUIET_PLUGINS'"
+  SERVER_URL="$SERVER_URL" PUBLIC_HOST="$PUBLIC_HOST" PLUGIN_TGZ="$remote_tgz" QUIET_PLUGINS="'$QUIET_PLUGINS'"
 
 if curl -fsS -m 10 "$SERVER_URL/health" -o /dev/null; then
   result 1 PASS "the server answers over the tailnet at $SERVER_URL"
