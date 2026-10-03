@@ -716,10 +716,15 @@ daemon_env_names() {
 
 # listening_check: say whether the server and the machine daemon are
 # listening on 127.0.0.1 only (ss -ltnp on Linux, lsof -iTCP -sTCP:LISTEN
-# -P -n on macOS), restricted to their own MainPIDs.
+# -P -n on macOS), restricted to their own MainPIDs (the server's from its
+# unit on Linux, from its plist's label on macOS).
 listening_check() {
   lc_pids=""
-  lc_pid=$(daemon_main_pid tutor-server.service) || lc_pid=""
+  case "$(os_kind)" in
+    linux) lc_server=tutor-server.service ;;
+    macos) lc_server=$(server_service_file) ;;
+  esac
+  lc_pid=$(daemon_main_pid "$lc_server") || lc_pid=""
   if [ -n "$lc_pid" ] && [ "$lc_pid" != 0 ]; then lc_pids="$lc_pid"; fi
   lc_service=$(machine_service_file) || lc_service=""
   if [ -n "$lc_service" ]; then
@@ -736,7 +741,8 @@ listening_check() {
   for lc_p in $lc_pids; do
     case "$(os_kind)" in
       linux)
-        lc_addrs=$(printf '%s\n' "$lc_raw" | grep "pid=$lc_p" | awk '{print $4}')
+        # "pid=N," so pid 4242 never matches pid 42421.
+        lc_addrs=$(printf '%s\n' "$lc_raw" | grep "pid=$lc_p," | awk '{print $4}')
         ;;
       macos)
         lc_addrs=$(printf '%s\n' "$lc_raw" | awk -v p="$lc_p" '$2==p {print $9}' | sed 's#.*TCP ##; s/ (LISTEN)//')

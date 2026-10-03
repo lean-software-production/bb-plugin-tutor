@@ -58,3 +58,19 @@ setup_done() { tutor up "$HOME/my-course" >/dev/null; : >"$STUB_LOG/bb"; : >"$ST
   [ "$status" -eq 1 ]
   grep -q "unreachable-77" "$TUTOR_HOME/logs/launcher.log"
 }
+
+# --- final review: I9 ---
+
+@test "on macOS the server's own sockets are checked too" {
+  export STUB_UNAME=Darwin
+  server_service_write 47386
+  launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.leansoftwareproduction.tutor-server.plist"
+  STUB_SERVER_PID=5151 STUB_LISTEN_PID=5151 STUB_LISTEN="0.0.0.0:47386" run listening_check
+  [[ "$output" == *"also on 0.0.0.0:47386"* ]]
+}
+
+@test "another process whose pid starts with the server's isn't counted as the server" {
+  STUB_UNAME=Linux; make_stub_machine_unit
+  STUB_MAIN_PID=4242 STUB_OTHER_LISTEN="42421 0.0.0.0:9999" run listening_check
+  [ "$output" = "Listening: 127.0.0.1 only" ]
+}
