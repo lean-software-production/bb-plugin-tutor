@@ -12,6 +12,9 @@
 #   ~/.local/bin/tutor login --provider <p>     (by hand: pi's /login, then /quit)
 #   standalone/e2e/e2e.sh lesson0    a Lesson 0 coach thread runs Tutor's pi on the machine
 #   standalone/e2e/e2e.sh fetch      add the fixture course: starter seeded, lessons listed
+#   standalone/e2e/e2e.sh scripted   (Stage B) install the scripted provider; coach threads use it
+#   standalone/e2e/e2e.sh lessons    (Stage B) adopt, pass and complete fixture lessons 001-004;
+#                                    the factory's tests run on the machine; the move at 004
 #   standalone/e2e/e2e.sh restart    tutor stop, tutor up: everything comes back
 #   standalone/e2e/e2e.sh uninstall  tutor uninstall --purge: nothing left, workspace untouched
 #
@@ -70,10 +73,21 @@ up() { # tutor up with the recording pi; output kept for the "no bb" check
   TUTOR_PI_COMMAND="$E2E_DIR/bin/record-pi" "$TUTOR" up "$@" >"$E2E_DIR/up.out" 2>&1
 }
 
+built_sdk() { tar -xzOf "$RELEASE/bb-plugin-tutor-$VERSION-built.tgz" "bb-plugin-tutor-$VERSION/dist/app.meta.json" | json 'v.pluginSdkVersion'; }
+
 stage_build() {
   rm -rf "$RELEASE"; mkdir -p "$RELEASE"
+  # The build is stamped with the bb CLI's own SDK version, so build with the
+  # BB the launcher installs, not whichever bb this shell has.
+  local bb_version sdk
+  bb_version=$(sed -n 's/^BB_VERSION=//p' "$REPO/standalone/tutor")
+  sdk=$(node -p 'require(process.argv[1]).devDependencies["@get-bb/plugin-sdk"]' "$REPO/package.json")
+  check "bb-app@$bb_version is fetched for the build" \
+    npm install --prefix "$E2E_DIR/bb-cli" --no-save --no-audit --no-fund --silent "bb-app@$bb_version"
+  export PATH="$E2E_DIR/bb-cli/node_modules/.bin:$PATH"
   check "the plugin release archive builds from HEAD" "$REPO/scripts/release-archive.sh" HEAD "$RELEASE"
   check "it checks out, and the built archive is written" "$REPO/scripts/check-release-archive.sh" "$RELEASE/bb-plugin-tutor-$VERSION.tgz"
+  check "the built plugin is stamped with SDK $sdk" test "$(built_sdk)" = "$sdk"
   check "the launcher assets and SHA256SUMS are written" "$REPO/scripts/release-standalone.sh" "$VERSION" "$RELEASE"
 }
 
@@ -196,6 +210,72 @@ stage_fetch() {
   info "Stage B (scripted provider) adopts 001–004 and checks the move at 004"
 }
 
+# --- Stage B: a scripted coach drives the fixture course ---------------------
+
+stage_scripted() {
+  local dir="$E2E_DIR/scripted-provider"
+  rm -rf "$dir"; mkdir -p "$dir"
+  cp "$REPO"/standalone/e2e/scripted-provider/{bridge.ts,host.ts,server.ts,package.json,package-lock.json,tsconfig.json} "$dir/"
+  check "the scripted provider's dependencies install" bash -c "cd '$dir' && npm ci --omit=dev >'$E2E_DIR/scripted-npm.log' 2>&1"
+  check "it installs in the tutor server" bbx plugin install "$dir" --yes
+  check "coach threads now use it" bbx plugin config tutor set coachProvider scripted
+  check "with its own default model" bbx plugin config tutor set coachModel ""
+  info "turns are logged in $TUTOR_HOME/server/plugins/scripted-provider/bridge-data/turns.ndjson"
+}
+
+# tell <thread> <line>…: send the lines to the coach thread and wait for its turn to finish.
+tell() {
+  local thread=$1; shift
+  printf '%s\n' "$@" >"$E2E_DIR/tell.txt"
+  bbx thread tell "$thread" --message-file "$E2E_DIR/tell.txt" >/dev/null || return 1
+  sleep 1
+  bbx thread wait "$thread" --timeout 120s >/dev/null 2>&1
+}
+iteration_is() { [ "$(tr -d '\n' <"$1/ITERATION" 2>/dev/null)" = "$2" ]; }
+example_keys() { # example_keys <lesson>: every Example key of the fixture lesson, one per line
+  rpc getLessonDetail "{\"courseId\":\"fixture\",\"lessonId\":\"$1\"}" | node -e 'let r="";process.stdin.on("data",c=>r+=c).on("end",()=>{const v=JSON.parse(r);const d=v.result??v;for(const f of d.lesson.features)for(const ru of f.rules)for(const e of ru.examples)console.log(e.key)})'
+}
+factory_tests_on_machine() { # runs `npm test` in the factory through a terminal on the enrolled machine
+  local factory=$1 mid out
+  mid=$(config_get machine_id)
+  out=$(bbx terminal create --machine "$mid" --cwd "$factory" --title "factory tests" --json -- sh -c 'npm test >.e2e-test.log 2>&1; echo $? >.e2e-test.status' 2>&1) || { printf '%s\n' "$out" >>"$RESULTS"; return 1; }
+  for _ in $(seq 1 60); do [ -f "$factory/.e2e-test.status" ] && break; sleep 1; done
+  local status; status=$(cat "$factory/.e2e-test.status" 2>/dev/null)
+  rm -f "$factory/.e2e-test.status"
+  [ "$status" = 0 ]
+}
+commit_all() { git -C "$WS" add -A && git -C "$WS" -c user.name=e2e -c user.email=e2e@example.invalid commit -qm "$1"; }
+
+stage_lessons() {
+  check "the fixture course is in the outline" course_order "$(rpc getOverview 'null')" "tutor,fixture"
+  # The coach commits the starter before its first lesson, as the tool's text tells it to.
+  git -C "$WS" status --porcelain | grep -q . && commit_all "Add the Fixture course starter"
+  local n id thread factory key
+  for n in 1 2 3 4; do
+    id=$(printf '%03d' "$n")
+    thread=$(rpc startNextLesson "{\"courseId\":\"fixture\",\"lessonId\":\"$id\"}" | json 'v.threadId ?? v.result?.threadId ?? ""')
+    check "lesson $id: its coach thread starts ($thread)" test -n "$thread"
+    bbx thread wait "$thread" --timeout 120s >/dev/null 2>&1
+    check "lesson $id: the coach adopts it" tell "$thread" "CALL tutor_adopt_iteration {\"iteration\":\"$id\"}"
+    if [ "$n" -lt 4 ]; then factory="$WS/tetris/.factory"; else factory="$WS/factory"; fi
+    if [ "$n" = 4 ]; then
+      check "lesson 004: the factory moved to factory/" test -f "$WS/factory/AGENTS.md" -a ! -e "$WS/tetris/.factory"
+      check "lesson 004: as a git rename" bash -c "git -C '$WS' status --porcelain | grep -q '^R.*tetris/.factory/AGENTS.md -> factory/AGENTS.md'"
+    fi
+    check "lesson $id: spec/ holds its README and features" test -f "$factory/spec/README.md" -a -d "$factory/spec/features"
+    check "lesson $id: ITERATION reads \"$id WIP\"" iteration_is "$factory" "$id WIP"
+    check "lesson $id: the factory's tests run on the machine" factory_tests_on_machine "$factory"
+    for key in $(example_keys "$id"); do
+      check "lesson $id: the coach marks $key passing" tell "$thread" "CALL tutor_mark_example {\"example\":\"$key\",\"status\":\"passing\",\"evidence\":\"npm test passed on the machine\"}"
+    done
+    check "lesson $id: progress records it" grep -q "status: passing" "$factory/spec/PROGRESS.yaml"
+    check "lesson $id: the coach completes it" tell "$thread" "CALL tutor_complete_iteration {\"iteration\":\"$id\",\"summary\":\"Step $n works.\"}"
+    check "lesson $id: ITERATION reads \"$id Done\"" iteration_is "$factory" "$id Done"
+    commit_all "Lesson $id"
+  done
+  check "the server's folder holds no copy of the workspace" test -z "$(find "$TUTOR_HOME/server" -path "$TUTOR_HOME/server/content" -prune -o -name ITERATION -print)"
+}
+
 stage_restart() {
   local thread; thread=$(cat "$E2E_DIR/lesson0.thread" 2>/dev/null || true)
   local progress_before; progress_before=$( [ -f "$WS/.tutor/progress.yaml" ] && cksum <"$WS/.tutor/progress.yaml" || echo absent)
@@ -236,6 +316,8 @@ case "${1:-}" in
   up) stage_up ;;
   lesson0) stage_lesson0 ;;
   fetch) stage_fetch ;;
+  scripted) stage_scripted ;;
+  lessons) stage_lessons ;;
   restart) stage_restart ;;
   uninstall) stage_uninstall ;;
   *) sed -n '2,20p' "$0"; exit 2 ;;
