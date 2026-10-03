@@ -9,7 +9,7 @@
 #   standalone/e2e/e2e.sh build      release assets from this checkout (HEAD for the plugin)
 #   standalone/e2e/e2e.sh install    install.sh from those assets
 #   standalone/e2e/e2e.sh up         tutor up, then tutor status
-#   ~/.local/bin/tutor login --provider <p>     (by hand: pi's /login, then /quit)
+#   ~/.local/bin/tutor login --provider <p> --model <m>   (by hand: pi's /login, then /quit)
 #   standalone/e2e/e2e.sh lesson0    a Lesson 0 coach thread runs Tutor's pi on the machine
 #   standalone/e2e/e2e.sh fetch      add the fixture course: starter seeded, lessons listed
 #   standalone/e2e/e2e.sh scripted   (Stage B) install the scripted provider; coach threads use it
@@ -95,6 +95,8 @@ stage_install() {
   if [ -e "$TUTOR" ] || [ -e "$TUTOR_HOME" ]; then
     echo "A Tutor is already installed ($TUTOR or $TUTOR_HOME). Run the uninstall stage first." >&2; exit 1
   fi
+  # A new cycle starts from a fresh workspace: uninstall leaves it alone on purpose.
+  rm -rf "$WS" "$E2E_DIR/fixtures"
   TUTOR_RELEASE_DIR="$RELEASE" sh "$RELEASE/install.sh" >"$E2E_DIR/install.out" 2>&1
   check "install.sh succeeds" test $? -eq 0
   check "the launcher is in ~/.local/bin" test -x "$TUTOR"
@@ -147,7 +149,9 @@ stage_lesson0() {
   check "BB started Tutor's pi for the thread" grep -q -- '--mode rpc --session' "$E2E_DIR/pi-launches.log"
   check "with PI_CODING_AGENT_DIR=~/.tutor/pi" has_line "$last" "PI_CODING_AGENT_DIR=$TUTOR_HOME/pi"
   check "and no provider key in its environment" has_line "$last" "keys: "
-  check "pinned to the model chosen at tutor login ($(config_get model))" contains "$last" "--model $(config_get model)"
+  local model; model=$(config_get model)
+  check "tutor login chose a model (else run: tutor login --provider <p> --model <m>)" test -n "$model"
+  check "pinned to the model chosen at tutor login ($model)" contains "$last" "--model $model "
   check "~/.pi is unchanged" test "$(own_pi_sum)" = "$(cat "$E2E_DIR/own-pi.cksum")"
   for _ in $(seq 1 120); do [ -f "$WS/.tutor/progress.yaml" ] && break; sleep 2; done
   if [ -f "$WS/.tutor/progress.yaml" ]; then
