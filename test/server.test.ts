@@ -1101,3 +1101,13 @@ test("an older Codespace part-way through Lesson 0 carries on: marks go to .tuto
   assert.ok(progress.includes(first.key) && progress.includes(second.key), progress);
   assert.equal(await readFile(capstoneFile, "utf8"), before);
 });
+
+test("before its first lesson is adopted, a course's lessons are ahead: its coach won't open, but the lesson can be started", async (t) => {
+  const { host } = await setup(t);
+  const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.deepEqual(overview.courses[1]?.lessons.map((lesson) => lesson.status), ["ahead", "ahead", "ahead"]);
+  assert.equal(overview.courses[0]?.lessons[0]?.status, "current");
+  await assert.rejects(openCoach(host, "001"), /has not started yet/);
+  const { threadId } = (await host.harness.behavior.callRpc("startNextLesson", { courseId: fixtureCourse.id, lessonId: "001" })) as { threadId: string };
+  assert.ok(threadId);
+});

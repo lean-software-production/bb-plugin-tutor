@@ -8,6 +8,7 @@ import {
   fixtureCompletion,
   fixtureLessonDetail,
   fixtureLexicon,
+  fixtureCourseOverview,
   fixtureOverview,
   fixtureOverviewNoFactory,
   fixtureThreads,
@@ -15,7 +16,7 @@ import {
 import type { CourseOverview, Overview } from "../../shared/rpc.ts";
 import { CARD_KIT_TONES, progressCardView, termView } from "./cards.ts";
 import { completionView, doneRibbon, whatsNext } from "./completion.ts";
-import { continueView, doneLessonsLabel, homeDecision } from "./home.ts";
+import { activeCourse, continueView, doneLessonsLabel, homeDecision } from "./home.ts";
 import { parseRuleTabParams, ruleTabTarget, ruleTabView } from "./rule-tab.ts";
 import { welcomeView } from "./welcome.ts";
 
@@ -116,15 +117,17 @@ function eachCourse(change: (entry: CourseOverview) => CourseOverview): Overview
   return { ...fixtureOverview, courses: fixtureOverview.courses.map(change) };
 }
 
-test("the course root sends the student where they are: Lesson 0 first, then the course after it", () => {
+test("the course root sends the student where they are: a course under way, else Lesson 0", () => {
   assert.deepEqual(homeDecision(fixtureOverview), { kind: "redirect", route: { kind: "start", courseId: "software-factory", lessonId: "002" } });
   assert.deepEqual(homeDecision(fixtureOverviewNoFactory), { kind: "redirect", route: { kind: "welcome" } });
   const done = eachCourse((entry) => (entry.builtin || entry.current === null ? entry : { ...entry, current: { ...entry.current, iterationStatus: "Done" } }));
   assert.deepEqual(homeDecision(done), { kind: "redirect", route: { kind: "complete", courseId: "software-factory", lessonId: "002" } });
   const onZero = eachCourse((entry) =>
-    !entry.builtin || entry.current === null
+    entry.current === null
       ? entry
-      : { ...entry, lessons: entry.lessons.map((lesson) => ({ ...lesson, status: "current" as const })), current: { ...entry.current, iterationStatus: "WIP" } },
+      : entry.builtin
+        ? { ...entry, lessons: entry.lessons.map((lesson) => ({ ...lesson, status: "current" as const })), current: { ...entry.current, iterationStatus: "WIP" } }
+        : { ...entry, lessons: entry.lessons.map((lesson) => ({ ...lesson, status: "ahead" as const })), current: { ...entry.current, lessonId: "001", iterationStatus: "not-started" } },
   );
   assert.deepEqual(homeDecision(onZero), { kind: "redirect", route: { kind: "start", courseId: "tutor", lessonId: "000" } });
   const alone: Overview = { ...fixtureOverview, courses: fixtureOverview.courses.filter((entry) => entry.builtin) };
@@ -137,10 +140,48 @@ test("the course root sends the student where they are: Lesson 0 first, then the
     kind: "error",
     message: "We couldn't load the course.",
   });
+  // A course with no current state yet hasn't started: the active course is Lesson 0's.
   assert.deepEqual(homeDecision(eachCourse((entry) => (entry.builtin ? entry : { ...entry, current: null }))), {
+    kind: "redirect",
+    route: { kind: "complete", courseId: "tutor", lessonId: "000" },
+  });
+  // Only another course, with no current state: its first lesson.
+  assert.deepEqual(homeDecision({ ...fixtureOverview, courses: [{ ...fixtureCourseOverview, current: null }] }), {
     kind: "redirect",
     route: { kind: "start", courseId: "software-factory", lessonId: "001" },
   });
+});
+
+/** A Codespace on capstone lesson 003 (WIP) with no Lesson 0 record: it adopted 001 directly, or predates Lesson 0. */
+function onThreeWithoutLesson0(): Overview {
+  return eachCourse((entry) => {
+    if (entry.builtin) {
+      return { ...entry, lessons: entry.lessons.map((lesson) => ({ ...lesson, status: "current" as const, counts: { ...lesson.counts, passing: 0 } })), current: entry.current === null ? null : { ...entry.current, iterationStatus: "not-started" } };
+    }
+    return {
+      ...entry,
+      lessons: entry.lessons.map((lesson) => ({ ...lesson, status: lesson.id === "003" ? ("current" as const) : ("done" as const) })),
+      current: entry.current === null ? null : { ...entry.current, lessonId: "003", iterationStatus: "WIP" },
+    };
+  });
+}
+
+test("a Codespace on a capstone lesson with no Lesson 0 record goes to that lesson, not to Lesson 0", () => {
+  const overview = onThreeWithoutLesson0();
+  assert.equal(activeCourse(overview)?.course.id, "software-factory");
+  assert.deepEqual(homeDecision(overview), { kind: "redirect", route: { kind: "start", courseId: "software-factory", lessonId: "003" } });
+  const view = continueView(overview);
+  assert.deepEqual(view.kind === "continue" ? [view.courseId, view.lessonId] : view.kind, ["software-factory", "003"]);
+});
+
+test("Lesson 0 done and the next course not started: home stays on Lesson 0's completion, which starts the course", () => {
+  const overview = eachCourse((entry) =>
+    entry.builtin
+      ? entry
+      : { ...entry, lessons: entry.lessons.map((lesson) => ({ ...lesson, status: "ahead" as const, coachThreadId: null })), current: entry.current === null ? null : { ...entry.current, lessonId: "001", iterationStatus: "not-started" } },
+  );
+  assert.equal(activeCourse(overview)?.course.id, "tutor");
+  assert.deepEqual(homeDecision(overview), { kind: "redirect", route: { kind: "complete", courseId: "tutor", lessonId: "000" } });
 });
 
 test("the Continue section reads from the overview alone", () => {

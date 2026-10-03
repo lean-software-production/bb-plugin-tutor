@@ -53,7 +53,9 @@ async function ok(host: TutorHost, name: string, input: unknown, threadId: strin
 async function coachFor(host: TutorHost, lessonId: string): Promise<string> {
   const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
   const course = overview.courses.find((entry) => entry.lessons.some((lesson) => lesson.id === lessonId)) ?? assert.fail(`no lesson ${lessonId}`);
-  const rpc = course.current?.lessonId === lessonId || lessonId === "000" ? "openCoach" : "startNextLesson";
+  // A lesson under way (or done) has its coach opened; one ahead is started, as the completion page does.
+  const status = course.lessons.find((lesson) => lesson.id === lessonId)?.status;
+  const rpc = status === "ahead" ? "startNextLesson" : "openCoach";
   return ((await host.harness.behavior.callRpc(rpc, { courseId: course.course.id, lessonId })) as { threadId: string }).threadId;
 }
 

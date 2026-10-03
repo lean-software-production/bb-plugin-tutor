@@ -109,9 +109,9 @@ test("a past lesson's completion counts carry-over from what was passing in that
   assert.equal(buildCompletion(makeWorld(student), fixtureCourse.id, "001", records).next?.carryOver, expected);
 });
 
-test("after Lesson 0, what comes next is the first lesson of the course that follows it, with nothing carried over", () => {
+test("after Lesson 0, what comes next is the first lesson (ahead until started, so the page says Start) of the course that follows it, with nothing carried over", () => {
   const completion = buildCompletion(makeWorld(fixtureFreshStudent), "tutor", "000", records);
   assert.deepEqual(completionSchema.parse(completion), completion);
   assert.equal(completion.summary, "You know your way around.");
-  assert.deepEqual([completion.next?.courseId, completion.next?.id, completion.next?.status, completion.next?.carryOver], ["software-factory", "001", "current", 0]);
+  assert.deepEqual([completion.next?.courseId, completion.next?.id, completion.next?.status, completion.next?.carryOver], ["software-factory", "001", "ahead", 0]);
 });

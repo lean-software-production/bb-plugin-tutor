@@ -99,3 +99,11 @@ test("lookups", () => {
   assert.equal(findExample(hw, rule.examples[0]!.key)?.name, rule.examples[0]!.name);
   assert.equal(findRule(hw, "nope/nope"), undefined);
 });
+
+test("a course not started yet shows its first lesson ahead, as it did beside Lesson 0; Lesson 0 itself is current", () => {
+  const notStarted = resolveCurrent(fixtureCourse, fixtureFreshStudent);
+  assert.equal(lessonStatus(fixtureCourse, notStarted, "001"), "ahead");
+  assert.equal(lessonStatus(fixtureCourse, notStarted, "002"), "ahead");
+  const zero = resolveCurrent(fixtureBuiltinCourse, fixtureFreshStudent);
+  assert.equal(lessonStatus(fixtureBuiltinCourse, zero, "000"), "current");
+});

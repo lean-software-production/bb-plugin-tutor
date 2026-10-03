@@ -608,14 +608,15 @@ export const fixtureOverview: Overview = {
   threads: fixtureThreads,
 };
 
-/** A course before there is a workspace: nothing recorded, so each course's first lesson is where it starts. */
+/** A course before there is a workspace: nothing recorded, so Lesson 0 is current and every other lesson is ahead. */
 function preview(entry: CourseOverview, ready: boolean): CourseOverview {
   return {
     ...entry,
     layout: { id: entry.layout.id, ready },
     lessons: entry.lessons.map((hw, index) => ({
       ...hw,
-      status: index === 0 ? "current" : "ahead",
+      // Lesson 0 is where the student starts; another course's lessons wait, ahead, until it is started.
+      status: index === 0 && hw.builtin ? "current" : "ahead",
       counts: countExamples(examplesOf(hw.id), {}),
       coachThreadId: null,
       outline: outline(hw.id, NOTHING_RECORDED),

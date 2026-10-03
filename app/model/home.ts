@@ -16,16 +16,18 @@ function noCourseMessage(overview: Overview): string {
 }
 
 /**
- * The course the student is on: the built-in course (Lesson 0) until it is
- * done, then the first course after it. With no other course, the built-in one.
+ * The course the student is on: the first course other than the built-in one
+ * that has started (a Codespace that went straight to 001, or predates
+ * Lesson 0, is on its capstone lesson); else the built-in course, whose
+ * Lesson 0 completion page starts the next course (until that course starts,
+ * its lessons are ahead, so it is nowhere to send the student); else the
+ * first course.
  */
 export function activeCourse(overview: Overview): CourseOverview | null {
-  const builtin = overview.courses.find((entry) => entry.builtin);
-  const next = overview.courses.find((entry) => !entry.builtin);
-  if (builtin === undefined) return next ?? null;
-  if (next === undefined) return builtin;
-  const done = builtin.current?.iterationStatus === "Done" || (builtin.lessons.length > 0 && builtin.lessons.every((lesson) => lesson.status === "done"));
-  return done ? next : builtin;
+  const started = overview.courses.find(
+    (entry) => !entry.builtin && entry.current !== null && entry.current.iterationStatus !== "not-started",
+  );
+  return started ?? overview.courses.find((entry) => entry.builtin) ?? overview.courses[0] ?? null;
 }
 
 export function homeDecision(overview: Overview): HomeDecision {

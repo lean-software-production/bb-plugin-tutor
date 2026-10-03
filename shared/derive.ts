@@ -110,8 +110,15 @@ export function resolveCurrent(course: Course, student: StudentState): CurrentPo
   return { lessonId: course.lessons[0]?.id ?? BUILTIN_LESSON_ID, iterationStatus: "not-started" };
 }
 
-/** Lessons before the current one are done; the current one is done once its status is Done. */
+/**
+ * Lessons before the current one are done; the current one is done once its
+ * status is Done. A course other than the built-in one that hasn't started
+ * has every lesson ahead, as its first lesson was while the student was on
+ * Lesson 0: it starts from Lesson 0's completion page (startNextLesson,
+ * which adoptionTargets still allows). Lesson 0 not started is current.
+ */
 export function lessonStatus(course: Course, pointer: CurrentPointer, id: string): LessonStatus {
+  if (pointer.iterationStatus === "not-started" && findLesson(course, pointer.lessonId)?.builtin !== true) return "ahead";
   const ids = course.lessons.map((lesson) => lesson.id);
   const current = ids.indexOf(pointer.lessonId);
   const index = ids.indexOf(id);

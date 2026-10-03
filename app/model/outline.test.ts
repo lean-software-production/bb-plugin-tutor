@@ -258,10 +258,40 @@ test("only the course the student is on opens its current lesson: Lesson 0 until
     courses: fixtureOverview.courses.map((entry) =>
       entry.builtin
         ? { ...entry, lessons: entry.lessons.map((lesson) => ({ ...lesson, status: "current" as const })), current: entry.current === null ? null : { ...entry.current, iterationStatus: "WIP" as const } }
-        : { ...entry, lessons: entry.lessons.map((lesson, index) => ({ ...lesson, status: index === 0 ? ("current" as const) : ("ahead" as const), coachThreadId: null })) },
+        : {
+            ...entry,
+            lessons: entry.lessons.map((lesson) => ({ ...lesson, status: "ahead" as const, coachThreadId: null })),
+            current: entry.current === null ? null : { ...entry.current, lessonId: "001", iterationStatus: "not-started" as const },
+          },
     ),
     threads: [],
   };
   const outline = buildOutline(input({ overview: onZero }));
   assert.deepEqual(lessonsOf(outline).filter((lesson) => lesson.expandedByDefault).map((lesson) => [lesson.courseId, lesson.id]), [["tutor", "000"]]);
+});
+
+test("a Codespace on a capstone lesson with no Lesson 0 record opens that lesson in the outline", () => {
+  const onThree: Overview = {
+    ...fixtureOverview,
+    courses: fixtureOverview.courses.map((entry) =>
+      entry.builtin
+        ? { ...entry, lessons: entry.lessons.map((lesson) => ({ ...lesson, status: "current" as const })), current: entry.current === null ? null : { ...entry.current, iterationStatus: "not-started" as const } }
+        : {
+            ...entry,
+            lessons: entry.lessons.map((lesson) => ({ ...lesson, status: lesson.id === "003" ? ("current" as const) : ("done" as const) })),
+            current: entry.current === null ? null : { ...entry.current, lessonId: "003", iterationStatus: "WIP" as const },
+          },
+    ),
+  };
+  const outline = buildOutline(input({ overview: onThree }));
+  assert.deepEqual(lessonsOf(outline).filter((lesson) => lesson.expandedByDefault).map((lesson) => [lesson.courseId, lesson.id]), [["software-factory", "003"]]);
+});
+
+test("a course not started yet offers no coach in the outline: its lessons are ahead", () => {
+  const outline = buildOutline(input({ overview: fixtureOverviewNoFactory }));
+  assert.ok(lessonsOf(outline).every((lesson) => !lesson.canStartCoach));
+  assert.deepEqual(
+    fixtureOverviewNoFactory.courses.flatMap((entry) => entry.lessons.map((lesson) => [lesson.id, lesson.status])),
+    [["000", "current"], ["001", "ahead"], ["002", "ahead"], ["003", "ahead"]],
+  );
 });
