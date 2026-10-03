@@ -116,12 +116,18 @@ check_prereqs() {
   [ -z "$problems" ] || fail "$problems"
 }
 
+# tutor_bb_port: the configured port, or TUTOR_PORT_DEFAULT.
+tutor_bb_port() {
+  port=$(config_get port)
+  [ -n "$port" ] || port=$TUTOR_PORT_DEFAULT
+  printf '%s' "$port"
+}
+
 # tutor_bb <args...>: run the installed bb CLI against the tutor server,
 # logging its output. BB_SERVER_URL always wins over any inherited value
 # (amendment 1), and never touches localhost.
 tutor_bb() {
-  port=$(config_get port)
-  [ -n "$port" ] || port=$TUTOR_PORT_DEFAULT
+  port=$(tutor_bb_port)
   mkdir -p "$TUTOR_HOME/logs"
   BB_SERVER_URL="http://127.0.0.1:$port" "$TUTOR_HOME/server/npm/node_modules/.bin/bb" "$@" >>"$TUTOR_HOME/logs/launcher.log" 2>&1
 }
@@ -282,6 +288,166 @@ plugin_install() {
   fi
   tutor_bb plugin install "$plugin_dir"
   tutor_bb plugin config tutor set coachProvider pi
+}
+
+# machine_id: the newest machine with machineProviderId "manual" in
+# `bb machine list --json`, parsed with node (a prerequisite). Mirrors
+# standalone/spike/lib.sh's machine_id. Doesn't go through tutor_bb, which
+# only logs its output — the JSON is needed back.
+machine_id() {
+  port=$(tutor_bb_port)
+  mkdir -p "$TUTOR_HOME/logs"
+  json=$(BB_SERVER_URL="http://127.0.0.1:$port" "$TUTOR_HOME/server/npm/node_modules/.bin/bb" machine list --json 2>>"$TUTOR_HOME/logs/launcher.log") || return 1
+  printf '%s\n' "$json" >>"$TUTOR_HOME/logs/launcher.log"
+  printf '%s' "$json" | node -e '
+    let raw = ""; process.stdin.on("data", (c) => (raw += c)).on("end", () => {
+      const data = JSON.parse(raw);
+      const rows = Array.isArray(data) ? data : (data.machines ?? data.hosts ?? []);
+      const manual = rows.filter((row) => (row.machineProviderId ?? row.provider ?? row.providerId) === "manual");
+      manual.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+      if (manual[0] === undefined) process.exit(1);
+      console.log(manual[0].id);
+    });'
+}
+
+# machine_wait_connected: poll `bb machine list --json` until the enrolled
+# machine (config's machine_id) shows connected, up to 60 s.
+machine_wait_connected() {
+  id=$(config_get machine_id)
+  [ -n "$id" ] || fail "No machine is enrolled yet. Run tutor up again."
+  port=$(tutor_bb_port)
+  timeout=${TUTOR_CONNECT_TIMEOUT:-60}
+  waited=0
+  while [ "$waited" -lt "$timeout" ]; do
+    json=$(BB_SERVER_URL="http://127.0.0.1:$port" "$TUTOR_HOME/server/npm/node_modules/.bin/bb" machine list --json 2>>"$TUTOR_HOME/logs/launcher.log") || json=""
+    if printf '%s' "$json" | TUTOR_MACHINE_ID="$id" node -e '
+      let raw = ""; process.stdin.on("data", (c) => (raw += c)).on("end", () => {
+        try {
+          const data = JSON.parse(raw);
+          const rows = Array.isArray(data) ? data : (data.machines ?? data.hosts ?? []);
+          const row = rows.find((r) => r.id === process.env.TUTOR_MACHINE_ID);
+          process.exit(row && row.connected ? 0 : 1);
+        } catch {
+          process.exit(1);
+        }
+      });'
+    then
+      return 0
+    fi
+    waited=$((waited + 1))
+    sleep 1
+  done
+  fail "Tutor's machine never connected. Run \`tutor logs\`."
+}
+
+# machine_installer_run: one attempt at enrolling this computer as a BB
+# machine. `bb machine create` runs in the background (output ->
+# enrol.out, 0600) because it blocks until the machine connects; the
+# enrolment line it prints is polled for, up to 60 s. The header
+# ("X-BB-Enrollment: <token>") is extracted straight from enrol.out into a
+# 0600 file with sed — the token is never held in a variable passed to a
+# command, and never reaches argv, stdout/stderr or any log. BB's installer
+# is downloaded with `curl -H @header`, run with its output in install.log,
+# and deleted as soon as it has run: its body holds the token too
+# (amendment 3). Every exit path cleans up enrol.out and enrol.header.
+#
+# Exit status: 0 success; 2 the enrolment expired or create failed (the
+# caller retries once); 1 any other failure.
+machine_installer_run() {
+  mkdir -p "$TUTOR_HOME" "$TUTOR_HOME/logs"
+  out="$TUTOR_HOME/enrol.out"
+  header="$TUTOR_HOME/enrol.header"
+  installer="$TUTOR_HOME/machine-installer.sh"
+  installlog="$TUTOR_HOME/install.log"
+  port=$(tutor_bb_port)
+
+  umask 077
+  : >"$out"
+  chmod 600 "$out"
+  rm -f "$header" "$installer"
+
+  (
+    BB_SERVER_URL="http://127.0.0.1:$port" "$TUTOR_HOME/server/npm/node_modules/.bin/bb" \
+      machine create --provider manual --key tutor-machine
+  ) >"$out" 2>&1 &
+  create_pid=$!
+
+  line=""
+  waited=0
+  limit=${TUTOR_ENROL_TIMEOUT:-60}
+  while [ "$waited" -lt "$limit" ]; do
+    line=$(grep -m1 'X-BB-Enrollment' "$out" 2>/dev/null) || line=""
+    [ -n "$line" ] && break
+    kill -0 "$create_pid" 2>/dev/null || break
+    waited=$((waited + 1))
+    sleep 1
+  done
+
+  if [ -z "$line" ]; then
+    wait "$create_pid" 2>/dev/null || true
+    rm -f "$out"
+    return 1
+  fi
+
+  umask 077
+  printf '%s\n' "$line" | sed -n "s/.*['\"]\\(X-BB-Enrollment:[^'\"]*\\)['\"].*/\\1/p" >"$header"
+  chmod 600 "$header"
+  url=$(printf '%s\n' "$line" | grep -o 'https\{0,1\}://[^ '"'"'"|]*' | head -n 1) || url=""
+
+  if [ ! -s "$header" ] || [ -z "$url" ]; then
+    rm -f "$header" "$out"
+    wait "$create_pid" 2>/dev/null || true
+    return 1
+  fi
+
+  if ! curl -fsSL -H @"$header" "$url" -o "$installer"; then
+    rm -f "$header" "$out" "$installer"
+    wait "$create_pid" 2>/dev/null || true
+    return 1
+  fi
+  chmod 600 "$installer"
+
+  install_status=0
+  sh "$installer" >"$installlog" 2>&1 || install_status=$?
+  rm -f "$installer" # its body holds the enrolment token too (amendment 3)
+
+  create_status=0
+  wait "$create_pid" || create_status=$?
+
+  rm -f "$header" "$out"
+
+  if [ "$install_status" -ne 0 ]; then
+    if grep -qi expired "$installlog" 2>/dev/null; then
+      return 2
+    fi
+    return 1
+  fi
+
+  [ "$create_status" -eq 0 ] || return 2
+
+  return 0
+}
+
+# machine_enrol: enrol this computer as a BB machine. Retries once, from
+# `bb machine create` (the --key tutor-machine idempotency key reuses the
+# creation), if the enrolment expires or the background create fails; a
+# second failure gives up.
+machine_enrol() {
+  attempt=1
+  while [ "$attempt" -le 2 ]; do
+    status=0
+    machine_installer_run || status=$?
+    if [ "$status" -eq 0 ]; then
+      id=$(machine_id) || fail "Couldn't find the enrolled machine. Run tutor up again."
+      config_set machine_id "$id"
+      return 0
+    fi
+    if [ "$status" -eq 2 ] && [ "$attempt" -eq 1 ]; then
+      attempt=$((attempt + 1))
+      continue
+    fi
+    fail "Enrolling this computer failed. Run tutor up again."
+  done
 }
 
 print_help() {

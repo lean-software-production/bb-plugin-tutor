@@ -1,5 +1,30 @@
 #!/bin/sh
 # Placeholder stub for later launcher tasks: logs argv, quiet, exit 0 unless
 # listed in $STUB_MISSING. Behaviour is scripted per-test via STUB_<NAME>_*.
+#
+# `machine create`: writes an enrolment line (with STUB_ENROL_TOKEN, default
+# stub-enrol-token) to its own stdout — never to $STUB_LOG — then, only when
+# STUB_BB_CREATE_BLOCKS_UNTIL_INSTALLED=1, blocks until $HOME/.stub-installed
+# exists (proving the launcher can't deadlock waiting on it synchronously).
+# `machine list --json`: a single manual machine, for machine_id to parse.
 . "$(cd "$(dirname "$0")" && pwd)/lib.sh"
 stub_init "bb" "$@"
+
+case "${1:-} ${2:-}" in
+  "machine create")
+    token="${STUB_ENROL_TOKEN:-stub-enrol-token}"
+    printf "Run: curl -H 'X-BB-Enrollment: %s' http://127.0.0.1:47386/install.sh | sh\n" "$token"
+    if [ "${STUB_BB_CREATE_BLOCKS_UNTIL_INSTALLED:-}" = 1 ]; then
+      i=0
+      while [ "$i" -lt 100 ]; do
+        [ -e "$HOME/.stub-installed" ] && break
+        i=$((i + 1))
+        sleep 0.1
+      done
+    fi
+    exit 0
+    ;;
+  "machine list")
+    echo '[{"id":"stub-machine-id","machineProviderId":"manual","createdAt":1,"connected":true}]'
+    ;;
+esac
