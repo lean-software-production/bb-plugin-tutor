@@ -4,14 +4,14 @@
 // never from plugin metadata. Which lesson it coaches does come from metadata,
 // but only the verified coach thread's, never the caller's own.
 //
-// How far that metadata can be trusted (SDK 0.5.9, bb-app 0.43.4):
+// How far that metadata can be trusted (SDK 0.5.29, bb-app 0.44.0):
 // `threads.getPluginMetadata` returns the namespace Tutor seeded at spawn
 // (`{ course, lesson, role: "coach" }`, threads.ts) plus `reachedRules`. The
 // SDK documents it as writable by "any API client, another plugin, or the
 // thread's own agent" (`updatePluginMetadata` takes an explicit `pluginId`),
 // so it is not a security boundary. It doesn't need to be one here: every
-// Tutor thread works directly in the factory with a shell and could edit
-// spec/ itself. What it guards against is a coach acting on the wrong lesson
+// Tutor thread works directly in the workspace with a shell and could edit
+// its files itself. What it guards against is a coach acting on the wrong lesson
 // by mistake, such as an old coach thread still open after the student moved
 // on. For that, the lesson Tutor wrote at spawn is the right record: it is the
 // same record that makes the thread its lesson's coach in the outline and in

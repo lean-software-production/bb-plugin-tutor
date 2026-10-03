@@ -1,4 +1,4 @@
-// Tutor's coach threads: one coach thread per lesson in the factory project,
+// Tutor's coach threads: one coach thread per lesson in the workspace project,
 // with side chats as hidden forks of it (and, from before side chats, side
 // threads as its children). Plugin metadata is used to list and find them,
 // and to know a verified coach thread's lesson (auth.ts); it is writable by
@@ -126,7 +126,7 @@ export async function listTutorThreads(sdk: Sdk, pluginId: string, projectId: st
 
 /**
  * Live Tutor threads in `projectId` that can be a coach thread, newest first.
- * `threads.list` (SDK 0.5.9) pages by offset only, with no cursor, so a
+ * `threads.list` (SDK 0.5.29) pages by offset only, with no cursor, so a
  * listing can skip a row when others vanish between its pages. Asking BB for
  * visible threads without a parent keeps the side chats (hidden forks) and
  * the side threads from before them (children) out of the listing, so it
@@ -146,7 +146,7 @@ async function tutorThreadsOf(
   const rows = await listAllThreads(
     sdk,
     { originPluginId: pluginId, projectId, archived: false, ...filter },
-    "of Tutor's threads in the factory project",
+    "of Tutor's threads in the workspace project",
   );
   const mine = rows.filter(
     (row) => row.originPluginId === pluginId && row.projectId === projectId && row.archivedAt === null,

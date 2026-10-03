@@ -525,7 +525,7 @@ test("coach discovery fails loudly past its page bound instead of reading foreve
   for (let index = 0; index < 10_001; index += 1) {
     host.addThread({ id: `thr_many_${index}`, originPluginId: "tutor" });
   }
-  await assert.rejects(openCoach(host, "000"), /more than 10000 of Tutor's threads in the factory project/);
+  await assert.rejects(openCoach(host, "000"), /more than 10000 of Tutor's threads in the workspace project/);
 });
 
 async function adoptedCoach(host: TutorHost): Promise<{ coach: string; rule: string }> {
