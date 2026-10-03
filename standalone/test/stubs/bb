@@ -21,6 +21,9 @@
 # routeProviderId being the part before the first "/".
 # `plugin list --json`: {"plugins": [...]}, holding plugin "tutor" with
 # rootDir $STUB_PLUGIN_ROOT when that is set, and nothing otherwise.
+# STUB_PLUGINS="<id>:on|off ..." adds those plugins to `plugin list --json`.
+# `theme show --json`: {"themeId": STUB_THEME (default "default")}; `theme
+# show <id> --json` fails for STUB_THEME_MISSING.
 # STUB_BB_FAIL="<word1> <word2>" makes that command (e.g. "plugin install")
 # print STUB_BB_FAIL_STDOUT, if set, on stdout, say why on stderr, and exit 1.
 . "$(cd "$(dirname "$0")" && pwd)/lib.sh"
@@ -34,10 +37,27 @@ fi
 
 case "${1:-} ${2:-}" in
   "plugin list")
+    printf '{"plugins":['
+    sep=""
     if [ -n "${STUB_PLUGIN_ROOT:-}" ]; then
-      printf '{"plugins":[{"id":"tutor","version":"0.0.0","enabled":true,"status":"ready","source":"path","rootDir":"%s"}]}\n' "$STUB_PLUGIN_ROOT"
+      printf '{"id":"tutor","version":"0.0.0","enabled":true,"status":"ready","source":"path","rootDir":"%s"}' "$STUB_PLUGIN_ROOT"
+      sep=","
+    fi
+    for entry in ${STUB_PLUGINS:-}; do
+      [ "${entry%%:*}" = tutor ] && [ -n "${STUB_PLUGIN_ROOT:-}" ] && continue
+      enabled=true
+      [ "${entry#*:}" = off ] && enabled=false
+      printf '%s{"id":"%s","enabled":%s}' "$sep" "${entry%%:*}" "$enabled"
+      sep=","
+    done
+    printf ']}\n'
+    ;;
+  "theme show")
+    if [ -n "${3:-}" ] && [ "$3" != --json ]; then
+      [ "$3" = "${STUB_THEME_MISSING:-}" ] && { echo "bb: no theme $3" >&2; exit 1; }
+      printf '{"themeId":"%s"}\n' "$3"
     else
-      printf '{"plugins":[]}\n'
+      printf '{"themeId":"%s"}\n' "${STUB_THEME:-default}"
     fi
     ;;
   "machine create")

@@ -425,6 +425,63 @@ plugin_install() {
     || fail "Tutor couldn't set up its coach. Run \`$TUTOR_NAME logs\`."
 }
 
+# Plugins a student doesn't need, switched off once each by tutor_polish.
+# BB's own plugins that Tutor runs on (tutor, thread-list, provider-pi and
+# the environment-* plugins coach threads use) are never on this list.
+TUTOR_QUIET_PLUGINS="account-pool agent-annotations ask-user-question automations bb-guide connect custom-instructions drafts keep-awake monaco-editor navigation plugin-api-docs plugin-api-tester provider-acp push-notifications scheduled-send workflows"
+TUTOR_THEME=plugin:tutor:sketchbook
+
+# tutor_polish: Tutor's look and a quieter BB, as the Codespace's tutor
+# Feature does. Each decision is made once and recorded in
+# $TUTOR_HOME/state/, so a plugin the student turns back on, or a theme they
+# choose, stays as they left it. Problems here never stop `tutor up`: they go
+# to the log and are tried again next time.
+tutor_polish() {
+  state="$TUTOR_HOME/state"
+  mkdir -p "$state" "$TUTOR_HOME/logs"
+  polish_plugins "$state/plugins-quieted" || true
+  polish_theme "$state/theme-selected" || true
+  return 0
+}
+
+# polish_plugins <marker>: switch off each of TUTOR_QUIET_PLUGINS that is on,
+# once. An id goes in the marker once it is switched off, found off or found
+# missing; a failed switch-off is tried again on the next `tutor up`.
+polish_plugins() {
+  pp_states=$(tutor_bb_json plugin list --json | node -e '
+    let raw = ""; process.stdin.on("data", (c) => (raw += c)).on("end", () => {
+      try {
+        const data = JSON.parse(raw);
+        for (const p of Array.isArray(data) ? data : (data.plugins ?? [])) {
+          process.stdout.write(p.id + " " + (p.enabled === false ? "off" : "on") + "\n");
+        }
+      } catch { process.exit(1); }
+    });' 2>>"$TUTOR_HOME/logs/launcher.log") || return 1
+  for pp_id in $TUTOR_QUIET_PLUGINS; do
+    if [ -f "$1" ] && grep -qxF "$pp_id" "$1"; then continue; fi
+    pp_state=$(printf '%s\n' "$pp_states" | awk -v id="$pp_id" '$1 == id { print $2; exit }')
+    if [ "$pp_state" = on ]; then
+      tutor_bb plugin disable "$pp_id" || continue
+    fi
+    printf '%s\n' "$pp_id" >>"$1"
+  done
+}
+
+# polish_theme <marker>: choose Tutor's Sketchbook theme once, and only while
+# BB's default theme is on. A theme BB doesn't offer yet is tried again later.
+polish_theme() {
+  [ ! -e "$1" ] || return 0
+  pt_current=$(tutor_bb_json theme show --json | node -e '
+    let raw = ""; process.stdin.on("data", (c) => (raw += c)).on("end", () => {
+      try { process.stdout.write(String(JSON.parse(raw).themeId ?? "")); } catch { process.exit(1); }
+    });' 2>>"$TUTOR_HOME/logs/launcher.log") || return 1
+  if [ "$pt_current" = default ]; then
+    tutor_bb_json theme show "$TUTOR_THEME" --json >/dev/null || return 0
+    tutor_bb theme set "$TUTOR_THEME" --json || return 1
+  fi
+  : >"$1"
+}
+
 # machine_id: the newest machine with machineProviderId "manual" in
 # `bb machine list --json`, parsed with node (a prerequisite). Mirrors
 # standalone/spike/lib.sh's machine_id. Doesn't go through tutor_bb, which
@@ -1184,6 +1241,7 @@ cmd_up() {
   server_wait_healthy "$up_port"
   server_configure "$up_port"
   plugin_install
+  tutor_polish
 
   # A machine service for this port must exist too: after `--port` changes
   # the port, the machine enrolled for the old one isn't this one's.

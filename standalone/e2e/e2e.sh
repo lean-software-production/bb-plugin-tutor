@@ -61,6 +61,8 @@ has_line() { printf '%s' "$1" | grep -qx -- "$2"; }         # has_line <text> <e
 plugin_running() { bbx plugin list --json | grep -q '"tutor"'; }
 thread_on_machine() { bbx thread show "$1" --json | grep -q -- "$2"; }
 thread_exists() { bbx thread show "$1" --json >/dev/null 2>&1; }
+theme_is() { bbx theme show --json | grep -q "\"themeId\": *\"$1\""; }
+plugins_off() { local list; list=$(bbx plugin list --json) || return 1; for id in "$@"; do printf '%s' "$list" | node -e 'let r="";process.stdin.on("data",c=>r+=c).on("end",()=>{const p=(JSON.parse(r).plugins??[]).find(x=>x.id===process.argv[1]);process.exit(p&&p.enabled===false?0:p?1:0)})' "$id" || return 1; done; }
 server_down() { ! curl -fsS "http://127.0.0.1:$PORT/health" -o /dev/null 2>&1; }
 course_order() { printf '%s' "$1" | node -e 'let r="";process.stdin.on("data",c=>r+=c).on("end",()=>{const v=JSON.parse(r);const o=v.result??v;process.exit(o.courses.map(c=>c.course.id).join(",")===process.argv[1]?0:1)})' "$2"; }
 up() { # tutor up with the recording pi; output kept for the "no bb" check
@@ -97,6 +99,8 @@ stage_up() {
   check "the workspace holds only .git" test "$(ls -A "$WS")" = ".git"
   check "the server is healthy" curl -fsS "http://127.0.0.1:$PORT/health" -o /dev/null
   check "the plugin is running in the tutor server" plugin_running
+  check "the Sketchbook theme is selected" theme_is plugin:tutor:sketchbook
+  check "the plugins a student doesn't need are off" plugins_off connect automations workflows monaco-editor keep-awake scheduled-send provider-acp
   "$TUTOR" status >"$E2E_DIR/status.out" 2>&1
   cat "$E2E_DIR/status.out"
   check "status: server healthy" grep -q "Server: healthy" "$E2E_DIR/status.out"
