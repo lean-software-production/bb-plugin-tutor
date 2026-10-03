@@ -802,7 +802,9 @@ machine_env_apply() {
   mkdir -p "$TUTOR_HOME/logs"
   service=$(machine_service_file) || fail "Tutor's machine service is missing. Run \`tutor up\` again."
   pi_dir="$TUTOR_HOME/pi"
-  pi_bin="$TUTOR_HOME/bin/pi"
+  # TUTOR_PI_COMMAND is for the end-to-end test only (standalone/e2e/): a
+  # wrapper that records how BB starts pi, then runs Tutor's pi.
+  pi_bin="${TUTOR_PI_COMMAND:-$TUTOR_HOME/bin/pi}"
 
   case "$(os_kind)" in
     linux)

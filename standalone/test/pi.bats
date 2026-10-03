@@ -8,6 +8,13 @@ load helper
   grep -q "restart" "$STUB_LOG/systemctl"
 }
 
+@test "TUTOR_PI_COMMAND (end-to-end tests only) replaces the pi the machine starts" {
+  STUB_UNAME=Linux; make_stub_machine_unit
+  TUTOR_PI_COMMAND="$HOME/e2e/record pi" machine_env_apply
+  grep -q "Environment=\"BB_PI_BRIDGE_COMMAND=$HOME/e2e/record pi\"" ~/.config/systemd/user/*.service.d/tutor.conf
+  grep -q "Environment=\"PI_CODING_AGENT_DIR=$TUTOR_HOME/pi\"" ~/.config/systemd/user/*.service.d/tutor.conf
+}
+
 @test "provider credentials the systemd user manager holds are unset for the machine, by name only" {
   STUB_UNAME=Linux; make_stub_machine_unit
   STUB_SYSTEMD_ENV=$'PATH=/usr/bin\nOPENCODE_API_KEY=s3cret\nANTHROPIC_OAUTH_TOKEN=s3cret2\nGITHUB_TOKEN=keep' machine_env_apply
