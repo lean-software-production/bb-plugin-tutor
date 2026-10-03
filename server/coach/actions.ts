@@ -20,7 +20,7 @@ import type { Course, ExampleProgress, Lesson, IterationState, ProgressFile, Rul
 import type { ToolParameters } from "../../shared/tools.ts";
 import { carryOver } from "../../layouts/progress/carry-over.ts";
 import { progressFor } from "../progress/current.ts";
-import { needsFactoryMove } from "../progress/factory-move.ts";
+import { needsFactoryMove } from "../../layouts/capstone-factory/factory-move.ts";
 import { notReadyText, type CourseLayoutState } from "../../layouts/state.ts";
 import { findCourse, methodCourse, type World } from "./world.ts";
 

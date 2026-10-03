@@ -16,7 +16,7 @@ function fakeBbWithFiles(files: Partial<{ [K in "read" | "write" | "remove"]: (a
 }
 
 function fakeHostClient(inspect: TutorHostClient["inspect"] = async () => assert.fail("inspect was not expected")): TutorHostClient {
-  return { inspect };
+  return { inspect, adoptLesson: async () => assert.fail("adoptLesson was not expected") };
 }
 
 /** An error shaped like the SDK's BbHttpError. */

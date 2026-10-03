@@ -2,10 +2,17 @@ import assert from "node:assert/strict";
 import { lstat, mkdir, readFile, readdir, readlink, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { test } from "node:test";
+import type { Lesson } from "../../shared/model.ts";
+import { lessonSpecBundle, standInsBundle } from "../../server/content/make-bundle.ts";
 import { makeRepoSandbox, makeSandbox } from "../../test/helpers/disk.ts";
-import { resolveLayout } from "../../layouts/capstone-factory/detect.ts";
 import { createDiskAccess } from "../../test/helpers/disk-access.ts";
-import { copyLessonSpec, seedFileName } from "./spec-copy.ts";
+import { resolveLayout } from "./detect.ts";
+import { copyLessonSpec, seedFileName, type SpecCopyOptions } from "./spec-copy.ts";
+
+/** What the server sends for `lesson`: its spec files and the course's stand-ins/, as bundles read now. */
+async function fromCourse(courseRoot: string, lesson: Lesson, extra: Partial<SpecCopyOptions> = {}): Promise<SpecCopyOptions> {
+  return { spec: await lessonSpecBundle(lesson.dir), standIns: await standInsBundle(courseRoot), ...extra };
+}
 
 test("names the seed after the codebase folder, as fetch-iteration names tetris.md", () => {
   assert.equal(seedFileName("/workspaces/capstone-project-starter/tetris"), "tetris.md");
@@ -25,7 +32,7 @@ test("replaces only spec/'s README.md, FACTORY.md and features/, leaving everyth
 
     const lesson = sandbox.course.lessons[1];
     assert.ok(lesson !== undefined);
-    const result = await copyLessonSpec(sandbox.factoryRoot, lesson, { courseRoot: sandbox.course.root });
+    const result = await copyLessonSpec(sandbox.factoryRoot, lesson, await fromCourse(sandbox.course.root, lesson));
 
     assert.deepEqual((await readdir(spec)).sort(), ["FACTORY.md", "ITERATION", "NOTES.md", "PROGRESS.yaml", "README.md", "features"]);
     assert.deepEqual((await readdir(join(spec, "features"))).sort(), ["planning.feature", "validation.feature"]);
@@ -45,10 +52,10 @@ test("a lesson without FACTORY.md removes the previous spec/FACTORY.md", async (
     const first = sandbox.course.lessons[0];
     const second = sandbox.course.lessons[1];
     assert.ok(first !== undefined && second !== undefined);
-    await copyLessonSpec(sandbox.factoryRoot, first, { courseRoot: sandbox.course.root });
+    await copyLessonSpec(sandbox.factoryRoot, first, await fromCourse(sandbox.course.root, first));
     await rm(join(second.dir, "FACTORY.md"));
 
-    await copyLessonSpec(sandbox.factoryRoot, second, { courseRoot: sandbox.course.root });
+    await copyLessonSpec(sandbox.factoryRoot, second, await fromCourse(sandbox.course.root, second));
     assert.deepEqual((await readdir(join(sandbox.factoryRoot, "spec"))).sort(), ["README.md", "features"]);
   } finally {
     await sandbox.cleanup();
@@ -61,7 +68,7 @@ test("copies the sample seed to ../seeds/tetris.md unless it is already there, n
     const lesson = sandbox.course.lessons[0];
     assert.ok(lesson !== undefined && lesson.seedSpec !== null);
     const seed = join(sandbox.codebaseRoot, "seeds/tetris.md");
-    const first = await copyLessonSpec(sandbox.factoryRoot, lesson, { courseRoot: sandbox.course.root });
+    const first = await copyLessonSpec(sandbox.factoryRoot, lesson, await fromCourse(sandbox.course.root, lesson));
     assert.equal(first.seed, "../seeds/tetris.md");
     assert.equal(first.seedAlreadyThere, false);
     assert.ok(first.written.includes("../seeds/tetris.md"));
@@ -69,7 +76,7 @@ test("copies the sample seed to ../seeds/tetris.md unless it is already there, n
     assert.equal(await readdir(join(sandbox.factoryRoot, "seeds")).catch(() => null), null, "no seeds/ in the factory");
 
     await writeFile(seed, "my own tetris\n");
-    const second = await copyLessonSpec(sandbox.factoryRoot, lesson, { courseRoot: sandbox.course.root });
+    const second = await copyLessonSpec(sandbox.factoryRoot, lesson, await fromCourse(sandbox.course.root, lesson));
     assert.equal(second.seedAlreadyThere, true);
     assert.ok(!second.written.includes("../seeds/tetris.md"));
     assert.equal(await readFile(seed, "utf8"), "my own tetris\n");
@@ -87,11 +94,14 @@ test("in a starter clone whose factory moved to factory/, the seed lands in tetr
     assert.ok(lesson !== undefined && lesson.seedSpec !== null);
     await rm(join(sandbox.codebaseRoot, "seeds/.gitkeep"));
 
-    const result = await copyLessonSpec(layout.factoryDir, lesson, {
-      courseRoot: sandbox.course.root,
-      seeds: { dir: layout.seedsDir, codebase: layout.codebase, shown: layout.seedsShown },
-      factoryShown: layout.factoryShown,
-    });
+    const result = await copyLessonSpec(
+      layout.factoryDir,
+      lesson,
+      await fromCourse(sandbox.course.root, lesson, {
+        seeds: { dir: layout.seedsDir, codebase: layout.codebase, shown: layout.seedsShown },
+        factoryShown: layout.factoryShown,
+      }),
+    );
     assert.equal(await readFile(join(sandbox.codebaseRoot, "seeds/tetris.md"), "utf8"), lesson.seedSpec);
     assert.deepEqual(await readdir(join(sandbox.codebaseRoot, "seeds")), ["tetris.md"]);
     assert.equal(await readdir(join(sandbox.repoRoot, "seeds")).catch(() => null), null, "no seeds/ beside factory/");
@@ -107,7 +117,7 @@ test("a lesson without a seed creates no ../seeds/", async () => {
   try {
     const lesson = sandbox.course.lessons[1];
     assert.ok(lesson !== undefined && lesson.seedSpec === null);
-    await copyLessonSpec(sandbox.factoryRoot, lesson, { courseRoot: sandbox.course.root });
+    await copyLessonSpec(sandbox.factoryRoot, lesson, await fromCourse(sandbox.course.root, lesson));
     assert.equal(await readdir(join(sandbox.codebaseRoot, "seeds")).catch(() => null), null);
   } finally {
     await sandbox.cleanup();
@@ -124,7 +134,7 @@ test("refuses a spec/ that is a symbolic link, and deletes nothing through it", 
     const lesson = sandbox.course.lessons[1];
     assert.ok(lesson !== undefined);
 
-    await assert.rejects(copyLessonSpec(sandbox.factoryRoot, lesson, { courseRoot: sandbox.course.root }), /spec\/ .*symbolic link/);
+    await assert.rejects(copyLessonSpec(sandbox.factoryRoot, lesson, await fromCourse(sandbox.course.root, lesson)), /spec\/ .*symbolic link/);
     assert.deepEqual(await readdir(src), ["main.ts"]);
   } finally {
     await sandbox.cleanup();
@@ -141,7 +151,7 @@ test("refuses a ../seeds/ that is a symbolic link, and a seed that is one, writi
     const lesson = sandbox.course.lessons[0];
     assert.ok(lesson !== undefined && lesson.seedSpec !== null);
 
-    await assert.rejects(copyLessonSpec(sandbox.factoryRoot, lesson, { courseRoot: sandbox.course.root }), /seeds\/ .*symbolic link/);
+    await assert.rejects(copyLessonSpec(sandbox.factoryRoot, lesson, await fromCourse(sandbox.course.root, lesson)), /seeds\/ .*symbolic link/);
     assert.deepEqual(await readdir(outside), []);
     assert.equal(await readdir(join(sandbox.factoryRoot, "spec")).catch(() => null), null, "spec/ is untouched");
     assert.equal(await readdir(join(sandbox.factoryRoot, "stand-ins")).catch(() => null), null, "stand-ins/ is untouched");
@@ -149,7 +159,7 @@ test("refuses a ../seeds/ that is a symbolic link, and a seed that is one, writi
     await rm(seeds);
     await mkdir(seeds);
     await symlink(join(outside, "tetris.md"), join(seeds, "tetris.md"));
-    await assert.rejects(copyLessonSpec(sandbox.factoryRoot, lesson, { courseRoot: sandbox.course.root }), /seeds\/tetris\.md is a symbolic link/);
+    await assert.rejects(copyLessonSpec(sandbox.factoryRoot, lesson, await fromCourse(sandbox.course.root, lesson)), /seeds\/tetris\.md is a symbolic link/);
     assert.deepEqual(await readdir(outside), []);
     assert.equal(await readdir(join(sandbox.factoryRoot, "spec")).catch(() => null), null, "spec/ is still untouched");
   } finally {
@@ -163,13 +173,13 @@ test("refuses a factory that is its repo's top folder, since ../seeds would be o
     const first = sandbox.course.lessons[0];
     const second = sandbox.course.lessons[1];
     assert.ok(first !== undefined && second !== undefined);
-    await copyLessonSpec(sandbox.factoryRoot, first, { courseRoot: sandbox.course.root });
+    await copyLessonSpec(sandbox.factoryRoot, first, await fromCourse(sandbox.course.root, first));
     const spec = join(sandbox.factoryRoot, "spec");
     const before = await filesUnder(spec);
     await mkdir(join(sandbox.factoryRoot, ".git"));
     await rm(join(sandbox.factoryRoot, "stand-ins"), { recursive: true, force: true });
 
-    await assert.rejects(copyLessonSpec(sandbox.factoryRoot, second, { courseRoot: sandbox.course.root }), /\.git/);
+    await assert.rejects(copyLessonSpec(sandbox.factoryRoot, second, await fromCourse(sandbox.course.root, second)), /\.git/);
     assert.deepEqual(await filesUnder(spec), before);
     assert.equal(await readFile(join(spec, "README.md"), "utf8"), first.readme);
     assert.equal(await readdir(join(sandbox.factoryRoot, "stand-ins")).catch(() => null), null, "stand-ins/ is untouched");
@@ -178,25 +188,34 @@ test("refuses a factory that is its repo's top folder, since ../seeds would be o
   }
 });
 
-test("refuses a ../seeds/ that is inside the course, or holds it", async () => {
+test("stages only the lesson's README.md, FACTORY.md and features/ from the spec bundle, never other course files", async () => {
   const sandbox = await makeSandbox();
   try {
-    const lesson = sandbox.course.lessons[0];
-    assert.ok(lesson !== undefined && lesson.seedSpec !== null);
+    const lesson = sandbox.course.lessons[1];
+    assert.ok(lesson !== undefined);
+    const options = await fromCourse(sandbox.course.root, lesson);
+    const extra = { kind: "file" as const, path: "notes-for-coaches.md", executable: false, base64: Buffer.from("not for students\n").toString("base64") };
+    await copyLessonSpec(sandbox.factoryRoot, lesson, { ...options, spec: { entries: [...options.spec.entries, extra] } });
+    assert.deepEqual((await readdir(join(sandbox.factoryRoot, "spec"))).sort(), ["FACTORY.md", "README.md", "features"]);
+  } finally {
+    await sandbox.cleanup();
+  }
+});
 
-    // A factory inside the course: ../seeds is course/tetris/seeds.
-    const inCourse = join(sandbox.course.root, "tetris/.factory");
-    await mkdir(inCourse, { recursive: true });
-    await assert.rejects(copyLessonSpec(inCourse, lesson, { courseRoot: sandbox.course.root }), /course/);
-    assert.deepEqual(await readdir(join(sandbox.course.root, "tetris")), [".factory"]);
-    assert.deepEqual(await readdir(inCourse), []);
-
-    // A course cloned into ../seeds.
-    const courseInSeeds = join(sandbox.codebaseRoot, "seeds/tutorial");
-    await mkdir(join(courseInSeeds, "stand-ins"), { recursive: true });
-    await assert.rejects(copyLessonSpec(sandbox.factoryRoot, lesson, { courseRoot: courseInSeeds }), /course/);
-    assert.deepEqual(await readdir(join(sandbox.codebaseRoot, "seeds")), ["tutorial"]);
-    assert.deepEqual(await readdir(sandbox.factoryRoot), []);
+test("a spec bundle that runs a path through a link, or out of the folder, is refused before spec/ changes", async () => {
+  const sandbox = await makeSandbox();
+  try {
+    const first = sandbox.course.lessons[0];
+    const second = sandbox.course.lessons[1];
+    assert.ok(first !== undefined && second !== undefined);
+    await copyLessonSpec(sandbox.factoryRoot, first, await fromCourse(sandbox.course.root, first));
+    const spec = join(sandbox.factoryRoot, "spec");
+    const before = await filesUnder(spec);
+    const options = await fromCourse(sandbox.course.root, second);
+    const escaping = { kind: "symlink" as const, path: "features/up.feature", target: "../../../outside" };
+    await assert.rejects(copyLessonSpec(sandbox.factoryRoot, second, { ...options, spec: { entries: [...options.spec.entries, escaping] } }), /escapes the bundle/);
+    assert.deepEqual(await filesUnder(spec), before);
+    assert.ok(!(await readdir(spec)).includes(".tutor-adopting"), "the staging folder is cleared");
   } finally {
     await sandbox.cleanup();
   }
@@ -214,7 +233,7 @@ test("refreshes stand-ins/ wholesale from the course's, keeping modes and links 
     const lesson = sandbox.course.lessons[1];
     assert.ok(lesson !== undefined);
 
-    await copyLessonSpec(sandbox.factoryRoot, lesson, { courseRoot: sandbox.course.root });
+    await copyLessonSpec(sandbox.factoryRoot, lesson, await fromCourse(sandbox.course.root, lesson));
     assert.deepEqual((await readdir(standIns)).sort(), ["README.md", "plan-alpha-beta", "plan-default"]);
     assert.equal(await readFile(join(standIns, "README.md"), "utf8"), "# Stand-ins\n");
     assert.equal((await lstat(join(standIns, "plan-alpha-beta"))).mode & 0o777, 0o755);
@@ -234,7 +253,7 @@ test("refuses a stand-ins/ that is a symbolic link before touching anything", as
     const lesson = sandbox.course.lessons[0];
     assert.ok(lesson !== undefined);
 
-    await assert.rejects(copyLessonSpec(sandbox.factoryRoot, lesson, { courseRoot: sandbox.course.root }), /stand-ins\/ .*symbolic link/);
+    await assert.rejects(copyLessonSpec(sandbox.factoryRoot, lesson, await fromCourse(sandbox.course.root, lesson)), /stand-ins\/ .*symbolic link/);
     assert.deepEqual(await readdir(outside), ["keep.txt"]);
     assert.equal(await readdir(join(sandbox.factoryRoot, "spec")).catch(() => null), null, "spec/ is untouched");
     assert.equal(await readdir(join(sandbox.codebaseRoot, "seeds")).catch(() => null), null, "no seed written");
@@ -253,7 +272,7 @@ test("a course without stand-ins/ leaves the factory's stand-ins/ alone", async 
     const lesson = sandbox.course.lessons[1];
     assert.ok(lesson !== undefined);
 
-    const result = await copyLessonSpec(sandbox.factoryRoot, lesson, { courseRoot: sandbox.course.root });
+    const result = await copyLessonSpec(sandbox.factoryRoot, lesson, await fromCourse(sandbox.course.root, lesson));
     assert.deepEqual(await readdir(standIns), ["mine"]);
     assert.ok(!result.written.includes("stand-ins/"));
   } finally {
@@ -277,7 +296,7 @@ test("a stand-ins/ refresh first recovers what a crashed one left, never followi
     const lesson = sandbox.course.lessons[1];
     assert.ok(lesson !== undefined);
 
-    await copyLessonSpec(sandbox.factoryRoot, lesson, { courseRoot: sandbox.course.root });
+    await copyLessonSpec(sandbox.factoryRoot, lesson, await fromCourse(sandbox.course.root, lesson));
     assert.deepEqual((await readdir(standIns)).sort(), ["README.md", "plan-alpha-beta"], "leftovers cleared");
     assert.deepEqual(await readdir(outside), ["keep.txt"]);
   } finally {
@@ -291,10 +310,10 @@ test("refuses a lesson with no feature files, keeping the previous spec snapshot
     const first = sandbox.course.lessons[0];
     const second = sandbox.course.lessons[1];
     assert.ok(first !== undefined && second !== undefined);
-    await copyLessonSpec(sandbox.factoryRoot, first, { courseRoot: sandbox.course.root });
+    await copyLessonSpec(sandbox.factoryRoot, first, await fromCourse(sandbox.course.root, first));
     await rm(join(second.dir, "features"), { recursive: true });
 
-    await assert.rejects(copyLessonSpec(sandbox.factoryRoot, second, { courseRoot: sandbox.course.root }), /no feature files/);
+    await assert.rejects(copyLessonSpec(sandbox.factoryRoot, second, await fromCourse(sandbox.course.root, second)), /no feature files/);
     assert.deepEqual(await readdir(join(sandbox.factoryRoot, "spec/features")), ["planning.feature"]);
   } finally {
     await sandbox.cleanup();
@@ -307,12 +326,12 @@ test("refuses a lesson whose README.md went missing after the course loaded, kee
     const first = sandbox.course.lessons[0];
     const second = sandbox.course.lessons[1];
     assert.ok(first !== undefined && second !== undefined);
-    await copyLessonSpec(sandbox.factoryRoot, first, { courseRoot: sandbox.course.root });
+    await copyLessonSpec(sandbox.factoryRoot, first, await fromCourse(sandbox.course.root, first));
     const spec = join(sandbox.factoryRoot, "spec");
     const before = (await readdir(spec)).sort();
     await rm(join(second.dir, "README.md"));
 
-    await assert.rejects(copyLessonSpec(sandbox.factoryRoot, second, { courseRoot: sandbox.course.root }), /Lesson 002 has no README\.md/);
+    await assert.rejects(copyLessonSpec(sandbox.factoryRoot, second, await fromCourse(sandbox.course.root, second)), /Lesson 002 has no README\.md/);
     assert.deepEqual((await readdir(spec)).sort(), before, "nothing added to or left behind in spec/");
     assert.equal(await readFile(join(spec, "README.md"), "utf8"), first.readme);
     assert.deepEqual(await readdir(join(spec, "features")), ["planning.feature"]);
@@ -333,14 +352,17 @@ test("a swap whose rollback can't put the old files back keeps them and says whe
     const first = sandbox.course.lessons[0];
     const second = sandbox.course.lessons[1];
     assert.ok(first !== undefined && second !== undefined);
-    await copyLessonSpec(sandbox.factoryRoot, first, { courseRoot: sandbox.course.root });
+    await copyLessonSpec(sandbox.factoryRoot, first, await fromCourse(sandbox.course.root, first));
     const spec = join(sandbox.factoryRoot, "spec");
 
     // Something makes a folder at spec/README.md once the old README moved aside: neither README can go there.
-    const error = await copyLessonSpec(sandbox.factoryRoot, second, {
-      courseRoot: sandbox.course.root,
-      hooks: { afterMovedAside: () => mkdir(join(spec, "README.md", "in-the-way"), { recursive: true }).then(() => undefined) },
-    }).then(
+    const error = await copyLessonSpec(
+      sandbox.factoryRoot,
+      second,
+      await fromCourse(sandbox.course.root, second, {
+        hooks: { afterMovedAside: () => mkdir(join(spec, "README.md", "in-the-way"), { recursive: true }).then(() => undefined) },
+      }),
+    ).then(
       () => assert.fail("the adoption succeeded"),
       (cause: Error) => cause,
     );
@@ -364,21 +386,24 @@ test("a swap's rollback never overwrites a file written in spec/ during the swap
     const first = sandbox.course.lessons[0];
     const second = sandbox.course.lessons[1];
     assert.ok(first !== undefined && second !== undefined);
-    await copyLessonSpec(sandbox.factoryRoot, first, { courseRoot: sandbox.course.root });
+    await copyLessonSpec(sandbox.factoryRoot, first, await fromCourse(sandbox.course.root, first));
     const spec = join(sandbox.factoryRoot, "spec");
     // The next lesson brings no FACTORY.md, so the old one moves aside and nothing replaces it.
     await rm(join(second.dir, "FACTORY.md"));
 
     // Once the old files are aside, the student saves FACTORY.md, and a folder in the way fails the swap.
-    const error = await copyLessonSpec(sandbox.factoryRoot, second, {
-      courseRoot: sandbox.course.root,
-      hooks: {
-        afterMovedAside: async () => {
-          await writeFile(join(spec, "FACTORY.md"), "written during the swap\n");
-          await mkdir(join(spec, "features", "in-the-way"), { recursive: true });
+    const error = await copyLessonSpec(
+      sandbox.factoryRoot,
+      second,
+      await fromCourse(sandbox.course.root, second, {
+        hooks: {
+          afterMovedAside: async () => {
+            await writeFile(join(spec, "FACTORY.md"), "written during the swap\n");
+            await mkdir(join(spec, "features", "in-the-way"), { recursive: true });
+          },
         },
-      },
-    }).then(
+      }),
+    ).then(
       () => assert.fail("the adoption succeeded"),
       (cause: Error) => cause,
     );
@@ -396,7 +421,7 @@ test("an adoption first recovers what a crashed one left in spec/, restoring mis
     const first = sandbox.course.lessons[0];
     const second = sandbox.course.lessons[1];
     assert.ok(first !== undefined && second !== undefined);
-    await copyLessonSpec(sandbox.factoryRoot, first, { courseRoot: sandbox.course.root });
+    await copyLessonSpec(sandbox.factoryRoot, first, await fromCourse(sandbox.course.root, first));
     const spec = join(sandbox.factoryRoot, "spec");
     // A crash mid-swap: the old README and features moved aside, the new README moved in, the rest staged.
     await mkdir(join(spec, ".tutor-previous"));
@@ -411,7 +436,7 @@ test("an adoption first recovers what a crashed one left in spec/, restoring mis
 
     // This adoption fails before the swap, so what recovery restored is what stays.
     await rm(join(second.dir, "README.md"));
-    await assert.rejects(copyLessonSpec(sandbox.factoryRoot, second, { courseRoot: sandbox.course.root }), /no README\.md/);
+    await assert.rejects(copyLessonSpec(sandbox.factoryRoot, second, await fromCourse(sandbox.course.root, second)), /no README\.md/);
     assert.deepEqual((await readdir(spec)).sort(), ["FACTORY.md", "NOTES.md", "README.md", "features"], "leftovers cleared");
     assert.equal(await readFile(join(spec, "README.md"), "utf8"), "half-adopted README\n", "a file present is never overwritten");
     assert.deepEqual(await readdir(join(spec, "features")), ["planning.feature"], "missing files restored");
@@ -419,7 +444,7 @@ test("an adoption first recovers what a crashed one left in spec/, restoring mis
     // The next adoption that works replaces the lesson files and keeps the rest.
     await writeFile(join(second.dir, "README.md"), second.readme);
     await mkdir(join(spec, ".tutor-previous"));
-    await copyLessonSpec(sandbox.factoryRoot, second, { courseRoot: sandbox.course.root });
+    await copyLessonSpec(sandbox.factoryRoot, second, await fromCourse(sandbox.course.root, second));
     assert.deepEqual((await readdir(spec)).sort(), ["FACTORY.md", "NOTES.md", "README.md", "features"], "the recovered notes stay");
     assert.deepEqual((await readdir(join(spec, "features"))).sort(), ["planning.feature", "validation.feature"]);
   } finally {
@@ -441,7 +466,7 @@ test("recovery never follows a leftover that is a symbolic link", async () => {
     for (const name of [".tutor-previous", ".tutor-adopting", ".tutor-staging-zz"]) await symlink(outside, join(spec, name));
 
     await rm(join(lesson.dir, "README.md"));
-    await assert.rejects(copyLessonSpec(sandbox.factoryRoot, lesson, { courseRoot: sandbox.course.root }), /no README\.md/);
+    await assert.rejects(copyLessonSpec(sandbox.factoryRoot, lesson, await fromCourse(sandbox.course.root, lesson)), /no README\.md/);
     assert.deepEqual(await readdir(spec), [], "the links are removed and nothing is restored through them");
     assert.deepEqual((await filesUnder(outside)).sort(), ["README.md", "features/x.feature"]);
   } finally {

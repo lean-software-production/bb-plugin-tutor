@@ -165,6 +165,8 @@ export async function makeTutorHost(
     hostStatus?: "connected" | "disconnected";
     /** Whether BB has a host of its own (the Codespace's); a standalone bb-server has none. Yes unless given. */
     serverHost?: boolean;
+    /** Runs before each call to the host entry is dispatched: to watch the calls, or to fail one by throwing. */
+    onHostCall?: (method: string, input: unknown) => unknown;
   } = {},
 ): Promise<TutorHost> {
   const threads: FakeThread[] = [];
@@ -219,8 +221,10 @@ export async function makeTutorHost(
   const hostHarness = experimental_createHostEntryHarness(hostEntry);
   const host = createFakePluginHost({
     pluginId: "tutor",
-    experimental_callHostRpc: (call) =>
-      hostHarness.experimental_call(call.method as keyof typeof hostEntry.contract, call.input as never, call.signal === undefined ? {} : { signal: call.signal }),
+    experimental_callHostRpc: async (call) => {
+      await options.onHostCall?.(call.method, call.input);
+      return hostHarness.experimental_call(call.method as keyof typeof hostEntry.contract, call.input as never, call.signal === undefined ? {} : { signal: call.signal });
+    },
     agentSkillIds: [SKILL_ID],
     settings,
     ...(options.dataDir === undefined ? {} : { dataDir: options.dataDir }),

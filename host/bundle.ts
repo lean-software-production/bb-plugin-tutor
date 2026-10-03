@@ -31,8 +31,8 @@ function parentsOf(path: string): string[] {
   return parents;
 }
 
-/** Validates every entry before anything is written: safe paths, links staying inside, no duplicate paths, and no entry's path running through another entry (a file or a symbolic link, neither of which can also be a folder). */
-function validate(bundle: Bundle): void {
+/** Validates every entry before anything is written: safe paths, links staying inside, no duplicate paths, and no entry's path running through another entry (a file or a symbolic link, neither of which can also be a folder). Throws the refusal. */
+export function validateBundle(bundle: Bundle): void {
   const seen = new Set<string>();
   for (const entry of bundle.entries) {
     const badPath = unsafePath(entry.path);
@@ -131,7 +131,7 @@ export async function writeBundle(target: string, bundle: Bundle, options: Write
   });
   if (!targetStats.isDirectory()) throw new Error(`${target} is not a real folder, so Tutor cannot write the bundle there.`);
 
-  validate(bundle);
+  validateBundle(bundle);
 
   // No entry's path may run through a symbolic link already on disk.
   for (const entry of bundle.entries) {

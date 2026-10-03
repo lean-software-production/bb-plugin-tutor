@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { makeSandbox } from "../../test/helpers/disk.ts";
 import { bundleBytes, MAX_BUNDLE_BYTES } from "../../shared/bundle.ts";
-import { bundleFolder } from "./make-bundle.ts";
+import { bundleFolder, lessonSpecBundle, standInsBundle } from "./make-bundle.ts";
 
 test("bundleFolder reads files, modes and links; the fixture course's largest lesson is far under the limit", async () => {
   const sandbox = await makeSandbox();
@@ -84,5 +84,24 @@ test("bundleFolder throws a clear error naming the folder when the encoded bundl
     });
   } finally {
     await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a lesson's spec bundle holds README.md, FACTORY.md and features/ only; stand-ins/ is null unless a real folder", async () => {
+  const sandbox = await makeSandbox();
+  try {
+    const lesson = sandbox.course.lessons.find((entry) => entry.id === "001");
+    assert.ok(lesson !== undefined && lesson.seedSpec !== null);
+    await writeFile(join(lesson.dir, "coach-notes.md"), "for the coach\n");
+    const spec = await lessonSpecBundle(lesson.dir);
+    assert.deepEqual(spec.entries.map((entry) => entry.path).sort(), ["FACTORY.md", "README.md", "features/planning.feature"]);
+
+    assert.ok((await standInsBundle(sandbox.course.root)) !== null);
+    await rm(join(sandbox.course.root, "stand-ins"), { recursive: true });
+    assert.equal(await standInsBundle(sandbox.course.root), null);
+    await symlink(join(sandbox.root, "elsewhere"), join(sandbox.course.root, "stand-ins"));
+    assert.equal(await standInsBundle(sandbox.course.root), null);
+  } finally {
+    await sandbox.cleanup();
   }
 });

@@ -27,7 +27,7 @@ function isOffline(cause: unknown): boolean {
 }
 
 /** Runs a call to the machine, turning BB's "not connected" into WorkspaceUnreachableError. */
-async function onMachine<T>(call: () => Promise<T>): Promise<T> {
+export async function onMachine<T>(call: () => Promise<T>): Promise<T> {
   try {
     return await call();
   } catch (cause) {

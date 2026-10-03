@@ -4,6 +4,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { coachThreadMetadataSchema } from "../../shared/model.ts";
 import { createActivityRecorder, resolveDataDir } from "../activity/heartbeat.ts";
 import { registerRpc } from "../rpc/handlers.ts";
+import { createHostClient } from "../workspace/host-client.ts";
 import { createCoachRegistry } from "./coach-registry.ts";
 import { coachConfiguration } from "./configure.ts";
 import { factoryWhere } from "./prompts.ts";
@@ -25,6 +26,7 @@ export async function registerTutor(bb: BbPluginApi, deps: WorldDeps): Promise<T
     world: createWorldSource(bb, settings, deps),
     store: deps.store,
     access: deps.access,
+    host: createHostClient(bb),
     signals: createStateSignals(bb),
     locks: createKeyedLock(),
     coaches: createCoachRegistry(),

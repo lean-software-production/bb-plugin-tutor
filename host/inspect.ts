@@ -1,7 +1,7 @@
 // lstat and realpath on the machine, for layout detection (layouts/types.ts LayoutProbe).
 import { lstat, realpath } from "node:fs/promises";
 import { resolve } from "node:path";
-import type { PathKind } from "../layouts/types.ts";
+import type { LayoutProbe, PathKind } from "../layouts/types.ts";
 import type { InspectInput, InspectOutput } from "./contract.ts";
 
 /** What is at `path` itself: a symbolic link is a link, wherever it leads. */
@@ -22,3 +22,9 @@ export async function inspect(input: InspectInput): Promise<InspectOutput> {
   for (const path of input.realPaths) realPaths[path] = await realPathOf(path);
   return { kinds, realPaths };
 }
+
+/** Layout detection's questions, answered on this machine directly. */
+export const localProbe: LayoutProbe = {
+  kinds: async (paths) => (await inspect({ paths: [...paths], realPaths: [] })).kinds,
+  realPath: realPathOf,
+};

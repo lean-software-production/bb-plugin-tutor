@@ -1,11 +1,12 @@
 // The six coach tools. Each call re-derives the world, re-checks the calling
 // thread with BB, runs the pure action, then writes the files it returned.
 import type { PluginAgentToolContext, PluginAgentToolResult, PluginRowLabels } from "@get-bb/plugin-sdk";
-import { TOOL_NAMES, type ToolName } from "../../shared/constants.ts";
+import { FACTORY_FILES, TOOL_NAMES, type ToolName } from "../../shared/constants.ts";
 import { findLesson, findRule } from "../../shared/derive.ts";
 import { toolParameterSchemas, type ToolParameters } from "../../shared/tools.ts";
-import { capstoneProgress } from "../../layouts/capstone-factory/detect.ts";
-import { adoptLesson } from "../progress/factory-move.ts";
+import type { IterationState, Lesson, ProgressFile } from "../../shared/model.ts";
+import { lessonSpecBundle, standInsBundle } from "../content/make-bundle.ts";
+import { overlaps, realPath } from "../paths.ts";
 import { isoSeconds } from "../progress/time.ts";
 import { WorkspaceUnreachableError, WriteConflictError } from "../workspace/access.ts";
 import {
@@ -62,6 +63,46 @@ function refusal(text: string): PluginAgentToolResult {
   return { content: [{ type: "text", text }], isError: true };
 }
 
+/**
+ * Refuses a seed that would land in the course: a seeds folder that is, or
+ * shares a folder with, the course checkout (the course is on the server's
+ * side, so this is checked here, before the machine is asked to write).
+ */
+async function refuseSeedsInCourse(rt: TutorRuntime, state: CoachState, lesson: Lesson): Promise<void> {
+  if (state.layout.id !== "capstone-factory" || lesson.seedSpec === null) return;
+  const { layout } = state.layout;
+  if (overlaps(await rt.access(state.hostId).realPath(layout.seedsDir), await realPath(state.course.root))) {
+    throw new Error(
+      `${layout.codebase}/${FACTORY_FILES.seedsDir}/ is, or shares a folder with, the course, so Tutor will not write the seed there. Keep the course checkout apart from your repo.`,
+    );
+  }
+}
+
+/**
+ * Adopts a capstone lesson as one host call on the workspace's machine
+ * (layouts/capstone-factory/adopt.ts): from 004 in a starter clone the factory
+ * moves to factory/ first, then spec/, the seed and stand-ins/ are written
+ * from bundles built here, then PROGRESS.yaml and ITERATION, so ITERATION
+ * never names a lesson that isn't there. A progress file edited since the
+ * world was read is a WriteConflictError, with nothing written; the tool
+ * then reads the world again and acts once more. Returns the host's note.
+ */
+async function adoptOnMachine(rt: TutorRuntime, state: CoachState, lesson: Lesson, outcome: { progress?: ProgressFile; iteration?: IterationState }): Promise<string | null> {
+  if (state.layout.id !== "capstone-factory") throw new Error("Only a capstone course's lessons are adopted into the workspace.");
+  if (outcome.progress === undefined || outcome.iteration === undefined) throw new Error(`Adopting lesson ${lesson.id} needs its progress and ITERATION.`);
+  await refuseSeedsInCourse(rt, state, lesson);
+  const adopted = await rt.host.adoptLesson(state.hostId, {
+    root: state.layout.layout.projectRoot,
+    lesson: { id: lesson.id, seedSpec: lesson.seedSpec },
+    spec: await lessonSpecBundle(lesson.dir),
+    standIns: await standInsBundle(state.course.root),
+    progress: outcome.progress,
+    iteration: outcome.iteration,
+    progressSha256: state.student.progressSha256 ?? null,
+  });
+  return adopted.note;
+}
+
 /** Performs the outcome's writes; returns a note to add to the tool's text, or null. */
 async function applyOutcome(rt: TutorRuntime, state: CoachState, outcome: Outcome, caller: Caller): Promise<string | null> {
   if ("error" in outcome) return null;
@@ -69,20 +110,18 @@ async function applyOutcome(rt: TutorRuntime, state: CoachState, outcome: Outcom
   // A factory Tutor can't find (or won't use) gets nothing written into where it should be.
   if (writes && state.layout.blocked !== null) throw new Error(state.layout.blocked);
   if (outcome.reached !== undefined) await recordReachedRule(rt.bb.sdk, caller.coachThreadId, outcome.reached);
-  const access = rt.access(state.hostId);
-  let progressAt = state.layout.progress;
   let note: string | null = null;
-  // Adoption writes spec/, the seed and stand-ins/ before ITERATION, so ITERATION never names a lesson that isn't there.
-  // From 004 in a starter clone it moves the factory to factory/ first (factory-move.ts), and the rest goes there.
-  // Only the capstone copies a lesson's spec into the workspace; a course without a layout keeps it in the course.
+  // Only the capstone copies a lesson's spec into the workspace, all of it on the machine in one call;
+  // a course without a layout keeps it in the course, and Lesson 0 lives in Tutor.
   if (outcome.adopt !== undefined && state.layout.id === "capstone-factory") {
-    const adoption = await adoptLesson(state.layout.layout, outcome.adopt, { courseRoot: state.course.root, probe: access });
-    progressAt = capstoneProgress(adoption.layout);
-    note = adoption.note;
+    note = await adoptOnMachine(rt, state, outcome.adopt, outcome);
+  } else {
+    const access = rt.access(state.hostId);
+    const progressAt = state.layout.progress;
+    if (outcome.iteration !== undefined) await rt.store.writeIteration(access, progressAt, outcome.iteration);
+    // Only if the file is still what the world read: an edit since then is a conflict, not lost.
+    if (outcome.progress !== undefined) await rt.store.writeProgress(access, progressAt, outcome.progress, state.student.progressSha256 ?? null);
   }
-  if (outcome.iteration !== undefined) await rt.store.writeIteration(access, progressAt, outcome.iteration);
-  // Only if the file is still what the world read: an edit since then is a conflict, not lost.
-  if (outcome.progress !== undefined) await rt.store.writeProgress(access, progressAt, outcome.progress, state.student.progressSha256 ?? null);
   if (outcome.iteration !== undefined || outcome.progress !== undefined) {
     rt.signals.publish(outcome.iteration === undefined ? "progress" : "iteration", outcome.progress?.iteration ?? null);
   }

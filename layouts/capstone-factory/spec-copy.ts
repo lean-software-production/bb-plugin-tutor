@@ -1,13 +1,14 @@
-// Adopting a lesson's spec, with the same result as the starter's
-// fetch-iteration (fetch.sh): spec/README.md, spec/FACTORY.md and
-// spec/features/ become the lesson's, leaving anything else in spec/ alone;
-// the lesson's sample seed is copied to <seeds>/<codebase>.md (tetris.md:
-// tetris/seeds/ in a starter clone, ../seeds for a factory that is its own
-// project; see layouts/capstone-factory/detect.ts) unless that file is already there; and stand-ins/
-// is refreshed wholesale from the course's. Every check runs before anything
-// is written, so a refusal leaves the factory as it was (checkLessonSpec runs
-// them alone, for the factory move to go first). Tutor's tools write
-// ITERATION last.
+// Adopting a lesson's spec on the student's machine, with the same result as
+// the starter's fetch-iteration (fetch.sh): spec/README.md, spec/FACTORY.md
+// and spec/features/ become the lesson's, leaving anything else in spec/
+// alone; the lesson's sample seed is written to <seeds>/<codebase>.md
+// (tetris.md: tetris/seeds/ in a starter clone, ../seeds for a factory that is
+// its own project; see detect.ts) unless that file is already there; and
+// stand-ins/ is refreshed wholesale from the course's. The course's files
+// arrive as bundles the server built (server/content/make-bundle.ts), and the
+// seed as text. Every check runs before anything is written, so a refusal
+// leaves the factory as it was (checkLessonSpec runs them alone, for the
+// factory move to go first). adopt.ts writes PROGRESS.yaml and ITERATION last.
 //
 // spec/ and stand-ins/ are each refreshed the same way: the new files are
 // staged inside the folder first and swapped in only once all of them copied,
@@ -18,11 +19,11 @@
 // under the factory lock, one at a time, so a fixed name never clashes with a
 // live adoption, and the next adoption starts by recovering whatever is left
 // in them (recoverLeftovers).
-import { access, copyFile, cp, lstat, mkdir, readdir, realpath, rename, rm, unlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, realpath, rename, rm, unlink, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
-import { COURSE_FILES, FACTORY_FILES } from "../../shared/constants.ts";
-import type { Lesson } from "../../shared/model.ts";
-import { overlaps, realPath } from "../paths.ts";
+import { validateBundle, writeBundle } from "../../host/bundle.ts";
+import type { Bundle } from "../../shared/bundle.ts";
+import { FACTORY_FILES } from "../../shared/constants.ts";
 import { ownFolder } from "./own-folder.ts";
 
 const README = "README.md";
@@ -30,6 +31,18 @@ const OPTIONAL_SPEC_FILES = ["FACTORY.md"];
 const FEATURES_DIR = "features";
 /** The lesson's names in spec/: the only entries an adoption replaces there. */
 const REPLACED_IN_SPEC = new Set([README, ...OPTIONAL_SPEC_FILES, FEATURES_DIR]);
+
+/** Whether a lesson's file, by its path in the lesson's folder, is one an adoption copies into spec/: README.md, FACTORY.md, or under features/. */
+export function isLessonSpecPath(path: string): boolean {
+  return path === README || OPTIONAL_SPEC_FILES.includes(path) || path.startsWith(`${FEATURES_DIR}/`);
+}
+
+/** What an adoption needs to know of the lesson itself: its files come as a bundle. */
+export interface AdoptedLesson {
+  id: string;
+  /** The sample seed's text (the lesson's spec.md), or null when it has none. */
+  seedSpec: string | null;
+}
 /** The staged files, inside the refreshed folder so the swap is a rename on one filesystem. */
 const ADOPTING_DIR = ".tutor-adopting";
 /** The previous files while they are moved aside. */
@@ -66,15 +79,6 @@ async function occupied(path: string): Promise<boolean> {
   );
 }
 
-async function exists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /** Whether the seed is already there. A symbolic link in its place is refused, dangling or not. */
 async function seedPresent(path: string, display: string): Promise<boolean> {
   const stats = await lstat(path).catch(() => null);
@@ -82,12 +86,23 @@ async function seedPresent(path: string, display: string): Promise<boolean> {
   return stats !== null;
 }
 
-/** Refuses a lesson with nothing to coach before anything in spec/ is replaced. */
-async function requireFeatureFiles(lesson: Lesson): Promise<void> {
-  const names = await readdir(join(lesson.dir, FEATURES_DIR)).catch(() => []);
-  if (!names.some((name) => name.endsWith(".feature"))) {
-    throw new Error(`Lesson ${lesson.id} has no feature files in ${lesson.dir}, so it cannot be adopted.`);
+/** The bundle's entries an adoption copies into spec/ (isLessonSpecPath); anything else in it is left out. */
+function specEntries(spec: Bundle): Bundle {
+  return { entries: spec.entries.filter((entry) => isLessonSpecPath(entry.path)) };
+}
+
+/**
+ * Refuses a lesson with nothing to coach before anything in spec/ is
+ * replaced, and a bundle that would write anywhere but inside its folder
+ * (host/bundle.ts validateBundle).
+ */
+function requireLessonFiles(lesson: AdoptedLesson, spec: Bundle, standIns: Bundle | null): void {
+  const features = spec.entries.filter((entry) => entry.path.startsWith(`${FEATURES_DIR}/`) && !entry.path.slice(FEATURES_DIR.length + 1).includes("/"));
+  if (!features.some((entry) => entry.path.endsWith(".feature"))) {
+    throw new Error(`Lesson ${lesson.id} has no feature files, so it cannot be adopted.`);
   }
+  validateBundle(spec);
+  if (standIns !== null) validateBundle(standIns);
 }
 
 /** The seed's file name: the codebase folder's (tetris/ → tetris.md), as fetch-iteration names it. */
@@ -134,25 +149,16 @@ interface SeedTarget {
 }
 
 /**
- * Where the seed goes. The seeds folder must be a real one apart from the
- * course, and the seed no symbolic link.
+ * Where the seed goes. The seeds folder must be a real one, and the seed no
+ * symbolic link. (That it is apart from the course, the server checks: the
+ * course is on its side.)
  */
-async function seedTarget(seeds: SeedsLocation, courseRoot: string): Promise<SeedTarget> {
+async function seedTarget(seeds: SeedsLocation): Promise<SeedTarget> {
   const seedsLabel = `${seeds.codebase}/${basename(seeds.dir)}/`;
   const dir = await ownFolder(dirname(seeds.dir), basename(seeds.dir), seedsLabel);
-  if (overlaps(await realPath(dir), await realPath(courseRoot))) {
-    throw new Error(`${seedsLabel} is, or shares a folder with, the course, so Tutor will not write the seed there. Keep the course checkout apart from your repo.`);
-  }
   const name = `${seeds.codebase}.md`;
   const path = join(dir, name);
   return { dir, path, shown: `${seeds.shown}/${name}`, alreadyThere: await seedPresent(path, `${seedsLabel}${name}`) };
-}
-
-/** The course's stand-ins/, or null when it has none as a real folder. */
-async function courseStandIns(courseRoot: string): Promise<string | null> {
-  const path = join(courseRoot, COURSE_FILES.standIns);
-  const stats = await lstat(path).catch(() => null);
-  return stats?.isDirectory() === true ? path : null;
 }
 
 export interface SpecCopyResult {
@@ -163,30 +169,20 @@ export interface SpecCopyResult {
   seedAlreadyThere: boolean;
 }
 
-/** Copies the lesson's files into `staging`; the names copied, README.md and features/ always among them. */
-async function stageLesson(lesson: Lesson, staging: string): Promise<string[]> {
-  try {
-    await copyFile(join(lesson.dir, README), join(staging, README));
-  } catch (cause) {
-    if ((cause as { code?: unknown }).code === "ENOENT") {
-      throw new Error(`Lesson ${lesson.id} has no README.md in ${lesson.dir}, so it cannot be adopted.`);
-    }
-    throw cause;
+/** Writes the lesson's spec bundle into `staging`; the names written, README.md and features/ always among them. */
+async function stageLesson(lesson: AdoptedLesson, lessonBundle: Bundle, staging: string): Promise<string[]> {
+  const spec = specEntries(lessonBundle);
+  if (!spec.entries.some((entry) => entry.path === README)) {
+    throw new Error(`Lesson ${lesson.id} has no README.md, so it cannot be adopted.`);
   }
-  const names = [README];
-  for (const file of OPTIONAL_SPEC_FILES) {
-    const source = join(lesson.dir, file);
-    if (!(await exists(source))) continue;
-    await copyFile(source, join(staging, file));
-    names.push(file);
-  }
-  await cp(join(lesson.dir, FEATURES_DIR), join(staging, FEATURES_DIR), { recursive: true });
-  return [...names, FEATURES_DIR];
+  await writeBundle(staging, spec, { onlyIfAbsent: false });
+  const present = new Set(spec.entries.map((entry) => entry.path.split("/")[0] ?? ""));
+  return [README, ...OPTIONAL_SPEC_FILES.filter((file) => present.has(file)), FEATURES_DIR];
 }
 
-/** Copies the course's stand-ins/ into `staging`, links as links; the names copied. */
-async function stageStandIns(source: string, staging: string): Promise<string[]> {
-  await cp(source, staging, { recursive: true, verbatimSymlinks: true });
+/** Writes the course's stand-ins/ bundle into `staging`, links as links and modes kept; the names written. */
+async function stageStandIns(standIns: Bundle, staging: string): Promise<string[]> {
+  await writeBundle(staging, standIns, { onlyIfAbsent: false });
   return (await readdir(staging)).filter((entry) => !isWorkingFolder(entry));
 }
 
@@ -312,8 +308,10 @@ async function refresh(folder: Refreshed, stage: (staging: string) => Promise<st
 }
 
 export interface SpecCopyOptions {
-  /** The course checkout, whose stand-ins/ is copied. */
-  courseRoot: string;
+  /** The lesson's README.md, FACTORY.md and features/ (server/content/make-bundle.ts lessonSpecBundle). */
+  spec: Bundle;
+  /** The course's stand-ins/, or null when it has none: the factory's stand-ins/ is then left alone. */
+  standIns: Bundle | null;
   /** Where the seed goes. Without it, ../seeds beside the factory's real folder, as for a factory that is its own project. */
   seeds?: SeedsLocation;
   /** The factory's folder relative to the repo (factory, tetris/.factory), prefixed to the paths written. */
@@ -325,43 +323,41 @@ interface Prepared {
   spec: Refreshed;
   seed: SeedTarget | null;
   standIns: Refreshed | null;
-  standInsSource: string | null;
 }
 
 /** Every check an adoption makes, before anything is written. */
-async function prepare(factoryRoot: string, lesson: Lesson, options: SpecCopyOptions): Promise<Prepared> {
-  await requireFeatureFiles(lesson);
+async function prepare(factoryRoot: string, lesson: AdoptedLesson, options: SpecCopyOptions): Promise<Prepared> {
+  requireLessonFiles(lesson, options.spec, options.standIns);
   await requireCodebaseFolder(factoryRoot);
   const spec: Refreshed = {
     dir: await ownFolder(factoryRoot, FACTORY_FILES.specDir, `${FACTORY_FILES.specDir}/ in the factory`),
     shown: FACTORY_FILES.specDir,
     replaces: (entry) => REPLACED_IN_SPEC.has(entry),
   };
-  const seed = lesson.seedSpec === null ? null : await seedTarget(options.seeds ?? (await legacySeeds(factoryRoot)), options.courseRoot);
-  const standInsSource = await courseStandIns(options.courseRoot);
+  const seed = lesson.seedSpec === null ? null : await seedTarget(options.seeds ?? (await legacySeeds(factoryRoot)));
   const standIns: Refreshed | null =
-    standInsSource === null
+    options.standIns === null
       ? null
       : {
           dir: await ownFolder(factoryRoot, FACTORY_FILES.standInsDir, `${FACTORY_FILES.standInsDir}/ in the factory`),
           shown: FACTORY_FILES.standInsDir,
           replaces: () => true,
         };
-  return { spec, seed, standIns, standInsSource };
+  return { spec, seed, standIns };
 }
 
 /** Runs every check copyLessonSpec makes, writing nothing: it throws what copyLessonSpec would refuse with. */
-export async function checkLessonSpec(factoryRoot: string, lesson: Lesson, options: SpecCopyOptions): Promise<void> {
+export async function checkLessonSpec(factoryRoot: string, lesson: AdoptedLesson, options: SpecCopyOptions): Promise<void> {
   await prepare(factoryRoot, lesson, options);
 }
 
-export async function copyLessonSpec(factoryRoot: string, lesson: Lesson, options: SpecCopyOptions): Promise<SpecCopyResult> {
+export async function copyLessonSpec(factoryRoot: string, lesson: AdoptedLesson, options: SpecCopyOptions): Promise<SpecCopyResult> {
   // Every check first: a refusal writes nothing.
-  const { spec, seed, standIns, standInsSource } = await prepare(factoryRoot, lesson, options);
+  const { spec, seed, standIns } = await prepare(factoryRoot, lesson, options);
   const hooks = options.hooks ?? {};
   const inFactory = (path: string) => (options.factoryShown === undefined ? path : `${options.factoryShown}/${path}`);
 
-  const names = await refresh(spec, (staging) => stageLesson(lesson, staging), hooks);
+  const names = await refresh(spec, (staging) => stageLesson(lesson, options.spec, staging), hooks);
   const written = names.map((name) => inFactory(name === FEATURES_DIR ? `${FACTORY_FILES.specDir}/${FEATURES_DIR}/` : `${FACTORY_FILES.specDir}/${name}`));
 
   if (lesson.seedSpec !== null && seed !== null && !seed.alreadyThere) {
@@ -371,8 +367,9 @@ export async function copyLessonSpec(factoryRoot: string, lesson: Lesson, option
     written.push(seed.shown);
   }
 
-  if (standIns !== null && standInsSource !== null) {
-    await refresh(standIns, (staging) => stageStandIns(standInsSource, staging), {});
+  const standInsBundle = options.standIns;
+  if (standIns !== null && standInsBundle !== null) {
+    await refresh(standIns, (staging) => stageStandIns(standInsBundle, staging), {});
     written.push(inFactory(`${FACTORY_FILES.standInsDir}/`));
   }
   return { written, seed: seed?.shown ?? null, seedAlreadyThere: seed?.alreadyThere ?? false };

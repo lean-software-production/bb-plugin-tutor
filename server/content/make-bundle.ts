@@ -4,6 +4,8 @@
 // allowlists it: it never touches the student's workspace).
 import { readdir, readFile, lstat, readlink } from "node:fs/promises";
 import { join, relative } from "node:path";
+import { isLessonSpecPath } from "../../layouts/capstone-factory/spec-copy.ts";
+import { COURSE_FILES } from "../../shared/constants.ts";
 import { bundleBytes, MAX_BUNDLE_BYTES, type Bundle, type BundleEntry } from "../../shared/bundle.ts";
 
 export interface BundleFolderOptions {
@@ -51,4 +53,21 @@ export async function bundleFolder(dir: string, options: BundleFolderOptions = {
     throw new Error(`${dir} encodes to ${size} bytes, over the ${MAX_BUNDLE_BYTES}-byte bundle limit.`);
   }
   return bundle;
+}
+
+/**
+ * What an adoption copies of a lesson into spec/: its README.md, FACTORY.md
+ * and features/, as fetch-iteration copies them. The seed (spec.md) travels
+ * as text, and nothing else in the lesson's folder is sent.
+ */
+export async function lessonSpecBundle(lessonDir: string): Promise<Bundle> {
+  const bundle = await bundleFolder(lessonDir, { skip: ["spec.md"] });
+  return { entries: bundle.entries.filter((entry) => isLessonSpecPath(entry.path)) };
+}
+
+/** The course's stand-ins/, or null when it has none as a real folder (the factory's stand-ins/ is then left alone). */
+export async function standInsBundle(courseRoot: string): Promise<Bundle | null> {
+  const dir = join(courseRoot, COURSE_FILES.standIns);
+  const stats = await lstat(dir).catch(() => null);
+  return stats?.isDirectory() === true ? bundleFolder(dir) : null;
 }

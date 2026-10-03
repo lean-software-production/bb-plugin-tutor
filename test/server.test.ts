@@ -2,7 +2,7 @@
 // tool authorisation, coach thread spawn-or-find, and the PROGRESS.yaml round
 // trip through the coach tools, including carry-over on adopt.
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, readlink, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
@@ -1225,6 +1225,114 @@ test("a progress file changed after the tool read it is retried once, then refus
   assert.equal(after.examples[first.key]?.status, "passing");
 });
 
+
+/** Every entry under `dir` but .git: folders, links with their targets, files with their contents. */
+async function snapshot(dir: string, prefix = ""): Promise<string[]> {
+  const out: string[] = [];
+  for (const entry of (await readdir(join(dir, prefix), { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) {
+    const path = prefix === "" ? entry.name : `${prefix}/${entry.name}`;
+    if (path === ".git") continue;
+    if (entry.isSymbolicLink()) out.push(`${path} -> ${await readlink(join(dir, path))}`);
+    else if (entry.isDirectory()) out.push(`${path}/`, ...(await snapshot(dir, path)));
+    else out.push(`${path}: ${await readFile(join(dir, path), "utf8")}`);
+  }
+  return out;
+}
+
+test("the server never copies course files itself: a capstone adoption is a single adoptLesson host call", async (t) => {
+  // fetch-iteration ran outside BB: ITERATION reads 001 WIP, so lesson 001's coach adopts it.
+  const sandbox = await makeRepoSandbox({ git: true, iteration: "001 WIP" });
+  const calls: string[] = [];
+  const host = await makeTutorHost(sandbox.course, sandbox.repoRoot, undefined, { onHostCall: (method) => calls.push(method) });
+  t.after(async () => {
+    await host.harness.lifecycle.dispose();
+    await sandbox.cleanup();
+  });
+  const coach1 = (await openCoach(host, "001")).threadId;
+  await ok(host, "tutor_adopt_iteration", { iteration: "001" }, coach1);
+  assert.deepEqual(calls.filter((method) => method !== "inspect"), ["adoptLesson"]);
+  assert.match(await readFile(join(sandbox.factoryRoot, "ITERATION"), "utf8"), /^001 WIP/);
+  assert.match(await readFile(join(sandbox.factoryRoot, "spec/PROGRESS.yaml"), "utf8"), /^iteration: "001"\n/);
+  assert.equal(await readFile(join(sandbox.codebaseRoot, "seeds/tetris.md"), "utf8"), findLesson(sandbox.course, "001")?.seedSpec);
+});
+
+test("a host call that fails mid-adoption (machine gone) leaves the workspace as it was", async (t) => {
+  const sandbox = await makeRepoSandbox({ git: true, iteration: "001 WIP" });
+  const host = await makeTutorHost(sandbox.course, sandbox.repoRoot, undefined, {
+    onHostCall: (method) => {
+      if (method === "adoptLesson") throw new WorkspaceUnreachableError();
+    },
+  });
+  t.after(async () => {
+    await host.harness.lifecycle.dispose();
+    await sandbox.cleanup();
+  });
+  const coach1 = (await openCoach(host, "001")).threadId;
+  const before = await snapshot(sandbox.repoRoot);
+  const refused = await tool(host, "tutor_adopt_iteration", { iteration: "001" }, coach1);
+  assert.ok(isError(refused));
+  assert.match(text(refused), UNREACHABLE);
+  assert.deepEqual(await snapshot(sandbox.repoRoot), before);
+});
+
+test("a progress file edited after the world was read: adoptLesson refuses with no writes, and the retry adopts", async (t) => {
+  const sandbox = await makeRepoSandbox({ git: true, iteration: "001 Done", progress: { iteration: "001" } });
+  const progressPath = join(sandbox.factoryRoot, "spec/PROGRESS.yaml");
+  /** The workspace as each adoptLesson call found it. */
+  const seen: string[][] = [];
+  const host = await makeTutorHost(sandbox.course, sandbox.repoRoot, undefined, {
+    onHostCall: async (method) => {
+      if (method === "adoptLesson") seen.push(await snapshot(sandbox.repoRoot));
+    },
+  });
+  t.after(async () => {
+    await host.harness.lifecycle.dispose();
+    await sandbox.cleanup();
+  });
+  const coach2 = ((await host.harness.behavior.callRpc("startNextLesson", { courseId: "software-factory", lessonId: "002" })) as { threadId: string }).threadId;
+  // The outside edit lands once the first attempt has loaded the world (the second load), before its host call.
+  const load = host.rt.world.load.bind(host.rt.world);
+  let loads = 0;
+  host.rt.world.load = async () => {
+    const world = await load();
+    loads += 1;
+    if (loads === 2) await writeFile(progressPath, 'iteration: "001"\nsummary: edited meanwhile\nexamples: {}\n');
+    return world;
+  };
+  await ok(host, "tutor_adopt_iteration", { iteration: "002" }, coach2);
+  assert.equal(loads, 3, "the retry loaded the world again");
+  assert.equal(seen.length, 2, "adoptLesson was called twice");
+  assert.deepEqual(seen[1], seen[0], "the first call wrote nothing");
+  assert.equal(await readFile(join(sandbox.factoryRoot, "ITERATION"), "utf8"), "002 WIP\n");
+  const progress = await readFile(progressPath, "utf8");
+  assert.match(progress, /^iteration: "002"\n/);
+  assert.match(progress, /summary: edited meanwhile/, "the outside edit is kept, in the history");
+});
+
+test("refuses to adopt when ../seeds/ is, or holds, the course, writing nothing", async (t) => {
+  const sandbox = await makeSandbox();
+  // The course cloned into ../seeds.
+  const courseRoot = join(sandbox.codebaseRoot, "seeds/tutorial");
+  await mkdir(join(sandbox.codebaseRoot, "seeds"), { recursive: true });
+  await rename(sandbox.course.root, courseRoot);
+  const course = {
+    ...sandbox.course,
+    root: courseRoot,
+    lessons: sandbox.course.lessons.map((lesson) => ({ ...lesson, dir: lesson.dir.replace(sandbox.course.root, courseRoot) })),
+  };
+  await writeFile(join(sandbox.factoryRoot, "ITERATION"), "001 WIP\n");
+  const host = await makeTutorHost(course, sandbox.factoryRoot);
+  t.after(async () => {
+    await host.harness.lifecycle.dispose();
+    await sandbox.cleanup();
+  });
+  const coach1 = (await openCoach(host, "001")).threadId;
+  const before = await snapshot(sandbox.root);
+  const refused = await tool(host, "tutor_adopt_iteration", { iteration: "001" }, coach1);
+  assert.ok(isError(refused));
+  assert.match(text(refused), /shares a folder with, the course/);
+  assert.deepEqual(await snapshot(sandbox.root), before);
+});
 
 test("through the machine: sdk.files and the host entry's inspect carry Lesson 0's progress", async (t) => {
   const sandbox = await makeSandbox();

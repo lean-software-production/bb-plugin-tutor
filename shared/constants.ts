@@ -155,7 +155,7 @@ export function coachThreadTitle(lessonId: string): string {
  * lesson `moveAtLesson` is adopted: the starter's fetch.sh does
  * `git mv tetris/.factory factory`, then points the factory's
  * `claudeSkillsLink` at `linkTarget` again. Tutor does the same
- * (server/progress/factory-move.ts). The rule belongs to the starter.
+ * (layouts/capstone-factory/factory-move.ts). The rule belongs to the starter.
  */
 export const STARTER_LAYOUT = {
   codebase: "tetris",
