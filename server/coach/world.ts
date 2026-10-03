@@ -75,6 +75,8 @@ export interface World {
   dataDir: string | null;
   /** The agent provider coach threads are pinned to; empty means BB's default (settings.ts). */
   coachProvider: string;
+  /** The model coach threads are pinned to, as provider/model; empty means the agent's default (settings.ts). */
+  coachModel: string;
   /** Tutor's built-in course first, then the configured or fetched courses. Empty only while there is no workspace. */
   courses: LoadedCourse[];
   /** Courses that could not be loaded, by id or path, with the reason. */
@@ -345,6 +347,7 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
           .map(({ id, title, description }) => ({ id, title, description, unfinished: unfinished.has(id) })),
         dataDir,
         coachProvider: values.coachProvider ?? "",
+        coachModel: values.coachModel ?? "",
         courses,
         courseErrors,
         projectHint: await projectHint(config, hostId),

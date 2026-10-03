@@ -74,6 +74,8 @@ export const SETTING_KEYS = {
   simpleNavigation: "simpleNavigation",
   /** `type: "string"`; the agent provider coach threads use. Empty means BB's default. */
   coachProvider: "coachProvider",
+  /** `type: "string"`; the model coach threads use, as provider/model. Empty means the coach agent's default. */
+  coachModel: "coachModel",
   /** `type: "string"`; a JSON course catalog replacing the built-in one (server/content/catalog.ts). Empty means the built-in one. */
   courseCatalog: "courseCatalog",
 } as const;

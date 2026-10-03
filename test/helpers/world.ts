@@ -85,6 +85,7 @@ export function makeWorld(
     fetchable: [],
     dataDir: null,
     coachProvider: "",
+    coachModel: "",
     courses,
     courseErrors: [],
     projectHint: null,

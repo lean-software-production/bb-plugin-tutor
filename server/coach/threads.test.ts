@@ -71,7 +71,7 @@ test("reached Rules come from the coach thread's metadata, leniently", () => {
 test("a coach thread is pinned to the provider explicitly, so BB keeps it", async () => {
   const spawned: unknown[] = [];
   const sdk = { threads: { spawn: async (args: unknown) => (spawned.push(args), { id: "thr_1" }) } } as unknown as Sdk;
-  await spawnCoachThread(sdk, { projectId: "p", workspace: { root: "/w", hostId: "h" }, courseId: "tutor", lessonId: "000", prompt: "x", providerId: "pi" });
+  await spawnCoachThread(sdk, { projectId: "p", workspace: { root: "/w", hostId: "h" }, courseId: "tutor", lessonId: "000", prompt: "x", providerId: "pi", model: null });
   assert.deepEqual((spawned[0] as { providerId: string; executionInputSources: unknown }).executionInputSources, { providerId: "explicit" });
   assert.equal((spawned[0] as { providerId: string }).providerId, "pi");
 });
@@ -79,10 +79,28 @@ test("a coach thread is pinned to the provider explicitly, so BB keeps it", asyn
 test("without a coach provider, spawn passes none (the Codespace)", async () => {
   const spawned: unknown[] = [];
   const sdk = { threads: { spawn: async (args: unknown) => (spawned.push(args), { id: "thr_1" }) } } as unknown as Sdk;
-  await spawnCoachThread(sdk, { projectId: "p", workspace: { root: "/w", hostId: "h" }, courseId: "tutor", lessonId: "000", prompt: "x", providerId: null });
+  await spawnCoachThread(sdk, { projectId: "p", workspace: { root: "/w", hostId: "h" }, courseId: "tutor", lessonId: "000", prompt: "x", providerId: null, model: null });
   const args = spawned[0] as Record<string, unknown>;
   assert.equal("providerId" in args, false);
   assert.equal("executionInputSources" in args, false);
+});
+
+test("a coach model pins coach threads to it explicitly, beside the provider", async () => {
+  const spawned: unknown[] = [];
+  const sdk = { threads: { spawn: async (args: unknown) => (spawned.push(args), { id: "thr_1" }) } } as unknown as Sdk;
+  const model = "openrouter/moonshotai/kimi-k2.6";
+  await spawnCoachThread(sdk, { projectId: "p", workspace: { root: "/w", hostId: "h" }, courseId: "tutor", lessonId: "000", prompt: "x", providerId: "pi", model });
+  const args = spawned[0] as Record<string, unknown>;
+  assert.equal(args.providerId, "pi");
+  assert.equal(args.model, model);
+  assert.deepEqual(args.executionInputSources, { providerId: "explicit", model: "explicit" });
+});
+
+test("without a coach model, spawn passes no model", async () => {
+  const spawned: unknown[] = [];
+  const sdk = { threads: { spawn: async (args: unknown) => (spawned.push(args), { id: "thr_1" }) } } as unknown as Sdk;
+  await spawnCoachThread(sdk, { projectId: "p", workspace: { root: "/w", hostId: "h" }, courseId: "tutor", lessonId: "000", prompt: "x", providerId: "pi", model: null });
+  assert.equal("model" in (spawned[0] as Record<string, unknown>), false);
 });
 
 test("listing reads every page once, even when a new thread shifts the pages meanwhile", async () => {

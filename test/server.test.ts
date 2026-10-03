@@ -178,6 +178,22 @@ test("a coachProvider setting pins coach threads to that provider explicitly", a
   assert.deepEqual(spawn.executionInputSources, { providerId: "explicit" });
 });
 
+test("a coachModel setting pins coach threads to that model explicitly", async (t) => {
+  const { host } = await setup(t, { factoryProject: PROJECT_ID, coachProvider: "pi", coachModel: "openrouter/moonshotai/kimi-k2.6" });
+  await openCoach(host, "000");
+  const [spawn] = host.harness.inspection.sdk.callsTo("threads.spawn")[0] as [Record<string, unknown>];
+  assert.equal(spawn.providerId, "pi");
+  assert.equal(spawn.model, "openrouter/moonshotai/kimi-k2.6");
+  assert.deepEqual(spawn.executionInputSources, { providerId: "explicit", model: "explicit" });
+});
+
+test("without a coachModel setting, a coach thread spawns with no model", async (t) => {
+  const { host } = await setup(t, { factoryProject: PROJECT_ID, coachProvider: "pi" });
+  await openCoach(host, "000");
+  const [spawn] = host.harness.inspection.sdk.callsTo("threads.spawn")[0] as [Record<string, unknown>];
+  assert.equal("model" in spawn, false);
+});
+
 test("the coach tools round-trip progress through the factory repo and carry passing Examples over", async (t) => {
   const { sandbox, host } = await setup(t);
   const root = sandbox.factoryRoot;

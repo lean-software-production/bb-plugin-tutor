@@ -201,6 +201,8 @@ export interface SpawnCoach {
   prompt: string;
   /** The coachProvider setting, or null to leave BB's default alone (settings.ts). */
   providerId: string | null;
+  /** The coachModel setting (provider/model), or null to leave the agent's default alone (settings.ts). */
+  model: string | null;
 }
 
 export async function spawnCoachThread(sdk: Sdk, spawn: SpawnCoach): Promise<string> {
@@ -211,8 +213,17 @@ export async function spawnCoachThread(sdk: Sdk, spawn: SpawnCoach): Promise<str
     title: coachThreadTitle(spawn.lessonId),
     pluginMetadata,
     prompt: spawn.prompt,
-    // Without a source, BB drops a providerId it was given no provenance for.
-    ...(spawn.providerId === null ? {} : { providerId: spawn.providerId, executionInputSources: { providerId: "explicit" } }),
+    // Without a source, BB drops a providerId or model it was given no provenance for.
+    ...(spawn.providerId === null ? {} : { providerId: spawn.providerId }),
+    ...(spawn.model === null ? {} : { model: spawn.model }),
+    ...(spawn.providerId === null && spawn.model === null
+      ? {}
+      : {
+          executionInputSources: {
+            ...(spawn.providerId === null ? {} : { providerId: "explicit" as const }),
+            ...(spawn.model === null ? {} : { model: "explicit" as const }),
+          },
+        }),
   });
   return thread.id;
 }

@@ -30,6 +30,11 @@ const descriptors = {
     label: "Coach agent",
     description: "The agent provider coach threads use, such as pi. Empty uses BB's default.",
   },
+  [SETTING_KEYS.coachModel]: {
+    type: "string",
+    label: "Coach model",
+    description: "The model coach threads use, as provider/model. Empty uses the coach agent's default.",
+  },
   [SETTING_KEYS.courseCatalog]: {
     type: "string",
     label: "Course catalog",
