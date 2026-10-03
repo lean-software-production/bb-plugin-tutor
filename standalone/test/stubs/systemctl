@@ -1,9 +1,14 @@
 #!/bin/sh
 # Logs argv, quiet, exit 0. `--user show-environment` prints
 # $STUB_SYSTEMD_ENV (NAME=value lines), the systemd user manager's
-# environment.
+# environment. STUB_SYSTEMCTL_FAIL=<verb> (restart, daemon-reload, ...) makes
+# that verb fail.
 . "$(cd "$(dirname "$0")" && pwd)/lib.sh"
 stub_init "systemctl" "$@"
+if [ -n "${STUB_SYSTEMCTL_FAIL:-}" ] && [ "${2:-}" = "$STUB_SYSTEMCTL_FAIL" ]; then
+  echo "Failed to $STUB_SYSTEMCTL_FAIL" >&2
+  exit 1
+fi
 if [ "${1:-} ${2:-}" = "--user show-environment" ] && [ -n "${STUB_SYSTEMD_ENV:-}" ]; then
   printf '%s\n' "$STUB_SYSTEMD_ENV"
 fi

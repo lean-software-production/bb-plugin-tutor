@@ -584,10 +584,19 @@ machine_env_apply() {
         rm -f "$dropin.new"
         return 0
       fi
+      # systemd reads only *.conf, so the drop-in goes in place first; if the
+      # reload or restart then fails it is removed again, so the next run
+      # sees a change and retries rather than trusting a daemon that never
+      # got the variables.
       mv "$dropin.new" "$dropin"
-      systemctl --user daemon-reload >>"$TUTOR_HOME/logs/launcher.log" 2>&1
-      systemctl --user restart "$(basename "$service")" >>"$TUTOR_HOME/logs/launcher.log" 2>&1 \
-        || fail "Tutor's machine service didn't restart. Run \`tutor logs\`."
+      if ! systemctl --user daemon-reload >>"$TUTOR_HOME/logs/launcher.log" 2>&1; then
+        rm -f "$dropin"
+        fail "Tutor couldn't reload its services. Run \`tutor logs\`."
+      fi
+      if ! systemctl --user restart "$(basename "$service")" >>"$TUTOR_HOME/logs/launcher.log" 2>&1; then
+        rm -f "$dropin"
+        fail "Tutor's machine service didn't restart. Run \`tutor logs\`."
+      fi
       ;;
     macos)
       pb=${PLISTBUDDY:-/usr/libexec/PlistBuddy}
@@ -644,28 +653,49 @@ canonical_path() {
   printf '%s%s' "$(cd "$cp_head" && pwd -P)" "$cp_tail"
 }
 
+# workspace_refuse_reserved <real path>: fail (Decision 18) for / , home
+# itself, and anything inside ~/.tutor (which holds the course content too),
+# ~/.bb-machines or $TUTOR_HOME.
+workspace_refuse_reserved() {
+  wr_real=$1
+  home_real=$(canonical_path "$HOME")
+  tutor_real=$(canonical_path "$TUTOR_HOME")
+  case "${wr_real%/}/" in
+    / | "$home_real/" | "$home_real/.tutor/"* | "$home_real/.bb-machines/"* | "$tutor_real/"*)
+      fail "Tutor keeps its own files there, so it can't be your course folder. Pick a folder of its own, such as ~/my-course."
+      ;;
+  esac
+}
+
 # workspace_prepare <folder>: make <folder> the workspace, setting
 # TUTOR_WORKSPACE to its absolute path. Refuses (Decision 18) home itself
 # and anything inside ~/.tutor or ~/.bb-machines (which holds the course
 # content too), and a folder that is neither empty nor a Tutor workspace
-# (one with .tutor/, or holding only .git). Creates it if missing and
+# (one with .tutor/, or holding only .git), and any path with a . or ..
+# component. Creates it if missing, checks its physical path again, and
 # git-inits it when it has no .git. Never deletes anything.
 workspace_prepare() {
   ws=$1
+  while :; do
+    case "$ws" in
+      ./*) ws=${ws#./} ;;
+      *) break ;;
+    esac
+  done
   case "$ws" in
     /*) ;;
     *) ws="$(pwd)/$ws" ;;
   esac
   while [ "${ws%/}" != "$ws" ] && [ "$ws" != / ]; do ws=${ws%/}; done
-
-  ws_real=$(canonical_path "$ws")
-  home_real=$(canonical_path "$HOME")
-  tutor_real=$(canonical_path "$TUTOR_HOME")
-  case "$ws_real/" in
-    "$home_real/" | / | "$home_real/.tutor/"* | "$home_real/.bb-machines/"* | "$tutor_real/"*)
-      fail "Tutor keeps its own files there, so it can't be your course folder. Pick a folder of its own, such as ~/my-course."
+  # A "." or ".." would be resolved only where the path exists, so a folder
+  # still to be made could step back into home or ~/.tutor: refuse them.
+  case "$ws/" in
+    */./* | */../*)
+      fail "Give the course folder's path without . or .., for example: $TUTOR_NAME up ~/my-course"
       ;;
   esac
+
+  workspace_refuse_reserved "$(canonical_path "$ws")"
 
   if [ -e "$ws" ] && [ ! -d "$ws" ]; then
     fail "$ws is a file, not a folder. Pick a folder for your course, such as ~/my-course."
@@ -679,6 +709,8 @@ workspace_prepare() {
   fi
 
   mkdir -p "$ws" "$TUTOR_HOME/logs"
+  # Once it exists, check again where it really is (symlinks followed).
+  workspace_refuse_reserved "$(cd "$ws" && pwd -P)"
   if [ ! -e "$ws/.git" ]; then
     git init --quiet "$ws" >>"$TUTOR_HOME/logs/launcher.log" 2>&1 \
       || fail "Tutor couldn't set up git in $ws. Run \`tutor logs\`."
@@ -703,13 +735,22 @@ json_project_id() {
 }
 
 # project_ensure: the project for TUTOR_WORKSPACE on the enrolled machine,
-# set as Tutor's workspaceProject. Created once; a later up for the same
-# folder reuses config's project_id.
+# set as Tutor's workspaceProject. Created once per folder and machine: a
+# later up for the same folder (however it is spelt) on the same machine
+# reuses config's project_id; a new machine (enrolled again) gets a new one.
 project_ensure() {
   ws=$TUTOR_WORKSPACE
+  pe_machine=$(config_get machine_id)
   project_id=$(config_get project_id)
-  if [ -z "$project_id" ] || [ "$(config_get workspace)" != "$ws" ]; then
-    json=$(tutor_bb_json project create --name "$(basename "$ws")" --root "$ws" --machine "$(config_get machine_id)" --json) \
+  pe_recorded=$(config_get workspace)
+  pe_same_folder=0
+  if [ -n "$pe_recorded" ] && [ -d "$pe_recorded" ] \
+    && [ "$(cd "$pe_recorded" && pwd -P)" = "$(cd "$ws" && pwd -P)" ]; then
+    pe_same_folder=1
+    ws=$pe_recorded
+  fi
+  if [ -z "$project_id" ] || [ "$pe_same_folder" -eq 0 ] || [ "$(config_get project_machine)" != "$pe_machine" ]; then
+    json=$(tutor_bb_json project create --name "$(basename "$ws")" --root "$ws" --machine "$pe_machine" --json) \
       || fail "Tutor couldn't add your course folder. Run \`tutor logs\`."
     project_id=$(printf '%s' "$json" | json_project_id) \
       || fail "Tutor couldn't add your course folder. Run \`tutor logs\`."
@@ -718,6 +759,7 @@ project_ensure() {
     || fail "Tutor couldn't choose your course folder. Run \`tutor logs\`."
   config_set workspace "$ws"
   config_set project_id "$project_id"
+  config_set project_machine "$pe_machine"
 }
 
 # pi_ready [provider]: whether Tutor's pi is signed in to <provider>

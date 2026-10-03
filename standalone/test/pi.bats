@@ -113,3 +113,19 @@ load helper
   [ "$status" -eq 0 ]
   grep -q "PI_CODING_AGENT_DIR=$TUTOR_HOME/pi auth check --provider openrouter" "$STUB_LOG/pi"
 }
+
+@test "a failed restart leaves the next run retrying, with what to do" {
+  STUB_UNAME=Linux; make_stub_machine_unit
+  STUB_SYSTEMCTL_FAIL=restart run machine_env_apply
+  [ "$status" -eq 1 ]; [[ "$output" == *"Run \`tutor logs\`"* ]]; ! printf '%s' "$output" | grep -iqw bb
+  machine_env_apply
+  [ "$(grep -c restart "$STUB_LOG/systemctl")" -eq 2 ]
+  grep -q PI_CODING_AGENT_DIR ~/.config/systemd/user/*.service.d/tutor.conf
+}
+
+@test "a failed daemon-reload fails with what to do" {
+  STUB_UNAME=Linux; make_stub_machine_unit
+  STUB_SYSTEMCTL_FAIL=daemon-reload run machine_env_apply
+  [ "$status" -eq 1 ]; [[ "$output" == *"Run \`tutor logs\`"* ]]
+  ! grep -q restart "$STUB_LOG/systemctl"
+}

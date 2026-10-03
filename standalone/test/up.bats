@@ -90,3 +90,40 @@ load helper
   grep -q "start bb-host-daemon-127-0-0-1-47386-stubhost.service" "$STUB_LOG/systemctl"
   ! grep -q "machine create" "$STUB_LOG/bb"
 }
+
+# --- fix round 1 ---
+
+@test "a .. in a folder that doesn't exist yet can't reach home or ~/.tutor" {
+  run tutor up "$HOME/new/.."
+  [ "$status" -eq 1 ]; [ ! -e "$HOME/new" ]; [ ! -e "$HOME/.git" ]
+  run tutor up "$HOME/nope/../.tutor/x"
+  [ "$status" -eq 1 ]; [ ! -e "$HOME/nope" ]; [ ! -e "$HOME/.tutor/x" ]
+  ! grep -q "^init" "$STUB_LOG/git" 2>/dev/null
+}
+
+@test "a ./ at the front of a relative folder is still fine" {
+  cd "$HOME"
+  run tutor up ./my-course
+  [ "$status" -eq 0 ]; grep -q -- "--root $HOME/my-course " "$STUB_LOG/bb"
+}
+
+@test "the root folder is refused with the reason" {
+  run workspace_prepare /
+  [ "$status" -eq 1 ]; [[ "$output" == *"Tutor keeps its own files there"* ]]
+}
+
+@test "a workspace on a newly enrolled machine gets a new project" {
+  run tutor up "$HOME/my-course"; [ "$status" -eq 0 ]
+  config_set machine_id other-machine-id   # as if up had enrolled again
+  TUTOR_WORKSPACE="$HOME/my-course" run project_ensure
+  [ "$status" -eq 0 ]
+  [ "$(grep -c 'project create' "$STUB_LOG/bb")" -eq 2 ]
+  grep -q -- "--machine other-machine-id" "$STUB_LOG/bb"
+}
+
+@test "a symlinked spelling of the same workspace doesn't make a second project" {
+  run tutor up "$HOME/my-course"; [ "$status" -eq 0 ]
+  ln -s "$HOME/my-course" "$HOME/link"
+  run tutor up "$HOME/link"; [ "$status" -eq 0 ]
+  [ "$(grep -c 'project create' "$STUB_LOG/bb")" -eq 1 ]
+}
