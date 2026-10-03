@@ -124,9 +124,18 @@ To build the same archive locally, run `scripts/release-archive.sh v<x.y.z> <out
 ## Settings and coach tools
 
 - `coursePath` (string): the course checkout. Empty falls back to `TUTOR_COURSE_PATH`, then the
-  Feature's `/usr/local/etc/tutor/config.json`, then `/workspaces/tutorial`.
-- `factoryProject` (project): the student's factory, written by the first-run page. Tutor never
-  creates projects.
+  Feature's `/usr/local/etc/tutor/config.json`, then `/workspaces/tutorial` (only if it exists).
+  A configured course wins: fetched courses are ignored and nothing is offered to add.
+- `workspaceProject` (project): the student's workspace, the BB project holding their repo,
+  where coach threads run. Written by the first-run page. Tutor never creates projects.
+- `factoryProject` (project, read only): an older Tutor's workspace setting. It is still read
+  when `workspaceProject` is unset, so existing Codespaces carry on, but Tutor never writes it.
+- `coachProvider` (string): the agent provider coach threads are pinned to, such as `pi`. Empty
+  uses BB's default. `tutor up` sets it to `pi`; the Codespace leaves it empty.
+- `courseCatalog` (string): the courses that can be added, as JSON: a list of
+  `{ id, title, description, repo, ref }`, each `repo` an `https://` (or the operator's own
+  `file://`) URL and each `ref` a tag or a full SHA. Empty uses Tutor's own catalog
+  (`server/content/catalog.ts`). A fetched course goes by its entry's `id`.
 - `simpleNavigation` (boolean, default true): Tutor's sidebar navigation
   (`experimental_sidebarNavigation` `simple-nav`) shows BB's own rows minus Plugins and Skills.
   Off, or while settings load, it renders BB's navigation unchanged. BB uses it while
@@ -171,11 +180,15 @@ To build the same archive locally, run `scripts/release-archive.sh v<x.y.z> <out
   Codespace …" with a Reload button instead of `rpc "…" failed (HTTP 401)`
   (`app/model/rpc-errors.ts`). Tutor's and BB's own errors are unchanged.
 
-Coach threads are spawned by Tutor directly in the factory folder, and only they are offered the
-`tutor` skill and the six `tutor_*` tools (`status`, `focus_rule`, `mark_example`,
-`adopt_iteration`, `complete_iteration`, `side_chat`). Each tool also refuses, inside
-`execute()`, any thread Tutor did not spawn in the chosen factory project, and a coach
-thread (or side chat) changes only its own lesson's progress.
+Coach threads are spawned by Tutor directly in the workspace, and only they are offered the
+`tutor` skill and the seven `tutor_*` tools (`status`, `focus_rule`, `mark_example`,
+`adopt_iteration`, `complete_iteration`, `side_chat`, `fetch_course`). Each tool also refuses,
+inside `execute()`, any thread Tutor did not spawn in the chosen workspace project, and a coach
+thread (or side chat) changes only its own lesson's progress. `tutor_fetch_course {course}`
+adds a course from the catalog when the student asks for it, as the outline's "Add the course"
+does: it fetches the course into BB's data dir, seeds its starter into the workspace (writing
+only files that aren't there yet) and lists its lessons after Lesson 0. Called again, it
+finishes a seed that was interrupted.
 
 ## Layout
 
