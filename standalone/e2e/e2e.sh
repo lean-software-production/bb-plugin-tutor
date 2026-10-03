@@ -73,7 +73,7 @@ up() { # tutor up with the recording pi; output kept for the "no bb" check
   TUTOR_PI_COMMAND="$E2E_DIR/bin/record-pi" "$TUTOR" up "$@" >"$E2E_DIR/up.out" 2>&1
 }
 
-built_sdk() { tar -xzOf "$RELEASE/bb-plugin-tutor-$VERSION-built.tgz" "bb-plugin-tutor-$VERSION/dist/app.meta.json" | json 'v.pluginSdkVersion'; }
+built_sdk() { tar -xzOf "$RELEASE/bb-plugin-tutor-$VERSION-built.tgz" "bb-plugin-tutor-$VERSION/dist/app.meta.json" | json 'v.sdkVersion'; }
 
 stage_build() {
   rm -rf "$RELEASE"; mkdir -p "$RELEASE"
