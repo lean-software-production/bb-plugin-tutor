@@ -25,10 +25,10 @@ Status: **Linux run in progress** (2026-10-03); macOS not run yet. This is Task 
 | 3 | After re-running BB's installer: service file rewritten? variables kept? (INFO) | | |
 | 4 | Tutor's pi has no credentials before login (INFO) | no `auth.json`; 96 models listed, from `OPENCODE_API_KEY` in the shell (see check 9) | |
 | 5 | Login writes to Tutor's pi dir; `~/.pi` unchanged | PASS (openrouter) | |
-| 6 | Model discovery on the machine reads Tutor's pi dir | first run invalid (the spike's `tee-pi` hung BB's `--version` probe; fixed in 79e0b00); re-run pending | |
-| 7 | A pi thread starts pi through `BB_PI_BRIDGE_COMMAND` with Tutor's pi dir | BB ran `tee-pi --version` with `PI_CODING_AGENT_DIR` set to Tutor's dir; thread re-run pending (same cause as 6) | |
+| 6 | Model discovery on the machine reads Tutor's pi dir | PASS: the machine lists openrouter models, which only Tutor's pi is signed in to. But after `OPENCODE_API_KEY` was unset, BB's list still held 114 opencode/opencode-go models that pi itself no longer lists (420 openrouter only, with or without the key): suspected BB-side caching, re-check pending | |
+| 7 | A pi thread starts pi through `BB_PI_BRIDGE_COMMAND` with Tutor's pi dir | PASS: the thread's pi ran through `tee-pi` with Tutor's pi dir, defaulting to `openrouter/moonshotai/kimi-k2.6` | |
 | 8 | Checks 1, 9 and 7 after a reboot | | |
-| 9 | No provider credential in the machine daemon's environment | FAIL: `OPENCODE_API_KEY`, inherited from the systemd user manager. `apply-env.sh` now unsets it (82eb2e7); re-run pending | |
+| 9 | No provider credential in the machine daemon's environment | First FAIL (`OPENCODE_API_KEY`, inherited from the systemd user manager); PASS after `apply-env.sh` added `UnsetEnvironment=` (82eb2e7) | |
 
 Failures, and the branch taken from the table in the plan's Task 1:
 
@@ -43,16 +43,28 @@ Failures, and the branch taken from the table in the plan's Task 1:
 | `MACHINE_UNIT_GLOB` / `MACHINE_PLIST_GLOB` | `~/.config/systemd/user/bb-host-daemon-127-0-0-1-<port>-<host id>.service` | |
 | The installer body holds the enrolment token? | yes: never keep it | |
 | `MACHINE_UNINSTALL` (did `--uninstall` remove everything?) | | |
-| `PI_PACKAGE` / `PI_VERSION` | `@earendil-works/pi-coding-agent` / | |
+| `PI_PACKAGE` / `PI_VERSION` | `@earendil-works/pi-coding-agent` / 0.85.1 | |
 | `PI_LOGIN` (exact steps) | | |
 | `PI_READY` (`pi auth check --provider <p>` with `PI_CODING_AGENT_DIR` set?) | yes | |
-| `bb machine list --json` shape (machine id field, provider field) | | |
+| `bb machine list --json` shape (machine id field, provider field) | `id`, `machineProviderId: "manual"` (setup found the machine by these) | |
 
 ## The BB↔pi exchange
 
-How BB drives pi (from `pi-in.log` / `pi-out.log`): pi's `--mode rpc`, the argv BB passes, and
-whether plugin tools reach pi through the RPC protocol or through an extension BB injects.
-The redacted turn is in `standalone/e2e/fixtures/pi-rpc-transcript.jsonl`.
+What BB runs (Linux, BB 0.44.0, from `tee-pi`'s log):
+
+- `<BB_PI_BRIDGE_COMMAND> --version`: the version probe, with stdin left open and a 15 s limit.
+- Model discovery: `--mode rpc --no-session --extension /tmp/bb-provider-bridge-provider-pi-…/pi/bb-pi-extension.mjs`.
+- A thread: `--mode rpc --session ~/.bb/pi-bridge-sessions/pi_<id>.jsonl --session-dir ~/.bb/pi-bridge-sessions --extension …/bb-pi-extension.mjs --append-system-prompt …/pi-append-….md --skill ~/.bb-machines/127.0.0.1-<port>/runtime/global-skills/<hash>/skills --model <provider>/<model> --thinking medium`.
+
+BB injects its own pi extension (`bb-pi-extension.mjs`), so plugin tools don't reach pi through
+the RPC protocol alone. That is the last row of the plan's Task 1 table: `fake-pi` only records its
+environment and argv, and every check that needs coach tool calls uses the scripted provider
+(Task 21). No transcript fixture is needed.
+
+Note: BB keeps pi's thread sessions in `~/.bb/pi-bridge-sessions`, not in `PI_CODING_AGENT_DIR`. The
+spec only requires credentials and config to stay apart from `~/.pi`, so this is fine, but
+`tutor uninstall --purge` doesn't remove `~/.bb/pi-bridge-sessions`. Decide whether it should
+(Task 19).
 
 ## Bundle sizes (for Task 9's ceiling)
 
