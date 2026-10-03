@@ -35,7 +35,7 @@ load helper
 @test "bb-app is installed once, at the pinned version, with its install scripts running" {
   server_install; server_install
   [ "$(grep -c 'install' "$STUB_LOG/npm")" -eq 1 ]
-  grep -q "bb-app@0.44.0" "$STUB_LOG/npm"
+  grep -q "bb-app@0.45.0" "$STUB_LOG/npm"
   ! grep -q "ignore-scripts" "$STUB_LOG/npm" || false   # the native modules must build
 }
 

@@ -1097,6 +1097,15 @@ pi_ready() {
 # first_model <provider>: the id of the first of <provider>'s models in the
 # machine's pi model list (rows whose routeProviderId is <provider>), or
 # fail.
+# default_model <provider>: the coach's model when the student doesn't pick
+# one, for the providers Tutor has a choice for.
+default_model() {
+  case "$1" in
+    openrouter) echo openrouter/z-ai/glm-5.3-flash ;;
+    *) return 1 ;;
+  esac
+}
+
 first_model() {
   fm_machine=$(config_get machine_id)
   [ -n "$fm_machine" ] || fm_machine=$(machine_id) || return 1
@@ -1126,9 +1135,10 @@ login_fail() {
 # (stdin is the terminal) with PI_CODING_AGENT_DIR=$TUTOR_HOME/pi, so the
 # student signs it in with /login; then record the provider (--provider, or
 # asked), check pi is signed in to it, and pin coach threads to a model of
-# it: --model, else the first in the machine's model list. BB caches that
-# list, so it is asked a few times (TUTOR_MODEL_RETRIES, default 5, every
-# TUTOR_MODEL_RETRY_SLEEP seconds, default 3) before leaving the model to pi.
+# it: --model, else Tutor's choice for that provider (default_model), else
+# the first in the machine's model list. BB caches that list, so it is asked
+# a few times (TUTOR_MODEL_RETRIES, default 5, every TUTOR_MODEL_RETRY_SLEEP
+# seconds, default 3) before leaving the model to pi.
 cmd_login() {
   login_provider=""
   login_model=""
@@ -1163,6 +1173,8 @@ cmd_login() {
       "$login_provider"/*) ;;
       *) login_model="$login_provider/$login_model" ;;
     esac
+  elif login_model=$(default_model "$login_provider"); then
+    :
   else
     tries=${TUTOR_MODEL_RETRIES:-5}
     try=1

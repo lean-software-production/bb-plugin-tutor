@@ -23,9 +23,17 @@ load helper
 }
 
 @test "tutor login records the provider and pins coach threads to its model" {
-  STUB_PI_SIGNED_IN=openrouter STUB_PROVIDER_MODELS='openrouter/some-model' run cmd_login --provider openrouter </dev/null
-  [ "$(config_get provider)" = openrouter ]
-  grep -q "plugin config tutor set coachModel openrouter/some-model" "$STUB_LOG/bb"
+  STUB_PI_SIGNED_IN=anthropic STUB_PROVIDER_MODELS='anthropic/some-model' run cmd_login --provider anthropic </dev/null
+  [ "$(config_get provider)" = anthropic ]
+  grep -q "plugin config tutor set coachModel anthropic/some-model" "$STUB_LOG/bb"
+}
+
+@test "on OpenRouter the coach uses GLM 5.3 Flash unless the student picks a model" {
+  STUB_PI_SIGNED_IN=openrouter STUB_PROVIDER_MODELS='openrouter/first' run cmd_login --provider openrouter </dev/null
+  [ "$status" -eq 0 ]
+  [ "$(config_get model)" = openrouter/z-ai/glm-5.3-flash ]
+  grep -q "plugin config tutor set coachModel openrouter/z-ai/glm-5.3-flash" "$STUB_LOG/bb"
+  ! grep -q "provider models pi" "$STUB_LOG/bb" || false
 }
 
 @test "on macOS the variables go into the machine's plist and the agent is reloaded" {
@@ -99,12 +107,12 @@ load helper
 }
 
 @test "tutor login picks the first model of the chosen provider only" {
-  STUB_PI_SIGNED_IN=openrouter STUB_PROVIDER_MODELS='opencode/other openrouter/first openrouter/second' run cmd_login --provider openrouter </dev/null
-  grep -q "coachModel openrouter/first" "$STUB_LOG/bb"
+  STUB_PI_SIGNED_IN=anthropic STUB_PROVIDER_MODELS='opencode/other anthropic/first anthropic/second' run cmd_login --provider anthropic </dev/null
+  grep -q "coachModel anthropic/first" "$STUB_LOG/bb"
 }
 
 @test "when the model list has nothing yet, login retries, then leaves the model to pi" {
-  STUB_PI_SIGNED_IN=openrouter STUB_PROVIDER_MODELS='' TUTOR_MODEL_RETRIES=3 run cmd_login --provider openrouter </dev/null
+  STUB_PI_SIGNED_IN=anthropic STUB_PROVIDER_MODELS='' TUTOR_MODEL_RETRIES=3 run cmd_login --provider anthropic </dev/null
   [ "$status" -eq 0 ]
   [ "$(grep -c 'provider models pi' "$STUB_LOG/bb")" -eq 3 ]
   [ -z "$(config_get model)" ]
