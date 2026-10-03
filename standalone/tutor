@@ -987,15 +987,27 @@ project_ensure() {
   config_set project_machine "$pe_machine"
 }
 
+# without_keys <command...>: run <command> with every provider credential
+# (KEY_PATTERN) removed from its environment, the way the machine daemon
+# runs (amendment 4). Names come from `env | cut`; values are never held.
+# `env -u` is in GNU and BSD/macOS env alike.
+without_keys() {
+  for wk_name in $(env | cut -d= -f1 | grep -E '^[A-Za-z_][A-Za-z0-9_]*$' | grep -E "$KEY_PATTERN" | sort -u); do
+    set -- -u "$wk_name" "$@"
+  done
+  env "$@"
+}
+
 # pi_ready [provider]: whether Tutor's pi is signed in to <provider>
 # (default: config's provider; none recorded means not ready) — PI_READY,
-# amendment 6.
+# amendment 6. Asked without the student's provider keys, which the machine
+# daemon doesn't get either, so a key in the shell never counts.
 pi_ready() {
   ready_provider=${1:-$(config_get provider)}
   [ -n "$ready_provider" ] || return 1
   [ -x "$TUTOR_HOME/bin/pi" ] || return 1
   mkdir -p "$TUTOR_HOME/logs"
-  PI_CODING_AGENT_DIR="$TUTOR_HOME/pi" "$TUTOR_HOME/bin/pi" auth check --provider "$ready_provider" \
+  without_keys PI_CODING_AGENT_DIR="$TUTOR_HOME/pi" "$TUTOR_HOME/bin/pi" auth check --provider "$ready_provider" \
     </dev/null >>"$TUTOR_HOME/logs/launcher.log" 2>&1
 }
 

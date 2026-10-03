@@ -129,3 +129,26 @@ load helper
   [ "$status" -eq 1 ]; [[ "$output" == *"Run \`tutor logs\`"* ]]
   ! grep -q restart "$STUB_LOG/systemctl" || false
 }
+
+# --- final review: I8 ---
+
+@test "pi_ready ignores provider keys in the student's shell, which the machine daemon doesn't get" {
+  pi_install; config_set provider openrouter
+  export STUB_PI_SIGNED_IN=env OPENROUTER_API_KEY=s3cret
+  # The stub does count a key it can see...
+  run "$TUTOR_HOME/bin/pi" auth check --provider openrouter
+  [ "$status" -eq 0 ]
+  # ...but pi_ready doesn't let it see one.
+  run pi_ready
+  [ "$status" -eq 1 ]
+  run cmd_status
+  [[ "$output" == *"Model provider: openrouter not signed in"* ]]
+  ! printf '%s' "$output" | grep -q s3cret || false
+}
+
+@test "pi_ready keeps the rest of the environment" {
+  pi_install; config_set provider openrouter
+  STUB_PI_SIGNED_IN=openrouter OPENROUTER_API_KEY=s3cret run pi_ready
+  [ "$status" -eq 0 ]
+  grep -q "PI_CODING_AGENT_DIR=$TUTOR_HOME/pi auth check --provider openrouter" "$STUB_LOG/pi"
+}
