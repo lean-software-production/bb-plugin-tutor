@@ -44,6 +44,7 @@ check() {
     exit 1
   fi
 }
+quiet() { "$@" >/dev/null; }
 info() { printf 'info — %s\n' "$*" | tee -a "$RESULTS"; }
 
 # bb against the tutor server, never a BB the shell already points at.
@@ -67,7 +68,12 @@ thread_exists() { bbx thread show "$1" --json >/dev/null 2>&1; }
 theme_is() { bbx theme show --json | grep -q "\"themeId\": *\"$1\""; }
 plugins_off() { local list; list=$(bbx plugin list --json) || return 1; for id in "$@"; do printf '%s' "$list" | node -e 'let r="";process.stdin.on("data",c=>r+=c).on("end",()=>{const p=(JSON.parse(r).plugins??[]).find(x=>x.id===process.argv[1]);process.exit(p&&p.enabled===false?0:p?1:0)})' "$id" || return 1; done; }
 server_down() { ! curl -fsS "http://127.0.0.1:$PORT/health" -o /dev/null 2>&1; }
-course_order() { printf '%s' "$1" | node -e 'let r="";process.stdin.on("data",c=>r+=c).on("end",()=>{const v=JSON.parse(r);const o=v.result??v;process.exit(o.courses.map(c=>c.course.id).join(",")===process.argv[1]?0:1)})' "$2"; }
+# course_order <overview json> <ids>: the outline's courses, in order; on a
+# mismatch it says what the outline held (the whole reply is in overview.json).
+course_order() {
+  printf '%s' "$1" >"$E2E_DIR/overview.json"
+  printf '%s' "$1" | node -e 'let r="";process.stdin.on("data",c=>r+=c).on("end",()=>{let o;try{const v=JSON.parse(r);o=v.result??v}catch{console.error("  not JSON: "+r.slice(0,300));process.exit(1)}const ids=(o.courses??[]).map(c=>c.course.id).join(",");if(ids===process.argv[1])process.exit(0);console.error("  outline: courses ["+ids+"], workspace "+JSON.stringify(o.workspace?.status)+", available ["+(o.available??[]).map(a=>a.id)+"], courseErrors "+JSON.stringify(o.courseErrors));process.exit(1)})' "$2"
+}
 up() { # tutor up with the recording pi; output kept for the "no bb" check
   install -m 755 "$REPO/standalone/e2e/record-pi" "$E2E_DIR/bin/record-pi"
   TUTOR_PI_COMMAND="$E2E_DIR/bin/record-pi" "$TUTOR" up "$@" >"$E2E_DIR/up.out" 2>&1
@@ -199,7 +205,7 @@ make_fixture() {
 stage_fetch() {
   make_fixture
   local catalog; catalog=$(printf '[{"id":"fixture","title":"Fixture course","description":"Four tiny lessons.","repo":"file://%s/fixtures/course","ref":"v1"}]' "$E2E_DIR")
-  check "the fixture catalog is set" bbx plugin config tutor set courseCatalog "$catalog"
+  check "the fixture catalog is set" quiet bbx plugin config tutor set courseCatalog "$catalog"
   local before; before=$(rpc getOverview 'null')
   check "the fixture course is offered" contains "$before" '"fixture"'
   check "nothing of it is on the computer yet" test ! -e "$TUTOR_HOME/server/content/fixture"
@@ -224,8 +230,8 @@ stage_scripted() {
   cp "$REPO"/standalone/e2e/scripted-provider/{bridge.ts,host.ts,server.ts,package.json,package-lock.json,tsconfig.json} "$dir/"
   check "the scripted provider's dependencies install" bash -c "cd '$dir' && npm ci --omit=dev >'$E2E_DIR/scripted-npm.log' 2>&1"
   check "it installs in the tutor server" bbx plugin install "$dir" --yes
-  check "coach threads now use it" bbx plugin config tutor set coachProvider scripted
-  check "with its own default model" bbx plugin config tutor set coachModel ""
+  check "coach threads now use it" quiet bbx plugin config tutor set coachProvider scripted
+  check "with its own default model" quiet bbx plugin config tutor set coachModel ""
   info "turns are logged in $TUTOR_HOME/server/plugins/scripted-provider/bridge-data/turns.ndjson"
 }
 
