@@ -1,0 +1,20 @@
+#!/bin/sh
+# BB_PI_BRIDGE_COMMAND for the spike: records pi's environment and argv, and
+# every byte of the RPC exchange, then runs the real pi. setup.sh copies it to
+# $SPIKE_HOME/bin/tee-pi.
+#
+#   $SPIKE_HOME/logs/pi-env.log   one block per launch: time, argv, PI_CODING_AGENT_DIR
+#   $SPIKE_HOME/logs/pi-in.log    what BB sent pi (stdin)
+#   $SPIKE_HOME/logs/pi-out.log   what pi sent BB (stdout)
+#
+# These logs can hold prompts and model replies; redact before committing any.
+SPIKE_HOME=${SPIKE_HOME:-$HOME/.tutor-spike}
+LOGS="$SPIKE_HOME/logs"
+mkdir -p "$LOGS"
+{
+  printf '=== %s pid %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$$"
+  printf 'argv: %s\n' "$*"
+  printf 'PI_CODING_AGENT_DIR=%s\n' "${PI_CODING_AGENT_DIR-<unset>}"
+  printf 'HOME=%s\n' "$HOME"
+} >>"$LOGS/pi-env.log"
+tee -a "$LOGS/pi-in.log" | "$SPIKE_HOME/bin/pi.real" "$@" | tee -a "$LOGS/pi-out.log"
