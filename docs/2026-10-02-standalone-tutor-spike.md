@@ -27,7 +27,7 @@ Status: **Linux run in progress** (2026-10-03); macOS not run yet. This is Task 
 | 5 | Login writes to Tutor's pi dir; `~/.pi` unchanged | PASS (openrouter) | |
 | 6 | Model discovery on the machine reads Tutor's pi dir | PASS: the machine lists openrouter models, which only Tutor's pi is signed in to. Right after `OPENCODE_API_KEY` was unset, BB still served a cached list with 114 opencode/opencode-go models; asked again later, it held `openrouter` only (419). BB caches the machine's pi model list for a while, so after `tutor login` or an environment repair the composer may show stale models briefly. Coach threads pin `coachModel`, so they don't depend on that list (amendment 4) | |
 | 7 | A pi thread starts pi through `BB_PI_BRIDGE_COMMAND` with Tutor's pi dir | PASS: the thread's pi ran through `tee-pi` with Tutor's pi dir, defaulting to `openrouter/moonshotai/kimi-k2.6` | |
-| 8 | Checks 1, 9 and 7 after a reboot | | |
+| 8 | Checks 1, 9 and 7 after a reboot | Reboot skipped. The unit is `enabled`, so it starts with the user's systemd manager; `Linger=no`, so it runs from login to logout. The variables live in the drop-in, and `UnsetEnvironment=` applies to whatever environment the manager has at boot, so check 2 covers them. A real reboot is left to the Mac run and the release checklist (acceptance criterion 7) | |
 | 9 | No provider credential in the machine daemon's environment | First FAIL (`OPENCODE_API_KEY`, inherited from the systemd user manager); PASS after `apply-env.sh` added `UnsetEnvironment=` (82eb2e7) | |
 
 Failures, and the branch taken from the table in the plan's Task 1:

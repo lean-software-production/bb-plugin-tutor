@@ -120,7 +120,13 @@ includes them; the spike document has the evidence.
 6. **`pi auth check --provider <p>` with `PI_CODING_AGENT_DIR` set** reports whether Tutor's pi is
    signed in to `p`. That is `PI_READY`, and `tutor login` records `p` in `~/.tutor/config`.
    Task 18.
-7. **Found on the first run:**
+7. **Lingering stays off.** The machine's unit is enabled, so it (and `tutor-server.service`, enabled
+   the same way) starts when the student logs in and stops at logout. With `Linger=no` (the default,
+   and what the spike found) Tutor isn't running while nobody is logged in, which suits a laptop.
+   After a reboot, logging in brings both services back, and `tutor up` repairs anything else.
+   So `tutor up` doesn't run `loginctl enable-linger`, which would keep Tutor running with no one
+   logged in. Only CI (Task 21) enables it, because a runner has no login session. Tasks 16 and 18.
+8. **Found on the first run:**
    - the health path is `/health`;
    - `bb settings general machineServerUrl|defaultMachineAccess` works;
    - the machine's systemd unit is `~/.config/systemd/user/bb-host-daemon-127-0-0-1-<port>-<host id>.service`.

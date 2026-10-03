@@ -38,7 +38,8 @@ sh standalone/spike/check-pi-env.sh before-login   # checks 1, 2, 9, 4
 sh standalone/spike/check-pi-env.sh login          # in pi: /login to a provider your ~/.pi lacks, then /quit
 SPIKE_PROVIDER=<that provider> sh standalone/spike/check-pi-env.sh after-login   # checks 5, 6, 7
 sh standalone/spike/check-pi-env.sh rewrite        # check 3: does a reinstall keep the variables? repairs after
-# reboot the computer, then:
+# optional: reboot, then check 8. Without a reboot, check that the unit is enabled and whether
+# lingering is on: systemctl --user is-enabled <unit>; loginctl show-user "$USER" -p Linger
 sh standalone/spike/check-pi-env.sh after-reboot   # check 8
 sh standalone/spike/check-pi-env.sh keys           # check 9 on its own, any time
 sh standalone/spike/teardown.sh                    # keeps results in ~/tutor-spike-results-<os>
@@ -49,9 +50,9 @@ also records the constants later tasks need: the health path, the settings comma
 the enrolment line, where the service file is, whether the installer body holds the token, and
 the machine id.
 
-After `after-login`, copy one coach turn from `~/.tutor-spike/logs/pi-in.log` and `pi-out.log`
-into `standalone/e2e/fixtures/pi-rpc-transcript.jsonl`, with credentials redacted. The fake pi in
-the end-to-end test replays it.
+`~/.tutor-spike/logs/pi-env.log` records every way BB starts pi. The Linux run showed that BB
+injects its own pi extension, so no RPC transcript is kept for the end-to-end test; its `fake-pi`
+only records environment and argv (see the spike document).
 
 ## The checks
 
