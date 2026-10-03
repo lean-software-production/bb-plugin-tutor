@@ -93,8 +93,9 @@ includes them; the spike document has the evidence.
    (`BB_SERVER_URL=http://127.0.0.1:<port>`). Tasks 15–19.
 2. **npm has no `--allow-scripts` flag.** It runs install scripts by default, so a plain
    `npm install` builds `better-sqlite3`, `node-pty` and `@parcel/watcher`. Task 16.
-3. **BB's installer body contains the one-time enrolment token,** so the launcher must not keep
-   it. `tutor uninstall` removes the machine's enrolment (`bb machine remove`) and its service
+3. **BB's installer body contains the enrolment token, and the saved installer re-enrols without a
+   new one,** so it is a reusable credential and the launcher deletes it as soon as it has run.
+   BB's installer also has no working `--uninstall`: it ignores the flag and reinstalls. `tutor uninstall` removes the machine's enrolment (`bb machine remove`) and its service
    file (the unit or plist found by `MACHINE_UNIT_GLOB`/`MACHINE_PLIST_GLOB`) itself, then
    deletes the machine directory. It never re-runs the installer. Tasks 17 and 19 (this replaces
    the saved-installer part of Decision 17).
@@ -120,13 +121,16 @@ includes them; the spike document has the evidence.
 6. **`pi auth check --provider <p>` with `PI_CODING_AGENT_DIR` set** reports whether Tutor's pi is
    signed in to `p`. That is `PI_READY`, and `tutor login` records `p` in `~/.tutor/config`.
    Task 18.
-7. **Lingering stays off.** The machine's unit is enabled, so it (and `tutor-server.service`, enabled
+7. **Node: odd majors are refused.** bb-app 0.44.0's `engines` is `^22.19.0 || ^24.0.0 || ^26.0.0`; the
+   spike ran on Node 25 with only a warning, but `check_prereqs` (Task 15) refuses 23 and 25 and
+   names a supported version, as the spec says.
+8. **Lingering stays off.** The machine's unit is enabled, so it (and `tutor-server.service`, enabled
    the same way) starts when the student logs in and stops at logout. With `Linger=no` (the default,
    and what the spike found) Tutor isn't running while nobody is logged in, which suits a laptop.
    After a reboot, logging in brings both services back, and `tutor up` repairs anything else.
    So `tutor up` doesn't run `loginctl enable-linger`, which would keep Tutor running with no one
    logged in. Only CI (Task 21) enables it, because a runner has no login session. Tasks 16 and 18.
-8. **Found on the first run:**
+9. **Found on the first run:**
    - the health path is `/health`;
    - `bb settings general machineServerUrl|defaultMachineAccess` works;
    - the machine's systemd unit is `~/.config/systemd/user/bb-host-daemon-127-0-0-1-<port>-<host id>.service`.
@@ -1657,6 +1661,13 @@ load helper
   STUB_NODE_VERSION=v22.18.0 run check_prereqs
   [ "$status" -eq 1 ]; [[ "$output" == *"Node 22.19 or newer"* ]]
   for v in v22.19.0 v24.1.0 v26.0.0; do STUB_NODE_VERSION=$v run check_prereqs; [ "$status" -eq 0 ]; done
+}
+
+@test "refuses the odd Node majors bb-app doesn't support, and names one that works" {
+  for v in v23.1.0 v25.2.1; do
+    STUB_NODE_VERSION=$v run check_prereqs
+    [ "$status" -eq 1 ]; [[ "$output" == *"Node 24"* ]]
+  done
 }
 
 @test "names git and npm when missing" {

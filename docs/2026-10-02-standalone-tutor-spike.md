@@ -1,6 +1,6 @@
 # Standalone Tutor spike: pi's environment on an enrolled machine
 
-Status: **Linux run in progress** (2026-10-03); macOS not run yet. This is Task 1 of
+Status: **Linux done** (2026-10-03). **macOS deferred**: run it before the launcher's macOS work (Tasks 16–19) or by the release checklist (Task 22) at the latest. This is Task 1 of
 [the implementation plan](2026-10-02-standalone-tutor-plan.md), done with the scripts in
 [`standalone/spike/`](../standalone/spike/README.md). Fill in each section from
 `~/tutor-spike-results-<os>/results.txt` on each OS. Leave out tokens, credentials and prompts.
@@ -10,11 +10,11 @@ Status: **Linux run in progress** (2026-10-03); macOS not run yet. This is Task 
 | | Linux | macOS |
 |---|---|---|
 | Date | 2026-10-03 | |
-| OS and version | | |
-| Node / npm | | |
+| OS and version | Omarchy (Arch), Linux 7.2.5, systemd user session | |
+| Node / npm | 25.2.1 / 11.6.2 (bb-app warns: it asks for ^22.19, ^24 or ^26; it ran anyway) | |
 | bb-app | 0.44.0 | 0.44.0 |
 | pi (`@earendil-works/pi-coding-agent`) | 0.85.1 | |
-| Native modules built cleanly (`npm.log`) | | |
+| Native modules built cleanly (`npm.log`) | yes (only the engine warning) | |
 
 ## Results
 
@@ -22,7 +22,7 @@ Status: **Linux run in progress** (2026-10-03); macOS not run yet. This is Task 
 |---|---|---|---|
 | 1 | The machine daemon's environment has both variables | PASS | |
 | 2 | They survive a service restart | PASS | |
-| 3 | After re-running BB's installer: service file rewritten? variables kept? (INFO) | | |
+| 3 | After re-running BB's installer: service file rewritten? variables kept? (INFO) | The saved installer re-ran **without a new enrolment** and left the unit unchanged; the drop-in survived; checks 1 and 9 still pass. So the installer is a reusable credential, not a one-time one. It didn't rewrite the unit, so a real update rewrite is still untested; `tutor up` repairs regardless | |
 | 4 | Tutor's pi has no credentials before login (INFO) | no `auth.json`; 96 models listed, from `OPENCODE_API_KEY` in the shell (see check 9) | |
 | 5 | Login writes to Tutor's pi dir; `~/.pi` unchanged | PASS (openrouter) | |
 | 6 | Model discovery on the machine reads Tutor's pi dir | PASS: the machine lists openrouter models, which only Tutor's pi is signed in to. Right after `OPENCODE_API_KEY` was unset, BB still served a cached list with 114 opencode/opencode-go models; asked again later, it held `openrouter` only (419). BB caches the machine's pi model list for a while, so after `tutor login` or an environment repair the composer may show stale models briefly. Coach threads pin `coachModel`, so they don't depend on that list (amendment 4) | |
@@ -42,7 +42,7 @@ Failures, and the branch taken from the table in the plan's Task 1:
 | `BB_ENROL_LINE_PATTERN` | `curl … -H 'X-BB-Enrollment: <token>' <url> \| sh` (parsed by `setup.sh`) | |
 | `MACHINE_UNIT_GLOB` / `MACHINE_PLIST_GLOB` | `~/.config/systemd/user/bb-host-daemon-127-0-0-1-<port>-<host id>.service` | |
 | The installer body holds the enrolment token? | yes: never keep it | |
-| `MACHINE_UNINSTALL` (did `--uninstall` remove everything?) | | |
+| `MACHINE_UNINSTALL` (did `--uninstall` remove everything?) | No: the installer ignored `--uninstall`, reinstalled, and waited 2 minutes for a machine the server had already removed. `teardown.sh` removed the unit, drop-in and machine directory itself. So uninstall is the launcher's own job (amendment 3) | |
 | `PI_PACKAGE` / `PI_VERSION` | `@earendil-works/pi-coding-agent` / 0.85.1 | |
 | `PI_LOGIN` (exact steps) | | |
 | `PI_READY` (`pi auth check --provider <p>` with `PI_CODING_AGENT_DIR` set?) | yes | |
@@ -92,3 +92,9 @@ Taken into the plan as "Amendments from the Linux spike run (2026-10-03)":
    Check this on macOS too.
 5. BB probes `<BB_PI_BRIDGE_COMMAND> --version` with stdin open and a 15 s limit, so any wrapper
    must answer one-shot commands at once.
+6. The saved installer re-enrols without a new token, so it is a reusable credential: the
+   launcher deletes it as soon as it has run. BB's installer has no working `--uninstall`.
+7. Lingering stays off: the services run from login to logout.
+8. Prerequisites: the run used Node 25, which bb-app 0.44.0's `engines` excludes (^22.19, ^24, ^26)
+   although it worked. The launcher's check should refuse odd majors, as the spec lists only
+   22.19+, 24 and 26, and say which to install.
