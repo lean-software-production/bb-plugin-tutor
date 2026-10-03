@@ -9,9 +9,18 @@ setup_done() { tutor up "$HOME/my-course" >/dev/null; : >"$STUB_LOG/bb"; : >"$ST
 }
 
 @test "tutor up restarts a stopped server and repairs Tutor's pi settings after an update rewrote the machine unit" {
-  setup_done; rm ~/.config/systemd/user/*.service.d/tutor.conf; STUB_SERVER_STOPPED=1
+  setup_done
+  # The server is down: /health fails until something starts it.
+  export STUB_SERVER_STOPPED=1 TUTOR_HEALTH_TIMEOUT=2; rm -f "$STUB_LOG/server-started"
+  # An update rewrote the machine's unit and dropped Tutor's drop-in.
+  unit=$(ls ~/.config/systemd/user/bb-host-daemon-127-0-0-1-47386-*.service)
+  printf '[Service]\nExecStart=%s/.bb-machines/127.0.0.1-47386/bin/daemon --updated\n' "$HOME" >"$unit"
+  rm "$unit.d/tutor.conf"
   run tutor up
-  [ "$status" -eq 0 ]; ls ~/.config/systemd/user/*.service.d/tutor.conf; grep -q "start tutor-server\|enable --now tutor-server" "$STUB_LOG/systemctl"
+  [ "$status" -eq 0 ]
+  grep -Eq "^--user (start|restart) tutor-server.service" "$STUB_LOG/systemctl"
+  grep -q "PI_CODING_AGENT_DIR=$TUTOR_HOME/pi" "$unit.d/tutor.conf"
+  grep -q "restart $(basename "$unit")" "$STUB_LOG/systemctl"
 }
 
 @test "status reports each part, and flags a listener off loopback" {
@@ -73,4 +82,29 @@ setup_done() { tutor up "$HOME/my-course" >/dev/null; : >"$STUB_LOG/bb"; : >"$ST
   STUB_UNAME=Linux; make_stub_machine_unit
   STUB_MAIN_PID=4242 STUB_OTHER_LISTEN="42421 0.0.0.0:9999" run listening_check
   [ "$output" = "Listening: 127.0.0.1 only" ]
+}
+
+# --- final review: M2 ---
+
+@test "uninstall --purge refuses a TUTOR_HOME that is home itself" {
+  setup_done; echo keep >"$HOME/mine.txt"
+  TUTOR_HOME="$HOME" run tutor uninstall --purge
+  [ "$status" -eq 1 ]; [ -f "$HOME/mine.txt" ]; [ -d "$HOME/my-course" ]
+  ! printf '%s' "$output" | grep -iqw bb || false
+}
+
+@test "uninstall --purge refuses a TUTOR_HOME with no config in it" {
+  mkdir -p "$HOME/stuff"; echo keep >"$HOME/stuff/a.txt"
+  TUTOR_HOME="$HOME/stuff" run tutor uninstall --purge
+  [ "$status" -eq 1 ]; [ -f "$HOME/stuff/a.txt" ]
+}
+
+@test "uninstall --purge refuses / (checked without deleting anything)" {
+  TUTOR_HOME=/ run purge_check
+  [ "$status" -eq 1 ]
+  TUTOR_HOME="$HOME/" run purge_check
+  [ "$status" -eq 1 ]
+  setup_done
+  run purge_check
+  [ "$status" -eq 0 ]
 }

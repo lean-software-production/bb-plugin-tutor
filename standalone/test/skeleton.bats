@@ -49,3 +49,25 @@ load helper
   run tutor help
   ! printf '%s' "$output" | grep -iqw bb || false
 }
+
+# --- final review: M6 ---
+
+@test "an unknown command prints help and fails" {
+  run tutor frobnicate
+  [ "$status" -ne 0 ]; [[ "$output" == *"Usage: tutor"* ]]
+}
+
+@test "--port accepts 1 to 65535 only" {
+  for p in 0 65536 99999 abc 1x; do
+    run tutor up --port "$p" "$HOME/my-course"
+    [ "$status" -eq 1 ]; [[ "$output" == *"port"* ]]
+  done
+  [ ! -e "$HOME/my-course" ]
+}
+
+@test "Bedrock's bearer token and Google's credentials file count as provider keys" {
+  for name in AWS_BEARER_TOKEN_BEDROCK GOOGLE_APPLICATION_CREDENTIALS OPENAI_API_KEY; do
+    printf '%s\n' "$name" | grep -qE "$KEY_PATTERN"
+  done
+  ! printf 'GITHUB_TOKEN\n' | grep -qE "$KEY_PATTERN" || false
+}
