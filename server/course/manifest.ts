@@ -7,7 +7,7 @@ import type { LayoutId } from "../../layouts/state.ts";
 import { CourseLoadError } from "../../shared/ports.ts";
 import { isInside } from "../paths.ts";
 import { readYaml } from "./yaml-file.ts";
-import { PINNED_REF, PINNED_REF_MESSAGE } from "../content/catalog.ts";
+import { FETCHABLE_URL, FETCHABLE_URL_MESSAGE, PINNED_REF, PINNED_REF_MESSAGE } from "../content/catalog.ts";
 import type { CourseStarter } from "../../shared/model.ts";
 
 export interface LessonEntry {
@@ -47,7 +47,8 @@ const courseYamlSchema = z.object({
   lexicon: text.optional(),
   starter: z
     .object({
-      repo: text.refine((value) => !value.startsWith("-"), "should be a repository URL"),
+      // A file:// starter is allowed only for a course itself fetched from a file:// catalog entry (content/store.ts).
+      repo: z.string().regex(FETCHABLE_URL, FETCHABLE_URL_MESSAGE),
       ref: z.string().regex(PINNED_REF, PINNED_REF_MESSAGE),
       /** Top-level entries of the starter left out of the seed, besides .git, .devcontainer and .github. */
       exclude: z.array(text).optional(),

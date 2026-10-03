@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, readdir, readlink, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { test, type TestContext } from "node:test";
 import {
   makeMessageDispatchHookContext,
@@ -20,7 +21,7 @@ import { NOT_A_TUTOR_THREAD } from "../server/coach/auth.ts";
 import { WorkspaceUnreachableError, WriteConflictError, type WorkspaceAccess } from "../server/workspace/access.ts";
 import { formatProgress, parseProgress } from "../layouts/progress/progress-yaml.ts";
 import { createDiskAccess } from "./helpers/disk-access.ts";
-import { emptyGitWorkspace, makeFixtureCourseRepo, makeSandbox, makeRepoSandbox, type Sandbox } from "./helpers/disk.ts";
+import { emptyGitWorkspace, git, makeFixtureCourseRepo, makeSandbox, makeRepoSandbox, type Sandbox } from "./helpers/disk.ts";
 import { allPassing, callTool, makeTutorHost, PROJECT_ID, type TutorHost } from "./helpers/fake-bb.ts";
 import { createCourseSource } from "../server/course/index.ts";
 import { THREAD_PAGE_SIZE } from "../server/coach/threads.ts";
@@ -1526,4 +1527,26 @@ test("tutor_fetch_course adds a course from Lesson 0's coach thread and tells th
   // Not a Tutor thread: refused like every tool.
   host.addThread({ id: "thr_stranger" });
   assert.ok(isError(await tool(host, "tutor_fetch_course", { course: "fixture" }, "thr_stranger")));
+});
+
+test("a course fetched over https:// may not name a file:// starter: adding it is refused and nothing is seeded", async (t) => {
+  const repo = await makeFixtureCourseRepo({ layout: "capstone-factory", starter: true });
+  const dataDir = await mkdtemp(join(tmpdir(), "bbdata-"));
+  const ws = await emptyGitWorkspace();
+  // The catalog names the course over https; its clone is already in place at v1, so nothing goes to the network.
+  const catalog = JSON.stringify([{ id: "fixture", title: "Fixture", description: "", repo: "https://example.invalid/course.git", ref: "v1" }]);
+  await mkdir(join(dataDir, "content/fixture"), { recursive: true });
+  git(join(dataDir, "content/fixture"), "clone", "-q", "--branch", "v1", pathToFileURL(repo.courseRepo).href, "course");
+  const host = await makeTutorHost(null, ws, { workspaceProject: PROJECT_ID, courseCatalog: catalog }, { dataDir });
+  t.after(async () => {
+    await host.harness.lifecycle.dispose();
+    await repo.cleanup();
+    await rm(dataDir, { recursive: true, force: true });
+    await rm(ws, { recursive: true, force: true });
+  });
+  await assert.rejects(host.harness.behavior.callRpc("fetchCourse", { courseId: "fixture" }), /fetched over https:\/\/ may only name an https:\/\/ starter/);
+  assert.deepEqual((await readdir(ws)).sort(), [".git"]);
+  assert.deepEqual((await readdir(join(dataDir, "content/fixture"))).sort(), ["course"]);
+  const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.deepEqual(overview.courses.map((entry) => entry.course.id), ["tutor"]);
 });

@@ -29,3 +29,12 @@ test("an override that isn't a catalog says what is wrong with it", () => {
   const twice = { id: "c", title: "C", description: "", repo: "file:///x", ref: "v1" };
   assert.throws(() => catalogFrom(JSON.stringify([twice, twice])), /twice/);
 });
+
+test("a catalog override may name https:// or file:// repos only", () => {
+  const entry = (repo: string) => JSON.stringify([{ id: "c", title: "C", description: "", repo, ref: "v1" }]);
+  assert.equal(catalogFrom(entry("https://example.com/c.git"))[0]?.repo, "https://example.com/c.git");
+  assert.equal(catalogFrom(entry("file:///srv/c"))[0]?.repo, "file:///srv/c");
+  for (const repo of ["ssh://git@example.com/c.git", "git://example.com/c.git", "ext::sh -c x", "-uhttps://x", "/srv/c", "http://example.com/c.git"]) {
+    assert.throws(() => catalogFrom(entry(repo)), /courseCatalog.*https:\/\/ or file:\/\//, repo);
+  }
+});

@@ -73,3 +73,12 @@ test("a starter names its repo at a tag or a full SHA, with optional top-level e
   assert.deepEqual(parse(`id: x\ntitle: X\nstarter: { repo: file:///s, ref: ${sha} }\n${lessons}`).starter, { repo: "file:///s", ref: sha, exclude: [] });
   throwsAt(`id: x\ntitle: X\nstarter: { repo: file:///s, ref: main }\n${lessons}`, /line 3: starter\.ref should be a tag .* or a full SHA/);
 });
+
+test("a starter's repo is an https:// or file:// URL: ssh://, ext:: and option-like values are refused at load", () => {
+  const lessons = "lessons:\n  - { id: '001', title: One, dir: one }\n";
+  const yaml = (repo: string) => `id: x\ntitle: X\nstarter:\n  repo: ${JSON.stringify(repo)}\n  ref: v1\n${lessons}`;
+  assert.equal(parse(yaml("file:///srv/starter")).starter?.repo, "file:///srv/starter");
+  for (const repo of ["ssh://git@example.com/s.git", "ext::sh -c x", "-uhttps://x", "git@example.com:s.git"]) {
+    throwsAt(yaml(repo), /starter\.repo should be an https:\/\/ or file:\/\/ URL/);
+  }
+});

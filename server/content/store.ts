@@ -10,7 +10,7 @@ import { readdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { COURSE_FILES } from "../../shared/constants.ts";
 import { parseCourseYaml } from "../course/manifest.ts";
-import type { CatalogEntry } from "./catalog.ts";
+import { isFileUrl, type CatalogEntry } from "./catalog.ts";
 import { fetchRepo } from "./fetch.ts";
 
 export interface FetchedCourse {
@@ -76,9 +76,15 @@ export function createContentStore(dataDir: string, now: () => Date = () => new 
     },
     async fetch(entry) {
       const where = paths(entry.id);
-      await fetchRepo(entry.repo, entry.ref, where.course);
+      // A file:// catalog entry is the operator's own (tests, the end-to-end fixture): only it, and the starter
+      // of a course fetched from it, may use file://. A course fetched over https names an https starter.
+      const local = isFileUrl(entry.repo);
+      await fetchRepo(entry.repo, entry.ref, where.course, { allowFile: local });
       const starter = await starterOf(where.course);
-      if (starter !== null) await fetchRepo(starter.repo, starter.ref, where.starter);
+      if (starter !== null && isFileUrl(starter.repo) && !local) {
+        throw new Error(`The course "${entry.id}" names a starter at ${starter.repo}, but a course fetched over https:// may only name an https:// starter.`);
+      }
+      if (starter !== null) await fetchRepo(starter.repo, starter.ref, where.starter, { allowFile: local });
       const previous = await readRecord(where.dir);
       const record: FetchedRecord = { ref: entry.ref, at: previous?.at ?? now().toISOString(), starter: starter !== null };
       const temporary = join(where.dir, `.${RECORD}.tmp`);

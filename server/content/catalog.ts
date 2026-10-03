@@ -30,6 +30,19 @@ export const BUILT_IN_CATALOG: readonly CatalogEntry[] = [
 export const PINNED_REF = /^(v\d[0-9A-Za-z._+-]*|[0-9a-f]{40})$/;
 export const PINNED_REF_MESSAGE = "should be a tag (v1.2.3) or a full SHA, not a branch name";
 
+/**
+ * The only transports Tutor fetches over: https://, and file:// for a catalog
+ * the server's operator wrote (tests and the end-to-end fixture). ssh://,
+ * git://, ext:: and the rest are refused, and so is anything git could read
+ * as an option. fetch.ts pins git to these per fetch.
+ */
+export const FETCHABLE_URL = /^(https|file):\/\/[^\s]+$/;
+export const FETCHABLE_URL_MESSAGE = "should be an https:// or file:// URL";
+
+export function isFileUrl(url: string): boolean {
+  return url.startsWith("file://");
+}
+
 /** Safe as a folder name in the content store and as a seed marker's name. */
 const CATALOG_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
@@ -40,7 +53,7 @@ const catalogSchema = z.array(
     id: z.string().regex(CATALOG_ID, "should be lower-case letters, digits and dashes"),
     title: text,
     description: z.string(),
-    repo: text.refine((value) => !value.startsWith("-"), "should be a repository URL"),
+    repo: z.string().regex(FETCHABLE_URL, FETCHABLE_URL_MESSAGE),
     ref: z.string().regex(PINNED_REF, PINNED_REF_MESSAGE),
   }),
 );
