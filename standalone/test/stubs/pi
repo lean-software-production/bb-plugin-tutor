@@ -4,7 +4,9 @@
 #
 # `--version`: answers at once (BB probes it; amendment 5).
 # `auth check --provider <p>`: signed in when STUB_PI_SIGNED_IN is unset or
-# names <p>; "0" means signed in to nothing.
+# names <p>; "0" means signed in to nothing; "env" means signed in only when
+# some *_API_KEY is in pi's own environment (a key the machine daemon
+# wouldn't have).
 # Anything else (the interactive login) exits 0 at once.
 # Self-contained (no lib.sh): the launcher runs it through the
 # $TUTOR_HOME/bin/pi symlink, where lib.sh isn't beside it.
@@ -16,6 +18,10 @@ case "${1:-} ${2:-}" in
   "auth check")
     signed_in=${STUB_PI_SIGNED_IN-any}
     [ "$signed_in" = any ] && exit 0
+    if [ "$signed_in" = env ]; then
+      env | cut -d= -f1 | grep -q '_API_KEY$' && exit 0
+      exit 1
+    fi
     [ "${3:-}" = --provider ] && [ "${4:-}" = "$signed_in" ] && exit 0
     exit 1
     ;;

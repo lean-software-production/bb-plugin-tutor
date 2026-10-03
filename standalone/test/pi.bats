@@ -12,7 +12,7 @@ load helper
   STUB_UNAME=Linux; make_stub_machine_unit
   STUB_SYSTEMD_ENV=$'PATH=/usr/bin\nOPENCODE_API_KEY=s3cret\nANTHROPIC_OAUTH_TOKEN=s3cret2\nGITHUB_TOKEN=keep' machine_env_apply
   grep -qx "UnsetEnvironment=OPENCODE_API_KEY ANTHROPIC_OAUTH_TOKEN" ~/.config/systemd/user/*.service.d/tutor.conf
-  ! grep -rq "s3cret" ~/.config/systemd/user "$TUTOR_HOME"
+  ! grep -rq "s3cret" ~/.config/systemd/user "$TUTOR_HOME" || false
 }
 
 @test "tutor login records the provider and pins coach threads to its model" {
@@ -82,7 +82,7 @@ load helper
 @test "tutor login refuses a provider pi isn't signed in to" {
   STUB_PI_SIGNED_IN=openrouter run cmd_login --provider anthropic </dev/null
   [ "$status" -eq 1 ]; [ -z "$(config_get provider)" ]
-  ! grep -q coachModel "$STUB_LOG/bb"
+  ! grep -q coachModel "$STUB_LOG/bb" || false
 }
 
 @test "tutor login takes --model, with or without the provider prefix" {
@@ -101,8 +101,8 @@ load helper
   [ "$status" -eq 0 ]
   [ "$(grep -c 'provider models pi' "$STUB_LOG/bb")" -eq 3 ]
   [ -z "$(config_get model)" ]
-  ! grep -q "coachModel ." "$STUB_LOG/bb"
-  ! printf '%s' "$output" | grep -iqw bb
+  ! grep -q "coachModel ." "$STUB_LOG/bb" || false
+  ! printf '%s' "$output" | grep -iqw bb || false
 }
 
 @test "pi_ready asks Tutor's pi about the recorded provider, with Tutor's pi folder" {
@@ -117,7 +117,7 @@ load helper
 @test "a failed restart leaves the next run retrying, with what to do" {
   STUB_UNAME=Linux; make_stub_machine_unit
   STUB_SYSTEMCTL_FAIL=restart run machine_env_apply
-  [ "$status" -eq 1 ]; [[ "$output" == *"Run \`tutor logs\`"* ]]; ! printf '%s' "$output" | grep -iqw bb
+  [ "$status" -eq 1 ]; [[ "$output" == *"Run \`tutor logs\`"* ]]; ! printf '%s' "$output" | grep -iqw bb || false
   machine_env_apply
   [ "$(grep -c restart "$STUB_LOG/systemctl")" -eq 2 ]
   grep -q PI_CODING_AGENT_DIR ~/.config/systemd/user/*.service.d/tutor.conf
@@ -127,5 +127,5 @@ load helper
   STUB_UNAME=Linux; make_stub_machine_unit
   STUB_SYSTEMCTL_FAIL=daemon-reload run machine_env_apply
   [ "$status" -eq 1 ]; [[ "$output" == *"Run \`tutor logs\`"* ]]
-  ! grep -q restart "$STUB_LOG/systemctl"
+  ! grep -q restart "$STUB_LOG/systemctl" || false
 }

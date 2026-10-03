@@ -9,7 +9,8 @@
 # =1, blocks until $HOME/.stub-installed exists (proving the launcher can't
 # deadlock waiting on it synchronously, and must kill it if it gives up
 # first). STUB_BB_NO_ENROL_LINE=1 prints nothing (the line never appears);
-# STUB_BB_BAD_ENROL_LINE=1 prints a line with "X-BB-Enrollment" but no
+# STUB_BB_CREATE_BLOCKS_FOREVER=1 blocks for 10 s whatever happens (a
+# create that never sees its machine connect). STUB_BB_BAD_ENROL_LINE=1 prints a line with "X-BB-Enrollment" but no
 # quoted header or URL (the line can't be parsed).
 # `machine list --json`: a single manual machine, with `status` — the real
 # API's field, not a boolean — taken from STUB_MACHINE_STATUS (default
@@ -18,10 +19,27 @@
 # `provider models pi ... --json`: one row per id in STUB_PROVIDER_MODELS
 # (space-separated provider/model ids; default openrouter/moonshotai/kimi-k2.6),
 # routeProviderId being the part before the first "/".
+# `plugin list --json`: {"plugins": [...]}, holding plugin "tutor" with
+# rootDir $STUB_PLUGIN_ROOT when that is set, and nothing otherwise.
+# STUB_BB_FAIL="<word1> <word2>" makes that command (e.g. "plugin install")
+# print STUB_BB_FAIL_STDOUT, if set, on stdout, say why on stderr, and exit 1.
 . "$(cd "$(dirname "$0")" && pwd)/lib.sh"
 stub_init "bb" "$@"
 
+if [ -n "${STUB_BB_FAIL:-}" ] && [ "${1:-} ${2:-}" = "$STUB_BB_FAIL" ]; then
+  [ -z "${STUB_BB_FAIL_STDOUT:-}" ] || printf '%s\n' "$STUB_BB_FAIL_STDOUT"
+  echo "bb: $STUB_BB_FAIL failed" >&2
+  exit 1
+fi
+
 case "${1:-} ${2:-}" in
+  "plugin list")
+    if [ -n "${STUB_PLUGIN_ROOT:-}" ]; then
+      printf '{"plugins":[{"id":"tutor","version":"0.0.0","enabled":true,"status":"ready","source":"path","rootDir":"%s"}]}\n' "$STUB_PLUGIN_ROOT"
+    else
+      printf '{"plugins":[]}\n'
+    fi
+    ;;
   "machine create")
     echo $$ >"$STUB_LOG/bb.pid"
     token="${STUB_ENROL_TOKEN:-stub-enrol-token}"
@@ -32,7 +50,13 @@ case "${1:-} ${2:-}" in
     else
       printf "Run: curl -H 'X-BB-Enrollment: %s' %s/install.sh | sh\n" "$token" "${BB_SERVER_URL:-http://127.0.0.1:47386}"
     fi
-    if [ "${STUB_BB_CREATE_BLOCKS_UNTIL_INSTALLED:-}" = 1 ]; then
+    if [ "${STUB_BB_CREATE_BLOCKS_FOREVER:-}" = 1 ]; then
+      i=0
+      while [ "$i" -lt 100 ]; do
+        i=$((i + 1))
+        sleep 0.1
+      done
+    elif [ "${STUB_BB_CREATE_BLOCKS_UNTIL_INSTALLED:-}" = 1 ]; then
       i=0
       while [ "$i" -lt 100 ]; do
         [ -e "$HOME/.stub-installed" ] && break

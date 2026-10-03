@@ -9,6 +9,12 @@ load helper
 
 INSTALL_SCRIPT="$BATS_TEST_DIRNAME/../install.sh"
 
+# install.sh starts from a computer with no ~/.tutor at all.
+setup() {
+  tutor_setup
+  rm -rf "$TUTOR_HOME"
+}
+
 # make_release_fixture: a fixture release directory, matching install.sh's
 # own unstamped TUTOR_VERSION (0.0.0-dev), with a real tutor script, a real
 # small archive and a correct SHA256SUMS. Sets $REL.
@@ -68,7 +74,7 @@ STUBCURL
   [ -x "$HOME/.local/bin/tutor" ]
   ls "$HOME"/.tutor/releases/*/bb-plugin-tutor-*.tgz
   [[ "$output" == *"tutor up ~/my-course"* ]]
-  ! printf '%s' "$output" | grep -iqw bb
+  ! printf '%s' "$output" | grep -iqw bb || false
 }
 
 @test "install.sh says how to add ~/.local/bin to PATH when it isn't there" {
@@ -83,7 +89,7 @@ STUBCURL
   mkdir -p "$HOME/.local/bin"
   TUTOR_RELEASE_DIR="$REL" PATH="$HOME/.local/bin:$PATH" run sh "$INSTALL_SCRIPT"
   [ "$status" -eq 0 ]
-  ! [[ "$output" == *'Add ~/.local/bin'* ]]
+  ! [[ "$output" == *'Add ~/.local/bin'* ]] || false
 }
 
 @test "without TUTOR_RELEASE_DIR, install.sh downloads tutor, the archive and SHA256SUMS from the exact release URL, with -fsSL" {
@@ -98,7 +104,7 @@ STUBCURL
   grep -qF -- "-fsSL $base/SHA256SUMS -o" "$CURL_LOG"
   # Exactly those three requests: install.sh never downloads itself.
   [ "$(wc -l <"$CURL_LOG")" -eq 3 ]
-  ! grep -q install.sh "$CURL_LOG"
+  ! grep -q install.sh "$CURL_LOG" || false
 }
 
 @test "a failed download installs nothing, exits non-zero, and says nothing about bb" {
@@ -109,5 +115,5 @@ STUBCURL
   [ "$status" -ne 0 ]
   [ ! -e "$HOME/.local/bin/tutor" ]
   [ ! -d "$HOME/.tutor/releases" ]
-  ! printf '%s' "$output" | grep -iqw bb
+  ! printf '%s' "$output" | grep -iqw bb || false
 }

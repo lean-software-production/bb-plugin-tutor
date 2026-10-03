@@ -7,7 +7,7 @@ load helper
   grep -q "project create --name my-course --root $HOME/my-course" "$STUB_LOG/bb"
   grep -q "plugin config tutor set workspaceProject prj_stub" "$STUB_LOG/bb"
   grep -q "http://127.0.0.1:47386" "$STUB_LOG/xdg-open"
-  ! printf '%s' "$output" | grep -iqw bb
+  ! printf '%s' "$output" | grep -iqw bb || false
 }
 
 @test "without pi signed in, up still finishes and says to run tutor login" {
@@ -34,7 +34,7 @@ load helper
 
 @test "refusals say why without naming the machine folder" {
   run tutor up "$HOME/.bb-machines/x"
-  [ "$status" -eq 1 ]; ! printf '%s' "$output" | grep -iq bb
+  [ "$status" -eq 1 ]; ! printf '%s' "$output" | grep -iq bb || false
   [ ! -e "$HOME/.bb-machines/x" ]
 }
 
@@ -55,7 +55,7 @@ load helper
   [ "$status" -eq 0 ]
   [ "$(config_get port)" = 47999 ]
   grep -q "http://127.0.0.1:47999" "$STUB_LOG/xdg-open"
-  ! grep -q 47386 "$STUB_LOG/curl"
+  ! grep -q 47386 "$STUB_LOG/curl" || false
 }
 
 @test "a second up reuses the enrolled machine and the workspace's project" {
@@ -88,7 +88,7 @@ load helper
   config_set machine_id stub-machine-id; make_stub_machine_unit
   STUB_MACHINE_STATUS=disconnected TUTOR_MACHINE_TIMEOUT=1 run tutor up "$HOME/my-course"
   grep -q "start bb-host-daemon-127-0-0-1-47386-stubhost.service" "$STUB_LOG/systemctl"
-  ! grep -q "machine create" "$STUB_LOG/bb"
+  ! grep -q "machine create" "$STUB_LOG/bb" || false
 }
 
 # --- fix round 1 ---
@@ -98,7 +98,7 @@ load helper
   [ "$status" -eq 1 ]; [ ! -e "$HOME/new" ]; [ ! -e "$HOME/.git" ]
   run tutor up "$HOME/nope/../.tutor/x"
   [ "$status" -eq 1 ]; [ ! -e "$HOME/nope" ]; [ ! -e "$HOME/.tutor/x" ]
-  ! grep -q "^init" "$STUB_LOG/git" 2>/dev/null
+  ! grep -q "^init" "$STUB_LOG/git" 2>/dev/null || false
 }
 
 @test "a ./ at the front of a relative folder is still fine" {

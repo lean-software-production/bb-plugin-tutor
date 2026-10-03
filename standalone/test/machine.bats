@@ -8,7 +8,7 @@ load helper
 
 @test "the enrolment header never reaches arguments, output or logs" {
   STUB_ENROL_TOKEN=s3cr3t-token run machine_enrol
-  ! grep -rq s3cr3t-token "$STUB_LOG" "$TUTOR_HOME/logs" ; ! printf '%s' "$output" | grep -q s3cr3t-token
+  ! grep -rq s3cr3t-token "$STUB_LOG" "$TUTOR_HOME/logs" || false ; ! printf '%s' "$output" | grep -q s3cr3t-token || false
   grep -q -- '-H @' "$STUB_LOG/curl"
   [ ! -e "$TUTOR_HOME/enrol.header" ]
   [ ! -e "$TUTOR_HOME/machine-installer.sh" ]   # its body holds the token (amendment 3)
@@ -48,7 +48,7 @@ load helper
   [ ! -e "$TUTOR_HOME/enrol.out" ]; [ ! -e "$TUTOR_HOME/enrol.header" ]; [ ! -e "$TUTOR_HOME/machine-installer.sh" ]
   pid=$(cat "$STUB_LOG/bb.pid")
   sleep 0.3
-  ! kill -0 "$pid" 2>/dev/null
+  ! kill -0 "$pid" 2>/dev/null || false
 }
 
 @test "an unparseable enrolment line kills the still-running create" {
@@ -57,7 +57,7 @@ load helper
   [ ! -e "$TUTOR_HOME/enrol.out" ]; [ ! -e "$TUTOR_HOME/enrol.header" ]; [ ! -e "$TUTOR_HOME/machine-installer.sh" ]
   pid=$(cat "$STUB_LOG/bb.pid")
   sleep 0.3
-  ! kill -0 "$pid" 2>/dev/null
+  ! kill -0 "$pid" 2>/dev/null || false
 }
 
 @test "a failed installer download kills the still-running create" {
@@ -66,7 +66,7 @@ load helper
   [ ! -e "$TUTOR_HOME/enrol.out" ]; [ ! -e "$TUTOR_HOME/enrol.header" ]; [ ! -e "$TUTOR_HOME/machine-installer.sh" ]
   pid=$(cat "$STUB_LOG/bb.pid")
   sleep 0.3
-  ! kill -0 "$pid" 2>/dev/null
+  ! kill -0 "$pid" 2>/dev/null || false
 }
 
 @test "machine_enrol's private umask doesn't leak into later steps" {

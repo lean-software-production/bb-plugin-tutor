@@ -1,6 +1,6 @@
 #!/bin/sh
 # A quiet, successful curl; STUB_CURL_FAIL=1 makes every call fail, as a
-# server that never becomes healthy would.
+# server that never becomes healthy would. STUB_SERVER_STOPPED=1: see below.
 #
 # When called with `-o <file>` (the launcher downloading the machine
 # installer), it writes a fake installer to <file> instead: it prints
@@ -27,6 +27,16 @@ if [ "${STUB_CURL_FAIL:-}" = 1 ]; then
   exit 1
 fi
 
+# STUB_SERVER_STOPPED=1: the server's /health fails until something has
+# started it (the systemctl stub's $STUB_LOG/server-started).
+if [ "${STUB_SERVER_STOPPED:-}" = 1 ] && [ ! -e "$STUB_LOG/server-started" ]; then
+  for arg in "$@"; do
+    case "$arg" in
+      */health) exit 7 ;;
+    esac
+  done
+fi
+
 out=""
 prev=""
 port=47386
@@ -47,6 +57,12 @@ if [ -n "$out" ]; then
     cat <<'INSTALLER'
 echo "installer says hello"
 touch "$HOME/.stub-installed"
+# STUB_INSTALLER_SIGNAL=<SIG>: the student presses Ctrl-C (or the shell is
+# killed) while the installer runs: signal the shell that ran it.
+if [ -n "${STUB_INSTALLER_SIGNAL:-}" ]; then
+  kill -s "$STUB_INSTALLER_SIGNAL" "$PPID"
+  sleep 0.2
+fi
 if [ "${STUB_UNAME:-Linux}" = Darwin ]; then
   mkdir -p "$HOME/Library/LaunchAgents"
   printf '<plist><string>%s/.bb-machines/127.0.0.1-%s/daemon</string></plist>\n' "$HOME" "$port" \

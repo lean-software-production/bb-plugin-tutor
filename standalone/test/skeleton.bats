@@ -47,5 +47,5 @@ load helper
 
 @test "nothing the launcher prints says bb" {
   run tutor help
-  ! printf '%s' "$output" | grep -iqw bb
+  ! printf '%s' "$output" | grep -iqw bb || false
 }

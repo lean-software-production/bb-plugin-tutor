@@ -291,19 +291,59 @@ server_configure() {
   tutor_bb settings general defaultMachineAccess direct
 }
 
-# plugin_install: install the tutor plugin from the release's own archive —
-# never the network — and pin coach threads to pi. Extracted once per
-# version into releases/<v>/bb-plugin-tutor-<v>/.
+# plugin_installed_from <folder>: whether `bb plugin list --json` shows
+# plugin "tutor" installed from <folder> (as given, or its physical path).
+plugin_installed_from() {
+  pif_json=$(tutor_bb_json plugin list --json) || return 1
+  pif_real=$(cd "$1" && pwd -P)
+  printf '%s' "$pif_json" | TUTOR_PLUGIN_DIR="$1" TUTOR_PLUGIN_REAL="$pif_real" node -e '
+    let raw = ""; process.stdin.on("data", (c) => (raw += c)).on("end", () => {
+      try {
+        const data = JSON.parse(raw);
+        const rows = Array.isArray(data) ? data : (data.plugins ?? []);
+        const row = rows.find((r) => r.id === "tutor");
+        const dirs = [process.env.TUTOR_PLUGIN_DIR, process.env.TUTOR_PLUGIN_REAL];
+        process.exit(row && dirs.includes(row.rootDir) ? 0 : 1);
+      } catch {
+        process.exit(1);
+      }
+    });' 2>>"$TUTOR_HOME/logs/launcher.log"
+}
+
+# plugin_install: install the tutor plugin from the release's own
+# ready-to-install archive, bb-plugin-tutor-<v>-built.tgz (dependencies
+# installed and built at release; install.sh put it in releases/<v>/) —
+# never the network — and pin coach threads to pi. The archive's one
+# top-level folder, bb-plugin-tutor-<v>/, is unpacked into a scratch folder
+# and moved into place in one step, so an interrupted unpack is redone next
+# time rather than skipped. `bb plugin install --yes` (it asks otherwise)
+# runs only when the plugin isn't already installed from that folder.
 plugin_install() {
+  mkdir -p "$TUTOR_HOME/logs"
   release_dir="$TUTOR_HOME/releases/$TUTOR_VERSION"
-  plugin_dir="$release_dir/bb-plugin-tutor-$TUTOR_VERSION"
-  archive="$release_dir/bb-plugin-tutor-$TUTOR_VERSION.tgz"
-  if [ ! -d "$plugin_dir" ] && [ -f "$archive" ]; then
-    mkdir -p "$plugin_dir"
-    tar -xzf "$archive" -C "$plugin_dir"
+  plugin_top="bb-plugin-tutor-$TUTOR_VERSION"
+  plugin_dir="$release_dir/$plugin_top"
+  archive="$release_dir/$plugin_top-built.tgz"
+  if [ ! -d "$plugin_dir" ]; then
+    [ -f "$archive" ] \
+      || fail "Tutor's plugin is missing from $release_dir. Install Tutor again, then run \`$TUTOR_NAME up\`."
+    unpack="$release_dir/.unpacking"
+    rm -rf "$unpack"
+    mkdir -p "$unpack"
+    if ! tar -xzf "$archive" -C "$unpack" >>"$TUTOR_HOME/logs/launcher.log" 2>&1 \
+      || [ ! -f "$unpack/$plugin_top/package.json" ]; then
+      rm -rf "$unpack"
+      fail "Tutor couldn't unpack its plugin. Run \`$TUTOR_NAME logs\`, or install Tutor again."
+    fi
+    mv "$unpack/$plugin_top" "$plugin_dir"
+    rm -rf "$unpack"
   fi
-  tutor_bb plugin install "$plugin_dir"
-  tutor_bb plugin config tutor set coachProvider pi
+  if ! plugin_installed_from "$plugin_dir"; then
+    tutor_bb plugin install "$plugin_dir" --yes \
+      || fail "Tutor couldn't install its plugin. Run \`$TUTOR_NAME logs\`."
+  fi
+  tutor_bb plugin config tutor set coachProvider pi \
+    || fail "Tutor couldn't set up its coach. Run \`$TUTOR_NAME logs\`."
 }
 
 # machine_id: the newest machine with machineProviderId "manual" in

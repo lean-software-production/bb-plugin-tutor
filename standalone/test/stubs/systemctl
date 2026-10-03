@@ -3,12 +3,21 @@
 # $STUB_SYSTEMD_ENV (NAME=value lines), the systemd user manager's
 # environment. STUB_SYSTEMCTL_FAIL=<verb> (restart, daemon-reload, ...) makes
 # that verb fail.
+#
+# Starting Tutor's server (start, restart or enable --now of
+# tutor-server.service) touches $STUB_LOG/server-started, which the curl
+# stub's /health reads when STUB_SERVER_STOPPED=1.
 . "$(cd "$(dirname "$0")" && pwd)/lib.sh"
 stub_init "systemctl" "$@"
 if [ -n "${STUB_SYSTEMCTL_FAIL:-}" ] && [ "${2:-}" = "$STUB_SYSTEMCTL_FAIL" ]; then
   echo "Failed to $STUB_SYSTEMCTL_FAIL" >&2
   exit 1
 fi
+case "${2:-} $*" in
+  start*tutor-server.service* | restart*tutor-server.service* | "enable --user enable --now tutor-server.service"*)
+    : >"$STUB_LOG/server-started"
+    ;;
+esac
 if [ "${1:-} ${2:-}" = "--user show-environment" ] && [ -n "${STUB_SYSTEMD_ENV:-}" ]; then
   printf '%s\n' "$STUB_SYSTEMD_ENV"
 fi

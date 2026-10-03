@@ -9,6 +9,10 @@ STUBS_DIR="$BATS_TEST_DIRNAME/stubs"
 TUTOR_SCRIPT="$BATS_TEST_DIRNAME/../tutor"
 
 setup() {
+  tutor_setup
+}
+
+tutor_setup() {
   TUTOR_TEST_HOME="$(mktemp -d)"
   export HOME="$TUTOR_TEST_HOME"
   unset TUTOR_HOME
@@ -31,8 +35,12 @@ setup() {
 
   # Each test opts in to a stub's behaviour; start clean. Exported (though
   # unset), so a plain `STUB_UNAME=Darwin` in a test reaches the stubs.
-  unset STUB_UNAME STUB_NODE_VERSION STUB_MISSING STUB_SYSTEMD_ENV STUB_PI_SIGNED_IN STUB_PROVIDER_MODELS STUB_SYSTEMCTL_FAIL
-  export STUB_UNAME STUB_NODE_VERSION STUB_MISSING STUB_SYSTEMD_ENV STUB_PI_SIGNED_IN STUB_PROVIDER_MODELS STUB_SYSTEMCTL_FAIL
+  unset STUB_UNAME STUB_NODE_VERSION STUB_MISSING STUB_SYSTEMD_ENV STUB_PI_SIGNED_IN STUB_PROVIDER_MODELS STUB_SYSTEMCTL_FAIL \
+    STUB_SERVER_STOPPED STUB_PLUGIN_ROOT STUB_BB_FAIL STUB_BB_FAIL_STDOUT STUB_LAUNCHCTL_FAIL STUB_SERVER_PID \
+    STUB_LISTEN_PID STUB_OTHER_LISTEN STUB_INSTALLER_SIGNAL STUB_BB_CREATE_BLOCKS_FOREVER
+  export STUB_UNAME STUB_NODE_VERSION STUB_MISSING STUB_SYSTEMD_ENV STUB_PI_SIGNED_IN STUB_PROVIDER_MODELS STUB_SYSTEMCTL_FAIL \
+    STUB_SERVER_STOPPED STUB_PLUGIN_ROOT STUB_BB_FAIL STUB_BB_FAIL_STDOUT STUB_LAUNCHCTL_FAIL STUB_SERVER_PID \
+    STUB_LISTEN_PID STUB_OTHER_LISTEN STUB_INSTALLER_SIGNAL STUB_BB_CREATE_BLOCKS_FOREVER
 
   # macOS's PlistBuddy lives at /usr/libexec/PlistBuddy; use the stub.
   export PLISTBUDDY=PlistBuddy
@@ -42,6 +50,28 @@ setup() {
   export TUTOR_SOURCE_ONLY=1
   # shellcheck disable=SC1090
   . "$TUTOR_SCRIPT"
+
+  # install.sh puts the release's ready-to-install plugin archive here.
+  make_plugin_archive
+}
+
+# make_plugin_archive: a small stand-in for the release's
+# bb-plugin-tutor-<v>-built.tgz at $TUTOR_HOME/releases/<v>/, laid out as
+# the real one is (scripts/check-release-archive.sh): one top-level folder
+# bb-plugin-tutor-<v>/ holding package.json and dist/.
+make_plugin_archive() {
+  local src="$BATS_TEST_TMPDIR/plugin-src" top="bb-plugin-tutor-$TUTOR_VERSION"
+  mkdir -p "$src/$top/dist" "$TUTOR_HOME/releases/$TUTOR_VERSION"
+  echo '{"name":"bb-plugin-tutor"}' >"$src/$top/package.json"
+  echo '// built' >"$src/$top/dist/host.js"
+  tar -C "$src" -czf "$TUTOR_HOME/releases/$TUTOR_VERSION/$top-built.tgz" "$top"
+}
+
+# launcher <args...>: the launcher as a student runs it — a separate `sh`
+# process (dash on Ubuntu CI), so `set -e` and the exit status behave as
+# they really do, unlike calling its functions in bats' own shell.
+launcher() {
+  env -u TUTOR_SOURCE_ONLY sh "$TUTOR_SCRIPT" "$@"
 }
 
 teardown() {

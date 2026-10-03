@@ -1,5 +1,15 @@
 #!/bin/sh
-# Placeholder stub for later launcher tasks: logs argv, quiet, exit 0 unless
-# listed in $STUB_MISSING. Behaviour is scripted per-test via STUB_<NAME>_*.
+# PlistBuddy: logs argv, quiet, exit 0 unless listed in $STUB_MISSING.
+# `-c 'Print :Label' <plist>` prints the <string> after <key>Label</key> in
+# that file (exit 1, as the real one does, when there is none).
 . "$(cd "$(dirname "$0")" && pwd)/lib.sh"
 stub_init "PlistBuddy" "$@"
+if [ "${1:-}" = -c ] && [ "${2:-}" = "Print :Label" ]; then
+  label=$(tr '\n' ' ' <"$3" 2>/dev/null | sed -n 's#.*<key>Label</key>[[:space:]]*<string>\([^<]*\)</string>.*#\1#p')
+  if [ -z "$label" ]; then
+    echo "Print: Entry, \":Label\", Does Not Exist" >&2
+    exit 1
+  fi
+  printf '%s\n' "$label"
+fi
+exit 0
