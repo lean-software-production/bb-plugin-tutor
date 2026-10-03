@@ -10,6 +10,7 @@
 #   standalone/e2e/e2e.sh install    install.sh from those assets
 #   standalone/e2e/e2e.sh up         tutor up, then tutor status
 #   ~/.local/bin/tutor login --provider <p> --model <m>   (by hand: pi's /login, then /quit)
+#   standalone/e2e/e2e.sh login      or: restore a saved sign-in ($E2E_DIR/pi-auth.json) instead
 #   standalone/e2e/e2e.sh lesson0    a Lesson 0 coach thread runs Tutor's pi on the machine
 #   standalone/e2e/e2e.sh fetch      add the fixture course: starter seeded, lessons listed
 #   standalone/e2e/e2e.sh scripted   (Stage B) install the scripted provider; coach threads use it
@@ -138,6 +139,30 @@ stage_up() {
   check "tutor status never says bb" says_no_bb "$E2E_DIR/status.out"
   check "the workspace project is set" test -n "$(config_get project_id)"
   info "next: run  $TUTOR login --provider <your provider>  (pi's /login, then /quit), then  $0 lesson0"
+}
+
+# A saved sign-in, so later runs need no hand at pi's /login. Copy it once
+# after a hand login:  install -m 600 ~/.tutor/pi/auth.json ~/tutor-e2e/pi-auth.json
+SAVED_AUTH="$E2E_DIR/pi-auth.json"
+config_put() { # what tutor login records: key=value in ~/.tutor/config, mode 0600
+  local rest; rest=$(grep -v "^$1=" "$TUTOR_HOME/config" 2>/dev/null || true)
+  (umask 077; { [ -z "$rest" ] || printf '%s\n' "$rest"; printf '%s=%s\n' "$1" "$2"; } >"$TUTOR_HOME/config.tmp")
+  mv "$TUTOR_HOME/config.tmp" "$TUTOR_HOME/config"
+}
+
+stage_login() {
+  if [ ! -f "$SAVED_AUTH" ]; then
+    echo "No saved sign-in at $SAVED_AUTH: run $TUTOR login --provider <p> by hand, then copy ~/.tutor/pi/auth.json there (mode 600)." >&2; exit 1
+  fi
+  local provider=${E2E_PROVIDER:-openrouter} model=${E2E_MODEL:-openrouter/z-ai/glm-5.3-flash}
+  # Tutor's pi folder is the launcher's (made by tutor up); only auth.json comes from the copy.
+  install -m 600 "$SAVED_AUTH" "$TUTOR_HOME/pi/auth.json"
+  check "the saved sign-in is Tutor's pi's" test -f "$TUTOR_HOME/pi/auth.json"
+  config_put provider "$provider"
+  config_put model "$model"
+  check "coach threads are pinned to $model" quiet bbx plugin config tutor set coachModel "$model"
+  "$TUTOR" status >"$E2E_DIR/status.out" 2>&1
+  check "status: Tutor's pi is signed in" grep -q "signed in$" "$E2E_DIR/status.out"
 }
 
 stage_lesson0() {
@@ -332,11 +357,12 @@ case "${1:-}" in
   build) stage_build ;;
   install) stage_install ;;
   up) stage_up ;;
+  login) stage_login ;;
   lesson0) stage_lesson0 ;;
   fetch) stage_fetch ;;
   scripted) stage_scripted ;;
   lessons) stage_lessons ;;
   restart) stage_restart ;;
   uninstall) stage_uninstall ;;
-  *) sed -n '2,20p' "$0"; exit 2 ;;
+  *) sed -n '2,21p' "$0"; exit 2 ;;
 esac
