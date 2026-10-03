@@ -148,9 +148,11 @@ server_install() {
 }
 
 # systemd_quote <string>: a systemd unit-file quoted argument (a
-# double-quoted token with backslashes and double quotes escaped).
+# double-quoted token with backslashes and double quotes escaped, and every
+# "%" doubled so systemd's specifier expansion — %h, %t, ... — never fires
+# on a literal percent in a path).
 systemd_quote() {
-  escaped=$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')
+  escaped=$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/%/%%/g')
   printf '"%s"' "$escaped"
 }
 
@@ -181,7 +183,7 @@ server_service_write() {
 Description=Tutor server
 
 [Service]
-Environment=PATH=$node_dir:/usr/bin:/bin
+Environment=$(systemd_quote "PATH=$node_dir:/usr/bin:/bin")
 ExecStart=$(systemd_quote "$node_bin") $(systemd_quote "$bbserver_bin") --data-dir $(systemd_quote "$data_dir") --server-bind-host 127.0.0.1 --server-port $port
 Restart=on-failure
 

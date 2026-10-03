@@ -14,6 +14,24 @@ load helper
   grep -q "<string>$HOME/.tutor/server</string>" ~/Library/LaunchAgents/com.leansoftwareproduction.tutor-server.plist
 }
 
+@test "a percent in a path is doubled so systemd never expands it as a specifier" {
+  export HOME="$BATS_TEST_TMPDIR/100% Done"; mkdir -p "$HOME"; TUTOR_HOME="$HOME/.tutor"
+  STUB_UNAME=Linux server_service_write 47386
+  # The raw path has one "%"; systemd's unit must see it doubled (%%), never
+  # bare, so it is never read as the start of a %-specifier.
+  grep -q -- '--data-dir "'"$BATS_TEST_TMPDIR"'/100%% Done/.tutor/server"' ~/.config/systemd/user/tutor-server.service
+  ! grep -q -- '100% Done' ~/.config/systemd/user/tutor-server.service
+}
+
+@test "node under a path with a space gets a correctly quoted Environment=PATH line" {
+  node_space_dir="$BATS_TEST_TMPDIR/Program Files/node"
+  mkdir -p "$node_space_dir"
+  cp "$STUBS_DIR/node" "$node_space_dir/node"
+  chmod +x "$node_space_dir/node"
+  PATH="$node_space_dir:$PATH" STUB_UNAME=Linux server_service_write 47386
+  grep -q -- 'Environment="PATH='"$node_space_dir"':/usr/bin:/bin"' ~/.config/systemd/user/tutor-server.service
+}
+
 @test "bb-app is installed once, at the pinned version, with its install scripts running" {
   server_install; server_install
   [ "$(grep -c 'install' "$STUB_LOG/npm")" -eq 1 ]
