@@ -13,6 +13,8 @@ TUTOR_VERSION=0.0.0-dev
 # shellcheck disable=SC2034 # the BB the plugin is pinned to; tutor_bb (later tasks) installs it
 BB_VERSION=0.44.0
 TUTOR_PORT_DEFAULT=47386
+# launchd's name for Tutor's server agent, and its plist's file name.
+SERVER_LABEL=com.leansoftwareproduction.tutor-server
 TUTOR_HOME="${TUTOR_HOME:-$HOME/.tutor}"
 # Tutor's own pi (spike constants PI_PACKAGE / PI_VERSION).
 PI_PACKAGE=@earendil-works/pi-coding-agent
@@ -155,9 +157,20 @@ server_prepare_dirs() {
   chmod 700 "$TUTOR_HOME/server"
 }
 
+# server_restart_needed: note that the running server (if any) is out of
+# date — its binaries or its service file changed — so server_start
+# restarts it rather than leaving it running. The note is a file, removed
+# only once the restart has worked, so a failed restart is retried by the
+# next `tutor up`.
+server_restart_needed() {
+  mkdir -p "$TUTOR_HOME/server"
+  : >"$TUTOR_HOME/server/.restart-pending"
+}
+
 # server_install: install bb-app at BB_VERSION under $TUTOR_HOME/server/npm.
 # npm runs the native modules' install scripts by default (amendment 2; no
-# --ignore-scripts). Skipped when already installed at BB_VERSION.
+# --ignore-scripts). Skipped when already installed at BB_VERSION; a
+# (re)install means the running server must restart.
 server_install() {
   marker="$TUTOR_HOME/server/npm/.bb-app-version"
   if [ -f "$marker" ] && [ "$(cat "$marker")" = "$BB_VERSION" ]; then
@@ -165,8 +178,9 @@ server_install() {
   fi
   mkdir -p "$TUTOR_HOME/server/npm" "$TUTOR_HOME/logs"
   npm install --prefix "$TUTOR_HOME/server/npm" "bb-app@$BB_VERSION" >>"$TUTOR_HOME/logs/launcher.log" 2>&1 \
-    || fail "Tutor's server failed to install. Run \`tutor logs\`."
+    || fail "Tutor's server failed to install. Run \`$TUTOR_NAME logs\`."
   printf '%s' "$BB_VERSION" >"$marker"
+  server_restart_needed
 }
 
 # systemd_quote <string>: a systemd unit-file quoted argument (a
@@ -184,9 +198,20 @@ xml_escape() {
   printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&apos;/g'
 }
 
-# server_service_write <port>: write the tutor server's user-service file —
-# the systemd unit on Linux, the launchd plist on macOS — pointing at the
-# installed bb-server on 127.0.0.1:<port>.
+# server_service_file: the tutor server's user-service file — the systemd
+# unit on Linux, the launchd plist on macOS.
+server_service_file() {
+  case "$(os_kind)" in
+    linux) printf '%s\n' "$HOME/.config/systemd/user/tutor-server.service" ;;
+    macos) printf '%s\n' "$HOME/Library/LaunchAgents/$SERVER_LABEL.plist" ;;
+  esac
+}
+
+# server_service_write <port>: write the tutor server's user-service file
+# (server_service_file) pointing at the installed bb-server on
+# 127.0.0.1:<port>, with the node found on PATH. When its content changed
+# (a new port, a different node, or a first write), the running server
+# must restart.
 server_service_write() {
   port=$1
   server_prepare_dirs
@@ -200,7 +225,7 @@ server_service_write() {
     linux)
       unit_dir="$HOME/.config/systemd/user"
       mkdir -p "$unit_dir"
-      cat >"$unit_dir/tutor-server.service" <<EOF
+      cat >"$unit_dir/tutor-server.service.new" <<EOF
 [Unit]
 Description=Tutor server
 
@@ -216,13 +241,13 @@ EOF
     macos)
       plist_dir="$HOME/Library/LaunchAgents"
       mkdir -p "$plist_dir"
-      cat >"$plist_dir/com.leansoftwareproduction.tutor-server.plist" <<EOF
+      cat >"$plist_dir/$SERVER_LABEL.plist.new" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.leansoftwareproduction.tutor-server</string>
+  <string>$SERVER_LABEL</string>
   <key>ProgramArguments</key>
   <array>
     <string>$(xml_escape "$node_bin")</string>
@@ -251,20 +276,68 @@ EOF
 EOF
       ;;
   esac
+
+  ssw_file=$(server_service_file)
+  if [ -f "$ssw_file" ] && cmp -s "$ssw_file.new" "$ssw_file"; then
+    rm -f "$ssw_file.new"
+  else
+    mv "$ssw_file.new" "$ssw_file"
+    server_restart_needed
+  fi
 }
 
-# server_start: load and enable the tutor server's user service so it starts
-# now and on every future login. Lingering stays off (amendment 8).
+# launchd_bootstrap <plist>: load a launchd agent. Tries a few times
+# (TUTOR_LAUNCHD_TRIES, default 5, a second apart): right after a bootout,
+# launchd may still be unloading it, and bootstrap then fails with error 5.
+launchd_bootstrap() {
+  lb_tries=${TUTOR_LAUNCHD_TRIES:-5}
+  lb_try=1
+  while ! launchctl bootstrap "gui/$(id -u)" "$1" >>"$TUTOR_HOME/logs/launcher.log" 2>&1; do
+    [ "$lb_try" -lt "$lb_tries" ] || return 1
+    lb_try=$((lb_try + 1))
+    sleep 1
+  done
+}
+
+# server_start: enable and start the tutor server's user service, so it runs
+# now and on every future login (lingering stays off: amendment 8), and
+# restart it when server_install or server_service_write said it is out of
+# date — `enable --now` alone leaves an already-running server as it was.
+# On macOS an agent that is already loaded (every re-run, and after login)
+# is left running unless it is out of date; then it is booted out and
+# bootstrapped again, so launchd reads the new plist. Every failure says
+# what to do; the details go to the log.
 server_start() {
+  mkdir -p "$TUTOR_HOME/logs"
+  ss_log="$TUTOR_HOME/logs/launcher.log"
+  ss_pending="$TUTOR_HOME/server/.restart-pending"
   case "$(os_kind)" in
     linux)
-      systemctl --user daemon-reload
-      systemctl --user enable --now tutor-server.service
+      systemctl --user daemon-reload >>"$ss_log" 2>&1 \
+        || fail "Tutor couldn't reach your user services (systemctl --user). Run \`$TUTOR_NAME logs\`."
+      systemctl --user enable tutor-server.service >>"$ss_log" 2>&1 \
+        || fail "Tutor's server didn't start. Run \`$TUTOR_NAME logs\`."
+      if [ -f "$ss_pending" ]; then
+        systemctl --user restart tutor-server.service >>"$ss_log" 2>&1 \
+          || fail "Tutor's server didn't start. Run \`$TUTOR_NAME logs\`."
+      else
+        systemctl --user start tutor-server.service >>"$ss_log" 2>&1 \
+          || fail "Tutor's server didn't start. Run \`$TUTOR_NAME logs\`."
+      fi
       ;;
     macos)
-      launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.leansoftwareproduction.tutor-server.plist"
+      ss_plist=$(server_service_file)
+      if launchctl print "gui/$(id -u)/$SERVER_LABEL" >/dev/null 2>&1; then
+        if [ -f "$ss_pending" ]; then
+          launchctl bootout "gui/$(id -u)" "$ss_plist" >>"$ss_log" 2>&1 || true
+          launchd_bootstrap "$ss_plist" || fail "Tutor's server didn't start. Run \`$TUTOR_NAME logs\`."
+        fi
+      else
+        launchd_bootstrap "$ss_plist" || fail "Tutor's server didn't start. Run \`$TUTOR_NAME logs\`."
+      fi
       ;;
   esac
+  rm -f "$ss_pending"
 }
 
 # server_wait_healthy <port>: poll /health until it answers, up to
@@ -286,9 +359,11 @@ server_wait_healthy() {
 # server_configure <port>: point the server at itself, directly, on
 # 127.0.0.1 (never localhost).
 server_configure() {
-  port=$1
-  tutor_bb settings general machineServerUrl "http://127.0.0.1:$port"
-  tutor_bb settings general defaultMachineAccess direct
+  sc_port=$1
+  tutor_bb settings general machineServerUrl "http://127.0.0.1:$sc_port" \
+    || fail "Tutor couldn't set up its server. Run \`$TUTOR_NAME logs\`."
+  tutor_bb settings general defaultMachineAccess direct \
+    || fail "Tutor couldn't set up its server. Run \`$TUTOR_NAME logs\`."
 }
 
 # plugin_installed_from <folder>: whether `bb plugin list --json` shows
@@ -737,7 +812,8 @@ machine_env_apply() {
       pb=${PLISTBUDDY:-/usr/libexec/PlistBuddy}
       changed=0
       if ! "$pb" -c 'Print :EnvironmentVariables' "$service" >/dev/null 2>&1; then
-        "$pb" -c 'Add :EnvironmentVariables dict' "$service" >>"$TUTOR_HOME/logs/launcher.log" 2>&1
+        "$pb" -c 'Add :EnvironmentVariables dict' "$service" >>"$TUTOR_HOME/logs/launcher.log" 2>&1 \
+          || fail "Tutor couldn't update its machine service. Run \`$TUTOR_NAME logs\`."
       fi
       for env_name in PI_CODING_AGENT_DIR BB_PI_BRIDGE_COMMAND; do
         case "$env_name" in
@@ -747,14 +823,15 @@ machine_env_apply() {
         current=$("$pb" -c "Print :EnvironmentVariables:$env_name" "$service" 2>/dev/null) || current=""
         [ "$current" = "$env_value" ] && continue
         "$pb" -c "Delete :EnvironmentVariables:$env_name" "$service" >/dev/null 2>&1 || true
-        "$pb" -c "Add :EnvironmentVariables:$env_name string $(plist_value "$env_value")" "$service" >>"$TUTOR_HOME/logs/launcher.log" 2>&1
+        "$pb" -c "Add :EnvironmentVariables:$env_name string $(plist_value "$env_value")" "$service" >>"$TUTOR_HOME/logs/launcher.log" 2>&1 \
+          || fail "Tutor couldn't update its machine service. Run \`$TUTOR_NAME logs\`."
         changed=1
       done
       [ "$changed" -eq 1 ] || return 0
       # launchd reads the plist when it loads it: reload, don't just kickstart.
       launchctl bootout "gui/$(id -u)" "$service" >>"$TUTOR_HOME/logs/launcher.log" 2>&1 || true
-      launchctl bootstrap "gui/$(id -u)" "$service" >>"$TUTOR_HOME/logs/launcher.log" 2>&1 \
-        || fail "Tutor's machine service didn't restart. Run \`tutor logs\`."
+      launchd_bootstrap "$service" \
+        || fail "Tutor's machine service didn't restart. Run \`$TUTOR_NAME logs\`."
       ;;
   esac
 }
@@ -1050,7 +1127,7 @@ cmd_up() {
   say "Starting Tutor's server..."
   server_install
   server_service_write "$up_port"
-  server_start >>"$TUTOR_HOME/logs/launcher.log" 2>&1
+  server_start
   server_wait_healthy "$up_port"
   server_configure "$up_port"
   plugin_install
@@ -1137,7 +1214,7 @@ cmd_stop() {
       if [ -n "$sp_service" ]; then
         launchctl bootout "gui/$(id -u)" "$sp_service" >>"$TUTOR_HOME/logs/launcher.log" 2>&1 || true
       fi
-      launchctl bootout "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.leansoftwareproduction.tutor-server.plist" \
+      launchctl bootout "gui/$(id -u)" "$HOME/Library/LaunchAgents/$SERVER_LABEL.plist" \
         >>"$TUTOR_HOME/logs/launcher.log" 2>&1 || true
       ;;
   esac
@@ -1195,9 +1272,9 @@ cmd_uninstall() {
         launchctl bootout "gui/$(id -u)" "$un_service" >>"$TUTOR_HOME/logs/launcher.log" 2>&1 || true
         rm -f "$un_service"
       fi
-      launchctl bootout "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.leansoftwareproduction.tutor-server.plist" \
+      launchctl bootout "gui/$(id -u)" "$HOME/Library/LaunchAgents/$SERVER_LABEL.plist" \
         >>"$TUTOR_HOME/logs/launcher.log" 2>&1 || true
-      rm -f "$HOME/Library/LaunchAgents/com.leansoftwareproduction.tutor-server.plist"
+      rm -f "$HOME/Library/LaunchAgents/$SERVER_LABEL.plist"
       ;;
   esac
 

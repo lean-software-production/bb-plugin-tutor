@@ -117,3 +117,93 @@ load helper
   ! printf '%s' "$output" | grep -iqw bb || false
   [ ! -e "$TUTOR_HOME/releases/$TUTOR_VERSION/bb-plugin-tutor-$TUTOR_VERSION" ]
 }
+
+# --- final review: C2, I4, I6 ---
+
+# server_up <port>: what tutor up does for the server, in order.
+server_up() {
+  server_install && server_service_write "$1" && server_start
+}
+
+@test "on macOS a second start finds the server already loaded and doesn't fail" {
+  export STUB_UNAME=Darwin
+  server_up 47386
+  grep -q "bootstrap gui/$(id -u) $HOME/Library/LaunchAgents/com.leansoftwareproduction.tutor-server.plist" "$STUB_LOG/launchctl"
+  : >"$STUB_LOG/launchctl"
+  run server_up 47386
+  [ "$status" -eq 0 ]
+  ! grep -q "bootstrap\|bootout" "$STUB_LOG/launchctl" || false
+}
+
+@test "on macOS a changed plist reloads the loaded server" {
+  export STUB_UNAME=Darwin
+  server_up 47386
+  : >"$STUB_LOG/launchctl"
+  run server_up 47999
+  [ "$status" -eq 0 ]
+  grep -q "^bootout gui/" "$STUB_LOG/launchctl"
+  grep -q "^bootstrap gui/" "$STUB_LOG/launchctl"
+}
+
+@test "on macOS a bootstrap that keeps failing says what to do, without naming bb" {
+  export STUB_UNAME=Darwin
+  STUB_LAUNCHCTL_FAIL=bootstrap TUTOR_LAUNCHD_TRIES=1 run server_up 47386
+  [ "$status" -eq 1 ]; [[ "$output" == *"Run \`tutor logs\`"* ]]
+  ! printf '%s' "$output" | grep -iqw bb || false
+}
+
+@test "an unchanged server is started, not restarted" {
+  server_up 47386
+  : >"$STUB_LOG/systemctl"
+  server_up 47386
+  grep -q "^--user start tutor-server.service" "$STUB_LOG/systemctl"
+  ! grep -q "restart tutor-server" "$STUB_LOG/systemctl" || false
+}
+
+@test "a new port restarts the running server" {
+  server_up 47386
+  : >"$STUB_LOG/systemctl"
+  server_up 47999
+  grep -q "^--user daemon-reload" "$STUB_LOG/systemctl"
+  grep -q "^--user restart tutor-server.service" "$STUB_LOG/systemctl"
+}
+
+@test "a new server version restarts the running server" {
+  server_up 47386
+  : >"$STUB_LOG/systemctl"
+  BB_VERSION=9.9.9 server_up 47386
+  grep -q "bb-app@9.9.9" "$STUB_LOG/npm"
+  grep -q "^--user restart tutor-server.service" "$STUB_LOG/systemctl"
+}
+
+@test "a different node restarts the running server" {
+  server_up 47386
+  : >"$STUB_LOG/systemctl"
+  other="$BATS_TEST_TMPDIR/other-node"; mkdir -p "$other"; cp "$STUBS_DIR/node" "$other/node"
+  PATH="$other:$PATH" server_up 47386
+  grep -q "^--user restart tutor-server.service" "$STUB_LOG/systemctl"
+}
+
+@test "a restart that failed is tried again on the next run" {
+  server_up 47386
+  STUB_SYSTEMCTL_FAIL=restart run server_up 47999
+  [ "$status" -eq 1 ]
+  : >"$STUB_LOG/systemctl"
+  server_up 47999
+  grep -q "^--user restart tutor-server.service" "$STUB_LOG/systemctl"
+}
+
+@test "each systemctl failure starting the server says what to do, without naming bb" {
+  for verb in daemon-reload enable restart; do
+    rm -f "$TUTOR_HOME/server/.restart-pending"; server_service_write 4000$RANDOM
+    STUB_SYSTEMCTL_FAIL=$verb run server_start
+    [ "$status" -eq 1 ]; [[ "$output" == *"Run \`tutor logs\`"* ]]
+    ! printf '%s' "$output" | grep -iqw bb || false
+  done
+}
+
+@test "a server that can't be configured says what to do, without naming bb" {
+  STUB_BB_FAIL="settings general" run server_configure 47386
+  [ "$status" -eq 1 ]; [[ "$output" == *"Run \`tutor logs\`"* ]]
+  ! printf '%s' "$output" | grep -iqw bb || false
+}

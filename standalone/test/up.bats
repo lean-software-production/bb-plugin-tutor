@@ -64,7 +64,8 @@ load helper
   [ "$status" -eq 0 ]
   [ "$(grep -c 'machine create' "$STUB_LOG/bb")" -eq 1 ]
   [ "$(grep -c 'project create' "$STUB_LOG/bb")" -eq 1 ]
-  [ "$(grep -c restart "$STUB_LOG/systemctl")" -eq 1 ]
+  [ "$(grep -c "restart bb-host-daemon" "$STUB_LOG/systemctl")" -eq 1 ]   # the machine: once, at enrolment
+  [ "$(grep -c "restart tutor-server" "$STUB_LOG/systemctl")" -eq 1 ]   # the server: once, when first written
 }
 
 @test "up with no folder and none recorded says what to type" {
