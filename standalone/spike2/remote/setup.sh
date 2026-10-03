@@ -17,6 +17,9 @@ if ! id "$STUDENT" >/dev/null 2>&1; then
   useradd --create-home --shell /bin/bash --comment "Tutor Spike 2 (bb-plugin-tutor standalone/spike2)" "$STUDENT"
   echo "created user $STUDENT"
 fi
+# Everything below runs from the student's home: sudo leaves us in ew-admin's,
+# which the student can't enter (bb's CLI then fails to spawn with EACCES).
+cd "$H"
 as_student mkdir -p "$H/tutor/npm" "$H/tutor/server" "$H/tutor/plugin"
 chmod 700 "$H/tutor/server"
 
@@ -104,7 +107,7 @@ bb settings general machineServerUrl "$SERVER_URL" >/dev/null
 bb settings general defaultMachineAccess direct >/dev/null
 
 # 6. Tutor's plugin, from the built archive (dist/ and node_modules/ included).
-top=$(tar -tzf "$PLUGIN_TGZ" | head -n 1 | cut -d/ -f1)
+top=$(tar -tzf "$PLUGIN_TGZ" | sed -n 1p | cut -d/ -f1)   # sed reads it all: no SIGPIPE under pipefail
 rm -rf "$H/tutor/plugin/$top"
 as_student tar -xzf "$PLUGIN_TGZ" -C "$H/tutor/plugin"
 rm -f "$PLUGIN_TGZ"
