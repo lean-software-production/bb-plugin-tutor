@@ -17,7 +17,8 @@ import { findLesson, lessonExamples } from "../shared/derive.ts";
 import { fixtureCourse, fixtureLayoutlessCourse } from "../shared/fixtures.ts";
 import type { Completion, LessonDetail, Overview } from "../shared/rpc.ts";
 import { NOT_A_TUTOR_THREAD } from "../server/coach/auth.ts";
-import type { WorkspaceAccess } from "../server/workspace/access.ts";
+import { WorkspaceUnreachableError, type WorkspaceAccess } from "../server/workspace/access.ts";
+import { formatProgress, parseProgress } from "../layouts/progress/progress-yaml.ts";
 import { createDiskAccess } from "./helpers/disk-access.ts";
 import { makeSandbox, makeRepoSandbox, type Sandbox } from "./helpers/disk.ts";
 import { allPassing, callTool, makeTutorHost, PROJECT_ID, type TutorHost } from "./helpers/fake-bb.ts";
@@ -1110,4 +1111,143 @@ test("before its first lesson is adopted, a course's lessons are ahead: its coac
   await assert.rejects(openCoach(host, "001"), /has not started yet/);
   const { threadId } = (await host.harness.behavior.callRpc("startNextLesson", { courseId: fixtureCourse.id, lessonId: "001" })) as { threadId: string };
   assert.ok(threadId);
+});
+
+const UNREACHABLE = /Tutor can't reach your computer's machine right now\. Run `tutor status`\./;
+
+test("a machine that is not connected makes the workspace unreachable, with its own message", async (t) => {
+  const host = await makeTutorHost(null, "/nowhere", undefined, { hostStatus: "disconnected" });
+  t.after(() => host.harness.lifecycle.dispose());
+  const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.deepEqual(overview.workspace, { status: "unreachable", projectId: PROJECT_ID, projectName: "tetris/.factory" });
+  await assert.rejects(host.harness.behavior.callRpc("openCoach", { courseId: "tutor", lessonId: "000" }), UNREACHABLE);
+  await assert.rejects(host.harness.behavior.callRpc("confirmWorkspace", { projectId: PROJECT_ID }), UNREACHABLE);
+  // A coach thread from before the machine went away: its tools say the same.
+  host.addThread({ id: "thr_coach", originPluginId: "tutor", metadata: { course: "tutor", lesson: "000", role: "coach" } });
+  const result = await tool(host, "tutor_status", {}, "thr_coach");
+  assert.ok(isError(result));
+  assert.match(text(result), UNREACHABLE);
+});
+
+test("a host call that finds the machine offline makes the workspace unreachable, not missing", async (t) => {
+  const sandbox = await makeSandbox();
+  const offline: WorkspaceAccess = {
+    ...createDiskAccess(),
+    read: async () => {
+      throw new WorkspaceUnreachableError();
+    },
+  };
+  const host = await makeTutorHost(sandbox.course, sandbox.factoryRoot, undefined, { access: () => offline });
+  t.after(async () => {
+    await host.harness.lifecycle.dispose();
+    await sandbox.cleanup();
+  });
+  const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.equal(overview.workspace.status, "unreachable");
+  await assert.rejects(openCoach(host, "000"), UNREACHABLE);
+});
+
+test("a progress file changed between read and write is retried once, then refused, and neither edit is lost", async (t) => {
+  const sandbox = await makeSandbox();
+  const disk = createDiskAccess();
+  // Runs before each write, as another writer getting in between Tutor's read and its write would.
+  let beforeWrite: ((path: string) => Promise<void>) | null = null;
+  const access: WorkspaceAccess = {
+    ...disk,
+    async write(path, text, expected) {
+      await beforeWrite?.(path);
+      return disk.write(path, text, expected);
+    },
+  };
+  const host = await makeTutorHost(sandbox.course, sandbox.factoryRoot, undefined, { access: () => access });
+  t.after(async () => {
+    await host.harness.lifecycle.dispose();
+    await sandbox.cleanup();
+  });
+  const progressPath = join(sandbox.factoryRoot, ".tutor/progress.yaml");
+  const coach = (await openCoach(host, "000")).threadId;
+  await ok(host, "tutor_adopt_iteration", { iteration: "000" }, coach);
+  const [first, second, third] = lessonExamples(findLesson(builtinCourse, "000") ?? assert.fail("lesson 000"));
+  assert.ok(first !== undefined && second !== undefined && third !== undefined);
+  const readProgress = async () => parseProgress(await readFile(progressPath, "utf8")).progress ?? assert.fail("progress unreadable");
+  /** Another writer skips `example` in the progress file, at a new time each edit so the file always changes. */
+  let edits = 0;
+  const outsideEdit = async (example: typeof first) => {
+    const text = await readFile(progressPath, "utf8");
+    const progress = parseProgress(text).progress ?? assert.fail("progress unreadable");
+    edits += 1;
+    progress.examples[example.key] = { status: "skipped", hash: example.hash, at: `2026-09-25T10:00:${String(edits).padStart(2, "0")}Z` };
+    await writeFile(progressPath, formatProgress(progress, text));
+  };
+
+  // Once: the tool re-reads the file (with the outside edit) and writes again.
+  let conflicts = 0;
+  beforeWrite = async (path) => {
+    if (path !== progressPath) return;
+    beforeWrite = null;
+    conflicts += 1;
+    await outsideEdit(second);
+  };
+  await ok(host, "tutor_mark_example", { example: first.key, status: "passing", evidence: "seen in the outline" }, coach);
+  assert.equal(conflicts, 1);
+  const once = await readProgress();
+  assert.equal(once.examples[first.key]?.status, "passing", "the tool's mark");
+  assert.equal(once.examples[second.key]?.status, "skipped", "the outside edit");
+
+  // Every time: the second conflict is refused, and the file keeps the outside edit.
+  beforeWrite = async (path) => {
+    if (path !== progressPath) return;
+    conflicts += 1;
+    await outsideEdit(third);
+  };
+  const refused = await tool(host, "tutor_mark_example", { example: second.key, status: "passing", evidence: "seen it" }, coach);
+  assert.ok(isError(refused));
+  assert.equal(text(refused), "Your progress file changed while Tutor was writing it. Call tutor_status and try again.");
+  assert.equal(conflicts, 3);
+  const after = await readProgress();
+  assert.equal(after.examples[second.key]?.status, "skipped", "not marked: both attempts conflicted");
+  assert.equal(after.examples[third.key]?.status, "skipped", "the outside edit");
+  assert.equal(after.examples[first.key]?.status, "passing");
+});
+
+test("through the machine: sdk.files and the host entry's inspect carry Lesson 0's progress", async (t) => {
+  const sandbox = await makeSandbox();
+  const host = await makeTutorHost(sandbox.course, sandbox.factoryRoot, undefined, { access: "machine" });
+  t.after(async () => {
+    await host.harness.lifecycle.dispose();
+    await sandbox.cleanup();
+  });
+  const coach = (await openCoach(host, "000")).threadId;
+  await ok(host, "tutor_adopt_iteration", { iteration: "000" }, coach);
+  const [first] = lessonExamples(findLesson(builtinCourse, "000") ?? assert.fail("lesson 000"));
+  assert.ok(first !== undefined);
+  await ok(host, "tutor_mark_example", { example: first.key, status: "passing", evidence: "seen in the outline" }, coach);
+  const progress = parseProgress(await readFile(join(sandbox.factoryRoot, ".tutor/progress.yaml"), "utf8")).progress;
+  assert.equal(progress?.examples[first.key]?.status, "passing");
+  const inspected = host.harness.inspection.experimental_hostRpcCalls.filter((call) => call.method === "inspect");
+  assert.ok(inspected.length > 0, "layout probes went to the host entry");
+  assert.ok(inspected.every((call) => call.hostId === "host_1"));
+});
+
+test("the Feature's project hint is resolved on BB's own host, and left as it is when BB has none", async (t) => {
+  const sandbox = await makeSandbox();
+  /** An access that records the machines it was asked for. */
+  const recording = (asked: string[]) => (hostId: string) => {
+    asked.push(hostId);
+    return createDiskAccess();
+  };
+  const env = { TUTOR_FACTORY_PATH: sandbox.factoryRoot };
+  const askedWithHost: string[] = [];
+  const asked: string[] = [];
+  const withHost = await makeTutorHost(sandbox.course, sandbox.factoryRoot, {}, { env, access: recording(askedWithHost) });
+  const standalone = await makeTutorHost(sandbox.course, sandbox.factoryRoot, {}, { env, access: recording(asked), serverHost: false });
+  t.after(async () => {
+    await withHost.harness.lifecycle.dispose();
+    await standalone.harness.lifecycle.dispose();
+    await sandbox.cleanup();
+  });
+  assert.equal((await withHost.rt.world.load()).projectHint, sandbox.repoRoot);
+  assert.deepEqual([...new Set(askedWithHost)], ["host_1"]);
+  assert.equal((await standalone.rt.world.load()).projectHint, sandbox.factoryRoot);
+  assert.deepEqual(asked, [], "nothing was probed");
 });

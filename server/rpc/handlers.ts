@@ -3,7 +3,7 @@
 import { withoutLeadingDirectives } from "../../shared/directives.ts";
 import { rpcContract } from "../../shared/rpc.ts";
 import type { Workspace } from "../../shared/rpc.ts";
-import { BUILTIN_COURSE_ID } from "../../shared/constants.ts";
+import { BUILTIN_COURSE_ID, WORKSPACE_UNREACHABLE_TEXT } from "../../shared/constants.ts";
 import { findLesson, findRule, lessonStatus } from "../../shared/derive.ts";
 import type { Course, Lesson, LexiconEntry, Rule } from "../../shared/model.ts";
 import { notReadyText } from "../../layouts/state.ts";
@@ -56,9 +56,11 @@ function requireWorkspace(world: World): FoundWorkspace {
     return { ...world.workspace, location: { root: world.workspace.root, hostId: world.hostId } };
   }
   throw new Error(
-    world.workspace.status === "missing"
-      ? "The workspace Tutor was set up with has gone. Pick it again on the Course page."
-      : "No workspace is set up yet. Confirm it on the Course page.",
+    world.workspace.status === "unreachable"
+      ? WORKSPACE_UNREACHABLE_TEXT
+      : world.workspace.status === "missing"
+        ? "The workspace Tutor was set up with has gone. Pick it again on the Course page."
+        : "No workspace is set up yet. Confirm it on the Course page.",
   );
 }
 
@@ -245,6 +247,7 @@ export function registerRpc(rt: TutorRuntime): void {
 
     confirmWorkspace: async ({ projectId }) => {
       const { workspace, hostId } = await resolveWorkspace(bb.sdk, projectId, rt.access);
+      if (workspace.status === "unreachable") throw new Error(WORKSPACE_UNREACHABLE_TEXT);
       if (workspace.status !== "found" || hostId === null) {
         throw new Error("That project has no folder on this machine, so Tutor cannot coach in it.");
       }

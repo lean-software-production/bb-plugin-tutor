@@ -4,7 +4,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type { Workspace } from "../../shared/rpc.ts";
 import { followedKind } from "../../layouts/types.ts";
-import type { WorkspaceAccess } from "./access.ts";
+import { WorkspaceUnreachableError, type WorkspaceAccess } from "./access.ts";
 
 export type Sdk = BbPluginApi["sdk"];
 export type ProjectWithSources = Awaited<ReturnType<Sdk["projects"]["get"]>>;
@@ -48,7 +48,21 @@ export async function resolveWorkspace(sdk: Sdk, projectId: string | undefined, 
     return missing;
   }
   const source = defaultSource(project);
-  if (source === undefined || !(await pathExists(accessFor(source.hostId), source.path))) return missing;
+  if (source === undefined) return missing;
+  const unreachable: ResolvedWorkspace = { workspace: { status: "unreachable", projectId, projectName: project.name }, hostId: null };
+  // A machine BB has no connection to can't be asked anything: no probing.
+  const connected = await sdk.hosts.get({ hostId: source.hostId }).then(
+    (machine) => machine.status === "connected",
+    () => null,
+  );
+  if (connected === null) return missing;
+  if (!connected) return unreachable;
+  try {
+    if (!(await pathExists(accessFor(source.hostId), source.path))) return missing;
+  } catch (cause) {
+    if (cause instanceof WorkspaceUnreachableError) return unreachable;
+    throw cause;
+  }
   return {
     workspace: { status: "found", projectId, projectName: project.name, root: source.path },
     hostId: source.hostId,

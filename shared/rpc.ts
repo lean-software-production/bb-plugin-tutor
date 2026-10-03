@@ -59,6 +59,8 @@ export const workspaceSchema = z.discriminatedUnion("status", [
   }),
   /** The workspaceProject setting names a project that is gone or has no local source. */
   z.object({ status: z.literal("missing"), projectId: z.string() }),
+  /** The project is there, but the machine holding its folder is not connected to BB (or a call to it found it offline). */
+  z.object({ status: z.literal("unreachable"), projectId: z.string(), projectName: z.string() }),
 ]);
 export type Workspace = z.infer<typeof workspaceSchema>;
 

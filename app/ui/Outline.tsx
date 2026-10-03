@@ -97,28 +97,21 @@ function OutlineBody({ outline, go, onNavigate }: { outline: OutlineView; go: Go
     case "unset":
       return (
         <>
-          {outline.groups.map((group) => (
-            <div key={group.courseId} role="group" aria-label={group.title}>
-              <GroupLabel outline={outline} title={group.title} />
-              {group.lessons.map((lesson, position) => (
-                <a
-                  key={lesson.id}
-                  className="tp-lesson-row tp-lesson-row--ahead"
-                  href={coursePageHref(lesson.startPath)}
-                  aria-label={`${lessonLabel(lesson.id)}, ${lesson.title}`}
-                  data-lesson-id={lesson.id}
-                  onClick={(event) => go(event, { kind: "start", courseId: lesson.courseId, lessonId: lesson.id })}
-                >
-                  <StepBadge position={position} label={Number(lesson.id)} className="tp-n" />
-                  <span className="tp-ltitle">{lesson.title}</span>
-                </a>
-              ))}
-            </div>
-          ))}
+          <LessonsAhead outline={outline} go={go} />
           <CourseErrors errors={outline.errors} />
           <a className="tp-setup-card" href={coursePageHref("welcome")} onClick={(event) => go(event, { kind: "welcome" })}>
             {outline.status.missing ? "Your workspace is gone. Pick it again →" : "Pick your workspace →"}
           </a>
+        </>
+      );
+    case "unreachable":
+      return (
+        <>
+          <LessonsAhead outline={outline} go={go} />
+          <CourseErrors errors={outline.errors} />
+          <div className="tp-outline-note tp-outline-note--error" role="alert">
+            {outline.status.message}
+          </div>
         </>
       );
     case "ready":
@@ -138,6 +131,32 @@ function OutlineBody({ outline, go, onNavigate }: { outline: OutlineView; go: Go
         </>
       );
   }
+}
+
+/** Each course's lessons, to read ahead, before there is a workspace to coach in. */
+function LessonsAhead({ outline, go }: { outline: OutlineView; go: Go }) {
+  return (
+    <>
+      {outline.groups.map((group) => (
+        <div key={group.courseId} role="group" aria-label={group.title}>
+          <GroupLabel outline={outline} title={group.title} />
+          {group.lessons.map((lesson, position) => (
+            <a
+              key={lesson.id}
+              className="tp-lesson-row tp-lesson-row--ahead"
+              href={coursePageHref(lesson.startPath)}
+              aria-label={`${lessonLabel(lesson.id)}, ${lesson.title}`}
+              data-lesson-id={lesson.id}
+              onClick={(event) => go(event, { kind: "start", courseId: lesson.courseId, lessonId: lesson.id })}
+            >
+              <StepBadge position={position} label={Number(lesson.id)} className="tp-n" />
+              <span className="tp-ltitle">{lesson.title}</span>
+            </a>
+          ))}
+        </div>
+      ))}
+    </>
+  );
 }
 
 /** A course's name above its lessons, once there is more than one course to tell apart. */

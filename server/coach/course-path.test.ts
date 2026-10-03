@@ -38,6 +38,8 @@ test("project hint: TUTOR_REPO_PATH, then config repo, then the repo holding the
   // A factory hint that isn't on this machine stays the hint.
   assert.equal(await resolveProjectHint({}, { factory: join(top, "gone/tetris/.factory") }, disk), join(top, "gone/tetris/.factory"));
   assert.equal(await resolveProjectHint({}, {}, disk), null);
+  // No machine to ask: the factory hint as it is, unresolved.
+  assert.equal(await resolveProjectHint({}, { factory }, null), factory);
 });
 
 test("the feature config's repo key is read, and a key this plugin doesn't know is ignored", async (t) => {

@@ -1,7 +1,8 @@
 // The one port through which the server reads, probes and writes the
-// student's workspace. Production reaches it through the machine (Task 8);
-// until then, server/workspace/local-access.ts is the local disk.
+// student's workspace. Production reaches it through the machine
+// (machine-access.ts); tests may use the local disk (test/helpers/disk-access.ts).
 import type { LayoutProbe } from "../../layouts/types.ts";
+import { WORKSPACE_UNREACHABLE_TEXT } from "../../shared/constants.ts";
 
 export interface FileText {
   text: string;
@@ -20,6 +21,9 @@ export interface WorkspaceAccess extends LayoutProbe {
 /** The machine holding the workspace can't be reached. */
 export class WorkspaceUnreachableError extends Error {
   override name = "WorkspaceUnreachableError";
+  constructor(options?: ErrorOptions) {
+    super(WORKSPACE_UNREACHABLE_TEXT, options);
+  }
 }
 
 /** A write's expected sha256 no longer matches the file. */

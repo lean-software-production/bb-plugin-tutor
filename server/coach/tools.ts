@@ -7,6 +7,7 @@ import { toolParameterSchemas, type ToolParameters } from "../../shared/tools.ts
 import { capstoneProgress } from "../../layouts/capstone-factory/detect.ts";
 import { adoptLesson } from "../progress/factory-move.ts";
 import { isoSeconds } from "../progress/time.ts";
+import { WorkspaceUnreachableError, WriteConflictError } from "../workspace/access.ts";
 import {
   adoptAction,
   adoptionByOtherError,
@@ -53,6 +54,9 @@ interface ToolSpec<Name extends ToolName> {
   needsLayout: boolean;
   action: Action<Name>;
 }
+
+/** A tool's second write conflict in one call (Decision 7): the coach sees it and starts again. */
+export const PROGRESS_CONFLICT_TEXT = "Your progress file changed while Tutor was writing it. Call tutor_status and try again.";
 
 function refusal(text: string): PluginAgentToolResult {
   return { content: [{ type: "text", text }], isError: true };
@@ -111,8 +115,23 @@ function register<Name extends ToolName>(rt: TutorRuntime, spec: ToolSpec<Name>)
         if (world.workspace.status !== "found") return await run(world);
         // Read-modify-write of the workspace's files: re-read them once earlier calls have written.
         // Keyed on the project's folder, which stays put when the factory moves to factory/.
-        return await rt.locks.run(workspaceLockKey(world.workspace.root), async () => run(await rt.world.load()));
+        return await rt.locks.run(workspaceLockKey(world.workspace.root), async () => {
+          try {
+            return await run(await rt.world.load());
+          } catch (cause) {
+            if (!(cause instanceof WriteConflictError)) throw cause;
+          }
+          // Something else wrote a file between Tutor's read and its write: read it again, and act once more.
+          try {
+            return await run(await rt.world.load());
+          } catch (cause) {
+            if (cause instanceof WriteConflictError) return refusal(PROGRESS_CONFLICT_TEXT);
+            throw cause;
+          }
+        });
       } catch (cause) {
+        // The machine went offline mid-call: say so as every gate does.
+        if (cause instanceof WorkspaceUnreachableError) return refusal(cause.message);
         rt.bb.log.error(`[tutor] ${spec.name} failed: ${String(cause)}`);
         return refusal(`${spec.name} failed: ${cause instanceof Error ? cause.message : String(cause)}`);
       }

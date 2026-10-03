@@ -7,11 +7,12 @@ import type { ProgressLocation } from "../../layouts/types.ts";
 import { BUILTIN_LESSON_ID } from "../../shared/constants.ts";
 import type { IterationState, ProgressFile, StudentState } from "../../shared/model.ts";
 import type { ProgressStore } from "../../shared/ports.ts";
-import type { WorkspaceAccess } from "../workspace/access.ts";
+import { WorkspaceUnreachableError, type WorkspaceAccess } from "../workspace/access.ts";
 
 /**
  * The progress file's progress. `unreadable`: the file is there but could not
- * be read or parsed, which is not the same as having none (StudentState).
+ * be read or parsed, which is not the same as having none (StudentState). A
+ * machine that can't be reached is not an unreadable file: that is thrown.
  */
 async function readProgressFile(
   access: WorkspaceAccess,
@@ -22,6 +23,7 @@ async function readProgressFile(
   try {
     text = (await access.read(join(at.dir, at.progressFile)))?.text ?? null;
   } catch (cause) {
+    if (cause instanceof WorkspaceUnreachableError) throw cause;
     problems.push(`${at.progressFile} could not be read (${(cause as Error).message}).`);
     return { progress: null, unreadable: true };
   }
@@ -46,6 +48,7 @@ async function readIteration(
       const file = await access.read(join(at.dir, label));
       if (file !== null) return { text: file.text, label };
     } catch (cause) {
+      if (cause instanceof WorkspaceUnreachableError) throw cause;
       problems.push(`${label} could not be read (${(cause as Error).message}).`);
       return null;
     }

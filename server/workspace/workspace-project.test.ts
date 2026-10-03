@@ -4,16 +4,23 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { createDiskAccess } from "../../test/helpers/disk-access.ts";
+import { WorkspaceUnreachableError, type WorkspaceAccess } from "./access.ts";
 import { resolveWorkspace, workspaceSetting, type Sdk } from "./workspace-project.ts";
 
-/** Just enough of the SDK for resolveWorkspace: one project whose default source is `path`. */
-function sdkWith(path: string): Sdk {
+/** Just enough of the SDK for resolveWorkspace: one project whose default source is `path`, on a machine in `status`. */
+function sdkWith(path: string, status: "connected" | "disconnected" | "gone" = "connected"): Sdk {
   const project = {
     id: "prj_1",
     name: "repo",
     sources: [{ id: "src_1", projectId: "prj_1", hostId: "host_1", type: "local_path", path, isDefault: true, createdAt: 1, updatedAt: 1 }],
   };
-  return { projects: { get: async () => project } } as unknown as Sdk;
+  const hosts = {
+    get: async ({ hostId }: { hostId: string }) => {
+      if (status === "gone") throw Object.assign(new Error("HTTP 404: Host not found"), { status: 404, code: "host_not_found" });
+      return { id: hostId, status };
+    },
+  };
+  return { projects: { get: async () => project }, hosts } as unknown as Sdk;
 }
 
 test("workspaceProject wins; an older Tutor's factoryProject is still read; empty is unset", () => {
@@ -34,4 +41,28 @@ test("a workspace folder that is a link counts only when it leads somewhere", as
   assert.equal((await resolveWorkspace(sdkWith(join(top, "linked")), "prj_1", disk)).workspace.status, "found");
   assert.equal((await resolveWorkspace(sdkWith(join(top, "dangling")), "prj_1", disk)).workspace.status, "missing");
   assert.equal((await resolveWorkspace(sdkWith(join(top, "nothing")), "prj_1", disk)).workspace.status, "missing");
+});
+
+test("a machine that is not connected is unreachable, asked nothing; one that is gone is missing", async () => {
+  const asked: string[] = [];
+  const access = (hostId: string): WorkspaceAccess => {
+    asked.push(hostId);
+    return createDiskAccess();
+  };
+  assert.deepEqual(await resolveWorkspace(sdkWith("/w", "disconnected"), "prj_1", access), {
+    workspace: { status: "unreachable", projectId: "prj_1", projectName: "repo" },
+    hostId: null,
+  });
+  assert.deepEqual(asked, []);
+  assert.equal((await resolveWorkspace(sdkWith("/w", "gone"), "prj_1", access)).workspace.status, "missing");
+});
+
+test("a probe that finds the machine offline is unreachable, not missing", async () => {
+  const offline = (): WorkspaceAccess => ({
+    ...createDiskAccess(),
+    kinds: async () => {
+      throw new WorkspaceUnreachableError();
+    },
+  });
+  assert.equal((await resolveWorkspace(sdkWith("/w"), "prj_1", offline)).workspace.status, "unreachable");
 });

@@ -3,13 +3,13 @@ import { chmod, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { WriteConflictError } from "./access.ts";
-import { createLocalAccess } from "./local-access.ts";
+import { WriteConflictError } from "../server/workspace/access.ts";
+import { createDiskAccess } from "./helpers/disk-access.ts";
 
-const local = createLocalAccess();
+const local = createDiskAccess();
 
 async function sandbox(t: { after(fn: () => Promise<void>): void }): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "tutor-local-access-"));
+  const dir = await mkdtemp(join(tmpdir(), "tutor-disk-access-"));
   t.after(() => rm(dir, { recursive: true, force: true }));
   return dir;
 }

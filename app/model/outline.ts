@@ -4,6 +4,7 @@
 // under the coach thread sit the lesson's Rules, grouped by Feature, each
 // leading to its section of the coach thread. Other threads follow the tree.
 // Pure, so every state is testable.
+import { WORKSPACE_UNREACHABLE_TEXT } from "../../shared/constants.ts";
 import { withoutLeadingDirectives } from "../../shared/directives.ts";
 import { formatRoute } from "../../shared/routes.ts";
 import type { TutorRoute } from "../../shared/routes.ts";
@@ -105,6 +106,8 @@ export type OutlineStatus =
   | { kind: "loading" }
   | { kind: "error"; message: string }
   | { kind: "unset"; missing: boolean }
+  /** The workspace's machine is not connected: the lessons are there to read, with why nothing else is. */
+  | { kind: "unreachable"; message: string }
   | { kind: "ready" };
 
 /** One course and its lessons. */
@@ -138,6 +141,7 @@ function statusOf(input: OutlineInput): OutlineStatus {
   if (overview.courses.length === 0) {
     return { kind: "error", message: overview.courseErrors[0]?.error ?? "We couldn't load the course." };
   }
+  if (overview.workspace.status === "unreachable") return { kind: "unreachable", message: WORKSPACE_UNREACHABLE_TEXT };
   if (overview.workspace.status !== "found") {
     return { kind: "unset", missing: overview.workspace.status === "missing" };
   }

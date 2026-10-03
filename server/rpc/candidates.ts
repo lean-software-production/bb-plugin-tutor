@@ -13,7 +13,7 @@ import { ITERATION_FILES, parseIteration } from "../../layouts/progress/iteratio
 import { BUILTIN_PROGRESS, COURSE_FILES, FACTORY_FILES, STARTER_COACH_SKILL, STARTER_LAYOUT } from "../../shared/constants.ts";
 import type { CandidateProject } from "../../shared/rpc.ts";
 import { overlaps } from "../paths.ts";
-import type { WorkspaceAccess } from "../workspace/access.ts";
+import { WorkspaceUnreachableError, type WorkspaceAccess } from "../workspace/access.ts";
 import { defaultSource, pathExists, type AccessFor, type ProjectWithSources } from "../workspace/workspace-project.ts";
 
 type Sdk = BbPluginApi["sdk"];
@@ -130,6 +130,17 @@ async function probeHasTutorDir(access: WorkspaceAccess, root: string): Promise<
   return (kinds[path] ?? "none") === "folder";
 }
 
+/** A project whose machine can't be reached has, for now, no folder Tutor can use. */
+async function probeReachable(project: ProjectWithSources, accessFor: AccessFor): Promise<ProjectProbe> {
+  try {
+    return await probe(project, accessFor);
+  } catch (cause) {
+    if (!(cause instanceof WorkspaceUnreachableError)) throw cause;
+    const root = defaultSource(project)?.path ?? null;
+    return { projectId: project.id, name: project.name, root, rootExists: false, iterationText: null, agentsText: null, hasTutorDir: false };
+  }
+}
+
 async function probe(project: ProjectWithSources, accessFor: AccessFor): Promise<ProjectProbe> {
   const source = defaultSource(project);
   const root = source?.path ?? null;
@@ -168,7 +179,7 @@ export async function listCandidates(
   const projects = await sdk.projects.list({ includePersonal: false });
   const coachFile = basename(coachPath ?? COURSE_FILES.defaultCoach);
   const context: CandidateContext = { coursePath, coachName: basename(coachFile, extname(coachFile)), layoutId };
-  const probes = await Promise.all(projects.filter((project) => project.kind === "standard").map((project) => probe(project, accessFor)));
+  const probes = await Promise.all(projects.filter((project) => project.kind === "standard").map((project) => probeReachable(project, accessFor)));
   const preferred = new Set(probes.filter((entry) => entry.hasTutorDir).map((entry) => entry.projectId));
   return rankCandidates(
     probes.map((entry) => describeCandidate(entry, context)),

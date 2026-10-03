@@ -13,18 +13,24 @@ import type { CourseSource, ProgressStore } from "../../shared/ports.ts";
 import type { Workspace } from "../../shared/rpc.ts";
 import { resolveCourseLayout, type CourseLayoutState } from "../../layouts/state.ts";
 import { overlaps, realPath } from "../paths.ts";
-import type { WorkspaceAccess } from "../workspace/access.ts";
-import { resolveWorkspace, workspaceSetting } from "../workspace/workspace-project.ts";
+import { WorkspaceUnreachableError, type WorkspaceAccess } from "../workspace/access.ts";
+import { resolveWorkspace, workspaceSetting, type ResolvedWorkspace } from "../workspace/workspace-project.ts";
 import { resolveCoachFile } from "./coach-file.ts";
-import { readFeatureConfig, resolveCoursePath, resolveProjectHint, type Env } from "./course-path.ts";
+import { readFeatureConfig, resolveCoursePath, resolveProjectHint, type Env, type FeatureConfig } from "./course-path.ts";
 import type { TutorSettings } from "./settings.ts";
 
 /**
- * The machine asked about the Feature's project hint while there is no
- * workspace yet: the one the server shares with the Feature (the Codespace).
- * Until Task 8 every machine is the local disk; Task 8 decides how to name it.
+ * The machine to ask about the Feature's project hint while there is no
+ * workspace yet: BB's own host, the one the server shares with the Feature
+ * (the Codespace). BB gives it no machine provider; a machine enrolled by
+ * hand has "manual". A standalone bb-server has none, and the hint is left as
+ * it is. Null when there is no such host, or it is not connected.
  */
-const FEATURE_HOST = "local";
+async function serverHostId(sdk: BbPluginApi["sdk"]): Promise<string | null> {
+  const hosts = await sdk.hosts.list().catch(() => []);
+  const own = hosts.find((host) => host.machineProviderId === null);
+  return own !== undefined && own.status === "connected" ? own.id : null;
+}
 
 /** Page loads fire several calls at once; they share one course read. */
 const COURSE_TTL_MS = 3000;
@@ -170,6 +176,46 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
     return { course, layout, student, pointer: resolveCurrent(course, student), coachPath: course.coachPath };
   }
 
+  /**
+   * The resolved workspace with its courses read. Re-checked on every load, not
+   * just at confirmWorkspace: a project whose folder now leads into the course
+   * would have the coach write spec/, stand-ins/ and the seed into the course,
+   * so it counts as missing. A machine found offline while it is read makes
+   * the workspace unreachable.
+   */
+  async function readWorkspace(
+    resolved: ResolvedWorkspace,
+    coursePath: string,
+    builtin: Course | null,
+    others: readonly Course[],
+  ): Promise<ResolvedWorkspace & { courses: LoadedCourse[] }> {
+    const { workspace, hostId } = resolved;
+    if (workspace.status !== "found" || hostId === null) return { workspace, hostId, courses: [] };
+    const access = deps.access(hostId);
+    try {
+      if (overlaps(await access.realPath(workspace.root), await realPath(coursePath))) {
+        return { workspace: { status: "missing", projectId: workspace.projectId }, hostId: null, courses: [] };
+      }
+      const loaded = await Promise.all(others.map((course) => readCourse(course, workspace.root, access)));
+      const courses = builtin === null ? loaded : [await readBuiltin(builtin, workspace.root, access, loaded), ...loaded];
+      return { workspace, hostId, courses };
+    } catch (cause) {
+      if (!(cause instanceof WorkspaceUnreachableError)) throw cause;
+      return { workspace: { status: "unreachable", projectId: workspace.projectId, projectName: workspace.projectName }, hostId: null, courses: [] };
+    }
+  }
+
+  /** The Feature's project hint, probed on the workspace's machine, else on BB's own host; as it is when neither can be asked. */
+  async function projectHint(config: FeatureConfig, hostId: string | null): Promise<string | null> {
+    const on = hostId ?? (await serverHostId(bb.sdk));
+    try {
+      return await resolveProjectHint(deps.env, config, on === null ? null : deps.access(on));
+    } catch (cause) {
+      if (!(cause instanceof WorkspaceUnreachableError)) throw cause;
+      return resolveProjectHint(deps.env, config, null);
+    }
+  }
+
   return {
     async load(): Promise<World> {
       const values = await settings.get();
@@ -182,15 +228,8 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
         refused ?? loadCourse(coursePath),
         resolveWorkspace(bb.sdk, workspaceSetting(values), deps.access),
       ]);
-      // Re-checked on every load, not just at confirmWorkspace: a project whose folder now
-      // leads into the course would have the coach write spec/, stand-ins/ and the seed into the course.
-      const { workspace, hostId } =
-        resolved.workspace.status === "found" &&
-        resolved.hostId !== null &&
-        overlaps(await deps.access(resolved.hostId).realPath(resolved.workspace.root), await realPath(coursePath))
-          ? { workspace: { status: "missing" as const, projectId: resolved.workspace.projectId }, hostId: null }
-          : resolved;
-      const access = workspace.status === "found" && hostId !== null ? deps.access(hostId) : null;
+      const others = courseResult.course === null ? [] : [courseResult.course];
+      const { workspace, hostId, courses } = await readWorkspace(resolved, coursePath, builtinResult.course, others);
       const courseErrors: World["courseErrors"] =
         refused !== null
           ? [{ source: deps.featureConfigFile, error: refused.error }]
@@ -198,14 +237,7 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
               ...(builtinResult.course === null ? [{ source: BUILTIN_COURSE_ID, error: builtinResult.error }] : []),
               ...(courseResult.course === null ? [{ source: coursePath, error: courseResult.error }] : []),
             ];
-      const others = courseResult.course === null ? [] : [courseResult.course];
       const available = [...(builtinResult.course === null ? [] : [builtinResult.course]), ...others];
-      let courses: LoadedCourse[] = [];
-      if (workspace.status === "found" && access !== null) {
-        const loaded = await Promise.all(others.map((course) => readCourse(course, workspace.root, access)));
-        courses =
-          builtinResult.course === null ? loaded : [await readBuiltin(builtinResult.course, workspace.root, access, loaded), ...loaded];
-      }
       last = courses;
       return {
         coursePath,
@@ -214,7 +246,7 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
         available,
         courses,
         courseErrors,
-        projectHint: await resolveProjectHint(deps.env, config, access ?? deps.access(FEATURE_HOST)),
+        projectHint: await projectHint(config, hostId),
       };
     },
     lastCourses: () => last,

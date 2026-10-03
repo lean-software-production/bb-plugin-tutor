@@ -1,7 +1,12 @@
 // A fake BB host for Tutor's backend: createFakePluginHost plus an in-memory
 // thread table and one factory project, so spawn/list/get/metadata behave
 // like the real server's.
-import { createFakePluginHost, type FakePluginHost } from "@get-bb/plugin-sdk/testing";
+import { createHash } from "node:crypto";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
+import { createFakePluginHost, makeHostResponse, type FakePluginHost } from "@get-bb/plugin-sdk/testing";
+import { experimental_createHostEntryHarness } from "@get-bb/plugin-sdk/testing/host";
+import hostEntry from "../../host.ts";
 import { SKILL_ID } from "../../shared/constants.ts";
 import { lessonExamples } from "../../shared/derive.ts";
 import type { Course, ExampleProgress, Lesson } from "../../shared/model.ts";
@@ -11,6 +16,8 @@ import { loadBuiltinCourse } from "../../server/course/load-course.ts";
 import { registerTutor } from "../../server/coach/register.ts";
 import { createProgressStore } from "../../server/progress/store.ts";
 import type { WorkspaceAccess } from "../../server/workspace/access.ts";
+import { createHostClient } from "../../server/workspace/host-client.ts";
+import { createMachineAccess } from "../../server/workspace/machine-access.ts";
 import { createDiskAccess } from "./disk-access.ts";
 import type { TutorRuntime } from "../../server/coach/runtime.ts";
 
@@ -91,6 +98,34 @@ interface ForkArgs {
   agentContextSeed?: { type: string; text?: string }[];
 }
 
+const sha256 = (data: Buffer | string) => createHash("sha256").update(data).digest("hex");
+
+/** sdk.files over this disk, answering as BB 0.44.0's host daemon does (ENOENT for a missing file). */
+const diskFiles = {
+  read: async ({ path }: { path: string }) => {
+    const data = await readFile(path).catch((cause: NodeJS.ErrnoException) => {
+      throw cause.code === "ENOENT" ? httpError(404, "ENOENT", `Path does not exist: ${path}`) : cause;
+    });
+    return { path, content: data.toString("base64"), contentEncoding: "base64" as const, sha256: sha256(data), sizeBytes: data.length };
+  },
+  write: async (args: { path: string; content: string; contentEncoding?: "utf8" | "base64"; createParents?: boolean; expectedSha256?: string | null }) => {
+    if (args.expectedSha256 !== undefined) {
+      const current = await readFile(args.path).then(sha256, () => null);
+      if (current !== args.expectedSha256) return { outcome: "conflict" as const, currentSha256: current };
+    }
+    const data = Buffer.from(args.content, args.contentEncoding === "base64" ? "base64" : "utf8");
+    if (args.createParents === true) await mkdir(dirname(args.path), { recursive: true });
+    await writeFile(args.path, data);
+    return { outcome: "written" as const, sha256: sha256(data), sizeBytes: data.length };
+  },
+  remove: async ({ path }: { path: string }) => {
+    await unlink(path).catch((cause: NodeJS.ErrnoException) => {
+      throw cause.code === "ENOENT" ? httpError(404, "ENOENT", `Path does not exist: ${path}`) : cause;
+    });
+    return { ok: true };
+  },
+};
+
 /** An error shaped like the SDK's BbHttpError. */
 function httpError(status: number, code: string, message: string): Error {
   return Object.assign(new Error(message), { status, code });
@@ -120,8 +155,16 @@ export async function makeTutorHost(
     env?: Record<string, string>;
     featureConfigFile?: string;
     projectName?: string;
-    /** The workspace access per machine; the local disk unless given. */
-    access?: (hostId: string) => WorkspaceAccess;
+    /**
+     * The workspace access per machine: the local disk unless given. "machine"
+     * is production's: sdk.files (faked over this disk) and the real host
+     * entry's handlers, reached through bb.hosts.experimental_client.
+     */
+    access?: ((hostId: string) => WorkspaceAccess) | "machine";
+    /** What sdk.hosts.get says of the workspace's machine; "connected" unless given. */
+    hostStatus?: "connected" | "disconnected";
+    /** Whether BB has a host of its own (the Codespace's); a standalone bb-server has none. Yes unless given. */
+    serverHost?: boolean;
   } = {},
 ): Promise<TutorHost> {
   const threads: FakeThread[] = [];
@@ -172,12 +215,22 @@ export async function makeTutorHost(
     ],
   };
 
+  // The real host entry, run in-process as BB's host daemon would run it.
+  const hostHarness = experimental_createHostEntryHarness(hostEntry);
   const host = createFakePluginHost({
     pluginId: "tutor",
+    experimental_callHostRpc: (call) =>
+      hostHarness.experimental_call(call.method as keyof typeof hostEntry.contract, call.input as never, call.signal === undefined ? {} : { signal: call.signal }),
     agentSkillIds: [SKILL_ID],
     settings,
     ...(options.dataDir === undefined ? {} : { dataDir: options.dataDir }),
     sdk: {
+      hosts: {
+        get: async ({ hostId }) => ({ ...makeHostResponse({ id: hostId, status: options.hostStatus ?? "connected" }), connectMachineId: null }),
+        // The server's own host has no machine provider; a machine enrolled by hand has "manual".
+        list: async () => (options.serverHost === false ? [] : [makeHostResponse({ id: "host_1", machineProviderId: null })]),
+      },
+      files: diskFiles,
       projects: {
         get: async ({ projectId }) => {
           if (projectId !== PROJECT_ID) throw new Error(`HTTP 404: project ${projectId} not found`);
@@ -294,7 +347,10 @@ export async function makeTutorHost(
     env: options.env ?? {},
     featureConfigFile: options.featureConfigFile ?? "/nonexistent/tutor/config.json",
     now: () => NOW,
-    access: options.access ?? (() => createDiskAccess()),
+    access:
+      options.access === "machine"
+        ? ((client) => (hostId: string) => createMachineAccess(host.bb, client, hostId))(createHostClient(host.bb))
+        : (options.access ?? (() => createDiskAccess())),
   });
   return { ...host, rt, threads, running, sent, tabs, tabConflicts, tabWriteError, forkRefusal, archiveRefusal, beforeList, addThread };
 }

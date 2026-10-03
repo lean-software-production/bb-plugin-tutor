@@ -176,3 +176,10 @@ export const STARTER_LAYOUT = {
  * (server/coach/coach-file.ts).
  */
 export const STARTER_COACH_SKILL = `${STARTER_LAYOUT.skillsDir}/coach-me/SKILL.md`;
+
+/**
+ * What every surface says while the machine holding the workspace is not
+ * connected to BB (the workspace is "unreachable"): the server's RPC errors
+ * and tool refusals, and the app's pages.
+ */
+export const WORKSPACE_UNREACHABLE_TEXT = "Tutor can't reach your computer's machine right now. Run `tutor status`.";

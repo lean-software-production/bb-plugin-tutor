@@ -17,7 +17,6 @@ const ALLOWED = new Set([
   "server/content/store.ts",             // Task 13
   "server/content/make-bundle.ts",       // Task 9
   "server/paths.ts",                     // realPath of the course path only
-  "server/workspace/local-access.ts",    // removed in Task 8
   "server/progress/spec-copy.ts",        // moves to layouts/ in Task 10
   "server/progress/factory-move.ts",     // moves to layouts/ in Task 10
   "server/progress/own-folder.ts",       // spec-copy's; moves to layouts/ in Task 10

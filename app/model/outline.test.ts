@@ -215,6 +215,12 @@ test("no workspace, loading and failed states still list other threads", () => {
   const missing = buildOutline(input({ overview: { ...fixtureOverviewNoFactory, workspace: { status: "missing", projectId: "prj_gone" } } }));
   assert.deepEqual(missing.status, { kind: "unset", missing: true });
 
+  const unreachable = buildOutline(
+    input({ overview: { ...fixtureOverviewNoFactory, workspace: { status: "unreachable", projectId: "prj_1", projectName: "repo" } } }),
+  );
+  assert.deepEqual(unreachable.status, { kind: "unreachable", message: "Tutor can't reach your computer's machine right now. Run `tutor status`." });
+  assert.equal(lessonsOf(unreachable).length, 4, "the lessons are still there to read");
+
   const loading = buildOutline(input({ overview: null }));
   assert.deepEqual(loading.status, { kind: "loading" });
   assert.equal(loading.brand, "Tutor");

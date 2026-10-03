@@ -2,6 +2,7 @@
 // "Continue" section (mockup 5) says. Both read only getOverview, and both
 // follow the course the student is on: Tutor's built-in course until Lesson 0
 // is done, then the course after it.
+import { WORKSPACE_UNREACHABLE_TEXT } from "../../shared/constants.ts";
 import type { TutorRoute } from "../../shared/routes.ts";
 import type { CourseOverview, Overview } from "../../shared/rpc.ts";
 import { lessonLabel, lessonNumber, percent } from "./format.ts";
@@ -32,6 +33,8 @@ export function activeCourse(overview: Overview): CourseOverview | null {
 
 export function homeDecision(overview: Overview): HomeDecision {
   if (overview.courses.length === 0) return { kind: "error", message: noCourseMessage(overview) };
+  // The workspace is there, on a machine that isn't connected: not one to set up again.
+  if (overview.workspace.status === "unreachable") return { kind: "error", message: WORKSPACE_UNREACHABLE_TEXT };
   if (overview.workspace.status !== "found") return { kind: "redirect", route: { kind: "welcome" } };
   const active = activeCourse(overview);
   if (active === null) return { kind: "error", message: noCourseMessage(overview) };
@@ -93,6 +96,7 @@ function setupTitle(overview: Overview): string {
 
 export function continueView(overview: Overview): ContinueView {
   if (overview.courses.length === 0) return { kind: "error", message: noCourseMessage(overview) };
+  if (overview.workspace.status === "unreachable") return { kind: "error", message: WORKSPACE_UNREACHABLE_TEXT };
   const active = activeCourse(overview);
   const current = active?.current ?? null;
   if (overview.workspace.status !== "found" || active === null || current === null) {

@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { describeCandidate, rankCandidates, type ProjectProbe } from "./candidates.ts";
+import { createDiskAccess } from "../../test/helpers/disk-access.ts";
+import { WorkspaceUnreachableError } from "../workspace/access.ts";
+import type { Sdk } from "../workspace/workspace-project.ts";
+import { describeCandidate, listCandidates, rankCandidates, type ProjectProbe } from "./candidates.ts";
 
 const context = { coursePath: "/workspaces/tutorial", coachName: "coach-me", layoutId: "capstone-factory" as const };
 
@@ -89,4 +92,22 @@ test("without the capstone-factory layout, every standard project qualifies, wit
     new Set(["b"]),
   );
   assert.deepEqual(ranked.map((candidate) => candidate.projectId), ["b", "a"]);
+});
+
+test("a project on a machine that can't be reached is listed with no folder, not an error", async () => {
+  const project = {
+    id: "prj_off",
+    name: "offline",
+    kind: "standard",
+    sources: [{ id: "src_1", projectId: "prj_off", hostId: "host_2", type: "local_path", path: "/w", isDefault: true, createdAt: 1, updatedAt: 1 }],
+  };
+  const sdk = { projects: { list: async () => [project] } } as unknown as Sdk;
+  const offline = () => ({
+    ...createDiskAccess(),
+    kinds: async () => {
+      throw new WorkspaceUnreachableError();
+    },
+  });
+  const [candidate] = await listCandidates(sdk, offline, "/workspaces/tutorial", null, null);
+  assert.deepEqual([candidate?.projectId, candidate?.qualifies, candidate?.detail], ["prj_off", false, "no folder on this machine"]);
 });

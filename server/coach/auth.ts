@@ -19,6 +19,7 @@
 // coach-record.ts, is checked against it too). If a hard boundary were ever
 // needed, Tutor would keep the thread-to-lesson map in `bb.storage.kv` instead.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import { WORKSPACE_UNREACHABLE_TEXT } from "../../shared/constants.ts";
 import { coachThreadMetadataSchema } from "../../shared/model.ts";
 import type { Workspace } from "../../shared/rpc.ts";
 import { threadCourse } from "./threads.ts";
@@ -84,6 +85,7 @@ export async function authorizeCaller(
   const thread = await getThread(sdk, threadId);
   const coachThread = thread === null ? null : await coachThreadOf(sdk, pluginId, thread);
   if (thread === null || coachThread === null) return { error: NOT_A_TUTOR_THREAD };
+  if (workspace.status === "unreachable") return { error: WORKSPACE_UNREACHABLE_TEXT };
   if (workspace.status !== "found") {
     return { error: "No workspace is set up yet. The student confirms it on the Course page." };
   }

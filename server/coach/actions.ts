@@ -2,7 +2,7 @@
 // They return the text for the coach and the files to write; tools.ts checks
 // the caller and performs the writes.
 import { relative } from "node:path";
-import { STARTER_LAYOUT } from "../../shared/constants.ts";
+import { STARTER_LAYOUT, WORKSPACE_UNREACHABLE_TEXT } from "../../shared/constants.ts";
 import {
   countExamples,
   findExample,
@@ -56,6 +56,7 @@ export type Outcome =
 
 /** The coach's view of one course: the caller's, from its coach thread's metadata (Lesson 0's is the built-in course). */
 export function coachStateOf(world: World, courseId: string): CoachState | { error: string } {
+  if (world.workspace.status === "unreachable") return { error: WORKSPACE_UNREACHABLE_TEXT };
   if (world.workspace.status !== "found" || world.hostId === null) {
     return { error: "No workspace is set up yet. The student confirms it on the Course page." };
   }

@@ -76,12 +76,14 @@ export function resolveFactoryHint(env: Env, config: FeatureConfig): string | nu
  * Only a hint: pre-selects the candidate project whose folder matches.
  * TUTOR_REPO_PATH, then the config's `repo`, then the repo (the folder
  * holding .git) above the factory hint, then the factory hint itself.
+ * Without a `probe` the factory hint is not resolved.
  */
-export async function resolveProjectHint(env: Env, config: FeatureConfig, probe: LayoutProbe): Promise<string | null> {
+export async function resolveProjectHint(env: Env, config: FeatureConfig, probe: LayoutProbe | null): Promise<string | null> {
   const repo = nonEmpty(env[ENV_VARS.repoPath]) ?? config.repo;
   if (repo !== undefined) return repo;
   const factory = resolveFactoryHint(env, config);
-  if (factory === null) return null;
+  // No machine to ask (a standalone bb-server has no host of its own): the hint as it is.
+  if (factory === null || probe === null) return factory;
   if ((await followedKind(probe, factory)) === "none") return factory;
   return (await findRepoRoot(factory, probe)) ?? factory;
 }
