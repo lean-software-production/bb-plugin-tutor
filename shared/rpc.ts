@@ -109,6 +109,11 @@ export const lessonSummarySchema = z.object({
   outline: z.array(featureOutlineSchema),
   /** The course declares a layout that isn't ready in the workspace (or there is no workspace yet), so this lesson can't start. Never for Lesson 0. */
   needsLayout: z.boolean(),
+  /**
+   * The course's next lesson to adopt (adoptionTargets), never Lesson 0: its start page offers Start
+   * (startNextLesson) though its status is "ahead", as a course just added has every lesson ahead.
+   */
+  canStart: z.boolean(),
 });
 export type LessonSummary = z.infer<typeof lessonSummarySchema>;
 

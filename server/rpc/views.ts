@@ -18,6 +18,7 @@ import { BUILTIN_COURSE_ID } from "../../shared/constants.ts";
 import type { Course, Lesson, StudentState } from "../../shared/model.ts";
 import type { Completion, CourseOverview, CurrentState, FeatureOutline, LessonDetail, Overview, TutorThread } from "../../shared/rpc.ts";
 import { progressFor, recordedProgress } from "../progress/current.ts";
+import { adoptionTargets } from "../coach/actions.ts";
 import { findCoachThread, type TutorThreadRecord } from "../coach/threads.ts";
 import { findCourse, type LoadedCourse, type World } from "../coach/world.ts";
 
@@ -156,6 +157,7 @@ function currentState(view: CourseView, threads: readonly TutorThreadRecord[]): 
 
 function courseOverview(view: CourseView, workspaceFound: boolean, threads: readonly TutorThreadRecord[]): CourseOverview {
   const { course, student, pointer, ready } = view;
+  const starts = adoptionTargets(course, pointer);
   return {
     course: { id: course.id, title: course.title, description: course.description },
     builtin: course.id === BUILTIN_COURSE_ID,
@@ -172,6 +174,8 @@ function courseOverview(view: CourseView, workspaceFound: boolean, threads: read
         coachThreadId: coachThread?.id ?? null,
         outline: lessonOutline(student, lesson, coachThread),
         needsLayout: !lesson.builtin && !ready,
+        // As startNextLesson allows it.
+        canStart: !lesson.builtin && starts.includes(lesson.id),
       };
     }),
     current: workspaceFound ? currentState(view, threads) : null,

@@ -213,3 +213,11 @@ test("before a coach thread exists, a student without a workspace is sent to set
   assert.equal(coachStart("current", null), "loading", "no coach action until the factoryProject is known");
   assert.equal(coachStart("ahead", null), "read-ahead");
 });
+
+test("a lesson ahead that can be started (the course's next to adopt) offers Start, which adopts it", () => {
+  assert.equal(coachStart("ahead", "found", true), "start-next");
+  assert.equal(coachStart("ahead", "found", false), "read-ahead");
+  assert.equal(coachStart("ahead", null, true), "loading");
+  assert.equal(coachStart("ahead", "unset", true), "set-up");
+  assert.equal(coachStart("ahead", "unreachable", true), "unreachable");
+});

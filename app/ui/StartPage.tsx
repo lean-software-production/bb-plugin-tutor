@@ -55,7 +55,8 @@ export function StartPage({ courseId, lessonId, ruleKey }: { courseId: string; l
   }
   const lessons = overview.data?.courses.find((entry) => entry.course.id === courseId)?.lessons ?? [];
   const view = buildLesson(detail.data, lessons, Date.now());
-  const start = coachStart(view.status, overview.data?.workspace.status ?? null);
+  const canStart = lessons.find((lesson) => lesson.id === lessonId)?.canStart ?? false;
+  const start = coachStart(view.status, overview.data?.workspace.status ?? null, canStart);
   return (
     <StartPageBody
       key={lessonId}
@@ -135,7 +136,9 @@ function StartPageBody({
   }, [urlRuleKey]);
 
   const openCoach = useAction(async () => {
-    const { threadId } = await rpc.call("openCoach", { courseId, lessonId });
+    // A lesson ahead that is its course's next (start-next) is adopted, as the completion page's Start does.
+    const { threadId } =
+      start === "start-next" ? await rpc.call("startNextLesson", { courseId, lessonId }) : await rpc.call("openCoach", { courseId, lessonId });
     refreshAll();
     navigate.toThread(threadId);
   });
@@ -236,16 +239,17 @@ function StartCoach({
         </div>
       );
     case "start":
+    case "start-next":
     case "revisit":
       return (
         <div className="tp-start">
           <p className="tp-prose">
-            {start === "start"
-              ? "Your coach works through this lesson with you, one Rule at a time, in your factory repo. The conversation opens in its own thread, with this lesson at the top."
-              : "You finished this lesson. Open a coach thread to look back at how it went."}
+            {start === "revisit"
+              ? "You finished this lesson. Open a coach thread to look back at how it went."
+              : "Your coach works through this lesson with you, one Rule at a time, in your workspace. The conversation opens in its own thread, with this lesson at the top."}
           </p>
           <Button disabled={pending} onClick={onStart}>
-            {pending ? "Starting…" : start === "start" ? "Start with your coach →" : "Open a coach thread →"}
+            {pending ? "Starting…" : start === "revisit" ? "Open a coach thread →" : "Start with your coach →"}
           </Button>
           {error === null ? null : <ErrorNotice message={error} />}
         </div>

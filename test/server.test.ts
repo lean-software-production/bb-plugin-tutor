@@ -1609,3 +1609,27 @@ test("a catalog course under Tutor's own id is refused and leaves no record", as
   const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
   assert.deepEqual(overview.courses.map((entry) => entry.course.id), ["tutor"]);
 });
+
+test("after Add the course, its first lesson can be started from its start page, whether or not Lesson 0 is done (Decision 16)", async (t) => {
+  const { host } = await standalone(t);
+  await host.harness.behavior.callRpc("fetchCourse", { courseId: "fixture" });
+  const canStart = async () => {
+    const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+    return overview.courses.flatMap((entry) => entry.lessons.map((lesson) => [entry.course.id, lesson.id, lesson.status, lesson.canStart]));
+  };
+  const lessons = await canStart();
+  assert.deepEqual(lessons.filter(([course]) => course === "tutor"), [["tutor", "000", "current", false]]);
+  assert.deepEqual(lessons.find(([course, id]) => course === "fixture" && id === "001"), ["fixture", "001", "ahead", true]);
+  assert.ok(lessons.filter(([course, id]) => course === "fixture" && id !== "001").every(([, , , can]) => can === false));
+  // Lesson 0 done: still the course's first lesson, still startable.
+  const coach0 = (await openCoach(host, "000", "tutor")).threadId;
+  await ok(host, "tutor_adopt_iteration", { iteration: "000" }, coach0);
+  for (const example of lessonExamples(findLesson(builtinCourse, "000") ?? assert.fail("lesson 000"))) {
+    await ok(host, "tutor_mark_example", { example: example.key, status: "passing", evidence: "seen in the outline" }, coach0);
+  }
+  const after = await canStart();
+  assert.deepEqual(after.find(([course]) => course === "tutor"), ["tutor", "000", "done", false]);
+  assert.deepEqual(after.find(([course, id]) => course === "fixture" && id === "001"), ["fixture", "001", "ahead", true]);
+  const { threadId } = (await host.harness.behavior.callRpc("startNextLesson", { courseId: "fixture", lessonId: "001" })) as { threadId: string };
+  assert.ok(threadId);
+});

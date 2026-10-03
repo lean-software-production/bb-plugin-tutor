@@ -553,6 +553,7 @@ export const fixtureBuiltinCourseOverview: CourseOverview = {
       coachThreadId: null,
       outline: outline(lesson0.id),
       needsLayout: false,
+      canStart: false,
     },
   ],
   current: {
@@ -582,6 +583,8 @@ export const fixtureCourseOverview: CourseOverview = {
     coachThreadId: coachByLesson[hw.id] ?? null,
     outline: outline(hw.id),
     needsLayout: false,
+    // Mid-way through 002: nothing to adopt until it is done.
+    canStart: false,
   })),
   current: {
     lessonId: "002",
@@ -624,6 +627,8 @@ function preview(entry: CourseOverview, ready: boolean): CourseOverview {
       coachThreadId: null,
       outline: outline(hw.id, NOTHING_RECORDED),
       needsLayout: !hw.builtin && !ready,
+      // From a fresh start, a course's first lesson is the one to adopt; Lesson 0 is started, not adopted.
+      canStart: !hw.builtin && index === 0,
     })),
     current: null,
   };
