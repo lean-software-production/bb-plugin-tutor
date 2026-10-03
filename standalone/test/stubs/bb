@@ -2,18 +2,32 @@
 # Placeholder stub for later launcher tasks: logs argv, quiet, exit 0 unless
 # listed in $STUB_MISSING. Behaviour is scripted per-test via STUB_<NAME>_*.
 #
-# `machine create`: writes an enrolment line (with STUB_ENROL_TOKEN, default
-# stub-enrol-token) to its own stdout — never to $STUB_LOG — then, only when
-# STUB_BB_CREATE_BLOCKS_UNTIL_INSTALLED=1, blocks until $HOME/.stub-installed
-# exists (proving the launcher can't deadlock waiting on it synchronously).
-# `machine list --json`: a single manual machine, for machine_id to parse.
+# `machine create`: writes its own pid to $STUB_LOG/bb.pid (so a test can
+# confirm it was killed, not left running), then writes an enrolment line
+# (with STUB_ENROL_TOKEN, default stub-enrol-token) to its own stdout —
+# never to $STUB_LOG — then, only when STUB_BB_CREATE_BLOCKS_UNTIL_INSTALLED
+# =1, blocks until $HOME/.stub-installed exists (proving the launcher can't
+# deadlock waiting on it synchronously, and must kill it if it gives up
+# first). STUB_BB_NO_ENROL_LINE=1 prints nothing (the line never appears);
+# STUB_BB_BAD_ENROL_LINE=1 prints a line with "X-BB-Enrollment" but no
+# quoted header or URL (the line can't be parsed).
+# `machine list --json`: a single manual machine, with `status` — the real
+# API's field, not a boolean — taken from STUB_MACHINE_STATUS (default
+# connected).
 . "$(cd "$(dirname "$0")" && pwd)/lib.sh"
 stub_init "bb" "$@"
 
 case "${1:-} ${2:-}" in
   "machine create")
+    echo $$ >"$STUB_LOG/bb.pid"
     token="${STUB_ENROL_TOKEN:-stub-enrol-token}"
-    printf "Run: curl -H 'X-BB-Enrollment: %s' http://127.0.0.1:47386/install.sh | sh\n" "$token"
+    if [ "${STUB_BB_NO_ENROL_LINE:-}" = 1 ]; then
+      : # the line never appears
+    elif [ "${STUB_BB_BAD_ENROL_LINE:-}" = 1 ]; then
+      printf 'X-BB-Enrollment: %s no-url-here\n' "$token"
+    else
+      printf "Run: curl -H 'X-BB-Enrollment: %s' http://127.0.0.1:47386/install.sh | sh\n" "$token"
+    fi
     if [ "${STUB_BB_CREATE_BLOCKS_UNTIL_INSTALLED:-}" = 1 ]; then
       i=0
       while [ "$i" -lt 100 ]; do
@@ -25,6 +39,6 @@ case "${1:-} ${2:-}" in
     exit 0
     ;;
   "machine list")
-    echo '[{"id":"stub-machine-id","machineProviderId":"manual","createdAt":1,"connected":true}]'
+    printf '[{"id":"stub-machine-id","machineProviderId":"manual","createdAt":1,"status":"%s"}]\n' "${STUB_MACHINE_STATUS:-connected}"
     ;;
 esac

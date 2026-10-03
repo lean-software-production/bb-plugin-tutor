@@ -1,8 +1,23 @@
 #!/bin/sh
-# Reports $STUB_NODE_VERSION (default v24.0.0) for --version/-v.
+# Reports $STUB_NODE_VERSION (default v24.0.0) for --version/-v. Every other
+# invocation (machine_id/machine_wait_connected's `node -e`, parsing real
+# JSON) delegates to the real node found later on PATH: those functions'
+# logic has to run for real, not be faked, or a test exercising it would
+# pass no matter what the JS actually says.
 . "$(cd "$(dirname "$0")" && pwd)/lib.sh"
 stub_init node "$@"
 case "${1:-}" in
   --version|-v) echo "${STUB_NODE_VERSION:-v24.0.0}" ;;
-  *) : ;;
+  *)
+    self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+    found=""
+    for candidate in $(type -a node 2>/dev/null | sed -n 's/^node is \(\/.*\)$/\1/p'); do
+      candidate_real="$(cd "$(dirname "$candidate")" && pwd)/$(basename "$candidate")"
+      [ "$candidate_real" = "$self" ] && continue
+      found="$candidate"
+      break
+    done
+    [ -n "$found" ] || { echo "node stub: no real node found on PATH" >&2; exit 1; }
+    exec "$found" "$@"
+    ;;
 esac

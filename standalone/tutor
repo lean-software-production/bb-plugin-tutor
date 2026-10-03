@@ -311,12 +311,15 @@ machine_id() {
 }
 
 # machine_wait_connected: poll `bb machine list --json` until the enrolled
-# machine (config's machine_id) shows connected, up to 60 s.
+# machine (config's machine_id) shows status "connected" — the real API
+# reports a status string, not a boolean — up to TUTOR_MACHINE_TIMEOUT
+# seconds (default 60; tests set it low).
 machine_wait_connected() {
   id=$(config_get machine_id)
   [ -n "$id" ] || fail "No machine is enrolled yet. Run tutor up again."
+  mkdir -p "$TUTOR_HOME/logs"
   port=$(tutor_bb_port)
-  timeout=${TUTOR_CONNECT_TIMEOUT:-60}
+  timeout=${TUTOR_MACHINE_TIMEOUT:-60}
   waited=0
   while [ "$waited" -lt "$timeout" ]; do
     json=$(BB_SERVER_URL="http://127.0.0.1:$port" "$TUTOR_HOME/server/npm/node_modules/.bin/bb" machine list --json 2>>"$TUTOR_HOME/logs/launcher.log") || json=""
@@ -326,7 +329,7 @@ machine_wait_connected() {
           const data = JSON.parse(raw);
           const rows = Array.isArray(data) ? data : (data.machines ?? data.hosts ?? []);
           const row = rows.find((r) => r.id === process.env.TUTOR_MACHINE_ID);
-          process.exit(row && row.connected ? 0 : 1);
+          process.exit(row && row.status === "connected" ? 0 : 1);
         } catch {
           process.exit(1);
         }
@@ -340,6 +343,15 @@ machine_wait_connected() {
   fail "Tutor's machine never connected. Run \`tutor logs\`."
 }
 
+# machine_create_abort <pid>: the real `bb machine create` blocks until a
+# machine connects, so a caller giving up on it (enrolment line never
+# appeared, couldn't be parsed, or the installer failed to download) must
+# not just `wait` on it — that could hang forever. Kill it, then reap it.
+machine_create_abort() {
+  kill "$1" 2>/dev/null || true
+  wait "$1" 2>/dev/null || true
+}
+
 # machine_installer_run: one attempt at enrolling this computer as a BB
 # machine. `bb machine create` runs in the background (output ->
 # enrol.out, 0600) because it blocks until the machine connects; the
@@ -349,7 +361,10 @@ machine_wait_connected() {
 # command, and never reaches argv, stdout/stderr or any log. BB's installer
 # is downloaded with `curl -H @header`, run with its output in install.log,
 # and deleted as soon as it has run: its body holds the token too
-# (amendment 3). Every exit path cleans up enrol.out and enrol.header.
+# (amendment 3). Every exit path cleans up enrol.out and enrol.header, and
+# restores the caller's umask (the 0600 files are written under a private
+# one, which must not leak into later steps such as the workspace or git
+# init).
 #
 # Exit status: 0 success; 2 the enrolment expired or create failed (the
 # caller retries once); 1 any other failure.
@@ -360,6 +375,7 @@ machine_installer_run() {
   installer="$TUTOR_HOME/machine-installer.sh"
   installlog="$TUTOR_HOME/install.log"
   port=$(tutor_bb_port)
+  caller_umask=$(umask)
 
   umask 077
   : >"$out"
@@ -378,31 +394,39 @@ machine_installer_run() {
   while [ "$waited" -lt "$limit" ]; do
     line=$(grep -m1 'X-BB-Enrollment' "$out" 2>/dev/null) || line=""
     [ -n "$line" ] && break
-    kill -0 "$create_pid" 2>/dev/null || break
+    if ! kill -0 "$create_pid" 2>/dev/null; then
+      # It has already exited (a real create exits only once connected, so
+      # this is a non-blocking test double, or a real failure) — one more
+      # read in case its last write landed after our check above.
+      line=$(grep -m1 'X-BB-Enrollment' "$out" 2>/dev/null) || line=""
+      break
+    fi
     waited=$((waited + 1))
     sleep 1
   done
 
   if [ -z "$line" ]; then
-    wait "$create_pid" 2>/dev/null || true
+    machine_create_abort "$create_pid"
     rm -f "$out"
+    umask "$caller_umask"
     return 1
   fi
 
-  umask 077
   printf '%s\n' "$line" | sed -n "s/.*['\"]\\(X-BB-Enrollment:[^'\"]*\\)['\"].*/\\1/p" >"$header"
   chmod 600 "$header"
   url=$(printf '%s\n' "$line" | grep -o 'https\{0,1\}://[^ '"'"'"|]*' | head -n 1) || url=""
 
   if [ ! -s "$header" ] || [ -z "$url" ]; then
+    machine_create_abort "$create_pid"
     rm -f "$header" "$out"
-    wait "$create_pid" 2>/dev/null || true
+    umask "$caller_umask"
     return 1
   fi
 
   if ! curl -fsSL -H @"$header" "$url" -o "$installer"; then
+    machine_create_abort "$create_pid"
     rm -f "$header" "$out" "$installer"
-    wait "$create_pid" 2>/dev/null || true
+    umask "$caller_umask"
     return 1
   fi
   chmod 600 "$installer"
@@ -415,6 +439,7 @@ machine_installer_run() {
   wait "$create_pid" || create_status=$?
 
   rm -f "$header" "$out"
+  umask "$caller_umask"
 
   if [ "$install_status" -ne 0 ]; then
     if grep -qi expired "$installlog" 2>/dev/null; then
