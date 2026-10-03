@@ -5,7 +5,7 @@
 #   checks.sh memory            2. the student's server's memory (idle; again with a coach running)
 #   checks.sh providers         4. which agents BB finds ready on this laptop's machine
 #   checks.sh workspace         5. a workspace on the laptop, and how long host calls take
-#   checks.sh coach <provider>  6. a Lesson 0 coach on claude-code | codex | pi: Tutor's tools reach
+#   checks.sh coach <provider> [model]  6. a Lesson 0 coach on claude-code | codex | pi: Tutor's tools reach
 #                                  it, and it forks a side chat
 #   checks.sh connected         7. the machine is connected (run after a suspend, or a tailnet drop)
 #   checks.sh browser           8. the public hostname answers, and only through Access
@@ -23,7 +23,7 @@ check_memory() {
 
 check_providers() {
   [ -n "$mid" ] || die "not enrolled: run laptop-enrol.sh"
-  sbb provider list --machine "$mid" --all --json >"$SPIKE2_HOME/providers.json"
+  sbb provider list --machine "$mid" --json >"$SPIKE2_HOME/providers.json"
   # shellcheck disable=SC2016 # JavaScript, not shell
   node -e '
     const rows = require(process.argv[1]);
@@ -60,26 +60,38 @@ check_workspace() {
 }
 
 check_coach() {
-  local provider=${1:?checks.sh coach <claude-code|codex|pi>}
+  local provider=${1:?checks.sh coach <claude-code|codex|pi> [model]} model=${2:-}
   [ -n "$mid" ] || die "not enrolled: run laptop-enrol.sh"
   # One coach thread per lesson: archive the last one, so this provider gets its own.
   local previous
   previous=$(cat "$SPIKE2_HOME/coach.thread" 2>/dev/null) || previous=""
   [ -z "$previous" ] || sbb thread archive "$previous" >/dev/null 2>&1 || true
   sbb plugin config tutor set coachProvider "$provider" >/dev/null
-  sbb plugin config tutor set coachModel "" >/dev/null
+  sbb plugin config tutor set coachModel "$model" >/dev/null
   local thread
   thread=$(rpc openCoach '{"courseId":"tutor","lessonId":"000"}' | json 'v.threadId ?? v.result?.threadId ?? ""')
   [ -n "$thread" ] || { result 6 FAIL "$provider: openCoach opened no thread"; return 1; }
   printf '%s\n' "$thread" >"$SPIKE2_HOME/coach.thread"
-  result 6 INFO "$provider: coach thread $thread (https://$PUBLIC_HOST)"
+  result 6 INFO "$provider (model: ${model:-default}): coach thread $thread (https://$PUBLIC_HOST)"
   sbb thread wait "$thread" --timeout 300s >/dev/null 2>&1 || true
   printf 'Before anything else: call the tutor_status tool and reply with the first line it returns.\n' >"$SPIKE2_HOME/tell.txt"
   sbb thread tell "$thread" --message-file "$SPIKE2_HOME/tell.txt" >/dev/null
   sbb thread wait "$thread" --timeout 300s >/dev/null 2>&1 || true
   sbb thread log "$thread" --all --json >"$SPIKE2_HOME/coach-$provider.log.json" 2>&1 || true
-  if grep -q 'tutor_status' "$SPIKE2_HOME/coach-$provider.log.json"; then
-    result 6 PASS "$provider: the coach called Tutor's tutor_status tool (log: $SPIKE2_HOME/coach-$provider.log.json)"
+  # A completed toolCall item naming a tutor_* tool: the prompt itself says
+  # "tutor_status", so a plain grep of the log would always match.
+  local tools
+  tools=$(node -e '
+    const d = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+    const names = new Set();
+    for (const e of Array.isArray(d) ? d : []) {
+      const item = e.type === "item/completed" ? e.data?.item : null;
+      if (item?.type === "toolCall" && /^tutor_/.test(item.tool ?? "")) names.add(item.tool);
+    }
+    console.log([...names].join(" "));
+  ' "$SPIKE2_HOME/coach-$provider.log.json" 2>/dev/null) || tools=""
+  if [[ " $tools " == *" tutor_status "* ]]; then
+    result 6 PASS "$provider: the coach called Tutor's tools: $tools (log: $SPIKE2_HOME/coach-$provider.log.json)"
   else
     result 6 FAIL "$provider: no tutor_status call in the thread's log ($SPIKE2_HOME/coach-$provider.log.json)"
   fi
