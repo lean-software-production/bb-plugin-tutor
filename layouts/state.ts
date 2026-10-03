@@ -21,7 +21,7 @@ export type CourseLayoutState =
   | { id: "capstone-factory"; ready: boolean; layout: Layout; progress: ProgressLocation; problems: string[]; blocked: string | null };
 
 /** What a lesson of a course whose layout isn't ready says instead of starting. */
-export const NOT_READY = "This lesson needs the course's starter files in your workspace. Add the course from the outline first.";
+export const NOT_READY = "This lesson needs the course's starter files in your workspace. Finish adding the course from the outline first.";
 
 /**
  * Why a course's own lessons can't start yet. A capstone factory Tutor can't

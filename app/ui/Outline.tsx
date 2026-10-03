@@ -187,7 +187,7 @@ function AddCourseItem({ course }: { course: AddCourseRow }) {
         <span className="tp-add-course-desc">{course.description}</span>
       </div>
       <button type="button" className="tp-th tp-th--add" disabled={add.pending} onClick={() => void add.run()}>
-        <span className="tp-t">{add.pending ? "Adding the course…" : "Add the course"}</span>
+        <span className="tp-t">{add.pending ? "Adding the course…" : course.action}</span>
       </button>
       {add.error === null ? null : (
         <div className="tp-outline-note tp-outline-note--error" role="alert">

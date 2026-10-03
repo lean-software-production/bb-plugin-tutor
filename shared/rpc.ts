@@ -132,8 +132,17 @@ export const currentStateSchema = z.object({
 });
 export type CurrentState = z.infer<typeof currentStateSchema>;
 
-/** A course Tutor can fetch and add (server/content/catalog.ts), not fetched yet. */
-export const availableCourseSchema = z.object({ id: z.string(), title: z.string(), description: z.string() });
+/** A course Tutor can fetch and add (server/content/catalog.ts): not fetched yet, or fetched but not finished. */
+export const availableCourseSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string(),
+  /**
+   * Fetched, but its starter is not all in the workspace yet (the seed was interrupted) or it no longer loads:
+   * offered as "Finish adding the course", with the same fetchCourse.
+   */
+  unfinished: z.boolean(),
+});
 export type AvailableCourse = z.infer<typeof availableCourseSchema>;
 
 /** One course in the overview, with the student's place in it. */
@@ -154,7 +163,7 @@ export const overviewSchema = z.object({
   workspace: workspaceSchema,
   /** Tutor's built-in course first, then the configured course. Before there is a workspace, they show what is ahead. */
   courses: z.array(courseOverviewSchema),
-  /** Courses that can be added ("Add the course"): catalog entries not fetched yet. Empty when a configured course wins (Decision 12). */
+  /** Courses that can be added ("Add the course"), or finished ("Finish adding the course"). Empty when a configured course wins (Decision 12). */
   available: z.array(availableCourseSchema),
   /** Courses that could not be loaded, by path, with the reason. */
   courseErrors: z.array(z.object({ source: z.string(), error: z.string() })),

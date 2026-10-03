@@ -295,9 +295,22 @@ test("a Codespace on a capstone lesson with no Lesson 0 record opens that lesson
 
 test("the outline offers each course that can be added, catalog entries not fetched yet", () => {
   const outline = buildOutline(
-    input({ overview: { ...overviewWithChat, available: [{ id: "robotics", title: "Build a robot", description: "Six lessons, one robot." }] } }),
+    input({
+      overview: { ...overviewWithChat, available: [{ id: "robotics", title: "Build a robot", description: "Six lessons, one robot.", unfinished: false }] },
+    }),
   );
-  assert.deepEqual(outline.addCourses, [{ courseId: "robotics", title: "Build a robot", description: "Six lessons, one robot." }]);
+  assert.deepEqual(outline.addCourses, [
+    { courseId: "robotics", title: "Build a robot", description: "Six lessons, one robot.", action: "Add the course" },
+  ]);
+});
+
+test("a course whose adding was interrupted is still offered, as Finish adding the course", () => {
+  const outline = buildOutline(
+    input({
+      overview: { ...overviewWithChat, available: [{ id: "robotics", title: "Build a robot", description: "Six lessons, one robot.", unfinished: true }] },
+    }),
+  );
+  assert.deepEqual(outline.addCourses.map((row) => row.action), ["Finish adding the course"]);
 });
 
 test("once a course is fetched, it has no Add row: available is empty while it is being taught", () => {

@@ -7,6 +7,14 @@ import type { TutorRoute } from "../../shared/routes.ts";
 import type { CourseOverview, Overview } from "../../shared/rpc.ts";
 import { lessonLabel, lessonNumber, percent } from "./format.ts";
 
+/** "Add the course", or "Finish adding the course" for one fetched whose seed was interrupted (addCourseAction). */
+export type AddCourseAction = "Add the course" | "Finish adding the course";
+
+/** The button that adds `course`: the same fetchCourse either way; calling it again finishes an interrupted seed. */
+export function addCourseAction(course: { unfinished: boolean }): AddCourseAction {
+  return course.unfinished ? "Finish adding the course" : "Add the course";
+}
+
 export type HomeDecision = { kind: "error"; message: string } | { kind: "redirect"; route: TutorRoute };
 
 const NO_COURSE = "We couldn't load the course.";
@@ -68,8 +76,8 @@ export function homeDecision(overview: Overview): HomeDecision {
 export type ContinueView =
   | { kind: "error"; message: string }
   | { kind: "setup"; courseTitle: string; missing: boolean }
-  /** Lesson 0 is done, nothing has been fetched yet, and the catalog has something to add (Decision 16). */
-  | { kind: "add-course"; courseId: string; title: string; description: string }
+  /** Lesson 0 is done, nothing has been fetched (or finished) yet, and the catalog has something to add (Decision 16). */
+  | { kind: "add-course"; courseId: string; title: string; description: string; action: AddCourseAction }
   | {
       kind: "continue";
       courseId: string;
@@ -116,7 +124,9 @@ export function continueView(overview: Overview): ContinueView {
   // Lesson 0 done, nothing fetched yet: suggest adding the course instead of only its own completion page.
   if (active.builtin && current.iterationStatus === "Done") {
     const course = overview.available[0];
-    if (course !== undefined) return { kind: "add-course", courseId: course.id, title: course.title, description: course.description };
+    if (course !== undefined) {
+      return { kind: "add-course", courseId: course.id, title: course.title, description: course.description, action: addCourseAction(course) };
+    }
   }
   const summary = active.lessons.find((lesson) => lesson.id === current.lessonId);
   const set = summary?.set ?? null;

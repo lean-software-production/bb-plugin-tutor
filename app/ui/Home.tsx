@@ -56,7 +56,7 @@ export function ContinueSection(_props: PluginHomepageSectionProps) {
             </h2>
             <p>{view.description}</p>
             <Button disabled={addCourse.pending} onClick={() => void addCourse.run()}>
-              {addCourse.pending ? "Adding the course…" : "Add the course"}
+              {addCourse.pending ? "Adding the course…" : view.action}
             </Button>
             {addCourse.error === null ? null : <ErrorNotice message={addCourse.error} />}
           </div>

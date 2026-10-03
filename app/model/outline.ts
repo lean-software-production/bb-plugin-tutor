@@ -12,7 +12,7 @@ import type { LessonStatus, Change, RuleStatus } from "../../shared/model.ts";
 import type { FeatureOutline, LessonSummary, Overview, TutorThread } from "../../shared/rpc.ts";
 import { routeCourse } from "./course-route.ts";
 import { percent } from "./format.ts";
-import { activeCourse } from "./home.ts";
+import { activeCourse, addCourseAction, type AddCourseAction } from "./home.ts";
 import { indicatorView, isListed } from "./threads.ts";
 import type { IndicatorView, SidebarThreadLike } from "./threads.ts";
 
@@ -118,11 +118,12 @@ export interface CourseGroup {
   lessons: LessonNode[];
 }
 
-/** A catalog course not fetched yet (Overview.available), offered as "Add the course" right after Lesson 0. */
+/** A catalog course not fetched yet, or not finished (Overview.available), offered right after Lesson 0. */
 export interface AddCourseRow {
   courseId: string;
   title: string;
   description: string;
+  action: AddCourseAction;
 }
 
 export interface OutlineView {
@@ -325,6 +326,7 @@ export function buildOutline(input: OutlineInput): OutlineView {
     courseId: course.id,
     title: course.title,
     description: course.description,
+    action: addCourseAction(course),
   }));
   return { brand, status, groups, errors, others, addCourses };
 }

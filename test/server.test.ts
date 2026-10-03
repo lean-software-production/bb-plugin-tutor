@@ -1435,7 +1435,7 @@ test("nothing from a course is on the computer until it is added; adding it seed
   const { host, ws, dataDir } = await standalone(t, { layout: "capstone-factory", starter: true });
   assert.deepEqual(await readdir(join(dataDir, "content")).catch(() => []), []);
   const before = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
-  assert.deepEqual(before.available.map((entry) => entry.id), ["fixture"]);
+  assert.deepEqual(before.available.map((entry) => [entry.id, entry.unfinished]), [["fixture", false]]);
   assert.deepEqual(before.courseErrors, []);
   assert.deepEqual(before.courses.map((entry) => entry.course.id), ["tutor"]);
   const added = (await host.harness.behavior.callRpc("fetchCourse", { courseId: "fixture" })) as Added;
@@ -1485,7 +1485,7 @@ test("with no course configured and nothing at the default course folder, there 
   assert.deepEqual(missing.available, []);
 });
 
-test("a fetched course whose seed did not finish asks for the course to be added, and adding it again finishes the seed", async (t) => {
+test("a fetched course whose seed did not finish is still offered, as Finish adding the course, and adding it again finishes the seed", async (t) => {
   let failSeeds = 1;
   const { host, ws } = await standalone(t, {
     onHostCall: (method) => {
@@ -1499,9 +1499,14 @@ test("a fetched course whose seed did not finish asks for the course to be added
   await assert.rejects(host.harness.behavior.callRpc("fetchCourse", { courseId: "fixture" }), /connection to the machine dropped/);
   const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
   assert.deepEqual(overview.courses.map((entry) => [entry.course.id, entry.layout.ready]), [["tutor", true], ["fixture", false]]);
+  // Still offered, as "Finish adding the course": not a dead end.
+  assert.deepEqual(
+    overview.available.map((entry) => [entry.id, entry.unfinished]),
+    [["fixture", true]],
+  );
   const refused = host.harness.behavior.callRpc("startNextLesson", { courseId: "fixture", lessonId: "001" });
   await assert.rejects(refused, (cause: Error) => {
-    assert.match(cause.message, /Add the course/);
+    assert.match(cause.message, /Finish adding the course from the outline/);
     assert.doesNotMatch(cause.message, /Restore it from git/);
     return true;
   });
@@ -1510,6 +1515,19 @@ test("a fetched course whose seed did not finish asks for the course to be added
   assert.ok((await readdir(join(ws, ".tutor/seeds"))).includes("fixture.json"));
   const after = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
   assert.equal(after.courses[1]?.layout.ready, true);
+  assert.deepEqual(after.available, []);
+  const { threadId } = (await host.harness.behavior.callRpc("startNextLesson", { courseId: "fixture", lessonId: "001" })) as { threadId: string };
+  assert.ok(threadId);
+});
+
+test("a fetched course that no longer loads is offered again, as unfinished", async (t) => {
+  const { host, dataDir } = await standalone(t);
+  await host.harness.behavior.callRpc("fetchCourse", { courseId: "fixture" });
+  await rm(join(dataDir, "content/fixture/course/course.yaml"));
+  const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.deepEqual(overview.courses.map((entry) => entry.course.id), ["tutor"]);
+  assert.match(overview.courseErrors.map((entry) => entry.error).join(" "), /is not a course/);
+  assert.deepEqual(overview.available.map((entry) => [entry.id, entry.unfinished]), [["fixture", true]]);
 });
 
 test("tutor_fetch_course adds a course from Lesson 0's coach thread and tells the coach to commit the starter, naming files it kept", async (t) => {

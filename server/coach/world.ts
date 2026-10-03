@@ -65,7 +65,11 @@ export interface World {
   allCourses: Course[];
   /** The catalog of courses that can be fetched (catalog.ts); empty when a configured course wins or the courseCatalog setting is broken. */
   catalog: readonly CatalogEntry[];
-  /** Catalog entries not fetched yet, offered as "Add the course" (Overview.available); empty when a configured course wins. */
+  /**
+   * Catalog entries offered as "Add the course" (Overview.available): those not fetched yet, and, as "Finish
+   * adding the course" (unfinished), fetched ones whose seed is not complete in the workspace or that no longer
+   * load. Empty when a configured course wins.
+   */
   fetchable: AvailableCourse[];
   /** BB's data dir, which holds fetched content under content/; null when BB cannot say. */
   dataDir: string | null;
@@ -205,15 +209,21 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
     return result;
   }
 
-  async function readCourse(course: Course, root: string, access: WorkspaceAccess, seedId: string | null): Promise<LoadedCourse> {
+  /** `unseeded`: a fetched course whose starter is not all in the workspace yet. */
+  async function readCourse(
+    course: Course,
+    root: string,
+    access: WorkspaceAccess,
+    seedId: string | null,
+  ): Promise<{ loaded: LoadedCourse; unseeded: boolean }> {
     const resolved = await resolveCourseLayout(course.layout, root, courseDirOf(course), access);
     // A starter not all there yet: the course needs adding (again), in NOT_READY's words, not a missing factory's.
-    const layout: CourseLayoutState =
-      seedId !== null && course.starter !== null && !(await seeded(access, root, seedId)) ? { ...resolved, ready: false, blocked: null } : resolved;
+    const unseeded = seedId !== null && course.starter !== null && !(await seeded(access, root, seedId));
+    const layout: CourseLayoutState = unseeded ? { ...resolved, ready: false, blocked: null } : resolved;
     const read = await deps.store.read(access, layout.progress);
     const student = layout.problems.length === 0 ? read : { ...read, problems: [...layout.problems, ...read.problems] };
     const coach = await resolveCoachMethod(course.coachPath, layout, root, access);
-    return { course, layout, student, pointer: resolveCurrent(course, student), coach };
+    return { loaded: { course, layout, student, pointer: resolveCurrent(course, student), coach }, unseeded };
   }
 
   async function readBuiltin(course: Course, root: string, access: WorkspaceAccess, others: readonly LoadedCourse[]): Promise<LoadedCourse> {
@@ -238,20 +248,31 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
     coursePath: string | null,
     builtin: Course | null,
     others: readonly { course: Course; seedId: string | null }[],
-  ): Promise<ResolvedWorkspace & { courses: LoadedCourse[] }> {
+  ): Promise<ResolvedWorkspace & { courses: LoadedCourse[]; unseeded: Set<string> }> {
     const { workspace, hostId } = resolved;
-    if (workspace.status !== "found" || hostId === null) return { workspace, hostId, courses: [] };
+    const unseeded = new Set<string>();
+    if (workspace.status !== "found" || hostId === null) return { workspace, hostId, courses: [], unseeded };
     const access = deps.access(hostId);
     try {
       if (coursePath !== null && overlaps(await access.realPath(workspace.root), await realPath(coursePath))) {
-        return { workspace: { status: "missing", projectId: workspace.projectId }, hostId: null, courses: [] };
+        return { workspace: { status: "missing", projectId: workspace.projectId }, hostId: null, courses: [], unseeded };
       }
-      const loaded = await Promise.all(others.map(({ course, seedId }) => readCourse(course, workspace.root, access, seedId)));
+      const read = await Promise.all(others.map(({ course, seedId }) => readCourse(course, workspace.root, access, seedId)));
+      read.forEach((entry, index) => {
+        const seedId = others[index]?.seedId ?? null;
+        if (entry.unseeded && seedId !== null) unseeded.add(seedId);
+      });
+      const loaded = read.map((entry) => entry.loaded);
       const courses = builtin === null ? loaded : [await readBuiltin(builtin, workspace.root, access, loaded), ...loaded];
-      return { workspace, hostId, courses };
+      return { workspace, hostId, courses, unseeded };
     } catch (cause) {
       if (!(cause instanceof WorkspaceUnreachableError)) throw cause;
-      return { workspace: { status: "unreachable", projectId: workspace.projectId, projectName: workspace.projectName }, hostId: null, courses: [] };
+      return {
+        workspace: { status: "unreachable", projectId: workspace.projectId, projectName: workspace.projectName },
+        hostId: null,
+        courses: [],
+        unseeded: new Set(),
+      };
     }
   }
 
@@ -293,7 +314,7 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
         const course = results[index]?.course ?? null;
         return course === null ? [] : [{ course, seedId: entry.seedId }];
       });
-      const { workspace, hostId, courses } = await readWorkspace(resolved, coursePath, builtinResult.course, others);
+      const { workspace, hostId, courses, unseeded } = await readWorkspace(resolved, coursePath, builtinResult.course, others);
       const courseErrors: World["courseErrors"] =
         refused !== null
           ? [{ source: deps.featureConfigFile, error: refused.error }]
@@ -307,6 +328,11 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
             ];
       const allCourses = [...(builtinResult.course === null ? [] : [builtinResult.course]), ...others.map((entry) => entry.course)];
       const fetchedIds = new Set(fetched.map((entry) => entry.id));
+      // Fetched but not finished: its seed is incomplete in this workspace, or it no longer loads. Adding it again finishes it.
+      const unfinished = new Set([
+        ...unseeded,
+        ...fetched.filter((_entry, index) => results[index]?.course === null).map((entry) => entry.id),
+      ]);
       last = courses;
       return {
         coursePath,
@@ -314,7 +340,9 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
         hostId,
         allCourses,
         catalog: catalog.entries,
-        fetchable: catalog.entries.filter((entry) => !fetchedIds.has(entry.id)).map(({ id, title, description }) => ({ id, title, description })),
+        fetchable: catalog.entries
+          .filter((entry) => !fetchedIds.has(entry.id) || unfinished.has(entry.id))
+          .map(({ id, title, description }) => ({ id, title, description, unfinished: unfinished.has(id) })),
         dataDir,
         coachProvider: values.coachProvider ?? "",
         courses,

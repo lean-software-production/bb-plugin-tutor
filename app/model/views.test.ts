@@ -214,14 +214,18 @@ test("after Lesson 0, BB home's Continue suggests adding the course when nothing
   const onlyBuiltin: Overview = {
     ...fixtureOverview,
     courses: fixtureOverview.courses.filter((entry) => entry.builtin),
-    available: [{ id: "robotics", title: "Build a robot", description: "Six lessons, one robot." }],
+    available: [{ id: "robotics", title: "Build a robot", description: "Six lessons, one robot.", unfinished: false }],
   };
   assert.deepEqual(continueView(onlyBuiltin), {
     kind: "add-course",
     courseId: "robotics",
     title: "Build a robot",
     description: "Six lessons, one robot.",
+    action: "Add the course",
   });
+  // Fetched, but its seed was interrupted: home keeps offering it, to finish.
+  const interrupted = continueView({ ...onlyBuiltin, available: [{ id: "robotics", title: "Build a robot", description: "", unfinished: true }] });
+  assert.equal(interrupted.kind === "add-course" ? interrupted.action : interrupted.kind, "Finish adding the course");
   // A configured course wins (Decision 12): available stays empty, so today's behaviour holds (Lesson 0's own completion).
   assert.deepEqual(continueView({ ...onlyBuiltin, available: [] }).kind, "continue");
 });
