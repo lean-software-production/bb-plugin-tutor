@@ -2,7 +2,9 @@ name: Release
 
 # Push a tag v<version>, where <version> is package.json's version, to publish
 # bb-plugin-tutor-<version>.tgz and its .sha256, plus the launcher's own
-# assets (tutor, install.sh, SHA256SUMS), as a GitHub Release. The tutor
+# assets (tutor, install.sh, bb-plugin-tutor-<version>-built.tgz — the
+# archive with its dependencies installed and built, which install.sh
+# downloads — and SHA256SUMS), as a GitHub Release. The tutor
 # Feature downloads that tarball and pins its SHA-256; students install the
 # launcher with install.sh. See README.md, Releasing.
 on:
@@ -38,7 +40,7 @@ jobs:
         run: npm install --global --ignore-scripts "bb-app@${BB_APP_VERSION}"
       - name: Build the release assets from the tag
         run: scripts/release-archive.sh "$GITHUB_REF_NAME" "$RUNNER_TEMP/release"
-      - name: Extract, npm ci --omit=dev --ignore-scripts, bb plugin build
+      - name: Extract, npm ci --omit=dev --ignore-scripts, bb plugin build; write the -built.tgz
         run: scripts/check-release-archive.sh "$RUNNER_TEMP/release/bb-plugin-tutor-${GITHUB_REF_NAME#v}.tgz"
       - name: Build the launcher's assets (tutor, install.sh, SHA256SUMS)
         run: scripts/release-standalone.sh "${GITHUB_REF_NAME#v}" "$RUNNER_TEMP/release"
@@ -47,7 +49,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           asset="$RUNNER_TEMP/release/bb-plugin-tutor-${GITHUB_REF_NAME#v}.tgz"
+          built="$RUNNER_TEMP/release/bb-plugin-tutor-${GITHUB_REF_NAME#v}-built.tgz"
           gh release create "$GITHUB_REF_NAME" \
-            "$asset" "$asset.sha256" \
+            "$asset" "$asset.sha256" "$built" \
             "$RUNNER_TEMP/release/tutor" "$RUNNER_TEMP/release/install.sh" "$RUNNER_TEMP/release/SHA256SUMS" \
             --verify-tag --title "$GITHUB_REF_NAME" --generate-notes

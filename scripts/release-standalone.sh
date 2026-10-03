@@ -7,9 +7,10 @@
 # writes <out-dir>/tutor and <out-dir>/install.sh — copies of
 # standalone/tutor and standalone/install.sh with their placeholder
 # TUTOR_VERSION=0.0.0-dev line replaced, exactly, by TUTOR_VERSION=<version>
-# — both mode 0755, and <out-dir>/SHA256SUMS covering tutor, install.sh and
-# bb-plugin-tutor-<version>.tgz (which scripts/release-archive.sh must have
-# already written into <out-dir>). Prints the SHA256SUMS path.
+# — both mode 0755, and <out-dir>/SHA256SUMS covering tutor, install.sh,
+# bb-plugin-tutor-<version>.tgz and bb-plugin-tutor-<version>-built.tgz
+# (which scripts/release-archive.sh and scripts/check-release-archive.sh must
+# have already written into <out-dir>). Prints the SHA256SUMS path.
 set -euo pipefail
 
 version="${1:-}" out="${2:-}"
@@ -37,6 +38,8 @@ stamp_version standalone/install.sh "$out/install.sh"
 
 archive="$out/bb-plugin-tutor-$version.tgz"
 [ -f "$archive" ] || { echo "ERROR: $archive is missing; run scripts/release-archive.sh first" >&2; exit 1; }
+built="$out/bb-plugin-tutor-$version-built.tgz"
+[ -f "$built" ] || { echo "ERROR: $built is missing; run scripts/check-release-archive.sh $archive first" >&2; exit 1; }
 
-(cd "$out" && sha256sum tutor install.sh "bb-plugin-tutor-$version.tgz" >SHA256SUMS)
+(cd "$out" && sha256sum tutor install.sh "bb-plugin-tutor-$version.tgz" "bb-plugin-tutor-$version-built.tgz" >SHA256SUMS)
 printf '%s\n' "$out/SHA256SUMS"

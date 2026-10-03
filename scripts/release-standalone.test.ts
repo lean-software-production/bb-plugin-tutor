@@ -9,13 +9,23 @@ import { join } from "node:path";
 import { test } from "node:test";
 
 function run(args: string[]) {
-  return execFileSync("bash", ["scripts/release-standalone.sh", ...args], { encoding: "utf8" });
+  return execFileSync("bash", ["scripts/release-standalone.sh", ...args], { encoding: "utf8", stdio: "pipe" });
 }
 
 test("release-standalone.sh fails without the plugin archive already in out-dir", () => {
   const out = mkdtempSync(join(tmpdir(), "release-standalone-"));
   try {
-    assert.throws(() => run(["9.9.9", out]));
+    assert.throws(() => run(["9.9.9", out]), { stderr: /bb-plugin-tutor-9\.9\.9\.tgz is missing/ });
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test("release-standalone.sh fails without the plugin's ready-to-install build already in out-dir", () => {
+  const out = mkdtempSync(join(tmpdir(), "release-standalone-"));
+  try {
+    writeFileSync(join(out, "bb-plugin-tutor-9.9.9.tgz"), "fixture archive bytes\n");
+    assert.throws(() => run(["9.9.9", out]), { stderr: /bb-plugin-tutor-9\.9\.9-built\.tgz is missing/ });
   } finally {
     rmSync(out, { recursive: true, force: true });
   }
@@ -26,6 +36,7 @@ test("release-standalone.sh stamps TUTOR_VERSION with an exact line replacement 
   const version = "9.9.9";
   try {
     writeFileSync(join(out, `bb-plugin-tutor-${version}.tgz`), "fixture archive bytes\n");
+    writeFileSync(join(out, `bb-plugin-tutor-${version}-built.tgz`), "fixture built archive bytes\n");
 
     run([version, out]);
 
@@ -42,7 +53,7 @@ test("release-standalone.sh stamps TUTOR_VERSION with an exact line replacement 
     assert.equal(installSh, originalInstall.replace("TUTOR_VERSION=0.0.0-dev", `TUTOR_VERSION=${version}`));
 
     const sums = readFileSync(join(out, "SHA256SUMS"), "utf8");
-    for (const name of ["tutor", "install.sh", `bb-plugin-tutor-${version}.tgz`]) {
+    for (const name of ["tutor", "install.sh", `bb-plugin-tutor-${version}.tgz`, `bb-plugin-tutor-${version}-built.tgz`]) {
       assert.ok(sums.includes(`  ${name}`), `SHA256SUMS should cover ${name}`);
     }
 

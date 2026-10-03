@@ -23,8 +23,9 @@ make_release_fixture() {
   mkdir -p "$REL"
   printf '#!/bin/sh\necho "stub tutor"\n' >"$REL/tutor"
   chmod +x "$REL/tutor"
-  printf 'fixture plugin archive bytes\n' >"$REL/bb-plugin-tutor-0.0.0-dev.tgz"
-  (cd "$REL" && sha256sum tutor bb-plugin-tutor-0.0.0-dev.tgz install.sh >SHA256SUMS 2>/dev/null) || true
+  printf 'fixture plugin source archive bytes\n' >"$REL/bb-plugin-tutor-0.0.0-dev.tgz"
+  printf 'fixture built plugin archive bytes\n' >"$REL/bb-plugin-tutor-0.0.0-dev-built.tgz"
+  (cd "$REL" && sha256sum tutor bb-plugin-tutor-0.0.0-dev.tgz bb-plugin-tutor-0.0.0-dev-built.tgz install.sh >SHA256SUMS 2>/dev/null) || true
   # install.sh isn't a fixture file (install.sh never verifies itself); drop
   # any failed line sha256sum may have printed for the missing file.
   grep -v ' install.sh$' "$REL/SHA256SUMS" >"$REL/SHA256SUMS.tmp" || true
@@ -35,7 +36,8 @@ make_release_fixture() {
 # that appends its full argv to $CURL_LOG, then — unless STUB_CURL_FAIL=1,
 # which makes it fail like a real HTTP error would — copies
 # $CURL_FIXTURES/<basename of the requested URL> to the file named by its
-# own -o argument, exactly as a real download would land it.
+# own -o argument, exactly as a real download would land it. Its failure
+# prints what a real curl -S does: an error naming the URL.
 make_curl_stub() {
   CURL_BIN="$BATS_TEST_TMPDIR/curlbin"
   CURL_LOG="$BATS_TEST_TMPDIR/curl.log"
@@ -44,7 +46,6 @@ make_curl_stub() {
   cat >"$CURL_BIN/curl" <<'STUBCURL'
 #!/bin/sh
 printf '%s\n' "$*" >>"$CURL_LOG"
-[ "${STUB_CURL_FAIL:-0}" = 1 ] && exit 22
 out="" url=""
 prev=""
 for arg in "$@"; do
@@ -54,6 +55,10 @@ for arg in "$@"; do
   esac
   prev="$arg"
 done
+if [ "${STUB_CURL_FAIL:-0}" = 1 ]; then
+  echo "curl: (22) The requested URL returned error: 404 for $url" >&2
+  exit 22
+fi
 cp "$CURL_FIXTURES/$(basename "$url")" "$out"
 STUBCURL
   chmod +x "$CURL_BIN/curl"
@@ -67,12 +72,13 @@ STUBCURL
   [ ! -e "$HOME/.local/bin/tutor" ]
 }
 
-@test "install.sh installs the launcher and the plugin archive for its version, and says what to run" {
+@test "install.sh installs the launcher and the plugin's ready-to-install build for its version, and says what to run" {
   make_release_fixture
   TUTOR_RELEASE_DIR="$REL" run sh "$INSTALL_SCRIPT"
   [ "$status" -eq 0 ]
   [ -x "$HOME/.local/bin/tutor" ]
-  ls "$HOME"/.tutor/releases/*/bb-plugin-tutor-*.tgz
+  cmp "$REL/bb-plugin-tutor-0.0.0-dev-built.tgz" "$HOME/.tutor/releases/0.0.0-dev/bb-plugin-tutor-0.0.0-dev-built.tgz"
+  [ ! -e "$HOME/.tutor/releases/0.0.0-dev/bb-plugin-tutor-0.0.0-dev.tgz" ]
   [[ "$output" == *"tutor up ~/my-course"* ]]
   ! printf '%s' "$output" | grep -iqw bb || false
 }
@@ -92,7 +98,7 @@ STUBCURL
   ! [[ "$output" == *'Add ~/.local/bin'* ]] || false
 }
 
-@test "without TUTOR_RELEASE_DIR, install.sh downloads tutor, the archive and SHA256SUMS from the exact release URL, with -fsSL" {
+@test "without TUTOR_RELEASE_DIR, install.sh downloads tutor, the built archive and SHA256SUMS from the exact release URL, with -fsSL" {
   make_release_fixture
   make_curl_stub
   export CURL_FIXTURES="$REL" CURL_LOG PATH="$CURL_BIN:$PATH"
@@ -100,7 +106,7 @@ STUBCURL
   [ "$status" -eq 0 ]
   base="https://github.com/lean-software-production/bb-plugin-tutor/releases/download/v0.0.0-dev"
   grep -qF -- "-fsSL $base/tutor -o" "$CURL_LOG"
-  grep -qF -- "-fsSL $base/bb-plugin-tutor-0.0.0-dev.tgz -o" "$CURL_LOG"
+  grep -qF -- "-fsSL $base/bb-plugin-tutor-0.0.0-dev-built.tgz -o" "$CURL_LOG"
   grep -qF -- "-fsSL $base/SHA256SUMS -o" "$CURL_LOG"
   # Exactly those three requests: install.sh never downloads itself.
   [ "$(wc -l <"$CURL_LOG")" -eq 3 ]
@@ -116,4 +122,25 @@ STUBCURL
   [ ! -e "$HOME/.local/bin/tutor" ]
   [ ! -d "$HOME/.tutor/releases" ]
   ! printf '%s' "$output" | grep -iqw bb || false
+}
+
+@test "a release folder missing the plugin installs nothing, and the message names neither bb nor the file" {
+  make_release_fixture
+  rm "$REL/bb-plugin-tutor-0.0.0-dev-built.tgz"
+  TUTOR_RELEASE_DIR="$REL" run sh "$INSTALL_SCRIPT"
+  [ "$status" -ne 0 ]
+  [ ! -e "$HOME/.local/bin/tutor" ]
+  [[ "$output" == *"the Tutor plugin"* ]]
+  ! printf '%s' "$output" | grep -iq '\bbb\b\|bb-plugin' || false
+}
+
+@test "a failed download of the plugin names neither bb nor the URL; curl's own error goes to the log" {
+  make_release_fixture
+  make_curl_stub
+  export CURL_FIXTURES="$REL" CURL_LOG STUB_CURL_FAIL=1 PATH="$CURL_BIN:$PATH"
+  run sh "$INSTALL_SCRIPT"
+  [ "$status" -ne 0 ]
+  ! printf '%s' "$output" | grep -iq '\bbb\b\|bb-plugin\|github' || false
+  [[ "$output" == *"Tutor couldn't download"* ]]
+  grep -q "404" "$HOME/.tutor/logs/install.log"
 }

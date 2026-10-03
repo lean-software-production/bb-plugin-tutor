@@ -112,14 +112,19 @@ A release is a tag `v<version>` whose version equals `version` in `package.json`
    `bb-plugin-tutor-<x.y.z>.tgz` with `git archive`. That archive has one top-level directory,
    `bb-plugin-tutor-<x.y.z>/`, and no `docs/`, `scripts/`, `.github/`, `dist/` or
    `node_modules`. The workflow checks that the archive installs
-   (`npm ci --omit=dev --ignore-scripts`) and builds (`bb plugin build .`). It then creates
-   the GitHub Release with that archive and its `.sha256`, plus generated notes.
+   (`npm ci --omit=dev --ignore-scripts`) and builds (`bb plugin build .`), and packs that
+   installed and built tree, under the same top-level directory, as
+   `bb-plugin-tutor-<x.y.z>-built.tgz`. It then creates the GitHub Release with the archive and
+   its `.sha256`, the `-built.tgz` (what the standalone launcher's `install.sh` downloads, so
+   `tutor up` fetches nothing), `tutor`, `install.sh` and a `SHA256SUMS` covering all four,
+   plus generated notes.
 4. To adopt the release in the tutor Feature, follow the steps in devcontainer-features'
    [`src/tutor/plugin-pin.sh`](https://github.com/lean-software-production/devcontainer-features/blob/main/src/tutor/plugin-pin.sh).
    Compute the SHA-256 yourself rather than copying the release's `.sha256`.
 
 To build the same archive locally, run `scripts/release-archive.sh v<x.y.z> <out-dir>`, then
-`scripts/check-release-archive.sh <out-dir>/bb-plugin-tutor-<x.y.z>.tgz`.
+`scripts/check-release-archive.sh <out-dir>/bb-plugin-tutor-<x.y.z>.tgz` (which also writes the
+`-built.tgz`) and `scripts/release-standalone.sh <x.y.z> <out-dir>`.
 
 ## Settings and coach tools
 

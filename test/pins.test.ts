@@ -24,7 +24,12 @@ test("the launcher installs the BB the plugin is pinned to", async () => {
   assert.match(launcher, new RegExp(`^BB_VERSION=${BB.replace(/\./g, "\\.")}$`, "m"));
 });
 
-test("release.yaml attaches install.sh, tutor and the plugin archive", async () => {
+test("release.yaml attaches install.sh, tutor, the plugin archive and its ready-to-install build", async () => {
   const release = await readFile(".github/workflows/release.yaml", "utf8");
-  for (const asset of ["install.sh", "tutor", "bb-plugin-tutor-"]) assert.ok(release.includes(asset), asset);
+  for (const asset of ["install.sh", "tutor", "bb-plugin-tutor-", "-built.tgz", "SHA256SUMS"]) assert.ok(release.includes(asset), asset);
+});
+
+test("install.sh downloads the plugin's ready-to-install build, not the source archive", async () => {
+  const install = await readFile("standalone/install.sh", "utf8");
+  assert.match(install, /^ARCHIVE_NAME="bb-plugin-tutor-\$TUTOR_VERSION-built\.tgz"$/m);
 });
