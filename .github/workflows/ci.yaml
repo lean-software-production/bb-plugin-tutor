@@ -42,6 +42,22 @@ jobs:
             test -s "dist/$artifact" || { echo "::error::bb plugin build did not produce dist/$artifact"; exit 1; }
           done
 
+  launcher:
+    name: Launcher (shellcheck, bats)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: standalone/tutor passes shellcheck -s sh
+        run: node --experimental-strip-types --no-warnings=ExperimentalWarning --test test/launcher-posix.test.ts
+      - run: npx bats standalone/test
+
   release-archive:
     name: Release archive installs and builds
     runs-on: ubuntu-latest

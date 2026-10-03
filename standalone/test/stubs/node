@@ -1,0 +1,8 @@
+#!/bin/sh
+# Reports $STUB_NODE_VERSION (default v24.0.0) for --version/-v.
+. "$(cd "$(dirname "$0")" && pwd)/lib.sh"
+stub_init node "$@"
+case "${1:-}" in
+  --version|-v) echo "${STUB_NODE_VERSION:-v24.0.0}" ;;
+  *) : ;;
+esac

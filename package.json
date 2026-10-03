@@ -40,6 +40,7 @@
     "test": "node --experimental-strip-types --no-warnings=ExperimentalWarning --test \"host/**/*.test.ts\" \"shared/**/*.test.ts\" \"server/**/*.test.ts\" \"app/**/*.test.ts\" \"test/**/*.test.ts\" \"layouts/**/*.test.ts\" \"scripts/*.test.ts\"",
     "build": "bb plugin build .",
     "sync-brand": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/sync-brand.ts",
+    "test:launcher": "bats standalone/test",
     "build:assets": "node --experimental-strip-types --no-warnings=ExperimentalWarning app/fonts/embed.ts && node --experimental-strip-types --no-warnings=ExperimentalWarning app/theme/build.ts && node --experimental-strip-types --no-warnings=ExperimentalWarning app/sketch/build-kit.ts && node --experimental-strip-types --no-warnings=ExperimentalWarning app/sketch/build-assets.ts",
     "fonts": "npm run build:assets"
   },
@@ -71,6 +72,7 @@
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "bats": "1.13.0",
     "better-sqlite3": "^12.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

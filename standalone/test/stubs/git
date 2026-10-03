@@ -1,0 +1,8 @@
+#!/bin/sh
+# A quiet, successful git; STUB_MISSING=git makes it behave as absent.
+. "$(cd "$(dirname "$0")" && pwd)/lib.sh"
+stub_init git "$@"
+case "${1:-}" in
+  --version) echo "git version 2.43.0" ;;
+  *) : ;;
+esac

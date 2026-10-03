@@ -1,0 +1,5 @@
+#!/bin/sh
+# Placeholder stub for later launcher tasks: logs argv, quiet, exit 0 unless
+# listed in $STUB_MISSING. Behaviour is scripted per-test via STUB_<NAME>_*.
+. "$(cd "$(dirname "$0")" && pwd)/lib.sh"
+stub_init "lsof" "$@"

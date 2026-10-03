@@ -16,3 +16,8 @@ test("package.json, the lockfile and CI pin the same BB and SDK", async () => {
   const ci = await readFile(".github/workflows/ci.yaml", "utf8");
   assert.match(ci, new RegExp(`BB_APP_VERSION: ${BB.replace(/\./g, "\\.")}\\b`));
 });
+
+test("the launcher installs the BB the plugin is pinned to", async () => {
+  const launcher = await readFile("standalone/tutor", "utf8");
+  assert.match(launcher, new RegExp(`^BB_VERSION=${BB.replace(/\./g, "\\.")}$`, "m"));
+});

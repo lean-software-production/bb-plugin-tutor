@@ -1,0 +1,171 @@
+#!/bin/sh
+# standalone/tutor — install and run a standalone Tutor (a BB server plus an
+# enrolled machine) on a student's Mac or Linux computer.
+#
+# One POSIX sh file: constants, then helper functions, then main() at the
+# bottom. Tests source it with TUTOR_SOURCE_ONLY=1 and call its functions
+# directly (see standalone/test/helper.bash).
+set -eu
+
+TUTOR_NAME=tutor                      # the command's name; a course brand renames it here
+# shellcheck disable=SC2034 # stamped at release (Task 20); read by test/pins.test.ts and later tasks
+TUTOR_VERSION=0.0.0-dev
+# shellcheck disable=SC2034 # the BB the plugin is pinned to; tutor_bb (later tasks) installs it
+BB_VERSION=0.44.0
+TUTOR_PORT_DEFAULT=47386
+TUTOR_HOME="${TUTOR_HOME:-$HOME/.tutor}"
+
+# say: one line to stdout, the student's voice; never names BB.
+say() {
+  printf '%s\n' "$*"
+}
+
+# fail: say (joined with newlines if multi-line) to stderr, then exit 1.
+fail() {
+  say "$@" >&2
+  exit 1
+}
+
+# log: append a timestamped line to $TUTOR_HOME/logs/launcher.log.
+log() {
+  mkdir -p "$TUTOR_HOME/logs"
+  printf '%s %s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" "$*" >>"$TUTOR_HOME/logs/launcher.log"
+}
+
+# config_get <key>: the value for <key> in $TUTOR_HOME/config, or empty.
+# Read with grep/sed; the file is never sourced, so a value can't run code.
+config_get() {
+  key=$1
+  [ -f "$TUTOR_HOME/config" ] || return 0
+  grep "^$key=" "$TUTOR_HOME/config" 2>/dev/null | tail -n 1 | sed "s/^$key=//"
+}
+
+# config_set <key> <value>: atomic rewrite of $TUTOR_HOME/config, mode 0600,
+# keeping every other key. Writes config.tmp under umask 077, then mv's it
+# into place.
+config_set() {
+  key=$1
+  value=$2
+  mkdir -p "$TUTOR_HOME"
+  rest="$TUTOR_HOME/config.rest"
+  tmp="$TUTOR_HOME/config.tmp"
+  if [ -f "$TUTOR_HOME/config" ]; then
+    grep -v "^$key=" "$TUTOR_HOME/config" >"$rest" 2>/dev/null || : >"$rest"
+  else
+    : >"$rest"
+  fi
+  (
+    umask 077
+    cat "$rest" >"$tmp"
+    printf '%s=%s\n' "$key" "$value" >>"$tmp"
+  )
+  rm -f "$rest"
+  mv "$tmp" "$TUTOR_HOME/config"
+}
+
+# os_kind: "linux" or "macos"; fails on anything else.
+os_kind() {
+  case "$(uname -s)" in
+    Linux*) echo linux ;;
+    Darwin*) echo macos ;;
+    *) fail "Tutor runs on macOS and Linux." ;;
+  esac
+}
+
+# check_prereqs: Node 22.19+, 24.x or 26.x; npm; git. Each failure names what
+# to install; all failures are reported together.
+check_prereqs() {
+  problems=""
+
+  if node_version_raw=$(node --version 2>/dev/null); then
+    node_major=$(printf '%s\n' "$node_version_raw" | sed -n 's/^v\([0-9][0-9]*\)\..*/\1/p')
+    node_minor=$(printf '%s\n' "$node_version_raw" | sed -n 's/^v[0-9][0-9]*\.\([0-9][0-9]*\)\..*/\1/p')
+    if [ -z "$node_major" ] || [ -z "$node_minor" ]; then
+      problems="${problems}Tutor couldn't read your Node version (got '$node_version_raw'); install Node 24.
+"
+    else
+      case "$node_major" in
+        22)
+          if [ "$node_minor" -lt 19 ]; then
+            problems="${problems}Node 22.19 or newer is required (found $node_version_raw); install Node 24.
+"
+          fi
+          ;;
+        24 | 26) ;;
+        *)
+          problems="${problems}Node $node_major is not supported (found $node_version_raw); install Node 24.
+"
+          ;;
+      esac
+    fi
+  else
+    problems="${problems}Node is not installed; install Node 24.
+"
+  fi
+
+  if ! npm --version >/dev/null 2>&1; then
+    problems="${problems}npm is not installed; it comes with Node.
+"
+  fi
+
+  if ! git --version >/dev/null 2>&1; then
+    problems="${problems}git is not installed; install git.
+"
+  fi
+
+  [ -z "$problems" ] || fail "$problems"
+}
+
+# tutor_bb <args...>: run the installed bb CLI against the tutor server,
+# logging its output. BB_SERVER_URL always wins over any inherited value
+# (amendment 1), and never touches localhost.
+tutor_bb() {
+  port=$(config_get port)
+  [ -n "$port" ] || port=$TUTOR_PORT_DEFAULT
+  mkdir -p "$TUTOR_HOME/logs"
+  BB_SERVER_URL="http://127.0.0.1:$port" "$TUTOR_HOME/server/npm/node_modules/.bin/bb" "$@" >>"$TUTOR_HOME/logs/launcher.log" 2>&1
+}
+
+print_help() {
+  say "Usage: $TUTOR_NAME <command> [options]"
+  say ""
+  say "Commands:"
+  say "  $TUTOR_NAME up [path]   Install and start the course at path."
+  say "  $TUTOR_NAME login       Sign the coach in to a provider."
+  say "  $TUTOR_NAME open        Open the course in your browser."
+  say "  $TUTOR_NAME status      Show whether the course is running."
+  say "  $TUTOR_NAME stop        Stop the course."
+  say "  $TUTOR_NAME logs        Show recent log lines."
+  say "  $TUTOR_NAME uninstall   Remove everything $TUTOR_NAME installed."
+  say "  $TUTOR_NAME help        Show this help."
+}
+
+# main: dispatch up | login | open | status | stop | logs | uninstall | help.
+main() {
+  cmd=${1:-help}
+  if [ $# -gt 0 ]; then
+    shift
+  fi
+
+  case "$cmd" in
+    up)
+      if [ "${1:-}" = "--server" ]; then
+        fail "$TUTOR_NAME up --server is not available yet."
+      fi
+      os_kind >/dev/null
+      check_prereqs
+      say "$TUTOR_NAME up: not implemented yet."
+      ;;
+    login | open | status | stop | logs | uninstall)
+      say "$TUTOR_NAME $cmd: not implemented yet."
+      ;;
+    help)
+      print_help
+      ;;
+    *)
+      print_help
+      ;;
+  esac
+}
+
+[ "${TUTOR_SOURCE_ONLY:-}" = 1 ] || main "$@"
