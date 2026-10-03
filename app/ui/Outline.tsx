@@ -16,6 +16,7 @@ import type { TutorRoute } from "../../shared/routes.ts";
 import {
   refreshAll,
   useAction,
+  useAddCourse,
   useAskSideQuestion,
   useCourseNavigate,
   useLiveRefresh,
@@ -178,13 +179,7 @@ function AddCourseList({ addCourses }: { addCourses: readonly AddCourseRow[] }) 
 }
 
 function AddCourseItem({ course }: { course: AddCourseRow }) {
-  const rpc = useTutorRpc();
-  const goCourse = useCourseNavigate();
-  const add = useAction(async () => {
-    const { firstLessonId } = await rpc.call("fetchCourse", { courseId: course.courseId });
-    refreshAll();
-    goCourse({ kind: "start", courseId: course.courseId, lessonId: firstLessonId });
-  });
+  const add = useAddCourse(course.courseId);
   return (
     <div className="tp-add-course" data-course-id={course.courseId}>
       <div className="tp-add-course-text">

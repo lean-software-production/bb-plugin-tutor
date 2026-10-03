@@ -21,7 +21,7 @@ import { NOT_A_TUTOR_THREAD } from "../server/coach/auth.ts";
 import { WorkspaceUnreachableError, WriteConflictError, type WorkspaceAccess } from "../server/workspace/access.ts";
 import { formatProgress, parseProgress } from "../layouts/progress/progress-yaml.ts";
 import { createDiskAccess } from "./helpers/disk-access.ts";
-import { emptyGitWorkspace, git, makeFixtureCourseRepo, makeSandbox, makeRepoSandbox, type Sandbox } from "./helpers/disk.ts";
+import { emptyGitWorkspace, git, makeFixtureCourseRepo, makeSandbox, makeRepoSandbox, type FixtureCourseRepoOptions, type Sandbox } from "./helpers/disk.ts";
 import { allPassing, callTool, makeTutorHost, PROJECT_ID, type TutorHost } from "./helpers/fake-bb.ts";
 import { createCourseSource } from "../server/course/index.ts";
 import { THREAD_PAGE_SIZE } from "../server/coach/threads.ts";
@@ -1408,9 +1408,14 @@ interface Added {
 /** A standalone Tutor: no configured course, an empty git workspace, the fixture course in the catalog, and BB's data dir. */
 async function standalone(
   t: TestContext,
-  options: { layout?: "capstone-factory"; starter?: boolean; onHostCall?: (method: string, input: unknown) => unknown } = {},
+  options: {
+    layout?: "capstone-factory";
+    starter?: boolean;
+    onHostCall?: (method: string, input: unknown) => unknown;
+    repo?: Omit<FixtureCourseRepoOptions, "layout" | "starter">;
+  } = {},
 ): Promise<{ host: TutorHost; ws: string; dataDir: string }> {
-  const repo = await makeFixtureCourseRepo({ layout: options.layout ?? "capstone-factory", starter: options.starter ?? true });
+  const repo = await makeFixtureCourseRepo({ layout: options.layout ?? "capstone-factory", starter: options.starter ?? true, ...options.repo });
   const dataDir = await mkdtemp(join(tmpdir(), "bbdata-"));
   const ws = await emptyGitWorkspace();
   const host = await makeTutorHost(null, ws, { workspaceProject: PROJECT_ID, courseCatalog: repo.catalogJson }, {
@@ -1547,6 +1552,42 @@ test("a course fetched over https:// may not name a file:// starter: adding it i
   await assert.rejects(host.harness.behavior.callRpc("fetchCourse", { courseId: "fixture" }), /fetched over https:\/\/ may only name an https:\/\/ starter/);
   assert.deepEqual((await readdir(ws)).sort(), [".git"]);
   assert.deepEqual((await readdir(join(dataDir, "content/fixture"))).sort(), ["course"]);
+  const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.deepEqual(overview.courses.map((entry) => entry.course.id), ["tutor"]);
+});
+
+test("a fetched course goes by its catalog id, whatever its course.yaml says: listed, routed, seeded and coached under it", async (t) => {
+  const { host, ws } = await standalone(t, { repo: { courseYamlId: "its-own-id" } });
+  const added = (await host.harness.behavior.callRpc("fetchCourse", { courseId: "fixture" })) as Added;
+  assert.equal(added.courseId, "fixture");
+  const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.deepEqual(overview.courses.map((entry) => entry.course.id), ["tutor", "fixture"]);
+  assert.deepEqual(overview.courseErrors, []);
+  assert.deepEqual(await readdir(join(ws, ".tutor/seeds")), ["fixture.json"]);
+  assert.equal(overview.courses[1]?.layout.ready, true);
+  const detail = (await host.harness.behavior.callRpc("getLessonDetail", { courseId: "fixture", lessonId: "001" })) as { lesson: { id: string } };
+  assert.equal(detail.lesson.id, "001");
+  const { threadId } = (await host.harness.behavior.callRpc("startNextLesson", { courseId: "fixture", lessonId: "001" })) as { threadId: string };
+  const threads = ((await host.harness.behavior.callRpc("getOverview", null)) as Overview).threads;
+  assert.deepEqual(threads.filter((thread) => thread.id === threadId).map((thread) => thread.courseId), ["fixture"]);
+  await assert.rejects(host.harness.behavior.callRpc("getLessonDetail", { courseId: "its-own-id", lessonId: "001" }), /no course "its-own-id"|could not be loaded/);
+});
+
+test("a course that does not load leaves no record: it is not listed, and it is still offered", async (t) => {
+  const { host, dataDir } = await standalone(t, { repo: { notACourse: true } });
+  await assert.rejects(host.harness.behavior.callRpc("fetchCourse", { courseId: "fixture" }), /is not a course/);
+  assert.deepEqual((await readdir(join(dataDir, "content/fixture"))).includes("fetched.json"), false);
+  const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.deepEqual(overview.courses.map((entry) => entry.course.id), ["tutor"]);
+  assert.deepEqual(overview.courseErrors, []);
+  assert.deepEqual(overview.available.map((entry) => entry.id), ["fixture"]);
+});
+
+test("a catalog course under Tutor's own id is refused and leaves no record", async (t) => {
+  const { host, ws, dataDir } = await standalone(t, { repo: { id: "tutor", courseYamlId: "something-else" } });
+  await assert.rejects(host.harness.behavior.callRpc("fetchCourse", { courseId: "tutor" }), /uses the id "tutor"/);
+  assert.deepEqual(await readdir(join(dataDir, "content")).catch(() => []), [], "nothing was fetched");
+  assert.deepEqual((await readdir(ws)).sort(), [".git"]);
   const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
   assert.deepEqual(overview.courses.map((entry) => entry.course.id), ["tutor"]);
 });

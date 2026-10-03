@@ -31,6 +31,15 @@ export function activeCourse(overview: Overview): CourseOverview | null {
   return started ?? overview.courses.find((entry) => entry.builtin) ?? overview.courses[0] ?? null;
 }
 
+/**
+ * Where "Add the course" lands: the first lesson's start page, under the
+ * course id fetchCourse returns (the catalog id the server lists it under),
+ * not the one the row or panel was offered under.
+ */
+export function addedCourseRoute(added: { courseId: string; firstLessonId: string }): TutorRoute {
+  return { kind: "start", courseId: added.courseId, lessonId: added.firstLessonId };
+}
+
 export function homeDecision(overview: Overview): HomeDecision {
   if (overview.courses.length === 0) return { kind: "error", message: noCourseMessage(overview) };
   // The workspace is there, on a machine that isn't connected: not one to set up again.

@@ -144,6 +144,10 @@ export interface FixtureCourseRepoOptions {
   starter?: boolean;
   /** The catalog entry's and course's id: "fixture" unless given. */
   id?: string;
+  /** course.yaml's own id, when it should differ from the catalog entry's. */
+  courseYamlId?: string;
+  /** Leave course.yaml out: the repo is not a course Tutor can load. */
+  notACourse?: boolean;
 }
 
 export interface FixtureCourseRepo {
@@ -185,14 +189,14 @@ export async function makeFixtureCourseRepo(options: FixtureCourseRepoOptions = 
     .map((lesson) => `  - id: "${lesson.id}"\n    title: ${JSON.stringify(lesson.title)}\n    dir: ${relative(courseRepo, lesson.dir)}\n`)
     .join("");
   const yaml =
-    `id: ${id}\n` +
+    `id: ${options.courseYamlId ?? id}\n` +
     `title: ${JSON.stringify(course.title)}\n` +
     `description: ${JSON.stringify(course.description ?? "")}\n` +
     (options.layout === undefined ? "" : `layout: ${options.layout}\n`) +
     "coach: .agents/coach-me.md\n" +
     (starterRepo === null ? "" : `starter:\n  repo: ${pathToFileURL(starterRepo).href}\n  ref: v1\n`) +
     `lessons:\n${lessons}`;
-  await writeFile(join(courseRepo, "course.yaml"), yaml);
+  if (options.notACourse !== true) await writeFile(join(courseRepo, "course.yaml"), yaml);
   git(courseRepo, "init", "-q", "-b", "main");
   git(courseRepo, "add", "-A");
   git(courseRepo, "commit", "-q", "-m", "Course");

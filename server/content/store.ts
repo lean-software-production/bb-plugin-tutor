@@ -2,13 +2,17 @@
 //
 //   <dataDir>/content/<id>/course        the course's clone, at the catalog entry's ref
 //   <dataDir>/content/<id>/starter       the starter course.yaml names, at its ref (when it names one)
-//   <dataDir>/content/<id>/fetched.json  { ref, at }: written last, so a course counts as fetched only once both clones are in place
+//   <dataDir>/content/<id>/fetched.json  { ref, at }: written by record(), once both clones are in place and the course loads
 //
-// `<id>` is the catalog entry's id (catalog.ts). Nothing here touches the
-// student's workspace (test/no-workspace-io.test.ts allowlists this module).
+// `<id>` is the catalog entry's id (catalog.ts), and a fetched course goes by
+// it (withCatalogId), whatever its course.yaml or ledger calls itself: the
+// store's key, the seed marker, routes and coach threads all agree. Nothing
+// here touches the student's workspace (test/no-workspace-io.test.ts
+// allowlists this module).
 import { readdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { COURSE_FILES } from "../../shared/constants.ts";
+import type { Course } from "../../shared/model.ts";
 import { parseCourseYaml } from "../course/manifest.ts";
 import { isFileUrl, type CatalogEntry } from "./catalog.ts";
 import { fetchRepo } from "./fetch.ts";
@@ -25,8 +29,18 @@ export interface ContentStore {
   root: string;
   /** Every course fetched so far, in the order it was first fetched. */
   fetched(): Promise<FetchedCourse[]>;
-  /** Fetches the course, then the starter its course.yaml names; a clone already at the right ref is kept. */
+  /**
+   * Fetches the course, then the starter its course.yaml names; a clone already at the right ref is kept.
+   * Nothing counts as fetched until record() is called.
+   */
   fetch(entry: CatalogEntry): Promise<{ coursePath: string; starterPath: string | null }>;
+  /** Records the course as fetched (fetched.json), once its clones are in place and it has loaded. */
+  record(entry: CatalogEntry, starter: boolean): Promise<void>;
+}
+
+/** A fetched course as Tutor knows it: under its catalog entry's id, whatever it calls itself. */
+export function withCatalogId(course: Course, id: string): Course {
+  return course.id === id ? course : { ...course, id };
 }
 
 interface FetchedRecord {
@@ -85,12 +99,15 @@ export function createContentStore(dataDir: string, now: () => Date = () => new 
         throw new Error(`The course "${entry.id}" names a starter at ${starter.repo}, but a course fetched over https:// may only name an https:// starter.`);
       }
       if (starter !== null) await fetchRepo(starter.repo, starter.ref, where.starter, { allowFile: local });
+      return { coursePath: where.course, starterPath: starter === null ? null : where.starter };
+    },
+    async record(entry, starter) {
+      const where = paths(entry.id);
       const previous = await readRecord(where.dir);
-      const record: FetchedRecord = { ref: entry.ref, at: previous?.at ?? now().toISOString(), starter: starter !== null };
+      const record: FetchedRecord = { ref: entry.ref, at: previous?.at ?? now().toISOString(), starter };
       const temporary = join(where.dir, `.${RECORD}.tmp`);
       await writeFile(temporary, `${JSON.stringify(record, null, 2)}\n`);
       await rename(temporary, join(where.dir, RECORD));
-      return { coursePath: where.course, starterPath: starter === null ? null : where.starter };
     },
   };
 }

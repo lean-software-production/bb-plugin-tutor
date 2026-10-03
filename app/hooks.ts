@@ -8,6 +8,7 @@ import { BUILTIN_COURSE_ID, BUILTIN_LESSON_ID, NAV_PANEL_PATH, REALTIME_CHANNELS
 import type { TutorRoute } from "../shared/routes.ts";
 import type { RpcContract } from "../shared/rpc.ts";
 import { coursePath, routeCourse } from "./model/course-route.ts";
+import { addedCourseRoute } from "./model/home.ts";
 import { SIDE_CHAT_HINT } from "./model/side-chat.ts";
 import { jumpToRuleSection, type RuleTarget } from "./rule-jump.ts";
 import { withConnectionLossDetection } from "./model/rpc-errors.ts";
@@ -148,6 +149,22 @@ export function useCourseNavigate(): (route: TutorRoute, options?: CourseNavigat
       navigate.toPluginPanel(NAV_PANEL_PATH, { subPath: coursePath(route, options?.ruleKey ?? null), replace: options?.replace }),
     [navigate],
   );
+}
+
+/**
+ * "Add the course" (or "Finish adding the course"): fetchCourse, then the
+ * first lesson's start page under the course id the server returns. The
+ * outline, BB home and the completion page all use this one action.
+ */
+export function useAddCourse(courseId: string | null): Action<[]> {
+  const rpc = useTutorRpc();
+  const goCourse = useCourseNavigate();
+  return useAction(async () => {
+    if (courseId === null) return;
+    const added = await rpc.call("fetchCourse", { courseId });
+    refreshAll();
+    goCourse(addedCourseRoute(added));
+  });
 }
 
 /** Refetch everything after a mutation instead of waiting for the backend's signal. */

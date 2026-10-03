@@ -5,7 +5,7 @@
 // the student's place (and the coach thread) from getOverview instead.
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import type { PluginHomepageSectionProps } from "@get-bb/plugin-sdk/app";
-import { refreshAll, useAction, useCourseNavigate, useLiveRefresh, useOverview, useTutorRpc } from "../hooks.ts";
+import { refreshAll, useAction, useAddCourse, useCourseNavigate, useLiveRefresh, useOverview, useTutorRpc } from "../hooks.ts";
 import { activeCourse, continueView } from "../model/home.ts";
 import { ErrorNotice, InlineText } from "./common.tsx";
 import { Button, Character, Highlight, Meter, Panel } from "./sketch/index.ts";
@@ -29,12 +29,7 @@ export function ContinueSection(_props: PluginHomepageSectionProps) {
     refreshAll();
     navigate.toThread(threadId);
   });
-  const addCourse = useAction(async () => {
-    if (view?.kind !== "add-course") return;
-    const { firstLessonId } = await rpc.call("fetchCourse", { courseId: view.courseId });
-    refreshAll();
-    goCourse({ kind: "start", courseId: view.courseId, lessonId: firstLessonId });
-  });
+  const addCourse = useAddCourse(view?.kind === "add-course" ? view.courseId : null);
 
   if (view === null) {
     return overview.status === "error" ? (

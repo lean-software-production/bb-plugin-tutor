@@ -3,15 +3,17 @@
 // all of it, so a seed never races an adoption or another seed.
 //
 //   1. Fetch the course, then the starter its course.yaml names, into BB's data dir (server/content/store.ts).
-//   2. Load the course, as the world will.
-//   3. If it has a starter, seed it into the workspace on the machine: only what is absent is written (Decision 10).
-//   4. Publish "course", so the outline lists its lessons after Lesson 0.
+//   2. Load the course, as the world will, under its catalog id (withCatalogId).
+//   3. Record it as fetched, only once it has loaded with at least one lesson: a course that doesn't leaves no record.
+//   4. If it has a starter, seed it into the workspace on the machine: only what is absent is written (Decision 10).
+//      A seed that fails leaves the course recorded but unfinished: it is offered as "Finish adding the course".
+//   5. Publish "course", so the outline lists its lessons after Lesson 0.
 //
 // A configured course wins (Decision 12): nothing is fetched then.
 import { BUILTIN_COURSE_ID } from "../../shared/constants.ts";
 import type { Course } from "../../shared/model.ts";
 import { bundleFolder } from "../content/make-bundle.ts";
-import { createContentStore } from "../content/store.ts";
+import { createContentStore, withCatalogId } from "../content/store.ts";
 import { loadCourse } from "../course/load-course.ts";
 import type { TutorRuntime } from "./runtime.ts";
 import type { World } from "./world.ts";
@@ -45,24 +47,31 @@ export async function addCourse(rt: TutorRuntime, world: World, courseId: string
   }
   if (world.dataDir === null) throw new Error("Tutor can't add a course: BB hasn't said where its data folder is.");
 
-  const { coursePath, starterPath } = await createContentStore(world.dataDir).fetch(entry);
-  const course = await loadCourse(coursePath);
-  if (course.id === BUILTIN_COURSE_ID) throw new Error(`The course "${courseId}" uses the id "${BUILTIN_COURSE_ID}", which is Tutor's own Lesson 0.`);
+  if (entry.id === BUILTIN_COURSE_ID) throw new Error(`The course "${courseId}" uses the id "${BUILTIN_COURSE_ID}", which is Tutor's own Lesson 0.`);
+
+  const store = createContentStore(world.dataDir);
+  const { coursePath, starterPath } = await store.fetch(entry);
+  const course = withCatalogId(await loadCourse(coursePath), entry.id);
   const firstLessonId = course.lessons[0]?.id;
   if (firstLessonId === undefined) throw new Error(`The course "${course.title}" has no lessons.`);
+  await store.record(entry, starterPath !== null);
 
   let seeded: AddedCourse["seeded"] = null;
-  if (course.starter !== null && starterPath !== null) {
-    const bundle = await bundleFolder(starterPath, { skip: [...NEVER_SEEDED, ...course.starter.exclude] });
-    const result = await rt.host.seedWorkspace(
-      world.hostId,
-      { root: world.workspace.root, courseId: entry.id, ref: course.starter.ref, bundle },
-      { timeoutMs: SEED_TIMEOUT_MS },
-    );
-    // A seed resumed after an interruption finds its earlier files as "same": they are the starter's too.
-    seeded = { written: result.written.length + result.same.length, kept: result.kept };
+  try {
+    if (course.starter !== null && starterPath !== null) {
+      const bundle = await bundleFolder(starterPath, { skip: [...NEVER_SEEDED, ...course.starter.exclude] });
+      const result = await rt.host.seedWorkspace(
+        world.hostId,
+        { root: world.workspace.root, courseId: entry.id, ref: course.starter.ref, bundle },
+        { timeoutMs: SEED_TIMEOUT_MS },
+      );
+      // A seed resumed after an interruption finds its earlier files as "same": they are the starter's too.
+      seeded = { written: result.written.length + result.same.length, kept: result.kept };
+    }
+  } finally {
+    // Recorded, seeded or not: the outline lists the course, or offers to finish adding it.
+    rt.signals.publish("course", null);
   }
-  rt.signals.publish("course", null);
   return { course, firstLessonId, seeded };
 }
 

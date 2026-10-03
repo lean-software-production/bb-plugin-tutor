@@ -16,7 +16,7 @@ import {
 import type { CourseOverview, Overview } from "../../shared/rpc.ts";
 import { CARD_KIT_TONES, progressCardView, termView } from "./cards.ts";
 import { completionView, doneRibbon, whatsNext } from "./completion.ts";
-import { activeCourse, continueView, doneLessonsLabel, homeDecision } from "./home.ts";
+import { activeCourse, addedCourseRoute, continueView, doneLessonsLabel, homeDecision } from "./home.ts";
 import { parseRuleTabParams, ruleTabTarget, ruleTabView } from "./rule-tab.ts";
 import { welcomeView } from "./welcome.ts";
 
@@ -224,6 +224,14 @@ test("after Lesson 0, BB home's Continue suggests adding the course when nothing
   });
   // A configured course wins (Decision 12): available stays empty, so today's behaviour holds (Lesson 0's own completion).
   assert.deepEqual(continueView({ ...onlyBuiltin, available: [] }).kind, "continue");
+});
+
+test("adding a course lands on its first lesson under the id fetchCourse returns, not the one the row was offered under", () => {
+  assert.deepEqual(addedCourseRoute({ courseId: "software-factory", firstLessonId: "001" }), {
+    kind: "start",
+    courseId: "software-factory",
+    lessonId: "001",
+  });
 });
 
 test("done lessons read as a range", () => {

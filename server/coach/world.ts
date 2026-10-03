@@ -21,7 +21,7 @@ import { WorkspaceUnreachableError, type WorkspaceAccess } from "../workspace/ac
 import { resolveWorkspace, workspaceSetting, type ResolvedWorkspace } from "../workspace/workspace-project.ts";
 import { resolveDataDir } from "../activity/heartbeat.ts";
 import { catalogFrom, type CatalogEntry } from "../content/catalog.ts";
-import { createContentStore, type FetchedCourse } from "../content/store.ts";
+import { createContentStore, withCatalogId, type FetchedCourse } from "../content/store.ts";
 import { resolveCoachMethod, type CoachMethod } from "./coach-file.ts";
 import { readFeatureConfig, resolveConfiguredCourse, resolveProjectHint, type Env, type FeatureConfig } from "./course-path.ts";
 import type { TutorSettings } from "./settings.ts";
@@ -277,11 +277,13 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
       // A configured course wins (Decision 12): fetched content is ignored, and nothing is offered.
       const standalone = refused === null && coursePath === null;
       const catalog = standalone ? readCatalog(values.courseCatalog) : { entries: [], error: null };
-      const fetched: FetchedCourse[] = standalone && dataDir !== null ? await createContentStore(dataDir).fetched() : [];
+      // Never one under Lesson 0's id: add-course.ts refuses to record one, and an older record is ignored.
+      const fetched: FetchedCourse[] =
+        standalone && dataDir !== null ? (await createContentStore(dataDir).fetched()).filter((entry) => entry.id !== BUILTIN_COURSE_ID) : [];
       const entries: CourseEntry[] =
         coursePath !== null
           ? [{ source: coursePath, result: loadCourse(coursePath), seedId: null }]
-          : fetched.map((entry) => ({ source: entry.id, result: loadCourse(entry.coursePath), seedId: entry.id }));
+          : fetched.map((entry) => ({ source: entry.id, result: underCatalogId(loadCourse(entry.coursePath), entry.id), seedId: entry.id }));
       const [builtinResult, results, resolved] = await Promise.all([
         refused ?? loadBuiltin(),
         Promise.all(entries.map((entry) => entry.result)),
@@ -331,6 +333,11 @@ function readCatalog(setting: string | undefined): { entries: readonly CatalogEn
   } catch (cause) {
     return { entries: [], error: cause instanceof Error ? cause.message : String(cause) };
   }
+}
+
+/** A fetched course goes by its catalog id, whatever its course.yaml or ledger says (content/store.ts). */
+function underCatalogId(result: Promise<CourseResult>, id: string): Promise<CourseResult> {
+  return result.then((outcome) => (outcome.course === null ? outcome : { course: withCatalogId(outcome.course, id), error: null }));
 }
 
 function settle(load: Promise<Course>): Promise<CourseResult> {
