@@ -11,7 +11,9 @@
 // connection) simply finishes on the next call: files already on disk come
 // back as "same". Run under the host lock (host.ts), keyed on the
 // workspace's real path, so a seed and an adoption of the same workspace
-// never race.
+// never race. A bundle is refused whole, writing nothing, if any entry's
+// first path segment is `.git` or `.tutor` (case-insensitive): a starter
+// must never write a git hook or a forged seed marker into either.
 import { randomBytes } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
@@ -43,6 +45,19 @@ function seedsDir(root: string): string {
 
 function markerPath(root: string, courseId: string): string {
   return join(seedsDir(root), `${courseId}.json`);
+}
+
+/** The reserved top folders a starter bundle may never write into: Tutor's own `.tutor/` (seed markers, progress) and the student's `.git/` (hooks, config). Compared case-insensitively: macOS filesystems are case-insensitive, so `.TUTOR/x` reaches the same place as `.tutor/x`. */
+const RESERVED_TOP_SEGMENTS = new Set([".git", ".tutor"]);
+
+/** Refuses the whole bundle, writing nothing, if any entry's first path segment is `.git` or `.tutor` (case-insensitive): a starter must never write a forged seed marker, a git hook, or anything else into either. */
+function refuseReservedPaths(bundle: SeedWorkspaceInput["bundle"]): void {
+  for (const entry of bundle.entries) {
+    const first = entry.path.split("/")[0] ?? "";
+    if (RESERVED_TOP_SEGMENTS.has(first.toLowerCase())) {
+      throw new Error(`Bundle entry refused: ${entry.path} writes into ${first}/, which a starter may never write into.`);
+    }
+  }
 }
 
 /** The marker at `path`, or null when there is none, or it is unreadable: the seed simply runs again. */
@@ -90,6 +105,7 @@ export async function seedWorkspace(input: SeedWorkspaceInput, options: SeedWork
   }
 
   validateBundle(input.bundle);
+  refuseReservedPaths(input.bundle);
 
   const written: string[] = [];
   const same: string[] = [];

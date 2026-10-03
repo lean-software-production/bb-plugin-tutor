@@ -114,6 +114,31 @@ test("a seed refuses a bundle with an escaping path and writes nothing, marker i
   assert.equal(await exists(markerPath(root, "tetris")), false);
 });
 
+test("a seed refuses a bundle that writes into .git/, writing nothing, marker included", async (t) => {
+  const root = await tempRoot();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(join(root, ".git"));
+  await writeFile(join(root, ".git", "HEAD"), "ref: refs/heads/main\n");
+
+  const bundle: Bundle = { entries: [fileEntry("ok.txt", "fine\n"), fileEntry(".git/hooks/pre-commit", "#!/bin/sh\nexit 1\n")] };
+  await assert.rejects(seedWorkspace({ root, courseId: "tetris", ref: "v1", bundle }), /\.git\/hooks\/pre-commit/);
+
+  assert.deepEqual(await readdir(root), [".git"]);
+  assert.deepEqual(await readdir(join(root, ".git")), ["HEAD"]);
+  assert.equal(await exists(markerPath(root, "tetris")), false);
+});
+
+test("a seed refuses a bundle that writes into .tutor/ (any case), writing nothing, marker included", async (t) => {
+  const root = await tempRoot();
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  const bundle: Bundle = { entries: [fileEntry("ok.txt", "fine\n"), fileEntry(".TUTOR/seeds/x.json", '{"ref":"forged","complete":true,"at":"now"}')] };
+  await assert.rejects(seedWorkspace({ root, courseId: "tetris", ref: "v1", bundle }), /\.TUTOR\/seeds\/x\.json/);
+
+  assert.deepEqual(await readdir(root), []);
+  assert.equal(await exists(markerPath(root, "tetris")), false);
+});
+
 test("a completed marker for the same ref returns at once, without writing anything new", async (t) => {
   const root = await tempRoot();
   t.after(() => rm(root, { recursive: true, force: true }));
