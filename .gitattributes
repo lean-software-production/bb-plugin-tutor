@@ -6,6 +6,10 @@
 # The vendored brand only feeds generated, committed files (themes/, app/fonts/),
 # so nothing in the plugin reads it at run time.
 /vendor/ export-ignore
+# The launcher ships as its own release asset (install.sh, tutor), not inside
+# the plugin archive. host.ts, host/ and layouts/ stay in the archive: the
+# plugin needs them.
+/standalone/ export-ignore
 
 # The brand repo's files, vendored byte for byte (scripts/sync-brand.ts --check
 # compares bytes), so git never rewrites their line endings.

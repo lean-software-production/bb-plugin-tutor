@@ -7,8 +7,8 @@
 # - one top-level directory bb-plugin-tutor-<version>/ holding package.json and
 #   package-lock.json, and no docs/, scripts/, .github/, vendor/, dist/ or node_modules/;
 # - extracted to a temp dir, `npm ci --omit=dev --ignore-scripts` and
-#   `bb plugin build .` succeed and write dist/app.js, dist/app.css and
-#   dist/app.meta.json.
+#   `bb plugin build .` succeed and write dist/app.js, dist/app.css,
+#   dist/app.meta.json and dist/host.js.
 #
 # `bb plugin build` gets a throwaway BB_DATA_DIR under the temp dir, and no
 # other BB_* settings, so it never touches a BB running on this machine.
@@ -51,7 +51,7 @@ npm ci --omit=dev --ignore-scripts --no-audit --no-fund
 # No inherited BB_* setting (server URL, daemon port, CLI path) may point bb at a real BB.
 while read -r bb_var; do unset "$bb_var"; done < <(compgen -e | grep '^BB_' || true)
 BB_DATA_DIR="$work/bb-data" bb plugin build .
-for artifact in app.js app.css app.meta.json; do
+for artifact in app.js app.css app.meta.json host.js; do
     [ -s "dist/$artifact" ] || fail "bb plugin build did not produce dist/$artifact"
 done
-echo "OK: $file ($(wc -c < "$tgz") bytes, $(printf '%s\n' "$listing" | grep -vc '/$') files) installs and builds; dist/app.js, dist/app.css and dist/app.meta.json present"
+echo "OK: $file ($(wc -c < "$tgz") bytes, $(printf '%s\n' "$listing" | grep -vc '/$') files) installs and builds; dist/app.js, dist/app.css, dist/app.meta.json and dist/host.js present"

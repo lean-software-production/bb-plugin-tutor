@@ -21,3 +21,8 @@ test("the launcher installs the BB the plugin is pinned to", async () => {
   const launcher = await readFile("standalone/tutor", "utf8");
   assert.match(launcher, new RegExp(`^BB_VERSION=${BB.replace(/\./g, "\\.")}$`, "m"));
 });
+
+test("release.yaml attaches install.sh, tutor and the plugin archive", async () => {
+  const release = await readFile(".github/workflows/release.yaml", "utf8");
+  for (const asset of ["install.sh", "tutor", "bb-plugin-tutor-"]) assert.ok(release.includes(asset), asset);
+});

@@ -56,6 +56,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: standalone/tutor passes shellcheck -s sh
         run: node --experimental-strip-types --no-warnings=ExperimentalWarning --test test/launcher-posix.test.ts
+      - name: standalone/tutor parses and runs help under dash
+        run: |
+          dash -n standalone/tutor
+          dash standalone/tutor help
       - run: npx bats standalone/test
 
   release-archive:

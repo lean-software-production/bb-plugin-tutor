@@ -61,3 +61,21 @@ load helper
   ! grep -q "git:" "$STUB_LOG/bb"
   grep -q "plugin config tutor set coachProvider pi" "$STUB_LOG/bb"
 }
+
+@test "a real plugin archive at releases/<version>/ is extracted once, and left alone on a later run" {
+  release_dir="$TUTOR_HOME/releases/$TUTOR_VERSION"
+  plugin_dir="$release_dir/bb-plugin-tutor-$TUTOR_VERSION"
+  pkg_src="$BATS_TEST_TMPDIR/pkg-src"
+  mkdir -p "$release_dir" "$pkg_src"
+  echo '{"name":"bb-plugin-tutor"}' >"$pkg_src/package.json"
+  tar -C "$pkg_src" -czf "$release_dir/bb-plugin-tutor-$TUTOR_VERSION.tgz" package.json
+
+  plugin_install
+  [ -f "$plugin_dir/package.json" ]
+  grep -q "plugin install $plugin_dir" "$STUB_LOG/bb"
+
+  # A later run must not re-extract: a change to the extracted file survives.
+  echo changed >"$plugin_dir/package.json"
+  plugin_install
+  grep -q changed "$plugin_dir/package.json"
+}

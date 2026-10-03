@@ -1,8 +1,11 @@
 // test/launcher-posix.test.ts: standalone/tutor is one POSIX sh file (no
 // bashisms). CI installs shellcheck and always runs this; locally it skips
 // with a clear message when shellcheck isn't on PATH (ruling L2 — replaces
-// checkbashisms, which isn't available here; Ubuntu CI's /bin/sh is dash,
-// which also catches bashisms at run time via `npx bats standalone/test`).
+// checkbashisms, which isn't available here). CI's launcher job also runs
+// `dash -n standalone/tutor` and `dash standalone/tutor help` directly under
+// dash: `npx bats standalone/test` sources the script into bats' own bash
+// process (see standalone/test/helper.bash), so it does not itself exercise
+// dash.
 import { execFileSync } from "node:child_process";
 import { test } from "node:test";
 
