@@ -1,6 +1,6 @@
 # Standalone Tutor spike: pi's environment on an enrolled machine
 
-Status: **not run yet**. This is Task 1 of
+Status: **Linux run in progress** (2026-10-03); macOS not run yet. This is Task 1 of
 [the implementation plan](2026-10-02-standalone-tutor-plan.md), done with the scripts in
 [`standalone/spike/`](../standalone/spike/README.md). Fill in each section from
 `~/tutor-spike-results-<os>/results.txt` on each OS. Leave out tokens, credentials and prompts.
@@ -9,25 +9,26 @@ Status: **not run yet**. This is Task 1 of
 
 | | Linux | macOS |
 |---|---|---|
-| Date | | |
+| Date | 2026-10-03 | |
 | OS and version | | |
 | Node / npm | | |
 | bb-app | 0.44.0 | 0.44.0 |
-| pi (`@earendil-works/pi-coding-agent`) | | |
+| pi (`@earendil-works/pi-coding-agent`) | 0.85.1 | |
 | Native modules built cleanly (`npm.log`) | | |
 
 ## Results
 
 | # | Check | Linux | macOS |
 |---|---|---|---|
-| 1 | The machine daemon's environment has both variables | | |
-| 2 | They survive a service restart | | |
+| 1 | The machine daemon's environment has both variables | PASS | |
+| 2 | They survive a service restart | PASS | |
 | 3 | After re-running BB's installer: service file rewritten? variables kept? (INFO) | | |
-| 4 | Tutor's pi has no credentials before login (INFO) | | |
-| 5 | Login writes to Tutor's pi dir; `~/.pi` unchanged | | |
-| 6 | Model discovery on the machine reads Tutor's pi dir | | |
-| 7 | A pi thread starts pi through `BB_PI_BRIDGE_COMMAND` with Tutor's pi dir | | |
-| 8 | Checks 1 and 7 after a reboot | | |
+| 4 | Tutor's pi has no credentials before login (INFO) | no `auth.json`; 96 models listed, from `OPENCODE_API_KEY` in the shell (see check 9) | |
+| 5 | Login writes to Tutor's pi dir; `~/.pi` unchanged | PASS (openrouter) | |
+| 6 | Model discovery on the machine reads Tutor's pi dir | first run invalid (the spike's `tee-pi` hung BB's `--version` probe; fixed in 79e0b00); re-run pending | |
+| 7 | A pi thread starts pi through `BB_PI_BRIDGE_COMMAND` with Tutor's pi dir | BB ran `tee-pi --version` with `PI_CODING_AGENT_DIR` set to Tutor's dir; thread re-run pending (same cause as 6) | |
+| 8 | Checks 1, 9 and 7 after a reboot | | |
+| 9 | No provider credential in the machine daemon's environment | FAIL: `OPENCODE_API_KEY`, inherited from the systemd user manager. `apply-env.sh` now unsets it (82eb2e7); re-run pending | |
 
 Failures, and the branch taken from the table in the plan's Task 1:
 
@@ -35,16 +36,16 @@ Failures, and the branch taken from the table in the plan's Task 1:
 
 | Constant | Value (Linux) | Value (macOS) |
 |---|---|---|
-| `BB_SERVER_HEALTH_PATH` | | |
-| `BB_SET_MACHINE_URL` | `bb settings general machineServerUrl http://127.0.0.1:<port>` and `bb settings general defaultMachineAccess direct`: confirm | |
-| `BB_CLI_ENV` | `BB_SERVER_URL=http://127.0.0.1:<port>` (found in BB 0.44.0's CLI; `BB_DATA_DIR` does not pick the server): confirm | |
-| `BB_ENROL_LINE_PATTERN` | | |
-| `MACHINE_UNIT_GLOB` / `MACHINE_PLIST_GLOB` | | |
-| The installer body holds the enrolment token? | | |
+| `BB_SERVER_HEALTH_PATH` | `/health` | |
+| `BB_SET_MACHINE_URL` | `bb settings general machineServerUrl http://127.0.0.1:<port>` and `bb settings general defaultMachineAccess direct`: works | |
+| `BB_CLI_ENV` | `BB_SERVER_URL=http://127.0.0.1:<port>` (found in BB 0.44.0's CLI; `BB_DATA_DIR` does not pick the server): works | |
+| `BB_ENROL_LINE_PATTERN` | `curl … -H 'X-BB-Enrollment: <token>' <url> \| sh` (parsed by `setup.sh`) | |
+| `MACHINE_UNIT_GLOB` / `MACHINE_PLIST_GLOB` | `~/.config/systemd/user/bb-host-daemon-127-0-0-1-<port>-<host id>.service` | |
+| The installer body holds the enrolment token? | yes: never keep it | |
 | `MACHINE_UNINSTALL` (did `--uninstall` remove everything?) | | |
 | `PI_PACKAGE` / `PI_VERSION` | `@earendil-works/pi-coding-agent` / | |
 | `PI_LOGIN` (exact steps) | | |
-| `PI_READY` (`pi auth check --provider <p>` with `PI_CODING_AGENT_DIR` set?) | | |
+| `PI_READY` (`pi auth check --provider <p>` with `PI_CODING_AGENT_DIR` set?) | yes | |
 | `bb machine list --json` shape (machine id field, provider field) | | |
 
 ## The BB↔pi exchange
@@ -63,4 +64,19 @@ The redacted turn is in `standalone/e2e/fixtures/pi-rpc-transcript.jsonl`.
 
 ## Corrections to the plan
 
-Anything the spike showed the plan got wrong, and the tasks it changes.
+Taken into the plan as "Amendments from the Linux spike run (2026-10-03)":
+
+1. The `bb` CLI picks its server from `BB_SERVER_URL`, not `BB_DATA_DIR`.
+2. npm has no `--allow-scripts` flag; its default install scripts build the native modules.
+3. BB's installer body holds the enrolment token: the launcher never keeps it, and
+   `tutor uninstall` removes the enrolment and the service file itself.
+4. **Linux: the machine service inherits provider API keys from the systemd user manager** (here
+   `OPENCODE_API_KEY`). `PI_CODING_AGENT_DIR` isolates pi's files, not its environment. Three
+   changes follow:
+   - the drop-in `UnsetEnvironment=`s pi's API-key variables by name;
+   - coach threads are pinned to the provider and model chosen at `tutor login`;
+   - `tutor status` names any key left.
+
+   Check this on macOS too.
+5. BB probes `<BB_PI_BRIDGE_COMMAND> --version` with stdin open and a 15 s limit, so any wrapper
+   must answer one-shot commands at once.

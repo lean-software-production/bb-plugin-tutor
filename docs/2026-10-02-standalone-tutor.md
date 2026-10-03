@@ -88,9 +88,9 @@ right box is unchanged.
 
 `tutor up` installs and runs it; there is no image.
 
-- **Install.** `npm install --prefix ~/.tutor/server/npm bb-app@<pinned>` with `allow-scripts` for
-  `better-sqlite3`, `node-pty` and `@parcel/watcher`. The pinned BB version is a constant in the
-  launcher, released with the plugin.
+- **Install.** `npm install --prefix ~/.tutor/server/npm bb-app@<pinned>`, whose install scripts
+  build `better-sqlite3`, `node-pty` and `@parcel/watcher` (npm runs them by default). The pinned BB
+  version is a constant in the launcher, released with the plugin.
 - **Run.** A user service (`~/Library/LaunchAgents/…tutor-server.plist` on macOS,
   `~/.config/systemd/user/tutor-server.service` on Linux) runs
   `bb-server --data-dir ~/.tutor/server --server-bind-host 127.0.0.1 --server-port 47386`.
@@ -161,6 +161,13 @@ BB's pi provider reads `PI_CODING_AGENT_DIR` from the daemon's environment and s
 machine service gives Tutor its own pi config without touching `~/.pi`. Coach threads are spawned
 with the provider set to pi explicitly (`server/coach/threads.ts` passes none today), so Tutor never
 falls back to another agent.
+
+The reverse leak matters too: on Linux the machine service inherits the systemd user manager's
+environment, which can hold the student's own provider keys (the spike found `OPENCODE_API_KEY`).
+`PI_CODING_AGENT_DIR` keeps pi's files apart, not its environment, so the machine's drop-in also
+unsets every provider credential by name, coach threads are pinned to the provider and model
+chosen at `tutor login`, and `tutor status` names any key that still reaches Tutor's agents
+(see the plan's amendments from the Linux spike).
 
 Because the variables are daemon-wide, everything the machine runs inherits them, including a
 course's own tools. The `capstone-factory` layout's tooling (`pi-rpc-acp`, which the factory's

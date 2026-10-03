@@ -73,8 +73,8 @@ The spec left these open. Each is decided here so a reviewer can see and challen
     - State: `~/.tutor/config` holds `key=value` lines. They are read with `grep`/`sed` and never sourced.
     - Releases: assets are kept in `~/.tutor/releases/<version>/`.
     - Services: `tutor-server.service` on Linux, `com.leansoftwareproduction.tutor-server` on macOS.
-    - BB calls: every `bb` call goes through `tutor_bb()` with `BB_DATA_DIR=~/.tutor/server`, and its output goes to `~/.tutor/logs/launcher.log`.
-    - Enrolment: `bb machine create --provider manual --key tutor-machine`, so a retry reuses the creation. BB's installer script is saved, without the header, so that `tutor uninstall` can run it with `--uninstall`.
+    - BB calls: every `bb` call goes through `tutor_bb()` with `BB_SERVER_URL=http://127.0.0.1:<port>` (amendment 1), and its output goes to `~/.tutor/logs/launcher.log`.
+    - Enrolment: `bb machine create --provider manual --key tutor-machine`, so a retry reuses the creation. BB's installer script holds the enrolment token, so it is deleted after it runs; `tutor uninstall` removes the enrolment and the service file itself (amendment 3).
 18. **`tutor up` refuses some folders as the workspace:** `$HOME` itself, anything inside `~/.tutor` or `~/.bb-machines`, and the course content directory.
 19. **The end-to-end test uses two stand-ins.**
     - A `fake-pi` on `BB_PI_BRIDGE_COMMAND` records its environment and argv, and replays the BB↔pi transcript captured in the spike. This proves a pi coach thread starts on the machine with `~/.tutor/pi`.
@@ -82,6 +82,48 @@ The spec left these open. Each is decided here so a reviewer can see and challen
 
     CI runs with `loginctl enable-linger` so systemd user services work.
 20. **The workspace is `unreachable` when the machine is not connected** (its `Host.status` is not `"connected"`), or when a host call fails with BB's offline error. Every gate shows "Tutor can't reach your computer's machine right now. Run `tutor status`."
+
+## Amendments from the Linux spike run (2026-10-03)
+
+The first run of Task 1, on Linux, changed these parts of the plan. The task text below already
+includes them; the spike document has the evidence.
+
+1. **The `bb` CLI picks its server from `BB_SERVER_URL`, not `BB_DATA_DIR`.** Inside a BB thread
+   `BB_SERVER_URL` already names the host BB, so `tutor_bb()` always sets it
+   (`BB_SERVER_URL=http://127.0.0.1:<port>`). Tasks 15–19.
+2. **npm has no `--allow-scripts` flag.** It runs install scripts by default, so a plain
+   `npm install` builds `better-sqlite3`, `node-pty` and `@parcel/watcher`. Task 16.
+3. **BB's installer body contains the one-time enrolment token,** so the launcher must not keep
+   it. `tutor uninstall` removes the machine's enrolment (`bb machine remove`) and its service
+   file (the unit or plist found by `MACHINE_UNIT_GLOB`/`MACHINE_PLIST_GLOB`) itself, then
+   deletes the machine directory. It never re-runs the installer. Tasks 17 and 19 (this replaces
+   the saved-installer part of Decision 17).
+4. **The machine service inherits provider API keys from the systemd user manager.** The run
+   found `OPENCODE_API_KEY` in the daemon's environment, exported by the desktop session.
+   `PI_CODING_AGENT_DIR` keeps pi's files apart, not its environment, so coach threads could quietly
+   use the student's own key instead of the one `tutor login` set up. Three changes follow:
+   - On Linux, the drop-in also writes `UnsetEnvironment=` for every provider credential the
+     user manager holds. Credentials are found by name (`*_API_KEY`, `*_AUTH_TOKEN`,
+     `*_OAUTH_TOKEN`, `HF_TOKEN`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
+     `AWS_SESSION_TOKEN`), and only the names are read. The list is recomputed on every
+     `tutor up`. launchd can't unset a variable, so on macOS `tutor status` only warns.
+     Task 18.
+   - Coach threads are pinned to the provider and model chosen at `tutor login`. A new plugin
+     setting, `coachModel` (`<provider>/<model>`, empty meaning the provider's default), is passed
+     with `executionInputSources.model: "explicit"`. Then a key that slips through is never
+     picked. Task 18.
+   - `tutor status` lists the names of any provider credentials the machine daemon still sees.
+     Task 19.
+5. **BB checks pi with `<BB_PI_BRIDGE_COMMAND> --version`, with stdin left open, and allows 15 s.**
+   Anything set as `BB_PI_BRIDGE_COMMAND` must answer one-shot commands promptly. The spike's
+   logging wrapper got this wrong at first. Tasks 18 and 21 (`fake-pi`).
+6. **`pi auth check --provider <p>` with `PI_CODING_AGENT_DIR` set** reports whether Tutor's pi is
+   signed in to `p`. That is `PI_READY`, and `tutor login` records `p` in `~/.tutor/config`.
+   Task 18.
+7. **Found on the first run:**
+   - the health path is `/health`;
+   - `bb settings general machineServerUrl|defaultMachineAccess` works;
+   - the machine's systemd unit is `~/.config/systemd/user/bb-host-daemon-127-0-0-1-<port>-<host id>.service`.
 
 ## File structure
 
@@ -132,7 +174,7 @@ This task builds no product code. It answers one question before anything depend
   - `PI_LOGIN`: how to run pi's login against a given agent dir.
   - `PI_READY`: how to tell whether that dir is signed in (expected: `auth.json` there holds at least one provider).
   - `PI_RPC_TRANSCRIPT`: `standalone/e2e/fixtures/pi-rpc-transcript.jsonl`, the BB↔pi exchange of one coach turn, which `fake-pi` (Task 21) replays.
-  - `BB_CLI_ENV`: how the `bb` CLI is pointed at the tutor server (expected `BB_DATA_DIR=~/.tutor/server`).
+  - `BB_CLI_ENV`: how the `bb` CLI is pointed at the tutor server (found: `BB_SERVER_URL=http://127.0.0.1:<port>`; amendment 1).
 
 - [ ] **Step 1: Write `standalone/spike/setup.sh`**
 
@@ -146,13 +188,13 @@ BB_VERSION=0.44.0
 umask 077
 mkdir -p "$SPIKE_HOME/server" "$SPIKE_HOME/pi" "$SPIKE_HOME/bin"
 npm install --prefix "$SPIKE_HOME/npm" "bb-app@$BB_VERSION" \
-  --allow-scripts=better-sqlite3,node-pty,@parcel/watcher >"$SPIKE_HOME/npm.log" 2>&1
+  >"$SPIKE_HOME/npm.log" 2>&1   # npm runs install scripts by default (amendment 2)
 BB="$SPIKE_HOME/npm/node_modules/.bin"
 "$BB/bb-server" --data-dir "$SPIKE_HOME/server" --server-bind-host 127.0.0.1 --server-port "$PORT" \
   >"$SPIKE_HOME/server.log" 2>&1 &
 echo $! >"$SPIKE_HOME/server.pid"
 until curl -fsS "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; do sleep 1; done
-export BB_DATA_DIR="$SPIKE_HOME/server"
+export BB_SERVER_URL="http://127.0.0.1:$PORT"   # not BB_DATA_DIR (amendment 1)
 "$BB/bb" settings general machineServerUrl "http://127.0.0.1:$PORT"
 "$BB/bb" settings general defaultMachineAccess direct
 "$BB/bb" machine create --provider manual --key spike-machine >"$SPIKE_HOME/create.out" 2>&1 &
@@ -209,6 +251,7 @@ git commit -m "Spike: pi's environment on an enrolled machine, Linux and macOS"
 | 2 or 8: a variable is lost on restart or reboot (Linux) | Write the variables into the unit's own `[Service]` section with `systemctl --user edit --full` instead of a drop-in, and repair it on every `tutor up` and `tutor status` (Tasks 18 and 19). |
 | 2 or 8 (macOS): the plist's `EnvironmentVariables` are lost | Repair on every `tutor up`, and have `tutor status` say "Run `tutor up` to repair Tutor's agent settings" (Task 19). Report it to BB together with the `localhost` bug (Task 23). |
 | 1 or 7: BB's pi provider ignores one variable in practice | Point `BB_PI_BRIDGE_COMMAND` at a wrapper, `~/.tutor/bin/pi`, that exports `PI_CODING_AGENT_DIR` and then `exec`s the pinned pi. Then only one variable has to reach the daemon (Task 18). If `BB_PI_BRIDGE_COMMAND` itself is ignored, put `~/.tutor/bin` first on the machine service's `PATH` instead, and say so in Task 18. |
+| 9: the machine daemon sees provider API keys from the systemd user manager (found on Linux) | Done in the plan already (amendment 4): `UnsetEnvironment=` in the drop-in, coach threads pinned to the `tutor login` provider and model, `tutor status` warns. |
 | 6: model discovery reads `~/.pi` although threads use `~/.tutor/pi` | Coach threads also pin the model. `coachProvider` becomes `pi:<model>` (Task 12), and `tutor login` writes the chosen model into `~/.tutor/config` and the plugin setting (Task 18). |
 | 5: pi's login writes outside `PI_CODING_AGENT_DIR` | Stop. Decision 10 of the spec (the student signs Tutor's pi in themselves, kept apart from `~/.pi`) no longer holds, and the design goes back to its author before Phase 5. Phases 2 to 4 do not depend on pi and can go ahead. |
 | The BB↔pi exchange can't be replayed (BB injects an extension that calls back into BB) | `fake-pi` only records its environment and exits cleanly after the first prompt, and every progress check uses the scripted provider (Task 21). |
@@ -1589,7 +1632,7 @@ config_get()   # config_get <key>: value from $TUTOR_HOME/config, or empty; grep
 config_set()   # config_set <key> <value>: atomic rewrite of $TUTOR_HOME/config (0600)
 os_kind()      # "linux" | "macos"; fail with "Tutor runs on macOS and Linux." otherwise
 check_prereqs()# Node 22.19+, 24 or 26; npm; git; each failure names what to install
-tutor_bb()     # BB_DATA_DIR="$TUTOR_HOME/server" "$TUTOR_HOME/server/npm/node_modules/.bin/bb" "$@" >>launcher.log 2>&1
+tutor_bb()     # BB_SERVER_URL="http://127.0.0.1:$(config_get port)" "$TUTOR_HOME/server/npm/node_modules/.bin/bb" "$@" >>launcher.log 2>&1  (amendment 1)
 main()         # dispatch: up | login | open | status | stop | logs | uninstall | help
 ```
 
@@ -1684,7 +1727,7 @@ git commit -m "Launcher skeleton: prerequisites, state file, quiet output"
 - Produces:
 
 ```sh
-server_install()          # npm install --prefix "$TUTOR_HOME/server/npm" "bb-app@$BB_VERSION" --allow-scripts=better-sqlite3,node-pty,@parcel/watcher; skipped when installed at BB_VERSION
+server_install()          # npm install --prefix "$TUTOR_HOME/server/npm" "bb-app@$BB_VERSION" (npm runs the native modules' install scripts by default; amendment 2); skipped when installed at BB_VERSION
 server_service_write()    # linux: ~/.config/systemd/user/tutor-server.service; macos: ~/Library/LaunchAgents/com.leansoftwareproduction.tutor-server.plist
 server_start()            # systemctl --user daemon-reload && enable --now tutor-server | launchctl bootstrap gui/$(id -u) <plist>
 server_wait_healthy()     # curl -fsS http://127.0.0.1:$port<health path>, up to 60 s; fail "Tutor's server didn't start. Run `tutor logs`."
@@ -1716,11 +1759,11 @@ load helper
   grep -q "<string>$HOME/.tutor/server</string>" ~/Library/LaunchAgents/com.leansoftwareproduction.tutor-server.plist
 }
 
-@test "bb-app is installed once, at the pinned version, with the native scripts allowed" {
+@test "bb-app is installed once, at the pinned version, with its install scripts running" {
   server_install; server_install
   [ "$(grep -c 'install' "$STUB_LOG/npm")" -eq 1 ]
   grep -q "bb-app@0.44.0" "$STUB_LOG/npm"
-  grep -q "allow-scripts=better-sqlite3,node-pty,@parcel/watcher" "$STUB_LOG/npm"
+  ! grep -q "ignore-scripts" "$STUB_LOG/npm"   # the native modules must build
 }
 
 @test "the server is configured with 127.0.0.1, never localhost" {
@@ -1770,13 +1813,14 @@ git commit -m "Launcher: install, run and configure the tutor server as a user s
 - Create: `standalone/test/machine.bats`
 
 **Interfaces:**
-- Consumes: from the spike document (Task 1), `BB_ENROL_LINE_PATTERN` and `MACHINE_UNINSTALL`.
+- Consumes: from the spike document (Task 1), `BB_ENROL_LINE_PATTERN`. (The installer body holds the token, so nothing of it is kept; amendment 3.)
 - Produces:
 
 ```sh
 machine_enrol()        # bb machine create --provider manual --key tutor-machine in the background (output → $TUTOR_HOME/enrol.out, 0600);
                        # poll enrol.out for the enrolment line (up to 60 s); write "X-BB-Enrollment: <token>" to $TUTOR_HOME/enrol.header (0600);
-                       # curl -fsSL -H @"$TUTOR_HOME/enrol.header" "<url>" -o "$TUTOR_HOME/machine-installer.sh"; sh it, output → $TUTOR_HOME/install.log;
+                       # curl -fsSL -H @"$TUTOR_HOME/enrol.header" "<url>" -o "$TUTOR_HOME/machine-installer.sh" (0600); sh it, output → $TUTOR_HOME/install.log;
+                       # then delete machine-installer.sh: its body holds the enrolment token (amendment 3);
                        # wait for the background create to exit 0; rm enrol.header and enrol.out; config_set machine_id …
                        # if the installer says the enrolment expired, or create exits non-zero: retry once from the top; then fail.
 machine_wait_connected() # tutor_bb machine list --json shows machine_id connected, up to 60 s
@@ -1799,6 +1843,7 @@ load helper
   ! grep -rq s3cr3t-token "$STUB_LOG" "$TUTOR_HOME/logs" ; ! printf '%s' "$output" | grep -q s3cr3t-token
   grep -q -- '-H @' "$STUB_LOG/curl"
   [ ! -e "$TUTOR_HOME/enrol.header" ]
+  [ ! -e "$TUTOR_HOME/machine-installer.sh" ]   # its body holds the token (amendment 3)
 }
 
 @test "the header file is 0600 while it exists" {
@@ -1845,6 +1890,8 @@ git commit -m "Launcher: enrol the machine without exposing its one-time header"
 **Files:**
 - Modify: `standalone/tutor` (`pi_install`, `machine_env_apply`, `workspace_prepare`, `project_ensure`, `pi_ready`, `cmd_login`, `cmd_open`, `cmd_up`)
 - Create: `standalone/test/pi.bats`, `standalone/test/up.bats`
+- Modify (plugin, amendment 4): `server/coach/settings.ts` (`coachModel`: string, label "Coach model", description "The model coach threads use, as provider/model. Empty uses the coach agent's default."), `server/coach/threads.ts` (`SpawnCoach.model: string | null`; when set, spawn passes `model` and `executionInputSources.model: "explicit"`), `server/rpc/handlers.ts` and `server/coach/world.ts` (read it beside `coachProvider`)
+- Test (plugin): `server/coach/threads.test.ts`, `test/server.test.ts`
 
 **Interfaces:**
 - Consumes: from the spike document (Task 1), `PI_PACKAGE`, `PI_VERSION`, `PI_LOGIN`, `PI_READY`, `MACHINE_UNIT_GLOB` and `MACHINE_PLIST_GLOB`, plus whichever fallback branch Task 1 took.
@@ -1852,14 +1899,19 @@ git commit -m "Launcher: enrol the machine without exposing its one-time header"
 
 ```sh
 pi_install()          # npm install --prefix "$TUTOR_HOME/pi-npm" "$PI_PACKAGE@$PI_VERSION"; ln -sf …/.bin/pi "$TUTOR_HOME/bin/pi"; mkdir -m 700 "$TUTOR_HOME/pi"
-machine_env_apply()   # linux: <unit>.d/tutor.conf with Environment="PI_CODING_AGENT_DIR=…" Environment="BB_PI_BRIDGE_COMMAND=…"; daemon-reload; restart
+machine_env_apply()   # linux: <unit>.d/tutor.conf with Environment="PI_CODING_AGENT_DIR=…" Environment="BB_PI_BRIDGE_COMMAND=…"
+                      #   and UnsetEnvironment=<every name in `systemctl --user show-environment` matching KEY_PATTERN> (amendment 4); daemon-reload; restart
+                      #   KEY_PATTERN='(_API_KEY|_AUTH_TOKEN|_OAUTH_TOKEN)$|^HF_TOKEN$|^AWS_(ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN)$' — names only, values never read
                       # macos: PlistBuddy Add/Set :EnvironmentVariables:… on the machine plist; launchctl bootout + bootstrap
                       # prints nothing; returns 0 when already applied (no restart)
 workspace_prepare()   # mkdir -p; refuse (Decision 18) and refuse a non-empty folder without .tutor/ or a .git only; git init when no .git
 project_ensure()      # tutor_bb project create --name "<basename>" --root "<abs folder>" --machine "$(config_get machine_id)" --json → project id;
                       # tutor_bb plugin config tutor set workspaceProject <id>; config_set workspace, project_id
-pi_ready()            # per PI_READY; exit 0 when signed in
-cmd_login()           # PI_CODING_AGENT_DIR="$TUTOR_HOME/pi" "$TUTOR_HOME/bin/pi" per PI_LOGIN (interactive; stdin is the terminal)
+pi_ready()            # PI_CODING_AGENT_DIR="$TUTOR_HOME/pi" pi auth check --provider "$(config_get provider)" </dev/null; exit 0 when signed in (amendment 6)
+cmd_login()           # PI_CODING_AGENT_DIR="$TUTOR_HOME/pi" "$TUTOR_HOME/bin/pi" per PI_LOGIN (interactive; stdin is the terminal);
+                      # then ask which provider was signed in (or take --provider), check it with pi_ready, config_set provider,
+                      # pick the model (--model, else the first of that provider's models in `tutor_bb provider models pi --machine <id> --json`),
+                      # config_set model, tutor_bb plugin config tutor set coachModel "<provider>/<model>" (amendment 4)
 cmd_open()            # xdg-open / open http://127.0.0.1:$port
 cmd_up()              # check_prereqs → workspace_prepare → server_* → plugin_install → machine_enrol (unless machine_id connected) → pi_install → machine_env_apply → project_ensure → pi_ready || say "Run `tutor login` to connect Tutor to a model provider" → cmd_open
 ```
@@ -1876,6 +1928,19 @@ load helper
   grep -q "Environment=\"PI_CODING_AGENT_DIR=$TUTOR_HOME/pi\"" ~/.config/systemd/user/*.service.d/tutor.conf
   grep -q "Environment=\"BB_PI_BRIDGE_COMMAND=$TUTOR_HOME/bin/pi\"" ~/.config/systemd/user/*.service.d/tutor.conf
   grep -q "restart" "$STUB_LOG/systemctl"
+}
+
+@test "provider credentials the systemd user manager holds are unset for the machine, by name only" {
+  STUB_UNAME=Linux; make_stub_machine_unit
+  STUB_SYSTEMD_ENV=$'PATH=/usr/bin\nOPENCODE_API_KEY=s3cret\nANTHROPIC_OAUTH_TOKEN=s3cret2\nGITHUB_TOKEN=keep' machine_env_apply
+  grep -qx "UnsetEnvironment=OPENCODE_API_KEY ANTHROPIC_OAUTH_TOKEN" ~/.config/systemd/user/*.service.d/tutor.conf
+  ! grep -rq "s3cret" ~/.config/systemd/user "$TUTOR_HOME"
+}
+
+@test "tutor login records the provider and pins coach threads to its model" {
+  STUB_PI_SIGNED_IN=openrouter STUB_PROVIDER_MODELS='openrouter/some-model' run cmd_login --provider openrouter </dev/null
+  [ "$(config_get provider)" = openrouter ]
+  grep -q "plugin config tutor set coachModel openrouter/some-model" "$STUB_LOG/bb"
 }
 
 @test "on macOS the variables go into the machine's plist and the agent is reloaded" {
@@ -1957,15 +2022,17 @@ git commit -m "Launcher: Tutor's own pi, the workspace project, login and open"
 - Create: `standalone/test/lifecycle.bats`
 
 **Interfaces:**
-- Consumes: everything above. `MACHINE_UNINSTALL` comes from the spike document.
+- Consumes: everything above, including `KEY_PATTERN` (Task 18) and the machine's service file from `MACHINE_UNIT_GLOB`/`MACHINE_PLIST_GLOB`.
 - Produces:
 
 ```sh
-cmd_status()    # lines: "Server: healthy|stopped", "Machine: connected|not connected", "Workspace: <path>", "Model provider: signed in|not signed in — run `tutor login`",
+cmd_status()    # lines: "Server: healthy|stopped", "Machine: connected|not connected", "Workspace: <path>", "Model provider: <provider> signed in|not signed in — run `tutor login`",
+                # "Other model keys: none" or "Other model keys: <NAMES> reach Tutor's agents — <how to remove them>" (names in the machine daemon's environment matching KEY_PATTERN; amendment 4),
                 # "Listening: 127.0.0.1 only" or "Listening: also on <addr> — this is unexpected" (ss -ltnp / lsof -iTCP -sTCP:LISTEN for the two services' PIDs)
 cmd_stop()      # stop both services (systemctl --user stop tutor-server <machine unit> | launchctl bootout); keep everything
 cmd_logs()      # tail -n 200 of ~/.tutor/server/logs/server-stdio.log, the machine's logs/host-daemon-stdio.log, ~/.tutor/install.log; these say "bb", by design
-cmd_uninstall() # tutor_bb machine remove <id> --yes; MACHINE_UNINSTALL; stop + remove the server service file; with --purge: rm -rf ~/.tutor and ~/.bb-machines/127.0.0.1-<port>; never the workspace
+cmd_uninstall() # tutor_bb machine remove <id> --yes; stop, disable and remove the machine's service file and its drop-in (unit or plist, found by glob; amendment 3);
+                # stop + remove the server service file; with --purge: rm -rf ~/.tutor and ~/.bb-machines/127.0.0.1-<port>; never the workspace
 ```
 
 - [ ] **Step 1: Write the failing tests**
@@ -1994,6 +2061,12 @@ setup_done() { tutor up "$HOME/my-course" >/dev/null; : >"$STUB_LOG/bb"; : >"$ST
   ! printf '%s' "$output" | grep -iqw bb
 }
 
+@test "status names provider keys that still reach Tutor's agents, never their values" {
+  setup_done; STUB_DAEMON_ENV=$'PATH=/usr/bin\nOPENCODE_API_KEY=s3cret' run tutor status
+  [[ "$output" == *"Other model keys: OPENCODE_API_KEY"* ]]
+  ! printf '%s' "$output" | grep -q s3cret
+}
+
 @test "stop keeps everything; up brings back the same workspace and project" {
   setup_done; tutor stop >/dev/null; run tutor up
   [ "$(config_get project_id)" = prj_stub ]; [ -d "$HOME/my-course/.git" ]
@@ -2004,7 +2077,8 @@ setup_done() { tutor up "$HOME/my-course" >/dev/null; : >"$STUB_LOG/bb"; : >"$ST
   run tutor uninstall --purge
   [ ! -e "$TUTOR_HOME" ]; [ ! -e "$HOME/.bb-machines/127.0.0.1-47386" ]
   [ ! -e ~/.config/systemd/user/tutor-server.service ]
-  grep -q -- "--uninstall" "$STUB_LOG/machine-installer"
+  ! ls ~/.config/systemd/user/bb-host-daemon-127-0-0-1-47386-*.service 2>/dev/null
+  grep -q "machine remove" "$STUB_LOG/bb"
   [ "$(cd "$HOME/my-course" && find . | sort | cksum)" = "$before" ]
 }
 
