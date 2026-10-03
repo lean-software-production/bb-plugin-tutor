@@ -126,6 +126,162 @@ tutor_bb() {
   BB_SERVER_URL="http://127.0.0.1:$port" "$TUTOR_HOME/server/npm/node_modules/.bin/bb" "$@" >>"$TUTOR_HOME/logs/launcher.log" 2>&1
 }
 
+# server_prepare_dirs: create $TUTOR_HOME/server (the bb-server data dir),
+# mode 0700.
+server_prepare_dirs() {
+  mkdir -p "$TUTOR_HOME/server"
+  chmod 700 "$TUTOR_HOME/server"
+}
+
+# server_install: install bb-app at BB_VERSION under $TUTOR_HOME/server/npm.
+# npm runs the native modules' install scripts by default (amendment 2; no
+# --ignore-scripts). Skipped when already installed at BB_VERSION.
+server_install() {
+  marker="$TUTOR_HOME/server/npm/.bb-app-version"
+  if [ -f "$marker" ] && [ "$(cat "$marker")" = "$BB_VERSION" ]; then
+    return 0
+  fi
+  mkdir -p "$TUTOR_HOME/server/npm" "$TUTOR_HOME/logs"
+  npm install --prefix "$TUTOR_HOME/server/npm" "bb-app@$BB_VERSION" >>"$TUTOR_HOME/logs/launcher.log" 2>&1 \
+    || fail "Tutor's server failed to install. Run \`tutor logs\`."
+  printf '%s' "$BB_VERSION" >"$marker"
+}
+
+# systemd_quote <string>: a systemd unit-file quoted argument (a
+# double-quoted token with backslashes and double quotes escaped).
+systemd_quote() {
+  escaped=$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')
+  printf '"%s"' "$escaped"
+}
+
+# xml_escape <string>: the string with XML's five special characters escaped,
+# safe to place inside a plist <string> element.
+xml_escape() {
+  printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&apos;/g'
+}
+
+# server_service_write <port>: write the tutor server's user-service file —
+# the systemd unit on Linux, the launchd plist on macOS — pointing at the
+# installed bb-server on 127.0.0.1:<port>.
+server_service_write() {
+  port=$1
+  server_prepare_dirs
+
+  node_bin=$(command -v node) || fail "Node is not installed."
+  node_dir=$(dirname "$node_bin")
+  bbserver_bin="$TUTOR_HOME/server/npm/node_modules/.bin/bb-server"
+  data_dir="$TUTOR_HOME/server"
+
+  case "$(os_kind)" in
+    linux)
+      unit_dir="$HOME/.config/systemd/user"
+      mkdir -p "$unit_dir"
+      cat >"$unit_dir/tutor-server.service" <<EOF
+[Unit]
+Description=Tutor server
+
+[Service]
+Environment=PATH=$node_dir:/usr/bin:/bin
+ExecStart=$(systemd_quote "$node_bin") $(systemd_quote "$bbserver_bin") --data-dir $(systemd_quote "$data_dir") --server-bind-host 127.0.0.1 --server-port $port
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+EOF
+      ;;
+    macos)
+      plist_dir="$HOME/Library/LaunchAgents"
+      mkdir -p "$plist_dir"
+      cat >"$plist_dir/com.leansoftwareproduction.tutor-server.plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.leansoftwareproduction.tutor-server</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>$(xml_escape "$node_bin")</string>
+    <string>$(xml_escape "$bbserver_bin")</string>
+    <string>--data-dir</string>
+    <string>$(xml_escape "$data_dir")</string>
+    <string>--server-bind-host</string>
+    <string>127.0.0.1</string>
+    <string>--server-port</string>
+    <string>$port</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>$(xml_escape "$node_dir"):/usr/bin:/bin</string>
+  </dict>
+</dict>
+</plist>
+EOF
+      ;;
+  esac
+}
+
+# server_start: load and enable the tutor server's user service so it starts
+# now and on every future login. Lingering stays off (amendment 8).
+server_start() {
+  case "$(os_kind)" in
+    linux)
+      systemctl --user daemon-reload
+      systemctl --user enable --now tutor-server.service
+      ;;
+    macos)
+      launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.leansoftwareproduction.tutor-server.plist"
+      ;;
+  esac
+}
+
+# server_wait_healthy <port>: poll /health until it answers, up to
+# TUTOR_HEALTH_TIMEOUT seconds (default 60; tests set it low).
+server_wait_healthy() {
+  port=$1
+  timeout=${TUTOR_HEALTH_TIMEOUT:-60}
+  waited=0
+  while [ "$waited" -lt "$timeout" ]; do
+    if curl -fsS "http://127.0.0.1:$port/health" >/dev/null 2>&1; then
+      return 0
+    fi
+    waited=$((waited + 1))
+    sleep 1
+  done
+  fail "Tutor's server didn't start. Run \`tutor logs\`."
+}
+
+# server_configure <port>: point the server at itself, directly, on
+# 127.0.0.1 (never localhost).
+server_configure() {
+  port=$1
+  tutor_bb settings general machineServerUrl "http://127.0.0.1:$port"
+  tutor_bb settings general defaultMachineAccess direct
+}
+
+# plugin_install: install the tutor plugin from the release's own archive —
+# never the network — and pin coach threads to pi. Extracted once per
+# version into releases/<v>/bb-plugin-tutor-<v>/.
+plugin_install() {
+  release_dir="$TUTOR_HOME/releases/$TUTOR_VERSION"
+  plugin_dir="$release_dir/bb-plugin-tutor-$TUTOR_VERSION"
+  archive="$release_dir/bb-plugin-tutor-$TUTOR_VERSION.tgz"
+  if [ ! -d "$plugin_dir" ] && [ -f "$archive" ]; then
+    mkdir -p "$plugin_dir"
+    tar -xzf "$archive" -C "$plugin_dir"
+  fi
+  tutor_bb plugin install "$plugin_dir"
+  tutor_bb plugin config tutor set coachProvider pi
+}
+
 print_help() {
   say "Usage: $TUTOR_NAME <command> [options]"
   say ""
