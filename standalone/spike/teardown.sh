@@ -49,6 +49,12 @@ fi
 if [ -f "$SPIKE_HOME/server.pid" ]; then
   kill "$(cat "$SPIKE_HOME/server.pid")" 2>/dev/null && say "Stopped the spike server"
 fi
+# bb-server is a launcher that starts the real server as a child: stopping the
+# launcher alone leaves the server running, so stop anything still running
+# from the spike's own bb-app.
+if pkill -f "$SPIKE_HOME/npm/node_modules/bb-app/" 2>/dev/null; then
+  say "Stopped the spike server's remaining processes"
+fi
 
 rm -rf "$SPIKE_HOME" "$MACHINE_DIR"
 say "Deleted $SPIKE_HOME and $MACHINE_DIR"
