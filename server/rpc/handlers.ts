@@ -140,6 +140,8 @@ export function registerRpc(rt: TutorRuntime): void {
       providerId: pin.providerId,
       model: pin.model,
     });
+    // What the coach was pinned to, so a thread running on another model can be traced to Tutor or to BB.
+    bb.log.info(`[tutor] spawned ${threadId} for ${course.id}/${lesson.id} with provider ${pin.providerId ?? "(BB default)"}, model ${pin.model ?? "(BB default)"}`);
     rt.coaches.remember([{ id: threadId, role: "coach", courseId: course.id, lessonId: lesson.id }]);
     rt.signals.publish("threads", lesson.id);
     return threadId;

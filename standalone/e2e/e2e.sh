@@ -122,6 +122,10 @@ stage_lesson0() {
   printf '%s\n' "$thread" >"$E2E_DIR/lesson0.thread"
   local mid; mid=$(config_get machine_id)
   check "the coach thread runs on the enrolled machine ($mid)" thread_on_machine "$thread" "$mid"
+  # Evidence for the model pin: what Tutor asked for, and what BB recorded for the thread.
+  grep -rh "\[tutor\] spawned $thread" "$TUTOR_HOME/server/logs" 2>/dev/null | tail -n 1 | sed 's/^/info — plugin log: /' | tee -a "$RESULTS"
+  bbx thread show "$thread" --json >"$E2E_DIR/lesson0-thread.json" 2>&1
+  info "BB's record of the thread: $E2E_DIR/lesson0-thread.json ($(grep -o '"model": *"[^"]*"' "$E2E_DIR/lesson0-thread.json" | head -n 1))"
   for _ in $(seq 1 90); do [ "$(launches)" -gt "$before" ] && grep -q -- '--mode rpc --session' "$E2E_DIR/pi-launches.log" && break; sleep 1; done
   # The last launch that is a thread session (BB also probes --version and lists models).
   local last; last=$(awk '/^===/{if (b ~ /--mode rpc --session/) keep=b; b=""} {b=b $0 "\n"} END{if (b ~ /--mode rpc --session/) keep=b; printf "%s", keep}' "$E2E_DIR/pi-launches.log" 2>/dev/null)
