@@ -887,7 +887,8 @@ workspace_refuse_reserved() {
 # TUTOR_WORKSPACE to its absolute path. Refuses (Decision 18) home itself
 # and anything inside ~/.tutor or ~/.bb-machines (which holds the course
 # content too), and a folder that is neither empty nor a Tutor workspace
-# (one with .tutor/, or holding only .git), and any path with a . or ..
+# (one with .tutor/, or holding only .git, or the folder config records as
+# the workspace Tutor set up), and any path with a . or ..
 # component. Creates it if missing, checks its physical path again, and
 # git-inits it when it has no .git. Never deletes anything.
 workspace_prepare() {
@@ -916,7 +917,15 @@ workspace_prepare() {
   if [ -e "$ws" ] && [ ! -d "$ws" ]; then
     fail "$ws is a file, not a folder. Pick a folder for your course, such as ~/my-course."
   fi
-  if [ -d "$ws" ] && [ ! -d "$ws/.tutor" ]; then
+  # The folder config records is the one Tutor set up before, even if the
+  # student added files before Lesson 0 wrote .tutor/.
+  wp_recorded=$(config_get workspace)
+  wp_ours=0
+  if [ -d "$ws" ] && [ -n "$wp_recorded" ] && [ -d "$wp_recorded" ] \
+    && [ "$(cd "$wp_recorded" && pwd -P)" = "$(cd "$ws" && pwd -P)" ]; then
+    wp_ours=1
+  fi
+  if [ -d "$ws" ] && [ ! -d "$ws/.tutor" ] && [ "$wp_ours" -eq 0 ]; then
     for entry in "$ws"/* "$ws"/.[!.]* "$ws"/..?*; do
       [ -e "$entry" ] || [ -L "$entry" ] || continue
       [ "$entry" = "$ws/.git" ] && continue

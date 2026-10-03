@@ -128,3 +128,18 @@ load helper
   run tutor up "$HOME/link"; [ "$status" -eq 0 ]
   [ "$(grep -c 'project create' "$STUB_LOG/bb")" -eq 1 ]
 }
+
+# --- final review: I7 ---
+
+@test "the folder Tutor set up is accepted again after the student added a file, before Lesson 0" {
+  run tutor up "$HOME/my-course"; [ "$status" -eq 0 ]
+  echo mine >"$HOME/my-course/notes.txt"
+  run tutor up; [ "$status" -eq 0 ]
+  run tutor up "$HOME/my-course"; [ "$status" -eq 0 ]
+  ln -s "$HOME/my-course" "$HOME/link"
+  run tutor up "$HOME/link"; [ "$status" -eq 0 ]
+  [ "$(cat "$HOME/my-course/notes.txt")" = mine ]
+  # Another folder with files in it is still refused.
+  mkdir -p "$HOME/other"; echo x >"$HOME/other/a.txt"
+  run tutor up "$HOME/other"; [ "$status" -eq 1 ]
+}
