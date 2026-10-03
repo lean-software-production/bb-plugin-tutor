@@ -141,12 +141,16 @@ tutor_bb() {
 }
 
 # tutor_bb_json <args...>: like tutor_bb, but its stdout comes back to the
-# caller (and is logged too); stderr goes to the log only.
+# caller (and is logged too, also when the command fails: with --json, bb
+# reports its errors on stdout); stderr goes to the log only.
 tutor_bb_json() {
   port=$(tutor_bb_port)
   mkdir -p "$TUTOR_HOME/logs"
-  bb_json=$(BB_SERVER_URL="http://127.0.0.1:$port" "$TUTOR_HOME/server/npm/node_modules/.bin/bb" "$@" 2>>"$TUTOR_HOME/logs/launcher.log") || return 1
+  bbj_status=0
+  bb_json=$(BB_SERVER_URL="http://127.0.0.1:$port" "$TUTOR_HOME/server/npm/node_modules/.bin/bb" "$@" 2>>"$TUTOR_HOME/logs/launcher.log") \
+    || bbj_status=$?
   printf '%s\n' "$bb_json" >>"$TUTOR_HOME/logs/launcher.log"
+  [ "$bbj_status" -eq 0 ] || return 1
   printf '%s' "$bb_json"
 }
 
@@ -1223,10 +1227,13 @@ cmd_stop() {
   say "Tutor is stopped. Run \`$TUTOR_NAME up\` to start it again."
 }
 
-# cmd_logs: the last 200 lines of the server's, the machine's and the
-# installer's own logs. The one command allowed to say "bb" (common.md).
+# cmd_logs: the last 200 lines of the launcher's own log (every step's
+# details: npm, systemctl/launchctl, bb), and of the server's, the
+# machine's and the machine installer's logs. The one command allowed to
+# say "bb" (common.md).
 cmd_logs() {
   lg_port=$(tutor_bb_port)
+  tail -n 200 "$TUTOR_HOME/logs/launcher.log" 2>/dev/null || true
   tail -n 200 "$TUTOR_HOME/server/logs/server-stdio.log" 2>/dev/null || true
   tail -n 200 "$HOME/.bb-machines/127.0.0.1-$lg_port/logs/host-daemon-stdio.log" 2>/dev/null || true
   tail -n 200 "$TUTOR_HOME/install.log" 2>/dev/null || true

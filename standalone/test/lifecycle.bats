@@ -44,3 +44,17 @@ setup_done() { tutor up "$HOME/my-course" >/dev/null; : >"$STUB_LOG/bb"; : >"$ST
 @test "logs is the one command that may say bb" {
   setup_done; run tutor logs; [ "$status" -eq 0 ]
 }
+
+# --- final review: I5 ---
+
+@test "logs includes the launcher's own log, where every step's details go" {
+  mkdir -p "$TUTOR_HOME/logs"; echo "launcher detail 123" >>"$TUTOR_HOME/logs/launcher.log"
+  run tutor logs
+  [ "$status" -eq 0 ]; [[ "$output" == *"launcher detail 123"* ]]
+}
+
+@test "a failing bb command's stdout (its JSON error) is kept in the log" {
+  STUB_BB_FAIL="machine list" STUB_BB_FAIL_STDOUT='{"ok":false,"error":{"code":"unreachable-77"}}' run tutor_bb_json machine list --json
+  [ "$status" -eq 1 ]
+  grep -q "unreachable-77" "$TUTOR_HOME/logs/launcher.log"
+}
