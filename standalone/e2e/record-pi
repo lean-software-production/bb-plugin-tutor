@@ -1,0 +1,18 @@
+#!/bin/sh
+# BB_PI_BRIDGE_COMMAND for the end-to-end test (TUTOR_PI_COMMAND): records how
+# BB starts pi, then runs Tutor's own pi unchanged. One block per launch in
+# $E2E_DIR/pi-launches.log: time, argv, PI_CODING_AGENT_DIR, and the names (never
+# values) of any provider credential in pi's environment.
+#
+# One-shot commands such as `--version` exec pi directly: BB probes it with
+# stdin left open and a 15 s limit, so nothing may sit between them.
+E2E_DIR=${E2E_DIR:-$HOME/tutor-e2e}
+TUTOR_HOME=${TUTOR_HOME:-$HOME/.tutor}
+mkdir -p "$E2E_DIR"
+{
+  printf '=== %s pid %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$$"
+  printf 'argv: %s\n' "$*"
+  printf 'PI_CODING_AGENT_DIR=%s\n' "${PI_CODING_AGENT_DIR-<unset>}"
+  printf 'keys: %s\n' "$(env | cut -d= -f1 | grep -E '(_API_KEY|_AUTH_TOKEN|_OAUTH_TOKEN)$|^HF_TOKEN$|^AWS_(ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN|BEARER_TOKEN_BEDROCK)$|^GOOGLE_APPLICATION_CREDENTIALS$' | tr '\n' ' ')"
+} >>"$E2E_DIR/pi-launches.log"
+exec "$TUTOR_HOME/bin/pi" "$@"
