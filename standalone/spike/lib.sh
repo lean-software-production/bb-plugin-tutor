@@ -7,7 +7,7 @@
 
 SPIKE_HOME=${SPIKE_HOME:-$HOME/.tutor-spike}
 SPIKE_PORT=${SPIKE_PORT:-47399}
-BB_VERSION=${BB_VERSION:-0.44.0}
+BB_VERSION=${BB_VERSION:-0.45.0}
 # The pi tested; record it in the spike document. Override with PI_VERSION=…
 PI_PACKAGE=${PI_PACKAGE:-@earendil-works/pi-coding-agent}
 PI_VERSION=${PI_VERSION:-0.85.1}

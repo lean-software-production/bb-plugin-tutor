@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 
-const BB = "0.44.0";
-const SDK = "0.5.29";
+const BB = "0.45.0";
+const SDK = "0.6.15";
 
 test("package.json, the lockfile and CI pin the same BB and SDK", async () => {
   const pkg = JSON.parse(await readFile("package.json", "utf8"));

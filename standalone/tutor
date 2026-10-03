@@ -11,7 +11,7 @@ TUTOR_NAME=tutor                      # the command's name; a course brand renam
 # shellcheck disable=SC2034 # stamped at release (Task 20); read by test/pins.test.ts and later tasks
 TUTOR_VERSION=0.0.0-dev
 # shellcheck disable=SC2034 # the BB the plugin is pinned to; tutor_bb (later tasks) installs it
-BB_VERSION=0.44.0
+BB_VERSION=0.45.0
 TUTOR_PORT_DEFAULT=47386
 # launchd's name for Tutor's server agent, and its plist's file name.
 SERVER_LABEL=com.leansoftwareproduction.tutor-server

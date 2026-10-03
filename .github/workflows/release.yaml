@@ -15,7 +15,7 @@ permissions:
   contents: write
 
 env:
-  BB_APP_VERSION: 0.44.0
+  BB_APP_VERSION: 0.45.0
 
 jobs:
   release:

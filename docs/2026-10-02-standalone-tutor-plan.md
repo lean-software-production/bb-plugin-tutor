@@ -134,6 +134,12 @@ includes them; the spike document has the evidence.
    - the health path is `/health`;
    - `bb settings general machineServerUrl|defaultMachineAccess` works;
    - the machine's systemd unit is `~/.config/systemd/user/bb-host-daemon-127-0-0-1-<port>-<host id>.service`.
+10. **BB 0.45.0 (2026-10-03).** Tutor pins bb-app 0.45.0 and plugin SDK 0.6.15 (`engines`, CI,
+    release, the launcher's `BB_VERSION`, `test/pins.test.ts`). The plugin needed no code change.
+    The spike's facts were found on 0.44.0; the end-to-end run (Task 21) re-checks them on 0.45.0.
+    `bb plugin build` stamps the build with the bb CLI's own SDK version, so release builds must
+    use a 0.45.0 `bb`: CI installs it, and the end-to-end `build` stage fetches it and checks the
+    stamp.
 
 ## File structure
 

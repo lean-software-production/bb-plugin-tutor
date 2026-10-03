@@ -9,8 +9,8 @@ The design is [`docs/DESIGN.md`](docs/DESIGN.md), as amended by
 [`docs/CHANGELOG-from-design.md`](docs/CHANGELOG-from-design.md). The module map, ownership and
 contracts are in [`docs/IMPLEMENTATION.md`](docs/IMPLEMENTATION.md).
 
-Tutor targets bb-app **0.44.0** (`engines.bb` is `>=0.44.0`, and CI builds with exactly 0.44.0)
-with plugin SDK **0.5.29**, which is pinned exactly in `devDependencies`. The plugin id is `tutor`.
+Tutor targets bb-app **0.45.0** (`engines.bb` is `>=0.45.0`, and CI builds with exactly 0.45.0)
+with plugin SDK **0.6.15**, which is pinned exactly in `devDependencies`. The plugin id is `tutor`.
 
 ## Install
 
@@ -74,7 +74,7 @@ bb plugin build .      # dist/app.* and dist/server.*
 ```
 
 CI (`.github/workflows/ci.yaml`) runs typecheck, the tests and `bb plugin build .` on Node 24.
-It installs bb-app from npm with `npm install --global --ignore-scripts bb-app@0.44.0`, which
+It installs bb-app from npm with `npm install --global --ignore-scripts bb-app@0.45.0`, which
 skips BB's native add-ons, since building a plugin does not need them. CI also builds the release
 archive from `HEAD` and checks that it installs and builds on its own
 (`scripts/release-archive.sh`, `scripts/check-release-archive.sh`).

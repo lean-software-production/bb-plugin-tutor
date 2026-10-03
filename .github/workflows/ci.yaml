@@ -10,7 +10,7 @@ permissions:
 
 env:
   # The BB the plugin targets (package.json engines.bb). Its CLI builds the plugin.
-  BB_APP_VERSION: 0.44.0
+  BB_APP_VERSION: 0.45.0
 
 jobs:
   test:
