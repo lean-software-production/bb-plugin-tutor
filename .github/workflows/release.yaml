@@ -3,8 +3,9 @@ name: Release
 # Push a tag v<version>, where <version> is package.json's version, to publish
 # bb-plugin-tutor-<version>.tgz and its .sha256, plus
 # bb-plugin-tutor-<version>-built.tgz (the archive with its dependencies
-# installed and built), as a GitHub Release. The tutor Feature downloads
-# that tarball and pins its SHA-256. See README.md, Releasing.
+# installed and built), as a GitHub Release. Student servers install the
+# -built.tgz, pinned by its SHA-256 (docs/tutor-students.md in the
+# infrastructure repo). See README.md, Release.
 on:
   push:
     tags: ["v*"]

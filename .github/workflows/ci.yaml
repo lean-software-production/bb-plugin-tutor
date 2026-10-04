@@ -56,7 +56,10 @@ jobs:
         env:
           SERVER_USER: tutor-e2e-server
       - if: failure()
-        run: tail -n 100 ~/tutor-e2e-hosted/machine.log; sudo tail -n 100 ~tutor-e2e-server/server.log
+        # Each log on its own: one that was never written must not hide the other.
+        run: |
+          tail -n 100 ~/tutor-e2e-hosted/machine.log || true
+          sudo tail -n 100 ~tutor-e2e-server/server.log || true
 
   release-archive:
     name: Release archive installs and builds

@@ -1,9 +1,9 @@
 # bb-plugin-tutor
 
-Tutor is a BB plugin for a coached, Gherkin-driven course inside a course Codespace's BB. It is
-the plugin half of the `tutor` devcontainer Feature, which lives in
-[devcontainer-features](https://github.com/lean-software-production/devcontainer-features/tree/main/src/tutor)
-and installs a pinned release of this repo.
+Tutor is a BB plugin for a coached, Gherkin-driven course. Each student has a hosted BB server
+running Tutor, and their Codespace of
+[capstone-project-starter](https://github.com/lean-software-production/capstone-project-starter)
+is that server's machine.
 
 The design is [`docs/DESIGN.md`](docs/DESIGN.md), as amended by
 [`docs/CHANGELOG-from-design.md`](docs/CHANGELOG-from-design.md). The module map, ownership and
@@ -16,26 +16,20 @@ with plugin SDK **0.6.15**, which is pinned exactly in `devDependencies`. The pl
 
 Tutor is hosted: one BB server per student, with the student's Codespace as its machine, rather
 than an all-on-the-laptop launcher. See [`docs/2026-10-04-hosted-tutor.md`](docs/2026-10-04-hosted-tutor.md)
-for the design, and [`docs/tutor-students.md`](../infrastructure/docs/tutor-students.md) (in the
-infrastructure repo) for running and operating student servers.
+for the design, and docs/tutor-students.md in the infrastructure repo for running and operating
+student servers.
 
 ## Install
 
-### In a course Codespace (the supported way)
+### On a student's server (the supported way)
 
-Add the tutor Feature, together with the bb Feature in standalone mode, as devcontainer-features'
-[`.devcontainer/tutor`](https://github.com/lean-software-production/devcontainer-features/tree/main/.devcontainer/tutor)
-does. At image build, the Feature downloads this repo's release
-`bb-plugin-tutor-<version>.tgz`, checks it against a SHA-256 pinned in the Feature, and prebuilds
-it. On start, it installs the plugin into the learner's BB and does the rest of the set-up:
-
-- clones the course (and the starter);
-- registers the course and the factory as BB projects;
-- selects the course outline as the sidebar and the Sketchbook theme (`plugin:tutor:sketchbook`);
-- switches off plugins a learner does not need;
-- runs the keep-alive that reads Tutor's activity heartbeat.
-
-To use a different plugin release, set the Feature's `pluginVersion` and `pluginSha256`.
+An operator installs a release's `bb-plugin-tutor-<version>-built.tgz` (the archive with its
+dependencies installed and built) into each student's BB server, with the infrastructure repo's
+tools (docs/tutor-students.md in the infrastructure repo). The student's Codespace of
+capstone-project-starter joins that server as its only machine, through the `bb` devcontainer
+feature's `machine` mode; the student runs no Tutor command. On the first run, Tutor offers the
+Codespace's checkout (`/workspaces/capstone-project-starter`, the `workspaceFolder` setting) as
+the workspace and, once the student confirms, makes the BB project for it.
 
 ### Directly into a BB
 
@@ -53,8 +47,8 @@ Codespace checkout as the workspace.
   `TUTOR_COURSE_PATH` in the BB server's environment works the same way. Leave both empty for the
   normal, hosted first-run experience.
 - **Workspace.** The first-run page ranks your BB projects as workspace candidates and asks you
-  to confirm one, or offers to check out the Codespace starter. Tutor never creates projects on
-  its own, so register your project as a BB project first if you want to point at an existing one.
+  to confirm one. When none is on a connected machine, it offers the connected machine's
+  `workspaceFolder` checkout instead and makes the BB project for it once you confirm.
 - **Everything else is up to you.** That covers selecting the course outline as the sidebar
   thread list and choosing the Sketchbook theme. Nothing reads the activity heartbeat, which
   lands in `<BB data dir>/.tutor-feature/activity`.
@@ -86,9 +80,11 @@ scripts/tutor-dev/up.sh
 scripts/tutor-dev/install-plugin.sh .      # path-installs this checkout; re-run to rebuild and reload
 ```
 
-The end-to-end walk in [`scripts/tutor-dev/e2e/`](scripts/tutor-dev/e2e/README.md) tests the
-tutor Feature and this plugin together. It uses a devcontainer-features checkout's
-`.devcontainer/tutor`, with this checkout swapped in for the pinned release.
+The hosted end to end is [`e2e/hosted.sh`](e2e/hosted.sh): a student's bb-server as its own
+Linux user, this user's host daemon as the "Codespace" machine, then the first run and the
+lessons (`SERVER_USER=$(id -un) e2e/hosted.sh all` runs it as yourself). CI runs it too. The
+older walk in [`scripts/tutor-dev/e2e/`](scripts/tutor-dev/e2e/README.md) tested the retired
+tutor Feature.
 
 ## Release
 
@@ -113,9 +109,8 @@ A release is a tag `v<version>` whose version equals `version` in `package.json`
    installed and built tree, under the same top-level directory, as
    `bb-plugin-tutor-<x.y.z>-built.tgz`. It then creates the GitHub Release with the archive,
    its `.sha256` and the `-built.tgz`, plus generated notes.
-4. To adopt the release in the tutor Feature, follow the steps in devcontainer-features'
-   [`src/tutor/plugin-pin.sh`](https://github.com/lean-software-production/devcontainer-features/blob/main/src/tutor/plugin-pin.sh).
-   Compute the SHA-256 yourself rather than copying the release's `.sha256`.
+4. To roll the release out to student servers, follow docs/tutor-students.md in the
+   infrastructure repo. Compute the SHA-256 yourself rather than copying the release's `.sha256`.
 
 To build the same archive locally, run `scripts/release-archive.sh v<x.y.z> <out-dir>`, then
 `scripts/check-release-archive.sh <out-dir>/bb-plugin-tutor-<x.y.z>.tgz` (which also writes the
@@ -128,15 +123,18 @@ To build the same archive locally, run `scripts/release-archive.sh v<x.y.z> <out
   environment. A configured course wins: fetched courses are ignored and nothing is offered to
   add.
 - `workspaceProject` (project): the student's workspace, the BB project holding their repo,
-  where coach threads run. Written by the first-run page. Tutor never creates projects.
+  where coach threads run. Written by the first-run page, which makes the project for the
+  Codespace's checkout when there is none. When the workspace's machine is gone (a rebuilt or
+  new Codespace enrols as a new machine), the course page offers the student's current machine's
+  checkout and switches this setting to it.
 - `factoryProject` (project, read only): an older Tutor's workspace setting. It is still read
   when `workspaceProject` is unset, so existing Codespaces carry on, but Tutor never writes it.
 - `coachProvider` (string): the agent provider coach threads are pinned to, such as `claude-code`,
   `codex` or `pi`. Empty uses the first of Claude Code, Codex and pi that BB reports signed in
-  ("ready") on the workspace's machine, on that agent's default model; with none ready, BB's
-  default. `tutor up` sets it to `pi`; the Codespace leaves it empty.
+  ("ready") on the workspace's machine, on that agent's default model. With none ready, the
+  coach buttons wait and say how to sign in. Leave it empty for students.
 - `coachModel` (string): the model coach threads use, as `provider/model`. It applies only with
-  `coachProvider` set; `tutor login` sets it.
+  `coachProvider` set.
 - `courseCatalog` (string): the courses that can be added, as JSON: a list of
   `{ id, title, description, repo, ref }`, each `repo` an `https://` (or the operator's own
   `file://`) URL and each `ref` a tag or a full SHA. Empty uses Tutor's own catalog
