@@ -5,6 +5,7 @@ import { coachThreadMetadataSchema } from "../../shared/model.ts";
 import { createActivityRecorder, resolveDataDir } from "../activity/heartbeat.ts";
 import { registerRpc } from "../rpc/handlers.ts";
 import { createHostClient } from "../workspace/host-client.ts";
+import { isTutorCoachThread } from "./auth.ts";
 import { createCoachRegistry } from "./coach-registry.ts";
 import { coachConfiguration } from "./configure.ts";
 import { factoryWhere } from "./prompts.ts";
@@ -16,6 +17,7 @@ import { defineTutorSettings } from "./settings.ts";
 import { createStateSignals } from "./signals.ts";
 import { listTutorThreads, threadCourse } from "./threads.ts";
 import { registerCoachTools } from "./tools.ts";
+import { createTurnFailures } from "./turn-failures.ts";
 import { createWorldSource, methodCourse, type WorldDeps } from "./world.ts";
 
 export async function registerTutor(bb: BbPluginApi, deps: WorldDeps): Promise<TutorRuntime> {
@@ -30,6 +32,7 @@ export async function registerTutor(bb: BbPluginApi, deps: WorldDeps): Promise<T
     signals: createStateSignals(bb),
     locks: createKeyedLock(),
     coaches: createCoachRegistry(),
+    turnFailures: createTurnFailures(),
     activity: createActivityRecorder({
       dataDir: async () =>
         resolveDataDir({
@@ -72,11 +75,16 @@ export async function registerTutor(bb: BbPluginApi, deps: WorldDeps): Promise<T
   const mayHoldATurn = (thread: { originPluginId: string | null; originKind: string | null }) =>
     thread.originPluginId === bb.pluginId || thread.originKind === "fork";
   bb.events.on("thread.idle", async ({ thread }) => {
+    if (isTutorCoachThread(thread, bb.pluginId)) rt.turnFailures.clear(thread.id);
     if (!mayHoldATurn(thread)) return;
     recheck();
     if (thread.originPluginId === bb.pluginId) rt.signals.observe(await rt.world.load(), { publishIfUnseen: true });
   });
-  bb.events.on("thread.failed", ({ thread }) => {
+  bb.events.on("thread.failed", ({ thread, error }) => {
+    if (isTutorCoachThread(thread, bb.pluginId)) {
+      rt.turnFailures.record(thread.id, error);
+      rt.signals.publish("threads", null);
+    }
     if (mayHoldATurn(thread)) recheck();
   });
   for (const event of ["thread.archived", "thread.unarchived", "thread.deleted"] as const) {

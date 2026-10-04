@@ -87,6 +87,8 @@ export interface LessonNode {
   /** The lesson on screen: its start page, its coach thread or one of its side chats. */
   isViewed: boolean;
   coach: ThreadRow | null;
+  /** Why the coach stopped on its last turn, in Tutor's words; null when it hasn't. */
+  coachFailure: string | null;
   /** No coach thread yet, and this is the lesson the student is on. */
   canStartCoach: boolean;
   sideRows: SideRow[];
@@ -322,6 +324,7 @@ export function buildOutline(input: OutlineInput): OutlineView {
       expandedByDefault: ready && ((lesson.status === "current" && courseId === active) || isViewed),
       isViewed,
       coach,
+      coachFailure: ready ? lesson.coachFailure : null,
       canStartCoach: ready && coachId === null && lesson.status === "current",
       sideRows: coachId === null ? [] : sideRowsOf(coachId, lesson, overview?.threads ?? [], liveById, activeThreadId),
       features: coachId === null ? [] : features(lesson.outline),

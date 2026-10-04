@@ -551,6 +551,7 @@ export const fixtureBuiltinCourseOverview: CourseOverview = {
       status: "done",
       counts: countExamples(lessonExamples(lesson0), fixtureLesson0Student.progress?.examples ?? {}),
       coachThreadId: null,
+      coachFailure: null,
       outline: outline(lesson0.id),
       needsLayout: false,
       canStart: false,
@@ -581,6 +582,7 @@ export const fixtureCourseOverview: CourseOverview = {
     status: statusByLesson[hw.id as keyof typeof statusByLesson],
     counts: countExamples(lessonExamples(hw), hw.id === "002" ? (fixtureStudent.progress?.examples ?? {}) : {}),
     coachThreadId: coachByLesson[hw.id] ?? null,
+    coachFailure: null,
     outline: outline(hw.id),
     needsLayout: false,
     // Mid-way through 002: nothing to adopt until it is done.

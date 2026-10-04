@@ -1000,6 +1000,24 @@ test("a Tutor thread going idle re-reads the factory and signals changes made ou
   assert.deepEqual([last?.channel, last?.payload], ["state-changed", { reason: "iteration", lessonId: "001" }]);
 });
 
+test("a failed turn shows why, in Tutor's words", async (t) => {
+  const { host } = await setup(t);
+  const { threadId } = await openCoach(host, "000");
+  await host.harness.behavior.emitThreadEvent("thread.failed", {
+    thread: makeThreadResponse({ id: threadId, originPluginId: "tutor", projectId: PROJECT_ID }),
+    error: "403: OpenCode's free tier can only be used from within OpenCode",
+  });
+  const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  const lesson = overview.courses[0]!.lessons.find((entry) => entry.id === "000")!;
+  assert.match(lesson.coachFailure ?? "", /^Your coach stopped: its agent said "403/);
+  await host.harness.behavior.emitThreadEvent("thread.idle", {
+    thread: makeThreadResponse({ id: threadId, originPluginId: "tutor", projectId: PROJECT_ID }),
+    lastAssistantText: null,
+  });
+  const after = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.equal(after.courses[0]!.lessons.find((entry) => entry.id === "000")!.coachFailure, null);
+});
+
 test("first run: candidates, confirmation and a course that will not load", async (t) => {
   const { sandbox, host } = await setup(t, {});
   const before = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;

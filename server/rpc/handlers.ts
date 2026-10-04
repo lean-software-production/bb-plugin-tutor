@@ -237,7 +237,7 @@ export function registerRpc(rt: TutorRuntime): void {
         world.workspace.status === "found" && world.coachProvider === "" && world.hostId !== null
           ? await coachAgentState(bb.sdk, world.hostId, (message) => bb.log.warn(message))
           : null;
-      return buildOverview(world, [...threads, ...(await bbSideChatsOf(threads))], agent);
+      return buildOverview(world, [...threads, ...(await bbSideChatsOf(threads))], agent, rt.turnFailures);
     },
 
     getLessonDetail: async ({ courseId, lessonId }) => {

@@ -20,6 +20,7 @@ import type { CoachAgentState, Completion, CourseOverview, CurrentState, Feature
 import { progressFor, recordedProgress } from "../progress/current.ts";
 import { adoptionTargets } from "../coach/actions.ts";
 import { findCoachThread, type TutorThreadRecord } from "../coach/threads.ts";
+import type { TurnFailures } from "../coach/turn-failures.ts";
 import { findCourse, type LoadedCourse, type World } from "../coach/world.ts";
 
 export function publicThread(record: TutorThreadRecord): TutorThread {
@@ -155,7 +156,7 @@ function currentState(view: CourseView, threads: readonly TutorThreadRecord[]): 
   };
 }
 
-function courseOverview(view: CourseView, workspaceFound: boolean, threads: readonly TutorThreadRecord[]): CourseOverview {
+function courseOverview(view: CourseView, workspaceFound: boolean, threads: readonly TutorThreadRecord[], turnFailures: TurnFailures): CourseOverview {
   const { course, student, pointer, ready } = view;
   const starts = adoptionTargets(course, pointer);
   return {
@@ -172,6 +173,7 @@ function courseOverview(view: CourseView, workspaceFound: boolean, threads: read
         status: lessonStatus(course, pointer, lesson.id),
         counts: countExamples(lessonExamples(lesson), progressMap(student, lesson.id)),
         coachThreadId: coachThread?.id ?? null,
+        coachFailure: coachThread === undefined ? null : turnFailures.get(coachThread.id),
         outline: lessonOutline(student, lesson, coachThread),
         needsLayout: !lesson.builtin && !ready,
         // As startNextLesson allows it.
@@ -182,7 +184,12 @@ function courseOverview(view: CourseView, workspaceFound: boolean, threads: read
   };
 }
 
-export function buildOverview(world: World, threads: readonly TutorThreadRecord[], coachAgent: CoachAgentState | null = null): Overview {
+export function buildOverview(
+  world: World,
+  threads: readonly TutorThreadRecord[],
+  coachAgent: CoachAgentState | null = null,
+  turnFailures: TurnFailures = { record: () => undefined, clear: () => undefined, get: () => null },
+): Overview {
   const found = world.workspace.status === "found";
   const views = courseViews(world);
   const ids = new Set(views.map((view) => view.course.id));
@@ -190,7 +197,7 @@ export function buildOverview(world: World, threads: readonly TutorThreadRecord[
   const shown = found ? threads.filter((thread) => ids.has(thread.courseId)) : [];
   return {
     workspace: world.workspace,
-    courses: views.map((view) => courseOverview(view, found, shown)),
+    courses: views.map((view) => courseOverview(view, found, shown, turnFailures)),
     available: world.fetchable,
     courseErrors: world.courseErrors,
     threads: shown.map(publicThread),

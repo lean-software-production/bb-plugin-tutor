@@ -329,6 +329,11 @@ function LessonThreads({
       ) : (
         <>
           <ThreadLink row={{ ...coach, title: coachThreadTitle(lesson.id) }} onNavigate={onNavigate} />
+          {lesson.coachFailure === null ? null : (
+            <div className="tp-outline-note tp-outline-note--error" role="alert">
+              {lesson.coachFailure}
+            </div>
+          )}
           <div className="tp-rules" role="group" aria-label={`Rules of ${lessonLabel(lesson.id)}`}>
             {lesson.features.map((feature) => (
               <div key={feature.slug} className="tp-rule-group">

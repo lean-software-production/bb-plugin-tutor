@@ -7,6 +7,7 @@ import type { CoachRegistry } from "./coach-registry.ts";
 import type { KeyedLock } from "./keyed-lock.ts";
 import type { TutorSettings } from "./settings.ts";
 import type { StateSignals } from "./signals.ts";
+import type { TurnFailures } from "./turn-failures.ts";
 import type { WorldSource } from "./world.ts";
 
 /** What the tools, events and RPC handlers share for one plugin load. */
@@ -24,6 +25,8 @@ export interface TutorRuntime {
   locks: KeyedLock;
   /** Coach threads seen so far, for configure (which cannot ask BB). */
   coaches: CoachRegistry;
+  /** The last failed turn of each coach thread, for the outline. */
+  turnFailures: TurnFailures;
   /** The student-activity stamp the feature's keep-alive reads. */
   activity: ActivityRecorder;
   now: () => Date;

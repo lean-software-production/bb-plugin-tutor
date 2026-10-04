@@ -113,6 +113,8 @@ export const lessonSummarySchema = z.object({
   counts: exampleCountsSchema,
   /** The lesson's coach thread, or null before it has one. */
   coachThreadId: threadIdSchema.nullable(),
+  /** Why the coach stopped on its last turn, in Tutor's words; null when it hasn't, or there is no coach thread. */
+  coachFailure: z.string().nullable(),
   /** Its features and Rules, for the course outline. */
   outline: z.array(featureOutlineSchema),
   /** The course declares a layout that isn't ready in the workspace (or there is no workspace yet), so this lesson can't start. Never for Lesson 0. */
