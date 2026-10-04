@@ -5,7 +5,7 @@
 // the student's place (and the coach thread) from getOverview instead.
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import type { PluginHomepageSectionProps } from "@get-bb/plugin-sdk/app";
-import { refreshAll, useAction, useAddCourse, useCourseNavigate, useLiveRefresh, useOverview, useTutorRpc } from "../hooks.ts";
+import { refreshAll, useAction, useAddCourse, useCoachGate, useCourseNavigate, useLiveRefresh, useOverview, useTutorRpc } from "../hooks.ts";
 import { activeCourse, continueView } from "../model/home.ts";
 import { ErrorNotice, InlineText } from "./common.tsx";
 import { Button, Character, Highlight, Meter, Panel } from "./sketch/index.ts";
@@ -16,6 +16,7 @@ export function ContinueSection(_props: PluginHomepageSectionProps) {
   const navigate = useBbNavigate();
   const goCourse = useCourseNavigate();
   const overview = useOverview();
+  const gate = useCoachGate();
   const view = overview.data === null ? null : continueView(overview.data);
   const lesson = view?.kind === "continue" ? { courseId: view.courseId, lessonId: view.lessonId } : null;
   const coachThreadId = view?.kind === "continue" ? view.coachThreadId : null;
@@ -114,7 +115,8 @@ export function ContinueSection(_props: PluginHomepageSectionProps) {
             {view.complete ? (
               <Button onClick={() => goCourse({ kind: "complete", courseId: view.courseId, lessonId: view.lessonId })}>See what's next →</Button>
             ) : (
-              <Button disabled={toCoach.pending} onClick={() => void toCoach.run()}>
+              // With no coach thread yet, this starts one: it waits for a signed-in agent, as the start page does.
+              <Button disabled={toCoach.pending || (view.coachThreadId === null && !gate.canStart)} onClick={() => void toCoach.run()}>
                 Continue with your coach →
               </Button>
             )}
@@ -124,6 +126,11 @@ export function ContinueSection(_props: PluginHomepageSectionProps) {
               </Button>
             ) : null}
           </div>
+          {view.complete || view.coachThreadId !== null || gate.notice === null ? null : (
+            <p className="tp-agent-notice" role="status">
+              {gate.notice}
+            </p>
+          )}
           {toCoach.error === null ? null : <ErrorNotice message={toCoach.error} />}
         </div>
         <div className="tp-hs-r">

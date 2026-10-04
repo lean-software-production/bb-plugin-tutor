@@ -7,11 +7,11 @@ import { useCallback, useEffect, useState } from "react";
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { WORKSPACE_UNREACHABLE_TEXT } from "../../shared/constants.ts";
 import { formatRoute } from "../../shared/routes.ts";
-import { refreshAll, useAction, useCourseNavigate, useOpenRule, useOverview, useQuery, useTutorRpc } from "../hooks.ts";
+import { refreshAll, useAction, useCoachGate, useCourseNavigate, useOpenRule, useOverview, useQuery, useTutorRpc } from "../hooks.ts";
 import { lessonLabel } from "../model/format.ts";
 import { buildLesson, coachStart, foldsHiding } from "../model/lesson.ts";
 import type { CoachStart, LessonView } from "../model/lesson.ts";
-import { canStartCoachWith } from "../model/outline.ts";
+import type { CoachGate } from "../model/outline.ts";
 import { QUERY_KEYS } from "../state/app-state.ts";
 import { ErrorNotice, Loading, coursePageHref, isPlainClick } from "./common.tsx";
 import { Lesson } from "./Lesson.tsx";
@@ -41,6 +41,7 @@ function markRedirected(): void {
 export function StartPage({ courseId, lessonId, ruleKey }: { courseId: string; lessonId: string; ruleKey: string | null }) {
   const rpc = useTutorRpc();
   const overview = useOverview();
+  const gate = useCoachGate();
   const detail = useQuery(QUERY_KEYS.lessonDetail(courseId, lessonId), () => rpc.call("getLessonDetail", { courseId, lessonId }));
   if (detail.data === null) {
     return (
@@ -58,7 +59,6 @@ export function StartPage({ courseId, lessonId, ruleKey }: { courseId: string; l
   const view = buildLesson(detail.data, lessons, Date.now());
   const canStart = lessons.find((lesson) => lesson.id === lessonId)?.canStart ?? false;
   const start = coachStart(view.status, overview.data?.workspace.status ?? null, canStart);
-  const canStartCoach = canStartCoachWith(overview.data?.coachAgent ?? null);
   return (
     <StartPageBody
       key={lessonId}
@@ -67,7 +67,7 @@ export function StartPage({ courseId, lessonId, ruleKey }: { courseId: string; l
       start={start}
       urlRuleKey={ruleKey}
       staleError={detail.status === "error" ? detail.error : null}
-      canStartCoach={canStartCoach}
+      gate={gate}
     />
   );
 }
@@ -113,14 +113,14 @@ function StartPageBody({
   start,
   urlRuleKey,
   staleError,
-  canStartCoach,
+  gate,
 }: {
   courseId: string;
   view: LessonView;
   start: CoachStart;
   urlRuleKey: string | null;
   staleError: string | null;
-  canStartCoach: boolean;
+  gate: CoachGate;
 }) {
   const rpc = useTutorRpc();
   const navigate = useBbNavigate();
@@ -196,7 +196,7 @@ function StartPageBody({
             error={openCoach.error}
             onStart={() => void openCoach.run()}
             onSetUp={() => goCourse({ kind: "welcome" })}
-            canStartCoach={canStartCoach}
+            gate={gate}
           />
         </div>
       </div>
@@ -210,14 +210,14 @@ function StartCoach({
   error,
   onStart,
   onSetUp,
-  canStartCoach,
+  gate,
 }: {
   start: CoachStart;
   pending: boolean;
   error: string | null;
   onStart: () => void;
   onSetUp: () => void;
-  canStartCoach: boolean;
+  gate: CoachGate;
 }) {
   switch (start) {
     case "loading":
@@ -256,9 +256,14 @@ function StartCoach({
               ? "You finished this lesson. Open a coach thread to look back at how it went."
               : "Your coach works through this lesson with you, one Rule at a time, in your workspace. The conversation opens in its own thread, with this lesson at the top."}
           </p>
-          <Button disabled={pending || (start !== "revisit" && !canStartCoach)} onClick={onStart}>
+          <Button disabled={pending || (start !== "revisit" && !gate.canStart)} onClick={onStart}>
             {pending ? "Starting…" : start === "revisit" ? "Open a coach thread →" : "Start with your coach →"}
           </Button>
+          {start === "revisit" || gate.notice === null ? null : (
+            <p className="tp-prose tp-agent-notice" role="status">
+              {gate.notice}
+            </p>
+          )}
           {error === null ? null : <ErrorNotice message={error} />}
         </div>
       );

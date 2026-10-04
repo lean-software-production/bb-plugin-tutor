@@ -274,6 +274,26 @@ export function canStartCoachWith(agentState: CoachAgentState | null): boolean {
   return agentState === null || agentState.ready !== null;
 }
 
+/** A coach-starting button's gate: whether it is enabled, and what to say beside it while it isn't. */
+export interface CoachGate {
+  canStart: boolean;
+  notice: string | null;
+}
+
+export function coachGate(agentState: CoachAgentState | null): CoachGate {
+  const canStart = canStartCoachWith(agentState);
+  return { canStart, notice: agentState === null || canStart ? null : agentNoticeText(agentState.signIn) };
+}
+
+/**
+ * Whether the page should keep asking for the overview: the student has a
+ * workspace but no coding agent is ready, and signing in to one happens in
+ * their Codespace's terminal, which sends Tutor no signal.
+ */
+export function awaitingAgentSignIn(agentState: CoachAgentState | null): boolean {
+  return agentState !== null && agentState.ready === null;
+}
+
 export function buildOutline(input: OutlineInput): OutlineView {
   const { overview, activeThreadId } = input;
   const status = statusOf(input);
@@ -353,8 +373,9 @@ export function buildOutline(input: OutlineInput): OutlineView {
     action: addCourseAction(course),
   }));
   const agentState = overview?.coachAgent ?? null;
-  const canStartCoach = canStartCoachWith(agentState);
-  const agentNotice = agentState === null || canStartCoach ? null : { text: agentNoticeText(agentState.signIn) };
+  const gate = coachGate(agentState);
+  const canStartCoach = gate.canStart;
+  const agentNotice = gate.notice === null ? null : { text: gate.notice };
   return { brand, status, groups, errors, others, addCourses, agentNotice, canStartCoach };
 }
 

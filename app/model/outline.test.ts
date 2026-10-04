@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fixtureBuiltinCourseOverview, fixtureCourseOverview, fixtureOverview, fixtureOverviewNoFactory } from "../../shared/fixtures.ts";
 import type { Overview } from "../../shared/rpc.ts";
-import { buildOutline, viewedLesson } from "./outline.ts";
+import { awaitingAgentSignIn, buildOutline, coachGate, viewedLesson } from "./outline.ts";
 import type { LessonNode, OutlineInput, OutlineView } from "./outline.ts";
 import { indicatorTone, indicatorView } from "./threads.ts";
 import type { SidebarThreadLike } from "./threads.ts";
@@ -207,6 +207,26 @@ test("with no agent signed in, the outline says how to sign in, and the coach bu
   const outline = buildOutline(input({ overview }));
   assert.deepEqual(outline.agentNotice, { text: "Sign in to a coding agent in your Codespace's terminal, then come back: Claude Code: run `claude`." });
   assert.equal(outline.canStartCoach, false);
+});
+
+test("a coach-starting button waits, with the sign-in notice beside it, only while no agent is ready", () => {
+  const signIn = [{ providerId: "claude-code", name: "Claude Code", command: "claude" }];
+  assert.deepEqual(coachGate({ ready: null, signIn }), {
+    canStart: false,
+    notice: "Sign in to a coding agent in your Codespace's terminal, then come back: Claude Code: run `claude`.",
+  });
+  assert.deepEqual(coachGate({ ready: null, signIn: [{ providerId: "pi", name: "pi", command: null }] }), {
+    canStart: false,
+    notice: "Install and sign in to Claude Code, Codex or pi in your Codespace.",
+  });
+  assert.deepEqual(coachGate({ ready: "claude-code", signIn: [] }), { canStart: true, notice: null });
+  assert.deepEqual(coachGate(null), { canStart: true, notice: null });
+});
+
+test("the page keeps checking for a signed-in agent only while there is a workspace and none is ready", () => {
+  assert.equal(awaitingAgentSignIn({ ready: null, signIn: [] }), true);
+  assert.equal(awaitingAgentSignIn({ ready: "codex", signIn: [] }), false);
+  assert.equal(awaitingAgentSignIn(null), false);
 });
 
 test("a coach thread the sidebar has not listed yet still gets a row", () => {

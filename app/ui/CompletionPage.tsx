@@ -5,7 +5,7 @@
 // with nothing fetched yet), a course that can be added is offered instead.
 import { useRef } from "react";
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
-import { refreshAll, useAction, useAddCourse, useCourseNavigate, useOverview, useQuery, useTutorRpc } from "../hooks.ts";
+import { refreshAll, useAction, useAddCourse, useCoachGate, useCourseNavigate, useOverview, useQuery, useTutorRpc } from "../hooks.ts";
 import { completionView, courseOffer } from "../model/completion.ts";
 import type { CourseOffer, NextLessonView } from "../model/completion.ts";
 import { QUERY_KEYS } from "../state/app-state.ts";
@@ -71,6 +71,7 @@ function NextLesson({ next }: { next: NextLessonView }) {
   const rpc = useTutorRpc();
   const navigate = useBbNavigate();
   const goCourse = useCourseNavigate();
+  const gate = useCoachGate();
   const start = useAction(async () => {
     const { threadId } = next.started
       ? await rpc.call("openCoach", { courseId: next.courseId, lessonId: next.id })
@@ -102,13 +103,18 @@ function NextLesson({ next }: { next: NextLessonView }) {
         </div>
       )}
       <div className="tp-continue">
-        <Button disabled={start.pending} onClick={() => void start.run()}>
+        <Button disabled={start.pending || !gate.canStart} onClick={() => void start.run()}>
           {start.pending ? "Starting…" : next.startLabel}
         </Button>
         <Button secondary onClick={() => goCourse({ kind: "start", courseId: next.courseId, lessonId: next.id })}>
           Read the features first
         </Button>
       </div>
+      {gate.notice === null ? null : (
+        <p className="tp-prose tp-agent-notice" role="status">
+          {gate.notice}
+        </p>
+      )}
       {start.error === null ? null : <ErrorNotice message={start.error} />}
     </>
   );

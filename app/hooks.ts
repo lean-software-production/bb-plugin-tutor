@@ -9,6 +9,7 @@ import type { TutorRoute } from "../shared/routes.ts";
 import type { RpcContract } from "../shared/rpc.ts";
 import { coursePath, routeCourse } from "./model/course-route.ts";
 import { addedCourseRoute } from "./model/home.ts";
+import { awaitingAgentSignIn, coachGate, type CoachGate } from "./model/outline.ts";
 import { SIDE_CHAT_HINT } from "./model/side-chat.ts";
 import { jumpToRuleSection, type RuleTarget } from "./rule-jump.ts";
 import { withConnectionLossDetection } from "./model/rpc-errors.ts";
@@ -81,6 +82,31 @@ export function useQuery<T>(key: string | null, fetcher: () => Promise<T>): Quer
 export function useOverview() {
   const rpc = useTutorRpc();
   return useQuery(QUERY_KEYS.overview, () => rpc.call("getOverview", null));
+}
+
+/** How often a page with a waiting coach button asks again whether an agent is signed in. */
+const AGENT_POLL_MS = 10_000;
+
+/**
+ * The overview's coach gate (coachGate), kept fresh while it waits: signing in
+ * to an agent in the Codespace's terminal sends Tutor no signal, so while
+ * none is ready, refetch the overview on window focus and every 10 s.
+ */
+export function useCoachGate(): CoachGate {
+  const overview = useOverview();
+  const agentState = overview.data?.coachAgent ?? null;
+  const waiting = awaitingAgentSignIn(agentState);
+  useEffect(() => {
+    if (!waiting) return;
+    const refetch = () => queryCache.invalidate((key) => key === QUERY_KEYS.overview);
+    const timer = window.setInterval(refetch, AGENT_POLL_MS);
+    window.addEventListener("focus", refetch);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refetch);
+    };
+  }, [waiting]);
+  return coachGate(agentState);
 }
 
 /**
