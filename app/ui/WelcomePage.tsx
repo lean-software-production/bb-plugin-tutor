@@ -1,13 +1,18 @@
 // First run (mockup 8): confirm the detected workspace (8A) or explain
 // how to create one (8B). The plugin never creates the project itself.
+// A hosted student has no candidates to pick from (their checkout lives on a
+// separate, enrolled machine), so HostedOffer (mockup 8C) offers it instead.
 import { useEffect, useState } from "react";
 import type { Workspace, CandidateProject } from "../../shared/rpc.ts";
 import { refreshAll, useAction, useCourseNavigate, useOverview, useQuery, useStore, useTutorRpc } from "../hooks.ts";
 import { homeDecision } from "../model/home.ts";
-import { welcomeView } from "../model/welcome.ts";
+import { hostedWelcome, welcomeView } from "../model/welcome.ts";
 import { QUERY_KEYS, queryCache, outlineMountedStore } from "../state/app-state.ts";
 import { ErrorNotice, Loading, Notice, SketchPage } from "./common.tsx";
 import { Button, Character, Highlight, Panel, Tick } from "./sketch/index.ts";
+
+/** How often the page checks offerWorkspace again while no machine is enrolled yet. */
+const OFFER_POLL_MS = 5_000;
 
 const COURSE_METHOD =
   "Your coach works through each lesson with you, one Rule at a time, in the workspace you pick below.";
@@ -36,11 +41,15 @@ export function WelcomePage() {
           <Loading label="Looking for your workspace…" />
         )
       ) : (
-        <Picker
-          candidates={candidates.data.projects}
-          workspace={overview.data.workspace}
-          description={course?.description ?? null}
-        />
+        candidates.data.projects.length === 0 ? (
+          <HostedOffer />
+        ) : (
+          <Picker
+            candidates={candidates.data.projects}
+            workspace={overview.data.workspace}
+            description={course?.description ?? null}
+          />
+        )
       )}
       {outlineMounted ? null : (
         <p className="tp-tip">
@@ -48,6 +57,58 @@ export function WelcomePage() {
         </p>
       )}
     </SketchPage>
+  );
+}
+
+/** Mockup 8C: the hosted first run, when there is no candidate project to pick from. */
+function HostedOffer() {
+  const rpc = useTutorRpc();
+  const goCourse = useCourseNavigate();
+  const offer = useQuery(QUERY_KEYS.offer, () => rpc.call("offerWorkspace", null));
+
+  // No machine enrolled yet: the student still has to open theirs, so keep
+  // checking back for it instead of waiting on a signal that never comes.
+  useEffect(() => {
+    if (offer.data?.status !== "no-machine") return;
+    const timer = window.setInterval(() => {
+      queryCache.invalidate((key) => key === QUERY_KEYS.offer);
+    }, OFFER_POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [offer.data?.status]);
+
+  const create = useAction(async (hostId: string, folder: string) => {
+    await rpc.call("createWorkspace", { hostId, folder });
+    // Decide from a fresh overview: the cached one still says "unset".
+    const decision = homeDecision(await rpc.call("getOverview", null));
+    refreshAll();
+    goCourse(decision.kind === "redirect" ? decision.route : { kind: "home" }, { replace: true });
+  });
+
+  if (offer.data === null) {
+    return offer.status === "error" ? (
+      <ErrorNotice message={offer.error} />
+    ) : (
+      <Loading label="Looking for your workspace…" />
+    );
+  }
+
+  const view = hostedWelcome(offer.data);
+  return (
+    <>
+      <p className="tp-eyebrow tp-pick-label">{view.heading}</p>
+      <p className="tp-dek">{view.body}</p>
+      {view.action === null ? null : (
+        <div className="tp-continue">
+          <Button
+            disabled={create.pending}
+            onClick={() => void create.run(view.action!.hostId, view.action!.folder)}
+          >
+            {create.pending ? "Setting up…" : view.action.label}
+          </Button>
+        </div>
+      )}
+      {create.error === null ? null : <ErrorNotice message={create.error} />}
+    </>
   );
 }
 
