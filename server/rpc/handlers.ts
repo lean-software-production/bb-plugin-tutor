@@ -190,7 +190,7 @@ export function registerRpc(rt: TutorRuntime): void {
 
   /**
    * The coachProvider and coachModel settings, each null when empty or unset (resolvePin decides what that means).
-   * The standalone launcher sets both at `tutor login`.
+   * A student's server leaves both empty; an operator may set them.
    */
   function coachPinOf(world: World): CoachPin {
     return {

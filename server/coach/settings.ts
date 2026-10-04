@@ -11,7 +11,7 @@ const descriptors = {
   [SETTING_KEYS.workspaceProject]: {
     type: "project",
     label: "Workspace",
-    description: "The BB project holding your repo, where the coach works. Tutor never creates it.",
+    description: "The project holding your repo, where the coach works. Tutor makes it for your Codespace's checkout when you first start, and again if your Codespace changes.",
   },
   [SETTING_KEYS.factoryProject]: {
     type: "project",
@@ -22,14 +22,14 @@ const descriptors = {
     type: "boolean",
     label: "Simple navigation",
     description:
-      "Hide BB's Plugins and Skills rows from the sidebar navigation. Takes effect while Tutor's navigation is selected under Settings → Appearance → Navigation.",
+      "Hide the Plugins and Skills rows from the sidebar navigation. Takes effect while Tutor's navigation is selected under Settings → Appearance → Navigation.",
     default: true,
   },
   [SETTING_KEYS.coachProvider]: {
     type: "string",
     label: "Coach agent",
     description:
-      "The agent provider coach threads use, such as claude-code, codex or pi. Empty uses the first of Claude Code, Codex and pi you have signed in to on your computer, else BB's default.",
+      "The agent provider coach threads use, such as claude-code, codex or pi. Empty uses the first of Claude Code, Codex and pi you have signed in to in your Codespace, else the default agent.",
   },
   [SETTING_KEYS.coachModel]: {
     type: "string",

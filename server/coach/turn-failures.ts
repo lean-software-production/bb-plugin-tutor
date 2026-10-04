@@ -21,7 +21,12 @@ export function createTurnFailures(): TurnFailures {
   };
 }
 
+/** The most of an agent's message the outline quotes: past it, the message is cut with an ellipsis. */
+export const MAX_QUOTED_FAILURE = 300;
+
 export function failureText(message: string | null): string {
-  const advice = "Sign in to another agent in your Codespace (Claude Code: `claude`), or choose a model under Settings → Tutor → Coach model.";
-  return message === null ? `Your coach stopped. ${advice}` : `Your coach stopped: its agent said "${message}". ${advice}`;
+  const advice = "Sign in to another agent in your Codespace (Claude Code: `claude`), or choose a model under Settings → Plugins → Tutor → Coach model.";
+  if (message === null) return `Your coach stopped. ${advice}`;
+  const quoted = message.length > MAX_QUOTED_FAILURE ? `${message.slice(0, MAX_QUOTED_FAILURE).trimEnd()}…` : message;
+  return `Your coach stopped: its agent said "${quoted}". ${advice}`;
 }

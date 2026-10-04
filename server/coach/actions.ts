@@ -180,7 +180,7 @@ function echo(line: string): string {
 function sectionHeader(line: string): string {
   return [
     "When you turn to this Rule, start your next message with this line, exactly as written and on a line of its own.",
-    "BB draws it as the Rule card, where the Rule's section of this conversation starts; the course outline jumps there.",
+    "Tutor draws it as the Rule card, where the Rule's section of this conversation starts; the course outline jumps there.",
     line,
   ].join("\n");
 }

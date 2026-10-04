@@ -37,7 +37,7 @@ export async function listAllThreads(sdk: Sdk, args: Omit<ThreadListArgs, "limit
     const page = await sdk.threads.list({ ...args, limit: atBound ? 1 : THREAD_PAGE_SIZE, offset });
     if (atBound) {
       if (page.length === 0) return rows;
-      throw new Error(`There are more than ${MAX_LISTED_THREADS} ${what}, more than Tutor reads. Archive the ones you no longer need in BB, then try again.`);
+      throw new Error(`There are more than ${MAX_LISTED_THREADS} ${what}, more than Tutor reads. Archive the ones you no longer need, then try again.`);
     }
     for (const row of page) {
       if (seen.has(row.id)) continue;

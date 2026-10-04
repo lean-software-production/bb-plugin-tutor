@@ -45,7 +45,7 @@ export async function addCourse(rt: TutorRuntime, world: World, courseId: string
     const ids = world.catalog.map((candidate) => candidate.id);
     throw new Error(`There is no course "${courseId}" to add.${ids.length === 0 ? "" : ` Courses you can add: ${ids.join(", ")}.`}`);
   }
-  if (world.dataDir === null) throw new Error("Tutor can't add a course: BB hasn't said where its data folder is.");
+  if (world.dataDir === null) throw new Error("Tutor can't add a course: it has no folder to keep courses in. Tell your course leader.");
 
   if (entry.id === BUILTIN_COURSE_ID) throw new Error(`The course "${courseId}" uses the id "${BUILTIN_COURSE_ID}", which is Tutor's own Lesson 0.`);
 

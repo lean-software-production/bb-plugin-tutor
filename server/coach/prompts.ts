@@ -78,7 +78,7 @@ export function coachThreadPrompt(
     `You are the coach for Lesson ${lesson.id} "${lesson.title}" of the course "${course.title}".`,
     `Load the \`${SKILL_ID}\` skill and follow it. ${method(coach)}`,
     ...(factory === null ? [] : [factoryText(factory)]),
-    "Start your first reply with this line, exactly as written and on a line of its own. BB draws it as the lesson card: the lesson and its Rules.",
+    "Start your first reply with this line, exactly as written and on a line of its own. Tutor draws it as the lesson card: the lesson and its Rules.",
     formatLessonRef({ lessonId: lesson.id }),
   ];
   if (start === "adopt") {
