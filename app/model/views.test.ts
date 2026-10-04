@@ -122,8 +122,8 @@ test("the course root sends the student where they are: a course under way, else
   assert.deepEqual(homeDecision(fixtureOverviewNoFactory), { kind: "redirect", route: { kind: "welcome" } });
   // A workspace whose machine is not connected is not one to set up again.
   const unreachable = { ...fixtureOverviewNoFactory, workspace: { status: "unreachable" as const, projectId: "prj_1", projectName: "repo" } };
-  assert.deepEqual(homeDecision(unreachable), { kind: "error", message: "Tutor can't reach your computer's machine right now. Run `tutor status`." });
-  assert.deepEqual(continueView(unreachable), { kind: "error", message: "Tutor can't reach your computer's machine right now. Run `tutor status`." });
+  assert.deepEqual(homeDecision(unreachable), { kind: "error", message: "Your Codespace is asleep or stopped. Open it and Tutor reconnects by itself." });
+  assert.deepEqual(continueView(unreachable), { kind: "error", message: "Your Codespace is asleep or stopped. Open it and Tutor reconnects by itself." });
   const done = eachCourse((entry) => (entry.builtin || entry.current === null ? entry : { ...entry, current: { ...entry.current, iterationStatus: "Done" } }));
   assert.deepEqual(homeDecision(done), { kind: "redirect", route: { kind: "complete", courseId: "software-factory", lessonId: "002" } });
   const onZero = eachCourse((entry) =>

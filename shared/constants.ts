@@ -189,4 +189,4 @@ export const STARTER_COACH_SKILL = `${STARTER_LAYOUT.skillsDir}/coach-me/SKILL.m
  * connected to BB (the workspace is "unreachable"): the server's RPC errors
  * and tool refusals, and the app's pages.
  */
-export const WORKSPACE_UNREACHABLE_TEXT = "Tutor can't reach your computer's machine right now. Run `tutor status`.";
+export const WORKSPACE_UNREACHABLE_TEXT = "Your Codespace is asleep or stopped. Open it and Tutor reconnects by itself.";

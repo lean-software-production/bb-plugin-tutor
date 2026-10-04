@@ -1217,7 +1217,7 @@ test("before its first lesson is adopted, a course's lessons are ahead: its coac
   assert.ok(threadId);
 });
 
-const UNREACHABLE = /Tutor can't reach your computer's machine right now\. Run `tutor status`\./;
+const UNREACHABLE = /Your Codespace is asleep or stopped\. Open it and Tutor reconnects by itself\./;
 
 test("a machine that is not connected makes the workspace unreachable, with its own message", async (t) => {
   const host = await makeTutorHost(null, "/nowhere", undefined, { hostStatus: "disconnected" });
@@ -1231,6 +1231,13 @@ test("a machine that is not connected makes the workspace unreachable, with its 
   const result = await tool(host, "tutor_status", {}, "thr_coach");
   assert.ok(isError(result));
   assert.match(text(result), UNREACHABLE);
+});
+
+test("an unreachable workspace says the Codespace is asleep, and that Tutor reconnects by itself", async (t) => {
+  const sandbox = await makeSandbox();
+  const host = await makeTutorHost(sandbox.course, sandbox.factoryRoot, { factoryProject: PROJECT_ID }, { hostStatus: "disconnected" });
+  t.after(async () => { await host.harness.lifecycle.dispose(); await sandbox.cleanup(); });
+  await assert.rejects(openCoach(host, "000"), /^Error: Your Codespace is asleep or stopped\. Open it and Tutor reconnects by itself\.$/);
 });
 
 test("a host call that finds the machine offline makes the workspace unreachable, not missing", async (t) => {
