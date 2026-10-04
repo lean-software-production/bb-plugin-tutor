@@ -1,8 +1,8 @@
 # Scripted provider (test fixture)
 
 A credential-free BB agent provider (id `scripted`) used by the Tutor tests
-instead of a real coding agent. This copy, for the standalone end-to-end test
-(`standalone/e2e/e2e.sh`), is devcontainer-features'
+instead of a real coding agent. This copy, for the hosted end-to-end test
+(`e2e/hosted.sh`), is devcontainer-features'
 `test/tutor/fixtures/scripted-provider` with its pins moved to bb-app 0.45.0 and
 plugin SDK 0.6.15 (and 0.5.29 before it); the code is unchanged. It is modelled on upstream
 `examples/plugins/echo-provider`.
