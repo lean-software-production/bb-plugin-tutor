@@ -1,8 +1,10 @@
-// The hosted first run: the student's own machine (their Codespace) holds the
-// workspace. Tutor offers that machine's checkout and, once the student
-// confirms, creates the BB project for it (the only way a hosted student gets one).
+// The hosted workspace: the student's own machine (their Codespace) holds it.
+// Tutor offers that machine's checkout and, once the student confirms, makes
+// (or reuses) the project for it: on the first run, and again when the
+// workspace's machine is gone and the student has a new Codespace (a rebuild
+// or a fresh one enrols as a new machine).
 import type { Sdk } from "../coach/threads.ts";
-import type { WorkspaceAccess } from "../workspace/access.ts";
+import { WorkspaceUnreachableError, type WorkspaceAccess } from "../workspace/access.ts";
 import type { WorkspaceOffer } from "../../shared/rpc.ts";
 
 /**
@@ -21,10 +23,28 @@ export async function studentMachine(sdk: Sdk): Promise<{ id: string; name: stri
   return host === undefined ? null : { id: host.id, name: host.name };
 }
 
-export async function offerHostedWorkspace(sdk: Sdk, access: (hostId: string) => WorkspaceAccess, folder: string): Promise<WorkspaceOffer> {
+/**
+ * The student's machine's checkout of `folder`, to make the workspace.
+ * `workspaceHostId` is the machine the current workspace's project is on, if
+ * any: offering that one again would change nothing, so it counts as no machine
+ * (the page then says the Codespace is asleep). So does a machine that turns
+ * out to be offline when asked.
+ */
+export async function offerHostedWorkspace(
+  sdk: Sdk,
+  access: (hostId: string) => WorkspaceAccess,
+  folder: string,
+  workspaceHostId: string | null = null,
+): Promise<WorkspaceOffer> {
   const machine = await studentMachine(sdk);
-  if (machine === null) return { status: "no-machine" };
-  const kinds = await access(machine.id).kinds([folder]);
+  if (machine === null || machine.id === workspaceHostId) return { status: "no-machine" };
+  let kinds: Awaited<ReturnType<WorkspaceAccess["kinds"]>>;
+  try {
+    kinds = await access(machine.id).kinds([folder]);
+  } catch (cause) {
+    if (cause instanceof WorkspaceUnreachableError) return { status: "no-machine" };
+    throw cause;
+  }
   if (kinds[folder] !== "folder") return { status: "no-folder", folder, machineName: machine.name };
   return { status: "offer", hostId: machine.id, machineName: machine.name, folder };
 }

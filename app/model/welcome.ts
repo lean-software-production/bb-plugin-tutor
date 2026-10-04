@@ -1,7 +1,9 @@
-// First run (mockup 8): confirm the detected workspace (8A), or explain
-// how to set one up when nothing qualifies (8B). The plugin never creates it.
-// A hosted student instead sees the Codespace offer (hostedWelcome): no
-// candidates ever list there, so offerWorkspace drives the page instead.
+// First run (mockup 8): confirm the detected workspace (8A), or, when no
+// project is on a connected machine, the Codespace offer (hostedWelcome, 8C):
+// Tutor makes the project for the student's Codespace checkout once they say
+// so. The same offer comes back when the workspace's machine is gone but the
+// student has a new Codespace (unreachableView).
+import { WORKSPACE_UNREACHABLE_TEXT } from "../../shared/constants.ts";
 import type { Workspace, CandidateProject, WorkspaceOffer } from "../../shared/rpc.ts";
 
 export interface WelcomeView {
@@ -28,6 +30,15 @@ export function welcomeView(candidates: readonly CandidateProject[], workspace: 
   };
 }
 
+/**
+ * Whether the first run offers the student's Codespace checkout (HostedOffer)
+ * instead of the picker: when no candidate project has a folder on a machine
+ * that is connected (none at all, or only ones on a Codespace that is gone).
+ */
+export function showsHostedOffer(candidates: readonly CandidateProject[]): boolean {
+  return !candidates.some((candidate) => candidate.reachable && candidate.root !== null);
+}
+
 export interface HostedWelcome {
   heading: string;
   body: string;
@@ -46,7 +57,7 @@ export function hostedWelcome(offer: WorkspaceOffer): HostedWelcome {
     case "no-folder":
       return {
         heading: "Your workspace folder isn't there",
-        body: `Tutor looked for ${offer.folder} on ${offer.machineName} and didn't find it. Create your Codespace from capstone-project-starter, or set the folder under Settings → Tutor → Workspace folder.`,
+        body: `Tutor looked for ${offer.folder} on ${offer.machineName} and didn't find it. Create your Codespace from capstone-project-starter, or set the folder under Settings → Plugins → Tutor → Workspace folder.`,
         action: null,
       };
     case "offer":
@@ -56,4 +67,21 @@ export function hostedWelcome(offer: WorkspaceOffer): HostedWelcome {
         action: { label: `Use ${offer.folder}`, hostId: offer.hostId, folder: offer.folder },
       };
   }
+}
+
+/**
+ * The page for a workspace whose machine is not connected: with an offer of
+ * the student's current Codespace (a different machine with the workspace
+ * folder: a rebuilt or new Codespace), one button to use it; otherwise (no
+ * offer, or still asking) the Codespace is asleep.
+ */
+export function unreachableView(offer: WorkspaceOffer | null): HostedWelcome {
+  if (offer?.status === "offer") {
+    return {
+      heading: "Your Codespace has changed",
+      body: `Your workspace was on a Codespace that is stopped or gone. Your Codespace (${offer.machineName}) has ${offer.folder}: carry on there.`,
+      action: { label: `Use ${offer.folder} on your Codespace (${offer.machineName})`, hostId: offer.hostId, folder: offer.folder },
+    };
+  }
+  return { heading: "Your Codespace is asleep", body: WORKSPACE_UNREACHABLE_TEXT, action: null };
 }

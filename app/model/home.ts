@@ -15,7 +15,11 @@ export function addCourseAction(course: { unfinished: boolean }): AddCourseActio
   return course.unfinished ? "Finish adding the course" : "Add the course";
 }
 
-export type HomeDecision = { kind: "error"; message: string } | { kind: "redirect"; route: TutorRoute };
+export type HomeDecision =
+  | { kind: "error"; message: string }
+  | { kind: "redirect"; route: TutorRoute }
+  /** The workspace is there, on a machine that isn't connected: its own page (unreachableView), not one to set up again. */
+  | { kind: "unreachable" };
 
 const NO_COURSE = "We couldn't load the course.";
 
@@ -49,9 +53,8 @@ export function addedCourseRoute(added: { courseId: string; firstLessonId: strin
 }
 
 export function homeDecision(overview: Overview): HomeDecision {
+  if (overview.workspace.status === "unreachable") return { kind: "unreachable" };
   if (overview.courses.length === 0) return { kind: "error", message: noCourseMessage(overview) };
-  // The workspace is there, on a machine that isn't connected: not one to set up again.
-  if (overview.workspace.status === "unreachable") return { kind: "error", message: WORKSPACE_UNREACHABLE_TEXT };
   if (overview.workspace.status !== "found") return { kind: "redirect", route: { kind: "welcome" } };
   const active = activeCourse(overview);
   if (active === null) return { kind: "error", message: noCourseMessage(overview) };

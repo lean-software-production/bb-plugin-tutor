@@ -1,12 +1,15 @@
-// First run (mockup 8): confirm the detected workspace (8A) or explain
-// how to create one (8B). The plugin never creates the project itself.
-// A hosted student has no candidates to pick from (their checkout lives on a
-// separate, enrolled machine), so HostedOffer (mockup 8C) offers it instead.
+// First run (mockup 8): confirm the detected workspace (8A), or, when no
+// project is on a connected machine, offer the student's Codespace checkout
+// (HostedOffer, mockup 8C); Tutor makes the project for it once they say so.
+// UnreachablePage is the course page for a workspace whose machine is not
+// connected: it offers the student's current Codespace when that is a
+// different machine (a rebuilt or new Codespace), else says it is asleep.
 import { useEffect, useState } from "react";
-import type { Workspace, CandidateProject } from "../../shared/rpc.ts";
+import type { Workspace, CandidateProject, WorkspaceOffer } from "../../shared/rpc.ts";
 import { refreshAll, useAction, useCourseNavigate, useOverview, useQuery, useStore, useTutorRpc } from "../hooks.ts";
 import { homeDecision } from "../model/home.ts";
-import { hostedWelcome, welcomeView } from "../model/welcome.ts";
+import { hostedWelcome, showsHostedOffer, unreachableView, welcomeView } from "../model/welcome.ts";
+import type { HostedWelcome } from "../model/welcome.ts";
 import { QUERY_KEYS, queryCache, outlineMountedStore } from "../state/app-state.ts";
 import { ErrorNotice, Loading, Notice, SketchPage } from "./common.tsx";
 import { Button, Character, Highlight, Panel, Tick } from "./sketch/index.ts";
@@ -41,7 +44,7 @@ export function WelcomePage() {
           <Loading label="Looking for your workspace…" />
         )
       ) : (
-        candidates.data.projects.length === 0 ? (
+        showsHostedOffer(candidates.data.projects) ? (
           <HostedOffer />
         ) : (
           <Picker
@@ -60,30 +63,56 @@ export function WelcomePage() {
   );
 }
 
-/** Mockup 8C: the hosted first run, when there is no candidate project to pick from. */
-function HostedOffer() {
+/**
+ * offerWorkspace's answer, re-asked every OFFER_POLL_MS while `waiting` says
+ * there is nothing to take yet (the student still has to open their
+ * Codespace, which sends no signal), with the action that takes the offer:
+ * createWorkspace, then on to the course.
+ */
+function useCodespaceOffer(waiting: (offer: WorkspaceOffer) => boolean, alsoRefresh: readonly string[] = []) {
   const rpc = useTutorRpc();
   const goCourse = useCourseNavigate();
   const offer = useQuery(QUERY_KEYS.offer, () => rpc.call("offerWorkspace", null));
-
-  // No machine enrolled yet: the student still has to open theirs, so keep
-  // checking back for it instead of waiting on a signal that never comes.
+  const wait = offer.data !== null && waiting(offer.data);
   useEffect(() => {
-    if (offer.data?.status !== "no-machine") return;
+    if (!wait) return;
+    const keys = new Set<string>([QUERY_KEYS.offer, ...alsoRefresh]);
     const timer = window.setInterval(() => {
-      queryCache.invalidate((key) => key === QUERY_KEYS.offer);
+      queryCache.invalidate((key) => keys.has(key));
     }, OFFER_POLL_MS);
     return () => window.clearInterval(timer);
-  }, [offer.data?.status]);
+  }, [wait]);
 
   const create = useAction(async (hostId: string, folder: string) => {
     await rpc.call("createWorkspace", { hostId, folder });
-    // Decide from a fresh overview: the cached one still says "unset".
+    // Decide from a fresh overview: the cached one still has the old workspace.
     const decision = homeDecision(await rpc.call("getOverview", null));
     refreshAll();
     goCourse(decision.kind === "redirect" ? decision.route : { kind: "home" }, { replace: true });
   });
+  return { offer, create };
+}
 
+/** The offer's button, and what went wrong taking it. */
+function OfferAction({ view, create }: { view: HostedWelcome; create: ReturnType<typeof useCodespaceOffer>["create"] }) {
+  const action = view.action;
+  return (
+    <>
+      {action === null ? null : (
+        <div className="tp-continue">
+          <Button disabled={create.pending} onClick={() => void create.run(action.hostId, action.folder)}>
+            {create.pending ? "Setting up…" : action.label}
+          </Button>
+        </div>
+      )}
+      {create.error === null ? null : <ErrorNotice message={create.error} />}
+    </>
+  );
+}
+
+/** Mockup 8C: the first run when no candidate project is on a connected machine. */
+function HostedOffer() {
+  const { offer, create } = useCodespaceOffer((answer) => answer.status === "no-machine");
   if (offer.data === null) {
     return offer.status === "error" ? (
       <ErrorNotice message={offer.error} />
@@ -97,18 +126,27 @@ function HostedOffer() {
     <>
       <p className="tp-eyebrow tp-pick-label">{view.heading}</p>
       <p className="tp-dek">{view.body}</p>
-      {view.action === null ? null : (
-        <div className="tp-continue">
-          <Button
-            disabled={create.pending}
-            onClick={() => void create.run(view.action!.hostId, view.action!.folder)}
-          >
-            {create.pending ? "Setting up…" : view.action.label}
-          </Button>
-        </div>
-      )}
-      {create.error === null ? null : <ErrorNotice message={create.error} />}
+      <OfferAction view={view} create={create} />
     </>
+  );
+}
+
+/**
+ * The course page while the workspace's machine is not connected. Keeps
+ * asking (the offer, and the overview, which redirects once the machine is
+ * back) until there is something to do.
+ */
+export function UnreachablePage() {
+  const { offer, create } = useCodespaceOffer((answer) => answer.status !== "offer", [QUERY_KEYS.overview]);
+  // Until the offer is known, or when asking for it failed, the Codespace is asleep: there is nothing else to do.
+  const view = unreachableView(offer.data);
+  return (
+    <SketchPage edge={<Character name="waver" className="tp-edge tp-edge--waver" />}>
+      <p className="tp-eyebrow">Your workspace</p>
+      <h1 className="sk-title tp-page-title">{view.heading}</h1>
+      <p className="tp-dek">{view.body}</p>
+      <OfferAction view={view} create={create} />
+    </SketchPage>
   );
 }
 
@@ -145,18 +183,12 @@ function Picker({
       <p className="tp-dek">
         {view.mode === "confirm"
           ? `${description === null ? "" : `${description} `}${COURSE_METHOD}`
-          : "Your coach needs a folder to work in. Run `tutor up <folder>` to make one, or pick a project below."}
+          : "Your coach needs a folder to work in: your Codespace's checkout of capstone-project-starter, or a project below."}
       </p>
       {view.mode === "setup" ? (
         <Panel dashed wash={false} className="tp-howto">
-          <p className="tp-eyebrow">Set one up</p>
-          <ol>
-            <li>
-              Pick the folder you'll work in, then run <code>tutor up &lt;folder&gt;</code> there.
-            </li>
-            <li>Come back here once it's done.</li>
-          </ol>
-          <Button secondary onClick={() => queryCache.invalidate((key) => key === QUERY_KEYS.candidates)}>
+          <HostedOffer />
+          <Button secondary onClick={() => queryCache.invalidate((key) => key === QUERY_KEYS.candidates || key === QUERY_KEYS.offer)}>
             Check again
           </Button>
         </Panel>

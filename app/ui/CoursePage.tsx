@@ -14,7 +14,7 @@ import { routeStore } from "../state/app-state.ts";
 import { ErrorNotice, Loading, SketchPage } from "./common.tsx";
 import { CompletionPage } from "./CompletionPage.tsx";
 import { StartPage } from "./StartPage.tsx";
-import { WelcomePage } from "./WelcomePage.tsx";
+import { UnreachablePage, WelcomePage } from "./WelcomePage.tsx";
 
 export function CoursePage({ subPath }: PluginNavPanelProps) {
   useLiveRefresh();
@@ -77,6 +77,8 @@ function CourseHome() {
       </SketchPage>
     );
   }
+  // The workspace's machine isn't connected: its own page, which offers a new Codespace when there is one.
+  if (decision?.kind === "unreachable") return <UnreachablePage />;
   if (decision?.kind === "error") {
     return (
       <SketchPage>
@@ -84,9 +86,8 @@ function CourseHome() {
         <h1 className="sk-title tp-page-title">We couldn't load the course</h1>
         <ErrorNotice message={decision.message} />
         <p className="tp-prose">
-          Check that the course is checked out, or set its path under Settings → Plugins → Tutor. Tutor looks in the{" "}
-          <code>coursePath</code> setting first, then <code>TUTOR_COURSE_PATH</code>, then the tutor feature's config,
-          then <code>/workspaces/tutorial</code>.
+          Reload the page to try again. If this keeps happening, tell your course leader what it says above; a course
+          author can point Tutor at a course checkout under Settings → Plugins → Tutor → Course folder.
         </p>
       </SketchPage>
     );

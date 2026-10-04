@@ -10,7 +10,7 @@ import { notReadyText } from "../../layouts/state.ts";
 import { adoptionTargets } from "../coach/actions.ts";
 import { coachThreadOf } from "../coach/auth.ts";
 import { recordCoachThread, recordedCoachThread } from "../coach/coach-record.ts";
-import { resolveWorkspace } from "../workspace/workspace-project.ts";
+import { defaultSource, resolveWorkspace } from "../workspace/workspace-project.ts";
 import { coachThreadLockKey, workspaceLockKey } from "../coach/lock-keys.ts";
 import { addCourse, CONFIGURED_COURSE_TEXT } from "../coach/add-course.ts";
 import { findOrCreateProject, offerHostedWorkspace } from "./hosted-workspace.ts";
@@ -229,6 +229,12 @@ export function registerRpc(rt: TutorRuntime): void {
     return workspace;
   }
 
+  /** The machine holding `projectId`'s default source, or null when the project or its source is gone. */
+  async function projectHostId(projectId: string): Promise<string | null> {
+    const project = await bb.sdk.projects.get({ projectId }).catch(() => null);
+    return project === null ? null : (defaultSource(project)?.hostId ?? null);
+  }
+
   bb.rpc.register(rpcContract, {
     getOverview: async () => {
       const world = await loadWorld();
@@ -305,7 +311,10 @@ export function registerRpc(rt: TutorRuntime): void {
 
     offerWorkspace: async () => {
       const world = await rt.world.load();
-      return offerHostedWorkspace(bb.sdk, rt.access, world.workspaceFolder);
+      // An unreachable workspace's machine: a different connected one (a rebuilt Codespace) is offered instead.
+      const workspaceHostId =
+        world.workspace.status === "unreachable" ? await projectHostId(world.workspace.projectId) : null;
+      return offerHostedWorkspace(bb.sdk, rt.access, world.workspaceFolder, workspaceHostId);
     },
 
     createWorkspace: async ({ hostId, folder }) => {

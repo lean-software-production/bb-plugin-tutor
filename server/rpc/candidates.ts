@@ -1,10 +1,11 @@
-// First run: which BB projects could be the student's workspace. Tutor
-// suggests and the student confirms; it never creates a project. When the
-// loaded course uses the capstone-factory layout, a capstone-project-starter
-// clone qualifies by its layout (tetris/.factory, factory/, or the coach-me
-// skill), and a folder that is a factory itself, as before, by its ITERATION
-// or an AGENTS.md naming the coach. Without that layout, every standard
-// project qualifies as a workspace: Tutor can set one up with `tutor up`.
+// First run: which projects could be the student's workspace. Tutor suggests
+// and the student confirms; the hosted first run (hosted-workspace.ts) makes
+// the project for the student's Codespace checkout instead when none of these
+// is on a connected machine. When the loaded course uses the capstone-factory
+// layout, a capstone-project-starter clone qualifies by its layout
+// (tetris/.factory, factory/, or the coach-me skill), and a folder that is a
+// factory itself, as before, by its ITERATION or an AGENTS.md naming the
+// coach. Without that layout, every standard project qualifies as a workspace.
 // Each project's folder is probed through the WorkspaceAccess of the machine
 // holding it.
 import { basename, extname, join, resolve } from "node:path";
@@ -35,6 +36,8 @@ export interface ProjectProbe {
   starter?: { factory: string | null };
   /** Whether the folder already holds `.tutor/`: a workspace Tutor has used before. */
   hasTutorDir: boolean;
+  /** False when the machine holding the folder could not be asked (it is not connected); true unless given. */
+  reachable?: boolean;
 }
 
 interface CandidateContext {
@@ -51,7 +54,7 @@ interface CandidateContext {
 }
 
 export function describeCandidate(probe: ProjectProbe, context: CandidateContext): CandidateProject {
-  const base = { projectId: probe.projectId, name: probe.name, root: probe.root };
+  const base = { projectId: probe.projectId, name: probe.name, root: probe.root, reachable: probe.reachable ?? true };
   if (probe.root === null || !probe.rootExists) return { ...base, qualifies: false, detail: "no folder on this machine" };
   if (context.coursePath !== null && resolve(probe.root) === resolve(context.coursePath)) return { ...base, qualifies: false, detail: "the course itself" };
   if (context.coursePath !== null && overlaps(probe.root, context.coursePath)) return { ...base, qualifies: false, detail: "shares a folder with the course" };
@@ -138,7 +141,7 @@ async function probeReachable(project: ProjectWithSources, accessFor: AccessFor)
   } catch (cause) {
     if (!(cause instanceof WorkspaceUnreachableError)) throw cause;
     const root = defaultSource(project)?.path ?? null;
-    return { projectId: project.id, name: project.name, root, rootExists: false, iterationText: null, agentsText: null, hasTutorDir: false };
+    return { projectId: project.id, name: project.name, root, rootExists: false, iterationText: null, agentsText: null, hasTutorDir: false, reachable: false };
   }
 }
 

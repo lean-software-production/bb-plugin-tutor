@@ -1118,6 +1118,75 @@ test("createWorkspace refuses a machine that isn't connected", async (t) => {
   await assert.rejects(host.harness.behavior.callRpc("createWorkspace", { hostId: "host_old", folder }), /Codespace is asleep or stopped/);
 });
 
+test("a rebuilt Codespace (a new machine) is offered while the workspace's old machine is gone, and taking it switches the workspace", async (t) => {
+  const ws = await emptyGitWorkspace();
+  // PROJECT_ID's folder is on host_1, the old Codespace, now disconnected; host_cs is the new one.
+  const host = await makeTutorHost(null, ws, { workspaceProject: PROJECT_ID, workspaceFolder: ws }, {
+    hosts: [
+      { id: "host_1", name: "old-codespace", status: "disconnected", machineProviderId: null },
+      { id: "host_cs", name: "new-codespace", status: "connected", machineProviderId: null },
+    ],
+  });
+  t.after(async () => {
+    await host.harness.lifecycle.dispose();
+    await rm(ws, { recursive: true, force: true });
+  });
+  const before = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.equal(before.workspace.status, "unreachable");
+  assert.deepEqual(await host.harness.behavior.callRpc("offerWorkspace", null), { status: "offer", hostId: "host_cs", machineName: "new-codespace", folder: ws });
+  const workspace = (await host.harness.behavior.callRpc("createWorkspace", { hostId: "host_cs", folder: ws })) as { status: string; projectId: string };
+  assert.equal(workspace.status, "found");
+  assert.notEqual(workspace.projectId, PROJECT_ID);
+  assert.equal((await host.rt.settings.get()).workspaceProject, workspace.projectId);
+  const [args] = host.harness.inspection.sdk.callsTo("projects.create")[0] as [Record<string, unknown>];
+  assert.deepEqual(args.source, { hostId: "host_cs", path: ws, type: "local_path" });
+  const after = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.equal(after.workspace.status, "found");
+});
+
+test("an unreachable workspace on the student's own (newest) machine offers nothing new", async (t) => {
+  const ws = await emptyGitWorkspace();
+  // host_1 is connected, but every call to it finds it offline.
+  const offline: WorkspaceAccess = {
+    ...createDiskAccess(),
+    kinds: async () => {
+      throw new WorkspaceUnreachableError();
+    },
+    read: async () => {
+      throw new WorkspaceUnreachableError();
+    },
+  };
+  const host = await makeTutorHost(null, ws, { workspaceProject: PROJECT_ID, workspaceFolder: ws }, {
+    hosts: [{ id: "host_1", name: "my-codespace", status: "connected", machineProviderId: null }],
+    access: () => offline,
+  });
+  t.after(async () => {
+    await host.harness.lifecycle.dispose();
+    await rm(ws, { recursive: true, force: true });
+  });
+  assert.deepEqual(await host.harness.behavior.callRpc("offerWorkspace", null), { status: "no-machine" });
+});
+
+test("a machine that turns out to be offline when asked for the folder is no machine to offer", async (t) => {
+  const ws = await emptyGitWorkspace();
+  const offline: WorkspaceAccess = {
+    ...createDiskAccess(),
+    kinds: async () => {
+      throw new WorkspaceUnreachableError();
+    },
+  };
+  const host = await makeTutorHost(null, ws, { workspaceFolder: ws }, {
+    hosts: [{ id: "host_cs", name: "my-codespace", status: "connected", machineProviderId: null }],
+    noProjectYet: true,
+    access: () => offline,
+  });
+  t.after(async () => {
+    await host.harness.lifecycle.dispose();
+    await rm(ws, { recursive: true, force: true });
+  });
+  assert.deepEqual(await host.harness.behavior.callRpc("offerWorkspace", null), { status: "no-machine" });
+});
+
 test("concurrent tool calls never lose each other's progress", async (t) => {
   const { sandbox, host } = await setup(t);
   const coach = (await openCoach(host, "000")).threadId;

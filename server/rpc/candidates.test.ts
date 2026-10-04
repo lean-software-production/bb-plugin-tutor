@@ -39,6 +39,7 @@ test("a repo with an ITERATION or a coach-me AGENTS.md qualifies", () => {
     root: "/workspaces/p",
     qualifies: true,
     detail: "ITERATION · 002 WIP",
+    reachable: true,
   });
   const agents = describeCandidate(probe({ agentsText: "read ../tutorial/.agents/coach-me.md" }), context);
   assert.equal(agents.qualifies, true);
@@ -64,9 +65,9 @@ test("the course itself, folderless projects and plain repos do not", () => {
 test("the feature's hinted folder comes first, then qualifying projects, then by name", () => {
   const ranked = rankCandidates(
     [
-      { projectId: "a", name: "alpha", root: "/w/alpha", qualifies: false, detail: "" },
-      { projectId: "b", name: "beta", root: "/w/beta", qualifies: true, detail: "" },
-      { projectId: "c", name: "gamma", root: "/w/gamma", qualifies: false, detail: "" },
+      { projectId: "a", name: "alpha", root: "/w/alpha", qualifies: false, detail: "", reachable: true },
+      { projectId: "b", name: "beta", root: "/w/beta", qualifies: true, detail: "", reachable: true },
+      { projectId: "c", name: "gamma", root: "/w/gamma", qualifies: false, detail: "", reachable: true },
     ],
     "/w/gamma",
   );
@@ -85,8 +86,8 @@ test("without the capstone-factory layout, every standard project qualifies, wit
 
   const ranked = rankCandidates(
     [
-      { projectId: "a", name: "alpha", root: "/w/alpha", qualifies: true, detail: "" },
-      { projectId: "b", name: "beta", root: "/w/beta", qualifies: true, detail: "" },
+      { projectId: "a", name: "alpha", root: "/w/alpha", qualifies: true, detail: "", reachable: true },
+      { projectId: "b", name: "beta", root: "/w/beta", qualifies: true, detail: "", reachable: true },
     ],
     null,
     new Set(["b"]),
@@ -109,5 +110,5 @@ test("a project on a machine that can't be reached is listed with no folder, not
     },
   });
   const [candidate] = await listCandidates(sdk, offline, "/workspaces/tutorial", null);
-  assert.deepEqual([candidate?.projectId, candidate?.qualifies, candidate?.detail], ["prj_off", false, "no folder on this machine"]);
+  assert.deepEqual([candidate?.projectId, candidate?.qualifies, candidate?.detail, candidate?.reachable], ["prj_off", false, "no folder on this machine", false]);
 });

@@ -64,7 +64,7 @@ export const workspaceSchema = z.discriminatedUnion("status", [
 ]);
 export type Workspace = z.infer<typeof workspaceSchema>;
 
-/** offerWorkspace's answer: the hosted first run's offer of the student's Codespace checkout. */
+/** offerWorkspace's answer: the offer of the student's Codespace checkout as the workspace. */
 export const workspaceOfferSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("no-machine") }),
   z.object({ status: z.literal("no-folder"), folder: z.string(), machineName: z.string() }),
@@ -253,6 +253,8 @@ export const candidateProjectSchema = z.object({
   qualifies: z.boolean(),
   /** One line for the picker: "ITERATION · 001 WIP", "no ITERATION". */
   detail: z.string(),
+  /** Whether the machine holding its folder could be asked; false when that machine is asleep, stopped or gone. */
+  reachable: z.boolean(),
 });
 export type CandidateProject = z.infer<typeof candidateProjectSchema>;
 
@@ -303,7 +305,10 @@ export const rpcContract = defineRpcContract({
     input: z.object({ projectId: z.string().min(1).max(128) }),
     output: workspaceSchema,
   },
-  /** The hosted first run: whether the student's enrolled machine (their Codespace) has a checkout to offer. */
+  /**
+   * Whether the student's machine (their Codespace) has a checkout to offer: on the first run, and when the
+   * workspace is unreachable and that machine is a different one (a rebuilt Codespace), to switch to it.
+   */
   offerWorkspace: {
     input: z.null(),
     output: workspaceOfferSchema,

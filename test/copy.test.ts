@@ -1,20 +1,24 @@
-// Tutor's own text is course-agnostic and never names BB or a Codespace.
+// Tutor's own text is course-agnostic, and nothing a student reads names BB.
+// Lesson 0 assumes no Codespace either; Tutor's pages may (the hosted design
+// talks about the student's Codespace by design).
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 
-const OWN_TEXT = [
-  "server/course/builtin/lesson-0/README.md",
-  "server/course/builtin/lesson-0/features/tutor.feature",
-  "app/ui/WelcomePage.tsx",
-];
+const LESSON_0 = ["server/course/builtin/lesson-0/README.md", "server/course/builtin/lesson-0/features/tutor.feature"];
 
-test("Lesson 0 and the welcome page don't assume the capstone, a Codespace or BB", async () => {
-  for (const path of OWN_TEXT) {
+test("Lesson 0 doesn't assume the capstone, a Codespace or BB", async () => {
+  for (const path of LESSON_0) {
     const text = await readFile(path, "utf8");
     assert.doesNotMatch(text, /\bfactory\b|lesson 1 is ready|Codespace/i, path);
     assert.doesNotMatch(text.replace(/@get-bb|bb\.(\w+)/g, ""), /\bBB\b/, path);
   }
+});
+
+test("the welcome page doesn't assume the capstone factory or name BB", async () => {
+  const text = await readFile("app/ui/WelcomePage.tsx", "utf8");
+  assert.doesNotMatch(text, /\bfactory\b|lesson 1 is ready/i);
+  assert.doesNotMatch(text.replace(/@get-bb|bb\.(\w+)/g, ""), /\bBB\b/);
 });
 
 /** Pages any course shows: they talk about the workspace, never a factory. */
@@ -27,7 +31,7 @@ test("Lesson 0 doesn't send the student to an Add row: a Tutor set up with its c
 
 test("the start, completion, home and outline pages talk about the workspace, not a factory", async () => {
   for (const path of OWN_PAGES) {
-    assert.doesNotMatch(await readFile(path, "utf8"), /\bfactory\b|Codespace/i, path);
+    assert.doesNotMatch(await readFile(path, "utf8"), /\bfactory\b/i, path);
   }
 });
 
