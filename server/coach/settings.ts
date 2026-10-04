@@ -6,7 +6,7 @@ const descriptors = {
     type: "string",
     label: "Course folder",
     description:
-      "Absolute path of the course checkout. Leave empty to use the tutor feature's setting, or /workspaces/tutorial.",
+      "Development only: absolute path of a course checkout on the server, in place of the hosted catalog. Leave empty for the normal first-run experience.",
   },
   [SETTING_KEYS.workspaceProject]: {
     type: "project",

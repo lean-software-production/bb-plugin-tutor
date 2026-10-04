@@ -20,8 +20,7 @@ Add the tutor Feature, together with the bb Feature in standalone mode, as devco
 [`.devcontainer/tutor`](https://github.com/lean-software-production/devcontainer-features/tree/main/.devcontainer/tutor)
 does. At image build, the Feature downloads this repo's release
 `bb-plugin-tutor-<version>.tgz`, checks it against a SHA-256 pinned in the Feature, and prebuilds
-it. It also writes `/usr/local/etc/tutor/config.json`. On start, it installs the plugin into the
-learner's BB and does the rest of the set-up:
+it. On start, it installs the plugin into the learner's BB and does the rest of the set-up:
 
 - clones the course (and the starter);
 - registers the course and the factory as BB projects;
@@ -31,15 +30,6 @@ learner's BB and does the rest of the set-up:
 
 To use a different plugin release, set the Feature's `pluginVersion` and `pluginSha256`.
 
-`config.json` carries `"schemaVersion": 1`. This plugin reads schema version 1, and treats a
-missing `schemaVersion` as 1. For any other version, Tutor refuses to run:
-
-- the course pages and the coach say which version they found and which one this plugin
-  supports;
-- every coach tool refuses and writes nothing.
-
-To fix it, update the plugin, or pin a tutor Feature version that matches it.
-
 ### Directly into a BB
 
 ```sh
@@ -47,20 +37,20 @@ bb plugin install git:https://github.com/lean-software-production/bb-plugin-tuto
 ```
 
 BB clones the tag, runs `npm install` with lifecycle scripts disabled, builds both bundles, and
-starts the plugin. It then runs with no Feature `config.json`, and none of the Feature's set-up
-above happens:
+starts the plugin. With no course configured, Tutor runs standalone: the first run offers its
+built-in course and a catalog of courses to add (`server/content/catalog.ts`), and offers the
+Codespace checkout as the workspace.
 
-- **Course.** Tutor looks for the course at the `coursePath` setting (Settings → Plugins →
-  Tutor), then `TUTOR_COURSE_PATH` in the BB server's environment, then `/workspaces/tutorial`.
-  If none of those holds a course, the home page and the Course page show "There is no course
-  folder at /workspaces/tutorial." along with how to fix it. Nothing else works until a course
-  is found.
-- **Factory.** With no factory hint from the Feature, the first-run page ranks your BB projects
-  as factory candidates and asks you to confirm one. Tutor never creates projects, so register your factory
-  as a BB project first.
+- **Course.** The `coursePath` setting (Settings → Plugins → Tutor) is a development-only
+  override: an absolute path on the server to a course checkout, in place of the hosted catalog.
+  `TUTOR_COURSE_PATH` in the BB server's environment works the same way. Leave both empty for the
+  normal, hosted first-run experience.
+- **Workspace.** The first-run page ranks your BB projects as workspace candidates and asks you
+  to confirm one, or offers to check out the Codespace starter. Tutor never creates projects on
+  its own, so register your project as a BB project first if you want to point at an existing one.
 - **Everything else is up to you.** That covers selecting the course outline as the sidebar
-  thread list, choosing the Sketchbook theme, and cloning the course. Nothing reads the
-  activity heartbeat, which lands in `<BB data dir>/.tutor-feature/activity`.
+  thread list and choosing the Sketchbook theme. Nothing reads the activity heartbeat, which
+  lands in `<BB data dir>/.tutor-feature/activity`.
 
 ## Develop
 
@@ -128,9 +118,10 @@ To build the same archive locally, run `scripts/release-archive.sh v<x.y.z> <out
 
 ## Settings and coach tools
 
-- `coursePath` (string): the course checkout. Empty falls back to `TUTOR_COURSE_PATH`, then the
-  Feature's `/usr/local/etc/tutor/config.json`, then `/workspaces/tutorial` (only if it exists).
-  A configured course wins: fetched courses are ignored and nothing is offered to add.
+- `coursePath` (string): development only. An absolute path to a course checkout on the server,
+  in place of the hosted catalog; empty falls back to `TUTOR_COURSE_PATH` in the server's
+  environment. A configured course wins: fetched courses are ignored and nothing is offered to
+  add.
 - `workspaceProject` (project): the student's workspace, the BB project holding their repo,
   where coach threads run. Written by the first-run page. Tutor never creates projects.
 - `factoryProject` (project, read only): an older Tutor's workspace setting. It is still read

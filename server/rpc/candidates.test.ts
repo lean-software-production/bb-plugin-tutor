@@ -108,6 +108,6 @@ test("a project on a machine that can't be reached is listed with no folder, not
       throw new WorkspaceUnreachableError();
     },
   });
-  const [candidate] = await listCandidates(sdk, offline, "/workspaces/tutorial", null, null);
+  const [candidate] = await listCandidates(sdk, offline, "/workspaces/tutorial", null);
   assert.deepEqual([candidate?.projectId, candidate?.qualifies, candidate?.detail], ["prj_off", false, "no folder on this machine"]);
 });

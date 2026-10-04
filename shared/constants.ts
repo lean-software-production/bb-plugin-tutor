@@ -86,31 +86,12 @@ export const SETTING_KEYS = {
 export const DEFAULT_WORKSPACE_FOLDER = "/workspaces/capstone-project-starter";
 
 /**
- * How the `tutor` devcontainer feature tells the plugin where things are.
- * Course path precedence: `coursePath` setting > `TUTOR_COURSE_PATH` env >
- * `FEATURE_CONFIG_FILE.course` > `DEFAULT_COURSE_PATH`.
- * The repo and factory paths are only hints for detecting the student's
- * project, in this order: `TUTOR_REPO_PATH`, config `repo`, the git top folder
- * above `TUTOR_FACTORY_PATH` / config `factory`, then that factory path
- * itself. The project is always a BB project id (`workspaceProject` setting).
+ * Course path precedence: `coursePath` setting (development) > `TUTOR_COURSE_PATH` env.
+ * The project is always a BB project id (`workspaceProject` setting).
  */
 export const ENV_VARS = {
   coursePath: "TUTOR_COURSE_PATH",
-  repoPath: "TUTOR_REPO_PATH",
-  factoryPath: "TUTOR_FACTORY_PATH",
 } as const;
-/**
- * JSON `{ "schemaVersion"?: 1, "course"?: string, "repo"?: string, "factory"?: string, "dataDir"?: string }`,
- * written by the feature's install.sh. Unknown keys are ignored.
- */
-export const FEATURE_CONFIG_FILE = "/usr/local/etc/tutor/config.json";
-/**
- * The config file layout this plugin understands. An absent `schemaVersion` is 1
- * (Features written before it existed); any other value stops Tutor, since the
- * Feature and the plugin are released separately.
- */
-export const FEATURE_CONFIG_SCHEMA_VERSION = 1;
-export const DEFAULT_COURSE_PATH = "/workspaces/tutorial";
 
 /**
  * The student-activity heartbeat, shared with the feature's keep-alive:

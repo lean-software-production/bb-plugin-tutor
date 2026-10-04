@@ -2,7 +2,7 @@
 // feature's activity file and the simpleNavigation setting. The themes the
 // manifest declares are checked in app/theme/manifest.test.ts.
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
@@ -37,16 +37,6 @@ test("the heartbeat RPC stamps <BB data dir>/.tutor-feature/activity, at most ev
 
   // Same clock, so the second call is inside the 30 s throttle.
   assert.deepEqual(await tutor.harness.behavior.callRpc("heartbeat", null), { recorded: false });
-});
-
-test("the heartbeat falls back to the feature config's dataDir when BB's data dir is not absolute", async (t) => {
-  const dataDir = await tempDir(t);
-  const config = join(await tempDir(t), "config.json");
-  await writeFile(config, JSON.stringify({ course: "/workspaces/tutorial", dataDir }));
-  const tutor = await host(t, { dataDir: "", featureConfigFile: config });
-
-  assert.deepEqual(await tutor.harness.behavior.callRpc("heartbeat", null), { recorded: true });
-  assert.equal(await readFile(join(dataDir, ACTIVITY_FILE), "utf8"), `${NOW.toISOString()}\n`);
 });
 
 test("simpleNavigation defaults to on", async (t) => {

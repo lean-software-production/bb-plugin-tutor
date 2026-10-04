@@ -9,7 +9,6 @@ import { isTutorCoachThread } from "./auth.ts";
 import { createCoachRegistry } from "./coach-registry.ts";
 import { coachConfiguration } from "./configure.ts";
 import { factoryWhere } from "./prompts.ts";
-import { readFeatureConfig } from "./course-path.ts";
 import { decideDispatch } from "./dispatch-guard.ts";
 import { createKeyedLock } from "./keyed-lock.ts";
 import type { TutorRuntime } from "./runtime.ts";
@@ -38,7 +37,7 @@ export async function registerTutor(bb: BbPluginApi, deps: WorldDeps): Promise<T
         resolveDataDir({
           fromBb: () => bb.server.experimental_dataDir,
           env: deps.env,
-          configDataDir: (await readFeatureConfig(deps.featureConfigFile)).dataDir,
+          configDataDir: undefined,
         }),
       now: deps.now,
     }),

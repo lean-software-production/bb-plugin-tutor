@@ -296,7 +296,6 @@ export function registerRpc(rt: TutorRuntime): void {
           rt.access,
           world.coursePath,
           course?.coachPath ?? null,
-          world.projectHint,
           course?.layout ?? null,
         ),
       };

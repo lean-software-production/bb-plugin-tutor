@@ -1617,29 +1617,6 @@ test("a snapshot that finds the machine offline makes the workspace unreachable;
   assert.equal(offline.workspace.status, "unreachable");
 });
 
-test("the Feature's project hint is resolved on BB's own host, and left as it is when BB has none", async (t) => {
-  const sandbox = await makeSandbox();
-  /** An access that records the machines it was asked for. */
-  const recording = (asked: string[]) => (hostId: string) => {
-    asked.push(hostId);
-    return createDiskAccess();
-  };
-  const env = { TUTOR_FACTORY_PATH: sandbox.factoryRoot };
-  const askedWithHost: string[] = [];
-  const asked: string[] = [];
-  const withHost = await makeTutorHost(sandbox.course, sandbox.factoryRoot, {}, { env, access: recording(askedWithHost) });
-  const standalone = await makeTutorHost(sandbox.course, sandbox.factoryRoot, {}, { env, access: recording(asked), serverHost: false });
-  t.after(async () => {
-    await withHost.harness.lifecycle.dispose();
-    await standalone.harness.lifecycle.dispose();
-    await sandbox.cleanup();
-  });
-  assert.equal((await withHost.rt.world.load()).projectHint, sandbox.repoRoot);
-  assert.deepEqual([...new Set(askedWithHost)], ["host_1"]);
-  assert.equal((await standalone.rt.world.load()).projectHint, sandbox.factoryRoot);
-  assert.deepEqual(asked, [], "nothing was probed");
-});
-
 // ---------------------------------------------------------------------------
 // Adding a course (Task 13): fetched on request into BB's data dir, its starter seeded into the workspace.
 // ---------------------------------------------------------------------------
@@ -1763,6 +1740,14 @@ test("a fetched course whose seed did not finish is still offered, as Finish add
   assert.deepEqual(after.available, []);
   const { threadId } = (await host.harness.behavior.callRpc("startNextLesson", { courseId: "fixture", lessonId: "001" })) as { threadId: string };
   assert.ok(threadId);
+});
+
+test("with no coursePath setting, Tutor offers its built-in course and the catalog, and reports no course error", async (t) => {
+  const { host } = await standalone(t);
+  const overview = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.deepEqual(overview.courseErrors, []);
+  assert.deepEqual(overview.courses.map((c) => c.course.id), ["tutor"]);
+  assert.deepEqual(overview.available.map((a) => a.id), ["fixture"]);
 });
 
 test("a fetched course that no longer loads is offered again, as unfinished", async (t) => {

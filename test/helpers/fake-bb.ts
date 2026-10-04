@@ -163,7 +163,6 @@ export async function makeTutorHost(
   options: {
     dataDir?: string;
     env?: Record<string, string>;
-    featureConfigFile?: string;
     projectName?: string;
     /**
      * The workspace access per machine: the local disk unless given. "machine"
@@ -238,6 +237,12 @@ export async function makeTutorHost(
   };
   const projects: ProjectResponse[] = options.noProjectYet === true ? [] : [project];
 
+  // A test that gives a configured course (not null) but no coursePath setting of its own means
+  // "the configured course wins", as a development coursePath setting would: pick an arbitrary
+  // absolute path, since the fake courseSource below ignores it and returns `course` regardless.
+  const effectiveSettings: Record<string, string | boolean> =
+    course !== null && !("coursePath" in settings) ? { coursePath: "/workspaces/tutorial", ...settings } : settings;
+
   // The real host entry, run in-process as BB's host daemon would run it.
   const hostHarness = experimental_createHostEntryHarness(hostEntry);
   const host = createFakePluginHost({
@@ -247,7 +252,7 @@ export async function makeTutorHost(
       return hostHarness.experimental_call(call.method as keyof typeof hostEntry.contract, call.input as never, call.signal === undefined ? {} : { signal: call.signal });
     },
     agentSkillIds: [SKILL_ID],
-    settings,
+    settings: effectiveSettings,
     ...(options.dataDir === undefined ? {} : { dataDir: options.dataDir }),
     sdk: {
       hosts: {
@@ -417,10 +422,7 @@ export async function makeTutorHost(
     },
     store: createProgressStore(),
     env: options.env ?? {},
-    featureConfigFile: options.featureConfigFile ?? "/nonexistent/tutor/config.json",
     now: () => NOW,
-    // The configured course stands in for whatever folder is named, the default one included; without one, nothing is at the default.
-    courseExists: async () => course !== null,
     access:
       options.access === "machine"
         ? (hostId: string) => createMachineAccess(host.bb, client, hostId)

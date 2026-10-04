@@ -24,21 +24,8 @@ import { resolveDataDir } from "../activity/heartbeat.ts";
 import { catalogFrom, type CatalogEntry } from "../content/catalog.ts";
 import { createContentStore, withCatalogId, type FetchedCourse } from "../content/store.ts";
 import { resolveCoachMethod, type CoachMethod } from "./coach-file.ts";
-import { readFeatureConfig, resolveConfiguredCourse, resolveProjectHint, type Env, type FeatureConfig } from "./course-path.ts";
+import { resolveConfiguredCourse, type Env } from "./course-path.ts";
 import type { TutorSettings } from "./settings.ts";
-
-/**
- * The machine to ask about the Feature's project hint while there is no
- * workspace yet: BB's own host, the one the server shares with the Feature
- * (the Codespace). BB gives it no machine provider; a machine enrolled by
- * hand has "manual". A standalone bb-server has none, and the hint is left as
- * it is. Null when there is no such host, or it is not connected.
- */
-async function serverHostId(sdk: BbPluginApi["sdk"]): Promise<string | null> {
-  const hosts = await sdk.hosts.list().catch(() => []);
-  const own = hosts.find((host) => host.machineProviderId === null);
-  return own !== undefined && own.status === "connected" ? own.id : null;
-}
 
 /** Page loads fire several calls at once; they share one course read. */
 const COURSE_TTL_MS = 3000;
@@ -82,8 +69,6 @@ export interface World {
   courses: LoadedCourse[];
   /** Courses that could not be loaded, by id or path, with the reason. */
   courseErrors: { source: string; error: string }[];
-  /** Pre-selects a candidate project on first run (resolveProjectHint). */
-  projectHint: string | null;
   /** Where the student's Codespace checks out the starter: the workspaceFolder setting, else DEFAULT_WORKSPACE_FOLDER. */
   workspaceFolder: string;
 }
@@ -92,7 +77,6 @@ export interface WorldDeps {
   courseSource: CourseSource;
   store: ProgressStore;
   env: Env;
-  featureConfigFile: string;
   now: () => Date;
   /** How the server reaches the workspace on a machine. */
   access: (hostId: string) => WorkspaceAccess;
@@ -102,8 +86,6 @@ export interface WorldDeps {
    * read goes to the machine on its own.
    */
   snapshot?: (hostId: string, input: SnapshotWant & { root: string }) => Promise<Snapshot>;
-  /** Whether a folder exists on the server: for the default course path (Decision 12). The disk unless given. */
-  courseExists?: (path: string) => Promise<boolean>;
 }
 
 export interface WorldSource {
@@ -302,27 +284,13 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
     }
   }
 
-  /** The Feature's project hint, probed on the workspace's machine, else on BB's own host; as it is when neither can be asked. */
-  async function projectHint(config: FeatureConfig, hostId: string | null): Promise<string | null> {
-    const on = hostId ?? (await serverHostId(bb.sdk));
-    try {
-      return await resolveProjectHint(deps.env, config, on === null ? null : deps.access(on));
-    } catch (cause) {
-      if (!(cause instanceof WorkspaceUnreachableError)) throw cause;
-      return resolveProjectHint(deps.env, config, null);
-    }
-  }
-
   return {
     async load(): Promise<World> {
       const values = await settings.get();
-      const config = await readFeatureConfig(deps.featureConfigFile);
-      // A config this plugin can't read stops Tutor: no course at all, so every RPC and tool refuses with its message.
-      const refused: CourseResult | null = config.error === undefined ? null : { course: null, error: config.error };
-      const coursePath = refused !== null ? null : await resolveConfiguredCourse(values.coursePath, deps.env, config, deps.courseExists);
-      const dataDir = resolveDataDir({ fromBb: () => bb.server.experimental_dataDir, env: deps.env, configDataDir: config.dataDir });
+      const coursePath = resolveConfiguredCourse(values.coursePath, deps.env);
+      const dataDir = resolveDataDir({ fromBb: () => bb.server.experimental_dataDir, env: deps.env, configDataDir: undefined });
       // A configured course wins (Decision 12): fetched content is ignored, and nothing is offered.
-      const standalone = refused === null && coursePath === null;
+      const standalone = coursePath === null;
       const catalog = standalone ? readCatalog(values.courseCatalog) : { entries: [], error: null };
       // Never one under Lesson 0's id: add-course.ts refuses to record one, and an older record is ignored.
       const fetched: FetchedCourse[] =
@@ -332,7 +300,7 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
           ? [{ source: coursePath, result: loadCourse(coursePath), seedId: null }]
           : fetched.map((entry) => ({ source: entry.id, result: underCatalogId(loadCourse(entry.coursePath), entry.id), seedId: entry.id }));
       const [builtinResult, results, resolved] = await Promise.all([
-        refused ?? loadBuiltin(),
+        loadBuiltin(),
         Promise.all(entries.map((entry) => entry.result)),
         resolveWorkspace(bb.sdk, workspaceSetting(values), deps.access),
       ]);
@@ -341,17 +309,14 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
         return course === null ? [] : [{ course, seedId: entry.seedId }];
       });
       const { workspace, hostId, courses, unseeded } = await readWorkspace(resolved, coursePath, builtinResult.course, others);
-      const courseErrors: World["courseErrors"] =
-        refused !== null
-          ? [{ source: deps.featureConfigFile, error: refused.error }]
-          : [
-              ...(builtinResult.course === null ? [{ source: BUILTIN_COURSE_ID, error: builtinResult.error }] : []),
-              ...entries.flatMap((entry, index) => {
-                const result = results[index];
-                return result === undefined || result.course !== null ? [] : [{ source: entry.source, error: result.error }];
-              }),
-              ...(catalog.error === null ? [] : [{ source: SETTING_KEYS.courseCatalog, error: catalog.error }]),
-            ];
+      const courseErrors: World["courseErrors"] = [
+        ...(builtinResult.course === null ? [{ source: BUILTIN_COURSE_ID, error: builtinResult.error }] : []),
+        ...entries.flatMap((entry, index) => {
+          const result = results[index];
+          return result === undefined || result.course !== null ? [] : [{ source: entry.source, error: result.error }];
+        }),
+        ...(catalog.error === null ? [] : [{ source: SETTING_KEYS.courseCatalog, error: catalog.error }]),
+      ];
       const allCourses = [...(builtinResult.course === null ? [] : [builtinResult.course]), ...others.map((entry) => entry.course)];
       const fetchedIds = new Set(fetched.map((entry) => entry.id));
       // Fetched but not finished: its seed is incomplete in this workspace, or it no longer loads. Adding it again finishes it.
@@ -374,7 +339,6 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
         coachModel: values.coachModel ?? "",
         courses,
         courseErrors,
-        projectHint: await projectHint(config, hostId),
         workspaceFolder: values.workspaceFolder || DEFAULT_WORKSPACE_FOLDER,
       };
     },

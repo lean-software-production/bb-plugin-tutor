@@ -89,7 +89,6 @@ export function makeWorld(
     coachModel: "",
     courses,
     courseErrors: [],
-    projectHint: null,
     workspaceFolder: DEFAULT_WORKSPACE_FOLDER,
   };
 }

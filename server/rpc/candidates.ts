@@ -174,7 +174,6 @@ export async function listCandidates(
   accessFor: AccessFor,
   coursePath: string | null,
   coachPath: string | null,
-  projectHint: string | null,
   layoutId: "capstone-factory" | null = null,
 ): Promise<CandidateProject[]> {
   const projects = await sdk.projects.list({ includePersonal: false });
@@ -184,7 +183,7 @@ export async function listCandidates(
   const preferred = new Set(probes.filter((entry) => entry.hasTutorDir).map((entry) => entry.projectId));
   return rankCandidates(
     probes.map((entry) => describeCandidate(entry, context)),
-    projectHint,
+    null,
     layoutId === "capstone-factory" ? undefined : preferred,
   );
 }
