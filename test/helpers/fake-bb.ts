@@ -17,7 +17,7 @@ import { createProgressStore } from "../../server/progress/store.ts";
 import type { WorkspaceAccess } from "../../server/workspace/access.ts";
 import { createHostClient } from "../../server/workspace/host-client.ts";
 import { createMachineAccess } from "../../server/workspace/machine-access.ts";
-import { createDiskAccess } from "./disk-access.ts";
+import { createDiskAccess, diskSnapshot } from "./disk-access.ts";
 import type { TutorRuntime } from "../../server/coach/runtime.ts";
 
 export const PROJECT_ID = "prj_factory";
@@ -408,6 +408,7 @@ export async function makeTutorHost(
       },
     },
   });
+  const client = createHostClient(host.bb);
   const rt = await registerTutor(host.bb, {
     courseSource: {
       // Without a configured course, the courses Tutor reads are fetched ones, read from disk for real.
@@ -422,8 +423,15 @@ export async function makeTutorHost(
     courseExists: async () => course !== null,
     access:
       options.access === "machine"
-        ? ((client) => (hostId: string) => createMachineAccess(host.bb, client, hostId))(createHostClient(host.bb))
+        ? (hostId: string) => createMachineAccess(host.bb, client, hostId)
         : (options.access ?? (() => createDiskAccess())),
+    // The snapshot goes the way the access does: through the host entry, or over the disk. An access a test
+    // gives (to watch or fail calls) gets none, so every read reaches it.
+    ...(options.access === "machine"
+      ? { snapshot: client.snapshot }
+      : options.access === undefined
+        ? { snapshot: diskSnapshot }
+        : {}),
   });
   return { ...host, rt, threads, running, sent, tabs, tabConflicts, tabWriteError, forkRefusal, archiveRefusal, beforeList, addThread };
 }

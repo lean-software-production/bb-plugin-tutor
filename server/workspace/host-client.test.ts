@@ -84,3 +84,23 @@ test("seedWorkspace's machine that is not connected is unreachable, and the host
     /Bundle entry refused/,
   );
 });
+
+test("snapshot is one call on the workspace's machine, and a machine that is not connected is unreachable", async () => {
+  const calls: unknown[] = [];
+  const want = { root: "/w/repo", kinds: ["/w/repo/.tutor"], realPaths: [], files: ["/w/repo/.tutor/progress.yaml"] };
+  const output = { kinds: { "/w/repo/.tutor": "folder" as const }, realPaths: {}, files: { "/w/repo/.tutor/progress.yaml": null } };
+  const client = createHostClient(
+    fakeBb(async (method, sent, options) => {
+      calls.push({ method, sent, options });
+      return output;
+    }),
+  );
+  assert.deepEqual(await client.snapshot("host_1", want), output);
+  assert.deepEqual(calls, [{ method: "snapshot", sent: want, options: { hostId: "host_1" } }]);
+  const offline = createHostClient(
+    fakeBb(async () => {
+      throw Object.assign(new Error("HTTP 502: Host is not connected"), { status: 502, code: "host_unavailable" });
+    }),
+  );
+  await assert.rejects(offline.snapshot("host_1", want), WorkspaceUnreachableError);
+});

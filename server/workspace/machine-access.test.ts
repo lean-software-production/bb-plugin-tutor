@@ -18,6 +18,7 @@ function fakeBbWithFiles(files: Partial<{ [K in "read" | "write" | "remove"]: (a
 function fakeHostClient(inspect: TutorHostClient["inspect"] = async () => assert.fail("inspect was not expected")): TutorHostClient {
   return {
     inspect,
+    snapshot: async () => assert.fail("snapshot was not expected"),
     adoptLesson: async () => assert.fail("adoptLesson was not expected"),
     seedWorkspace: async () => assert.fail("seedWorkspace was not expected"),
   };

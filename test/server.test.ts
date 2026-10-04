@@ -1568,6 +1568,55 @@ test("through the machine: sdk.files and the host entry's inspect carry Lesson 0
   assert.ok(inspected.every((call) => call.hostId === "host_1"));
 });
 
+test("a page load asks the machine at most twice once Tutor has seen the workspace", async (t) => {
+  const calls: string[] = [];
+  const sandbox = await makeSandbox();
+  const host = await makeTutorHost(sandbox.course, sandbox.factoryRoot, undefined, {
+    access: "machine",
+    onHostCall: (method) => {
+      calls.push(method);
+    },
+  });
+  t.after(async () => {
+    await host.harness.lifecycle.dispose();
+    await sandbox.cleanup();
+  });
+  await host.harness.behavior.callRpc("getOverview", null);
+  calls.length = 0;
+  const filesBefore = host.harness.inspection.sdk.callsTo("files.read").length;
+  await host.harness.behavior.callRpc("getOverview", null);
+  const filesRead = host.harness.inspection.sdk.callsTo("files.read").length - filesBefore;
+  // resolveWorkspace's pathExists inspect, then the snapshot.
+  assert.ok(calls.length <= 2, `host calls: ${calls.join(", ")}`);
+  assert.equal(filesRead, 0, "every file came in the snapshot");
+});
+
+test("a snapshot that finds the machine offline makes the workspace unreachable; one the host entry refuses leaves reads live", async (t) => {
+  const sandbox = await makeSandbox();
+  const fail: { snapshot: Error | null } = { snapshot: null };
+  const host = await makeTutorHost(sandbox.course, sandbox.factoryRoot, undefined, {
+    access: "machine",
+    onHostCall: (method) => {
+      if (method === "snapshot" && fail.snapshot !== null) throw fail.snapshot;
+    },
+  });
+  t.after(async () => {
+    await host.harness.lifecycle.dispose();
+    await sandbox.cleanup();
+  });
+  const first = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.equal(first.workspace.status, "found");
+  // An older host entry without the method: the load reads everything the usual way.
+  fail.snapshot = new Error('unknown host method "snapshot"');
+  const filesBefore = host.harness.inspection.sdk.callsTo("files.read").length;
+  const refused = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.deepEqual(refused, first);
+  assert.ok(host.harness.inspection.sdk.callsTo("files.read").length > filesBefore, "the files were read live");
+  fail.snapshot = Object.assign(new Error("HTTP 502: Host is not connected"), { status: 502, code: "host_unavailable" });
+  const offline = (await host.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.equal(offline.workspace.status, "unreachable");
+});
+
 test("the Feature's project hint is resolved on BB's own host, and left as it is when BB has none", async (t) => {
   const sandbox = await makeSandbox();
   /** An access that records the machines it was asked for. */

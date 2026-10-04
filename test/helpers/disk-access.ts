@@ -4,9 +4,16 @@ import { createHash, randomBytes } from "node:crypto";
 import { chmod, mkdir, readFile, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { inspect } from "../../host/inspect.ts";
+import { snapshot } from "../../host/snapshot.ts";
 import { WriteConflictError, type WorkspaceAccess } from "../../server/workspace/access.ts";
+import type { Snapshot, SnapshotWant } from "../../server/workspace/snapshot-access.ts";
 
 const sha = (text: string) => createHash("sha256").update(text).digest("hex");
+
+/** The host entry's snapshot over this disk, called in-process: what WorldDeps.snapshot asks the machine. */
+export function diskSnapshot(_hostId: string, input: SnapshotWant & { root: string }): Promise<Snapshot> {
+  return snapshot(input);
+}
 
 export function createDiskAccess(): WorkspaceAccess {
   return {

@@ -18,6 +18,7 @@ import type { AvailableCourse, Workspace } from "../../shared/rpc.ts";
 import { resolveCourseLayout, type CourseLayoutState } from "../../layouts/state.ts";
 import { overlaps, realPath } from "../paths.ts";
 import { WorkspaceUnreachableError, type WorkspaceAccess } from "../workspace/access.ts";
+import { createSnapshotAccess, createSnapshotMemory, type Snapshot, type SnapshotWant } from "../workspace/snapshot-access.ts";
 import { resolveWorkspace, workspaceSetting, type ResolvedWorkspace } from "../workspace/workspace-project.ts";
 import { resolveDataDir } from "../activity/heartbeat.ts";
 import { catalogFrom, type CatalogEntry } from "../content/catalog.ts";
@@ -95,6 +96,12 @@ export interface WorldDeps {
   now: () => Date;
   /** How the server reaches the workspace on a machine. */
   access: (hostId: string) => WorkspaceAccess;
+  /**
+   * The workspace's reads for one page load in one call to its machine
+   * (host/snapshot.ts): what the last load of it asked for. Without it, every
+   * read goes to the machine on its own.
+   */
+  snapshot?: (hostId: string, input: SnapshotWant & { root: string }) => Promise<Snapshot>;
   /** Whether a folder exists on the server: for the default course path (Decision 12). The disk unless given. */
   courseExists?: (path: string) => Promise<boolean>;
 }
@@ -191,6 +198,8 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
   const cached = new Map<string, { at: number; result: Promise<CourseResult> }>();
   let builtin: Promise<CourseResult> | null = null;
   let last: LoadedCourse[] = [];
+  /** What the last load of each workspace read, fetched in one call by the next (snapshot-access.ts). */
+  const snapshotMemory = createSnapshotMemory();
 
   function loadCourse(path: string): Promise<CourseResult> {
     const now = deps.now().getTime();
@@ -256,8 +265,19 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
     const { workspace, hostId } = resolved;
     const unseeded = new Set<string>();
     if (workspace.status !== "found" || hostId === null) return { workspace, hostId, courses: [], unseeded };
-    const access = deps.access(hostId);
+    const live = deps.access(hostId);
+    const { snapshot } = deps;
+    // One call for what the last load of this workspace read; writes always go to the machine.
+    const snapshotted =
+      snapshot === undefined
+        ? null
+        : createSnapshotAccess(live, (want) => snapshot(hostId, { root: workspace.root, ...want }), snapshotMemory, hostId, workspace.root);
+    const access = snapshotted?.access ?? live;
     try {
+      // A snapshot that fails for any other reason (an older host entry without it) leaves every read live.
+      await snapshotted?.prefetch().catch((cause: unknown) => {
+        if (cause instanceof WorkspaceUnreachableError) throw cause;
+      });
       if (coursePath !== null && overlaps(await access.realPath(workspace.root), await realPath(coursePath))) {
         return { workspace: { status: "missing", projectId: workspace.projectId }, hostId: null, courses: [], unseeded };
       }
@@ -277,6 +297,8 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
         courses: [],
         unseeded: new Set(),
       };
+    } finally {
+      snapshotted?.remember();
     }
   }
 

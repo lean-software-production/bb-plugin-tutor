@@ -17,5 +17,7 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
     now: () => new Date(),
     // The workspace is on the student's machine: reached through sdk.files and the host entry.
     access: (hostId) => createMachineAccess(bb, host, hostId),
+    // A page load's reads in one call to the machine.
+    snapshot: (hostId, input) => host.snapshot(hostId, input),
   });
 }

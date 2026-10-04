@@ -8,6 +8,7 @@ import { hostContract } from "./host/contract.ts";
 import { inspect, localProbe } from "./host/inspect.ts";
 import { createHostLock } from "./host/lock.ts";
 import { seedWorkspace } from "./host/seed.ts";
+import { snapshot } from "./host/snapshot.ts";
 
 /** One adoption or seed of a workspace at a time, keyed on its real folder, so the two never race. */
 const workspaceLocks = createHostLock();
@@ -16,6 +17,7 @@ export default experimental_defineHostEntry({
   contract: hostContract,
   handlers: {
     inspect: (input) => inspect(input),
+    snapshot: (input) => snapshot(input),
     adoptLesson: async (input) => {
       const key = await realpath(input.root).catch(() => resolve(input.root));
       return workspaceLocks.run(key, async () => {

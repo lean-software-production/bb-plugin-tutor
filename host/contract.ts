@@ -21,6 +21,25 @@ export const hostContract = {
     }),
   },
   /**
+   * One page load's reads in one call (host/snapshot.ts): inspect's kinds and
+   * real paths, and the files under `root` with their text and the sha256 of
+   * their bytes (as sdk.files.read reports it); null: the file is not there.
+   * A file outside `root`, or whose real path leaves it, is left out.
+   */
+  snapshot: {
+    input: z.object({
+      root: z.string().startsWith("/"),
+      kinds: z.array(z.string().startsWith("/")).max(256),
+      realPaths: z.array(z.string().startsWith("/")).max(16),
+      files: z.array(z.string().startsWith("/")).max(64),
+    }),
+    output: z.object({
+      kinds: z.record(z.string(), pathKindSchema),
+      realPaths: z.record(z.string(), z.string()),
+      files: z.record(z.string(), z.object({ text: z.string(), sha256: z.string() }).nullable()),
+    }),
+  },
+  /**
    * Adopts a capstone lesson into the workspace at `root` as one operation
    * (layouts/capstone-factory/adopt.ts): the move to factory/ at 004, spec/,
    * the seed and stand-ins/, then PROGRESS.yaml and ITERATION. A refusal
@@ -62,6 +81,8 @@ export const hostContract = {
 export type HostContract = typeof hostContract;
 export type InspectInput = z.infer<HostContract["inspect"]["input"]>;
 export type InspectOutput = z.infer<HostContract["inspect"]["output"]>;
+export type SnapshotInput = z.infer<HostContract["snapshot"]["input"]>;
+export type SnapshotOutput = z.infer<HostContract["snapshot"]["output"]>;
 export type AdoptLessonInput = z.infer<HostContract["adoptLesson"]["input"]>;
 /** What an adoption that went ahead returns. */
 export type AdoptLessonOutput = Exclude<z.infer<HostContract["adoptLesson"]["output"]>, { conflict: true }>;

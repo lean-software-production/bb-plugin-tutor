@@ -8,6 +8,8 @@ import {
   type InspectOutput,
   type SeedWorkspaceInput,
   type SeedWorkspaceOutput,
+  type SnapshotInput,
+  type SnapshotOutput,
 } from "../../host/contract.ts";
 import { WriteConflictError } from "./access.ts";
 import { onMachine } from "./machine-access.ts";
@@ -17,6 +19,11 @@ export const ADOPT_TIMEOUT_MS = 120_000;
 
 export interface TutorHostClient {
   inspect(hostId: string, input: InspectInput): Promise<InspectOutput>;
+  /**
+   * One page load's reads in one call (host/snapshot.ts). Throws
+   * WorkspaceUnreachableError when the machine is not connected.
+   */
+  snapshot(hostId: string, input: SnapshotInput): Promise<SnapshotOutput>;
   /**
    * Adopts a capstone lesson on the machine, as one operation. Throws
    * WriteConflictError when the progress file changed since the server read
@@ -38,6 +45,7 @@ export function createHostClient(bb: BbPluginApi): TutorHostClient {
   const client = bb.hosts.experimental_client({ contract: hostContract });
   return {
     inspect: (hostId, input) => client.call("inspect", input, { hostId }),
+    snapshot: (hostId, input) => onMachine(() => client.call("snapshot", input, { hostId })),
     async adoptLesson(hostId, input) {
       const output = await onMachine(() => client.call("adoptLesson", input, { hostId, timeoutMs: ADOPT_TIMEOUT_MS }));
       if ("conflict" in output) throw new WriteConflictError("The progress file changed since Tutor read it.");
