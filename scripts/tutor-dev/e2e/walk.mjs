@@ -91,6 +91,11 @@ function sideChatTabs(coach) {
 function readFactory(path) {
   return sh(`cat ${FACTORY}/${path} 2>/dev/null || true`);
 }
+
+/** Lesson 0, Tutor's built-in course, keeps its progress in .tutor/progress.yaml in the project's folder. */
+function readLesson0Progress() {
+  return sh(`cat '${PROJECT}/.tutor/progress.yaml' 2>/dev/null || true`);
+}
 /** Whether a path exists (a file, folder or dangling symlink). */
 function exists(path) {
   return sh(`if [ -e '${path}' ] || [ -L '${path}' ]; then echo yes; else echo no; fi`).trim() === "yes";
@@ -194,7 +199,7 @@ step("01 first run asks to confirm the detected factory", async () => {
 
 step("02 confirm lands on Lesson 0's start page; the outline is one tree of lessons", async () => {
   await page.getByText("Start the course →").click();
-  await page.waitForURL(/\/plugins\/tutor\/course\/start\/000/, { timeout: 30000 });
+  await page.waitForURL(/\/plugins\/tutor\/course\/start\/(tutor\/)?000/, { timeout: 30000 });
   await page.getByText("Start with your coach →").waitFor({ timeout: 30000 });
   const config = JSON.parse(bb("plugin", "config", "tutor", "--json"));
   check(/^proj_/.test(config.values.factoryProject ?? ""), `factoryProject is set (${config.values.factoryProject})`);
@@ -243,7 +248,8 @@ step("04 the coach adopts Lesson 0; every Rule is greyed until the coach reaches
   check(t.toolReport.every((r) => r.includes(": ok →")), "adopt and status succeeded");
   ctx.keys = keysFrom(lastToolResult(ctx.coach0, "tutor_status"));
   check(ctx.keys.rules.length === 5 && ctx.keys.examples.length === 10, `tutor_status lists 5 Rules and 10 Examples`);
-  check(/iteration: "000"/.test(readFactory("spec/PROGRESS.yaml")), "spec/PROGRESS.yaml records iteration \"000\"");
+  check(/iteration: "000"/.test(readLesson0Progress()), ".tutor/progress.yaml records iteration \"000\"");
+  check(!/iteration: "000"/.test(readFactory("spec/PROGRESS.yaml")), "the capstone's spec/PROGRESS.yaml is not Lesson 0's");
   if (STARTER_LAYOUT) {
     check(!exists(`${FACTORY}/ITERATION`) && !exists(`${FACTORY}/spec/ITERATION`), "neither ITERATION nor spec/ITERATION is written for Lesson 0");
   } else {
@@ -530,7 +536,7 @@ step("14 a non-Tutor thread cannot use Tutor tools", async () => {
 });
 
 step("15 Lesson 0 stays truthful after moving on", async () => {
-  check(/^history:\n {2}"000":\n/m.test(readFactory("spec/PROGRESS.yaml")), "PROGRESS.yaml keeps Lesson 0 under history");
+  check(/iteration: "000"/.test(readLesson0Progress()) && /summary: /.test(readLesson0Progress()), ".tutor/progress.yaml keeps Lesson 0, completed");
   await page.goto(`${BASE}/threads/${ctx.coach1}`, { waitUntil: "load" });
   await outline().locator("li.tp-lesson").first().waitFor({ timeout: 30000 });
   await sleep(1500);
@@ -610,9 +616,10 @@ for id in 001 002 003; do
 done
 PATH=/tmp/tutor-e2e-bin:$PATH bash ${clone}/.agents/skills/fetch-iteration/fetch.sh`);
   check(/moved the factory to factory\//.test(fetched), "fetch.sh moved the second clone's factory to factory/");
-  const same = sh(`diff -r --no-dereference --exclude=PROGRESS.yaml --exclude=ITERATION --exclude=jobs '${FACTORY}' ${clone}/factory && diff -r '${CODEBASE}/seeds' ${clone}/tetris/seeds && echo same`);
+  const same = sh(`diff -r --no-dereference --exclude=PROGRESS.yaml --exclude=.tutor --exclude=ITERATION --exclude=jobs '${FACTORY}' ${clone}/factory && diff -r '${CODEBASE}/seeds' ${clone}/tetris/seeds && echo same`);
   check(same.trim().endsWith("same"), "factory/ and tetris/seeds/ match the fetch.sh clone's");
-  const staged = (dir) => sh(`git -C '${dir}' status --porcelain --untracked-files=all | grep -v PROGRESS.yaml | sort || true`);
+  // PROGRESS.yaml and .tutor/ (Lesson 0's progress) are Tutor's alone: fetch.sh never writes them.
+  const staged = (dir) => sh(`git -C '${dir}' status --porcelain --untracked-files=all | grep -v PROGRESS.yaml | grep -v ' \\.tutor/' | sort || true`);
   check(staged(PROJECT) === staged(clone), "the same changes are staged as in the fetch.sh clone");
 
   const t4 = await turn(ctx.coach4, ["CALL tutor_status {}"]);

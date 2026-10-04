@@ -3,19 +3,20 @@ import assert from "node:assert/strict";
 import { parseProgressCard, parseTermRef } from "../../shared/directives.ts";
 import {
   FIXTURE_NOW,
-  fixtureFactoryProject,
+  fixtureWorkspace,
   fixtureCandidates,
   fixtureCompletion,
   fixtureLessonDetail,
   fixtureLexicon,
+  fixtureCourseOverview,
   fixtureOverview,
   fixtureOverviewNoFactory,
   fixtureThreads,
 } from "../../shared/fixtures.ts";
-import type { Overview } from "../../shared/rpc.ts";
+import type { CourseOverview, Overview } from "../../shared/rpc.ts";
 import { CARD_KIT_TONES, progressCardView, termView } from "./cards.ts";
-import { completionView, doneRibbon, whatsNext } from "./completion.ts";
-import { continueView, doneLessonsLabel, homeDecision } from "./home.ts";
+import { completionView, courseOffer, doneRibbon, whatsNext } from "./completion.ts";
+import { activeCourse, addedCourseRoute, continueView, doneLessonsLabel, homeDecision } from "./home.ts";
 import { parseRuleTabParams, ruleTabTarget, ruleTabView } from "./rule-tab.ts";
 import { welcomeView } from "./welcome.ts";
 
@@ -111,26 +112,81 @@ test("terms resolve against the lexicon; unknown ids fall back", () => {
 // Course root redirect and the BB home "Continue" section (5).
 // ---------------------------------------------------------------------------
 
-test("the course root sends the student where they are", () => {
-  assert.deepEqual(homeDecision(fixtureOverview), { kind: "redirect", route: { kind: "start", lessonId: "002" } });
+/** fixtureOverview with each course changed by `change`. */
+function eachCourse(change: (entry: CourseOverview) => CourseOverview): Overview {
+  return { ...fixtureOverview, courses: fixtureOverview.courses.map(change) };
+}
+
+test("the course root sends the student where they are: a course under way, else Lesson 0", () => {
+  assert.deepEqual(homeDecision(fixtureOverview), { kind: "redirect", route: { kind: "start", courseId: "software-factory", lessonId: "002" } });
   assert.deepEqual(homeDecision(fixtureOverviewNoFactory), { kind: "redirect", route: { kind: "welcome" } });
-  const done: Overview = {
-    ...fixtureOverview,
-    current: fixtureOverview.current === null ? null : { ...fixtureOverview.current, iterationStatus: "Done" },
-  };
-  assert.deepEqual(homeDecision(done), { kind: "redirect", route: { kind: "complete", lessonId: "002" } });
-  assert.deepEqual(homeDecision({ ...fixtureOverview, course: null, courseError: "No course.yaml or ledger." }), {
+  // A workspace whose machine is not connected is not one to set up again.
+  const unreachable = { ...fixtureOverviewNoFactory, workspace: { status: "unreachable" as const, projectId: "prj_1", projectName: "repo" } };
+  assert.deepEqual(homeDecision(unreachable), { kind: "unreachable" });
+  assert.deepEqual(homeDecision({ ...unreachable, courses: [] }), { kind: "unreachable" }, "the Codespace comes first, before any course");
+  assert.deepEqual(continueView(unreachable), { kind: "error", message: "Your Codespace is asleep or stopped. Open it and Tutor reconnects by itself." });
+  const done = eachCourse((entry) => (entry.builtin || entry.current === null ? entry : { ...entry, current: { ...entry.current, iterationStatus: "Done" } }));
+  assert.deepEqual(homeDecision(done), { kind: "redirect", route: { kind: "complete", courseId: "software-factory", lessonId: "002" } });
+  const onZero = eachCourse((entry) =>
+    entry.current === null
+      ? entry
+      : entry.builtin
+        ? { ...entry, lessons: entry.lessons.map((lesson) => ({ ...lesson, status: "current" as const })), current: { ...entry.current, iterationStatus: "WIP" } }
+        : { ...entry, lessons: entry.lessons.map((lesson) => ({ ...lesson, status: "ahead" as const })), current: { ...entry.current, lessonId: "001", iterationStatus: "not-started" } },
+  );
+  assert.deepEqual(homeDecision(onZero), { kind: "redirect", route: { kind: "start", courseId: "tutor", lessonId: "000" } });
+  const alone: Overview = { ...fixtureOverview, courses: fixtureOverview.courses.filter((entry) => entry.builtin) };
+  assert.deepEqual(homeDecision(alone), { kind: "redirect", route: { kind: "complete", courseId: "tutor", lessonId: "000" } }, "Lesson 0 done, and no other course");
+  assert.deepEqual(homeDecision({ ...fixtureOverview, courses: [], courseErrors: [{ source: "/x", error: "No course.yaml or ledger." }] }), {
     kind: "error",
     message: "No course.yaml or ledger.",
   });
-  assert.deepEqual(homeDecision({ ...fixtureOverview, course: null, courseError: null }), {
+  assert.deepEqual(homeDecision({ ...fixtureOverview, courses: [] }), {
     kind: "error",
     message: "We couldn't load the course.",
   });
-  assert.deepEqual(homeDecision({ ...fixtureOverview, current: null }), {
+  // A course with no current state yet hasn't started: the active course is Lesson 0's.
+  assert.deepEqual(homeDecision(eachCourse((entry) => (entry.builtin ? entry : { ...entry, current: null }))), {
     kind: "redirect",
-    route: { kind: "start", lessonId: "000" },
+    route: { kind: "complete", courseId: "tutor", lessonId: "000" },
   });
+  // Only another course, with no current state: its first lesson.
+  assert.deepEqual(homeDecision({ ...fixtureOverview, courses: [{ ...fixtureCourseOverview, current: null }] }), {
+    kind: "redirect",
+    route: { kind: "start", courseId: "software-factory", lessonId: "001" },
+  });
+});
+
+/** A Codespace on capstone lesson 003 (WIP) with no Lesson 0 record: it adopted 001 directly, or predates Lesson 0. */
+function onThreeWithoutLesson0(): Overview {
+  return eachCourse((entry) => {
+    if (entry.builtin) {
+      return { ...entry, lessons: entry.lessons.map((lesson) => ({ ...lesson, status: "current" as const, counts: { ...lesson.counts, passing: 0 } })), current: entry.current === null ? null : { ...entry.current, iterationStatus: "not-started" } };
+    }
+    return {
+      ...entry,
+      lessons: entry.lessons.map((lesson) => ({ ...lesson, status: lesson.id === "003" ? ("current" as const) : ("done" as const) })),
+      current: entry.current === null ? null : { ...entry.current, lessonId: "003", iterationStatus: "WIP" },
+    };
+  });
+}
+
+test("a Codespace on a capstone lesson with no Lesson 0 record goes to that lesson, not to Lesson 0", () => {
+  const overview = onThreeWithoutLesson0();
+  assert.equal(activeCourse(overview)?.course.id, "software-factory");
+  assert.deepEqual(homeDecision(overview), { kind: "redirect", route: { kind: "start", courseId: "software-factory", lessonId: "003" } });
+  const view = continueView(overview);
+  assert.deepEqual(view.kind === "continue" ? [view.courseId, view.lessonId] : view.kind, ["software-factory", "003"]);
+});
+
+test("Lesson 0 done and the next course not started: home stays on Lesson 0's completion, which starts the course", () => {
+  const overview = eachCourse((entry) =>
+    entry.builtin
+      ? entry
+      : { ...entry, lessons: entry.lessons.map((lesson) => ({ ...lesson, status: "ahead" as const, coachThreadId: null })), current: entry.current === null ? null : { ...entry.current, lessonId: "001", iterationStatus: "not-started" } },
+  );
+  assert.equal(activeCourse(overview)?.course.id, "tutor");
+  assert.deepEqual(homeDecision(overview), { kind: "redirect", route: { kind: "complete", courseId: "tutor", lessonId: "000" } });
 });
 
 test("the Continue section reads from the overview alone", () => {
@@ -152,7 +208,46 @@ test("the Continue section reads from the overview alone", () => {
     courseTitle: "Build a software factory",
     missing: false,
   });
-  assert.equal(continueView({ ...fixtureOverview, course: null, courseError: null }).kind, "error");
+  assert.equal(continueView({ ...fixtureOverview, courses: [] }).kind, "error");
+});
+
+test("after Lesson 0, BB home's Continue suggests adding the course when nothing has been fetched", () => {
+  const onlyBuiltin: Overview = {
+    ...fixtureOverview,
+    courses: fixtureOverview.courses.filter((entry) => entry.builtin),
+    available: [{ id: "robotics", title: "Build a robot", description: "Six lessons, one robot.", unfinished: false }],
+  };
+  assert.deepEqual(continueView(onlyBuiltin), {
+    kind: "add-course",
+    courseId: "robotics",
+    title: "Build a robot",
+    description: "Six lessons, one robot.",
+    action: "Add the course",
+  });
+  // Fetched, but its seed was interrupted: home keeps offering it, to finish.
+  const interrupted = continueView({ ...onlyBuiltin, available: [{ id: "robotics", title: "Build a robot", description: "", unfinished: true }] });
+  assert.equal(interrupted.kind === "add-course" ? interrupted.action : interrupted.kind, "Finish adding the course");
+  // A configured course wins (Decision 12): available stays empty, so today's behaviour holds (Lesson 0's own completion).
+  assert.deepEqual(continueView({ ...onlyBuiltin, available: [] }).kind, "continue");
+});
+
+test("adding a course lands on its first lesson under the id fetchCourse returns, not the one the row was offered under", () => {
+  assert.deepEqual(addedCourseRoute({ courseId: "software-factory", firstLessonId: "001" }), {
+    kind: "start",
+    courseId: "software-factory",
+    lessonId: "001",
+  });
+});
+
+test("after the last lesson with nothing next, the completion page offers a course that can be added, or finished", () => {
+  assert.equal(courseOffer([]), null);
+  assert.deepEqual(courseOffer([{ id: "robotics", title: "Build a robot", description: "Six lessons.", unfinished: false }]), {
+    courseId: "robotics",
+    title: "Build a robot",
+    description: "Six lessons.",
+    action: "Add the course",
+  });
+  assert.equal(courseOffer([{ id: "robotics", title: "Build a robot", description: "", unfinished: true }])?.action, "Finish adding the course");
 });
 
 test("done lessons read as a range", () => {
@@ -184,7 +279,7 @@ test("the completion page recaps the lesson and introduces the next", () => {
   assert.equal(view.next?.diff?.title, "FACTORY.md — what changed since lesson 1");
   assert.equal(view.next?.started, false);
   assert.equal(view.next?.startLabel, "Start lesson 2 with your coach →");
-  assert.equal(view.next?.startPath, "start/002");
+  assert.equal(view.next?.startPath, "start/software-factory/002");
 
   const sameDay = completionView(
     {
@@ -238,7 +333,7 @@ test("first run confirms a detected factory, or explains how to set one up", () 
   assert.equal(none.mode, "setup");
   assert.equal(none.preselected, null);
   assert.equal(none.missingProjectId, "prj_gone");
-  assert.equal(welcomeView([], fixtureFactoryProject).mode, "setup");
+  assert.equal(welcomeView([], fixtureWorkspace).mode, "setup");
 });
 
 // ---------------------------------------------------------------------------
@@ -246,23 +341,26 @@ test("first run confirms a detected factory, or explains how to set one up", () 
 // ---------------------------------------------------------------------------
 
 test("rule tab params are validated field by field", () => {
-  assert.deepEqual(parseRuleTabParams({ lessonId: "002", ruleKey: FOCUS }), { lessonId: "002", ruleKey: FOCUS });
-  assert.deepEqual(parseRuleTabParams({ lessonId: "2", ruleKey: "../etc" }), { lessonId: null, ruleKey: null });
-  assert.deepEqual(parseRuleTabParams(["002"]), { lessonId: null, ruleKey: null });
-  assert.deepEqual(parseRuleTabParams(null), { lessonId: null, ruleKey: null });
+  assert.deepEqual(parseRuleTabParams({ courseId: "software-factory", lessonId: "002", ruleKey: FOCUS }), { courseId: "software-factory", lessonId: "002", ruleKey: FOCUS });
+  assert.deepEqual(parseRuleTabParams({ lessonId: "002", ruleKey: FOCUS }), { courseId: null, lessonId: "002", ruleKey: FOCUS }, "a tab from before courses");
+  assert.deepEqual(parseRuleTabParams({ courseId: "x".repeat(65), lessonId: "2", ruleKey: "../etc" }), { courseId: null, lessonId: null, ruleKey: null });
+  assert.deepEqual(parseRuleTabParams(["002"]), { courseId: null, lessonId: null, ruleKey: null });
+  assert.deepEqual(parseRuleTabParams(null), { courseId: null, lessonId: null, ruleKey: null });
 });
 
 test("the rule tab targets explicit params, else the thread's own lesson and Rule", () => {
   const side = fixtureThreads[1] ?? null;
   const coach = fixtureThreads[0] ?? null;
-  assert.deepEqual(ruleTabTarget({ lessonId: null, ruleKey: null }, side), { lessonId: "002", ruleKey: FOCUS });
-  assert.deepEqual(ruleTabTarget({ lessonId: null, ruleKey: null }, coach), { lessonId: "002", ruleKey: null });
-  assert.deepEqual(ruleTabTarget({ lessonId: "001", ruleKey: null }, side), { lessonId: "001", ruleKey: null });
-  assert.equal(ruleTabTarget({ lessonId: null, ruleKey: null }, null), null);
+  const none = { courseId: null, lessonId: null, ruleKey: null };
+  assert.deepEqual(ruleTabTarget(none, side), { courseId: "software-factory", lessonId: "002", ruleKey: FOCUS });
+  assert.deepEqual(ruleTabTarget(none, coach), { courseId: "software-factory", lessonId: "002", ruleKey: null });
+  assert.deepEqual(ruleTabTarget({ ...none, lessonId: "001" }, side), { courseId: null, lessonId: "001", ruleKey: null }, "another lesson's course isn't the thread's to say");
+  assert.deepEqual(ruleTabTarget({ courseId: "software-factory", lessonId: "001", ruleKey: null }, side), { courseId: "software-factory", lessonId: "001", ruleKey: null });
+  assert.equal(ruleTabTarget(none, null), null);
 });
 
 test("the rule tab shows the Rule and its Examples", () => {
-  const view = ruleTabView(fixtureLessonDetail, { lessonId: "002", ruleKey: null }, false);
+  const view = ruleTabView(fixtureLessonDetail, { courseId: "software-factory", lessonId: "002", ruleKey: null }, false);
   assert.equal(view.kind, "rule");
   if (view.kind !== "rule") return;
   assert.equal(view.eyebrow, "Rule in focus · Validation");
@@ -272,16 +370,16 @@ test("the rule tab shows the Rule and its Examples", () => {
     view.examples.map((example) => example.detail),
     ["Passing", "Not yet — Crashed in the doer loop instead of retrying when the validator said no."],
   );
-  assert.equal(view.startPath, "start/002");
+  assert.equal(view.startPath, "start/software-factory/002");
   const keys = fixtureLessonDetail.lesson.features.flatMap((feature) => feature.rules.map((rule) => rule.key));
   assert.equal(view.number, keys.indexOf(FOCUS) + 1, "the Rule's number across the lesson, for its step badge");
 
-  const spun = ruleTabView(fixtureLessonDetail, { lessonId: "002", ruleKey: "planning/the-planner-writes-a-plan" }, true);
+  const spun = ruleTabView(fixtureLessonDetail, { courseId: "software-factory", lessonId: "002", ruleKey: "planning/the-planner-writes-a-plan" }, true);
   assert.equal(spun.kind === "rule" ? spun.eyebrow : null, "Spun off from · Planning");
   assert.equal(spun.kind === "rule" ? spun.examples[0]?.detail : null, "Passing · carried over");
   assert.equal(spun.kind === "rule" ? spun.number : null, 1);
-  assert.deepEqual(ruleTabView({ ...fixtureLessonDetail, focus: null }, { lessonId: "002", ruleKey: null }, false), {
+  assert.deepEqual(ruleTabView({ ...fixtureLessonDetail, focus: null }, { courseId: "software-factory", lessonId: "002", ruleKey: null }, false), {
     kind: "no-rule",
-    startPath: "start/002",
+    startPath: "start/software-factory/002",
   });
 });

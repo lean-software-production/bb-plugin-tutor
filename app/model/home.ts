@@ -1,27 +1,76 @@
 // Where the course page's root sends the student, and what BB's home page
-// "Continue" section (mockup 5) says. Both read only getOverview.
+// "Continue" section (mockup 5) says. Both read only getOverview, and both
+// follow the course the student is on: Tutor's built-in course until Lesson 0
+// is done, then the course after it.
+import { WORKSPACE_UNREACHABLE_TEXT } from "../../shared/constants.ts";
 import type { TutorRoute } from "../../shared/routes.ts";
-import type { Overview } from "../../shared/rpc.ts";
+import type { CourseOverview, Overview } from "../../shared/rpc.ts";
 import { lessonLabel, lessonNumber, percent } from "./format.ts";
 
-export type HomeDecision = { kind: "error"; message: string } | { kind: "redirect"; route: TutorRoute };
+/** "Add the course", or "Finish adding the course" for one fetched whose seed was interrupted (addCourseAction). */
+export type AddCourseAction = "Add the course" | "Finish adding the course";
+
+/** The button that adds `course`: the same fetchCourse either way; calling it again finishes an interrupted seed. */
+export function addCourseAction(course: { unfinished: boolean }): AddCourseAction {
+  return course.unfinished ? "Finish adding the course" : "Add the course";
+}
+
+export type HomeDecision =
+  | { kind: "error"; message: string }
+  | { kind: "redirect"; route: TutorRoute }
+  /** The workspace is there, on a machine that isn't connected: its own page (unreachableView), not one to set up again. */
+  | { kind: "unreachable" };
+
+const NO_COURSE = "We couldn't load the course.";
+
+/** Why no course could be shown: the first load error, else a general line. */
+function noCourseMessage(overview: Overview): string {
+  return overview.courseErrors[0]?.error ?? NO_COURSE;
+}
+
+/**
+ * The course the student is on: the first course other than the built-in one
+ * that has started (a Codespace that went straight to 001, or predates
+ * Lesson 0, is on its capstone lesson); else the built-in course, whose
+ * Lesson 0 completion page starts the next course (until that course starts,
+ * its lessons are ahead, so it is nowhere to send the student); else the
+ * first course.
+ */
+export function activeCourse(overview: Overview): CourseOverview | null {
+  const started = overview.courses.find(
+    (entry) => !entry.builtin && entry.current !== null && entry.current.iterationStatus !== "not-started",
+  );
+  return started ?? overview.courses.find((entry) => entry.builtin) ?? overview.courses[0] ?? null;
+}
+
+/**
+ * Where "Add the course" lands: the first lesson's start page, under the
+ * course id fetchCourse returns (the catalog id the server lists it under),
+ * not the one the row or panel was offered under.
+ */
+export function addedCourseRoute(added: { courseId: string; firstLessonId: string }): TutorRoute {
+  return { kind: "start", courseId: added.courseId, lessonId: added.firstLessonId };
+}
 
 export function homeDecision(overview: Overview): HomeDecision {
-  if (overview.course === null) {
-    return { kind: "error", message: overview.courseError ?? "We couldn't load the course." };
-  }
-  if (overview.factoryProject.status !== "found") return { kind: "redirect", route: { kind: "welcome" } };
-  const current = overview.current;
+  if (overview.workspace.status === "unreachable") return { kind: "unreachable" };
+  if (overview.courses.length === 0) return { kind: "error", message: noCourseMessage(overview) };
+  if (overview.workspace.status !== "found") return { kind: "redirect", route: { kind: "welcome" } };
+  const active = activeCourse(overview);
+  if (active === null) return { kind: "error", message: noCourseMessage(overview) };
+  const courseId = active.course.id;
+  const current = active.current;
   if (current === null) {
-    const first = overview.lessons[0];
+    const first = active.lessons[0];
     return first === undefined
       ? { kind: "error", message: "This course has no lessons yet." }
-      : { kind: "redirect", route: { kind: "start", lessonId: first.id } };
+      : { kind: "redirect", route: { kind: "start", courseId, lessonId: first.id } };
   }
   return {
     kind: "redirect",
     route: {
       kind: current.iterationStatus === "Done" ? "complete" : "start",
+      courseId,
       lessonId: current.lessonId,
     },
   };
@@ -30,8 +79,11 @@ export function homeDecision(overview: Overview): HomeDecision {
 export type ContinueView =
   | { kind: "error"; message: string }
   | { kind: "setup"; courseTitle: string; missing: boolean }
+  /** Lesson 0 is done, nothing has been fetched (or finished) yet, and the catalog has something to add (Decision 16). */
+  | { kind: "add-course"; courseId: string; title: string; description: string; action: AddCourseAction }
   | {
       kind: "continue";
+      courseId: string;
       lessonId: string;
       eyebrow: string;
       title: string;
@@ -59,19 +111,32 @@ export function doneLessonsLabel(ids: readonly string[]): string | null {
   return contiguous ? `Lessons ${first}–${last} done ✓` : `Lessons ${numbers.join(", ")} done ✓`;
 }
 
+/** The course a first run sets up: the one after the built-in course, else the built-in one. */
+function setupTitle(overview: Overview): string {
+  return (overview.courses.find((entry) => !entry.builtin) ?? overview.courses[0])?.course.title ?? "Your course";
+}
+
 export function continueView(overview: Overview): ContinueView {
-  if (overview.course === null) {
-    return { kind: "error", message: overview.courseError ?? "We couldn't load the course." };
+  if (overview.courses.length === 0) return { kind: "error", message: noCourseMessage(overview) };
+  if (overview.workspace.status === "unreachable") return { kind: "error", message: WORKSPACE_UNREACHABLE_TEXT };
+  const active = activeCourse(overview);
+  const current = active?.current ?? null;
+  if (overview.workspace.status !== "found" || active === null || current === null) {
+    return { kind: "setup", courseTitle: setupTitle(overview), missing: overview.workspace.status === "missing" };
   }
-  const current = overview.current;
-  if (overview.factoryProject.status !== "found" || current === null) {
-    return { kind: "setup", courseTitle: overview.course.title, missing: overview.factoryProject.status === "missing" };
+  // Lesson 0 done, nothing fetched yet: suggest adding the course instead of only its own completion page.
+  if (active.builtin && current.iterationStatus === "Done") {
+    const course = overview.available[0];
+    if (course !== undefined) {
+      return { kind: "add-course", courseId: course.id, title: course.title, description: course.description, action: addCourseAction(course) };
+    }
   }
-  const summary = overview.lessons.find((lesson) => lesson.id === current.lessonId);
+  const summary = active.lessons.find((lesson) => lesson.id === current.lessonId);
   const set = summary?.set ?? null;
   const rules = current.outline.flatMap((feature) => feature.rules).filter((rule) => rule.change !== "unchanged");
   return {
     kind: "continue",
+    courseId: active.course.id,
     lessonId: current.lessonId,
     eyebrow: ["Continue", lessonLabel(current.lessonId), set].filter((part) => part !== null).join(" · "),
     title: summary?.title ?? lessonLabel(current.lessonId),
@@ -83,7 +148,7 @@ export function continueView(overview: Overview): ContinueView {
     freshRules: rules.length,
     freshRulesPassing: rules.filter((rule) => rule.status === "passing").length,
     doneLabel: doneLessonsLabel(
-      overview.lessons.filter((lesson) => lesson.status === "done" && !lesson.builtin).map((lesson) => lesson.id),
+      active.lessons.filter((lesson) => lesson.status === "done" && !lesson.builtin).map((lesson) => lesson.id),
     ),
     coachThreadId: current.coachThreadId,
     complete: current.iterationStatus === "Done",

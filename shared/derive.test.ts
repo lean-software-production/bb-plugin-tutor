@@ -11,11 +11,11 @@ import {
   resolveCurrent,
   ruleStatus,
 } from "./derive.ts";
-import { fixtureCourse, fixtureFreshStudent, fixtureStudent } from "./fixtures.ts";
+import { fixtureBuiltinCourse, fixtureCourse, fixtureFreshStudent, fixtureStudent } from "./fixtures.ts";
 import type { ExampleProgress, Lesson } from "./model.ts";
 
 function lesson(id: string): Lesson {
-  const found = fixtureCourse.lessons.find((h) => h.id === id);
+  const found = [...fixtureBuiltinCourse.lessons, ...fixtureCourse.lessons].find((h) => h.id === id);
   assert.ok(found);
   return found;
 }
@@ -56,7 +56,7 @@ test("a rule is passing when every example is passing or skipped", () => {
 test("resolveCurrent trusts ITERATION", () => {
   const pointer = resolveCurrent(fixtureCourse, fixtureStudent);
   assert.deepEqual(pointer, { lessonId: "002", iterationStatus: "WIP" });
-  assert.equal(lessonStatus(fixtureCourse, pointer, "000"), "done");
+  assert.equal(lessonStatus(fixtureCourse, pointer, "001"), "done");
   assert.equal(lessonStatus(fixtureCourse, pointer, "002"), "current");
   assert.equal(lessonStatus(fixtureCourse, pointer, "003"), "ahead");
   assert.equal(lessonStatus(fixtureCourse, pointer, "999"), "ahead");
@@ -64,11 +64,12 @@ test("resolveCurrent trusts ITERATION", () => {
   assert.equal(lessonStatus(fixtureCourse, done, "002"), "done");
 });
 
-test("with no ITERATION the student starts on Lesson 0", () => {
-  assert.deepEqual(resolveCurrent(fixtureCourse, fixtureFreshStudent), { lessonId: "000", iterationStatus: "not-started" });
+test("with no ITERATION the student starts on the course's first lesson; in the built-in course, Lesson 0 is under way once it has progress", () => {
+  assert.deepEqual(resolveCurrent(fixtureCourse, fixtureFreshStudent), { lessonId: "001", iterationStatus: "not-started" });
+  assert.deepEqual(resolveCurrent(fixtureBuiltinCourse, fixtureFreshStudent), { lessonId: "000", iterationStatus: "not-started" });
   const builtin = lessonExamples(lesson("000"));
-  const onZero = (statuses: ExampleProgress["status"][]) =>
-    resolveCurrent(fixtureCourse, {
+  const onZero = (statuses: ExampleProgress["status"][], course = fixtureBuiltinCourse) =>
+    resolveCurrent(course, {
       iteration: null,
       problems: [],
       progress: {
@@ -80,11 +81,13 @@ test("with no ITERATION the student starts on Lesson 0", () => {
     });
   assert.equal(onZero(["passing", "pending"]).iterationStatus, "WIP");
   assert.equal(onZero(["passing", "skipped"]).iterationStatus, "Done");
+  // An older capstone progress file still on Lesson 0 is no lesson of the capstone course.
+  assert.deepEqual(onZero(["passing", "skipped"], fixtureCourse), { lessonId: "001", iterationStatus: "not-started" });
 });
 
 test("an ITERATION naming an unknown lesson is ignored", () => {
   const pointer = resolveCurrent(fixtureCourse, { ...fixtureFreshStudent, iteration: { iteration: "042", status: "WIP" } });
-  assert.equal(pointer.lessonId, "000");
+  assert.equal(pointer.lessonId, "001");
 });
 
 test("lookups", () => {
@@ -95,4 +98,12 @@ test("lookups", () => {
   assert.equal(findRule(hw, rule.key)?.name, rule.name);
   assert.equal(findExample(hw, rule.examples[0]!.key)?.name, rule.examples[0]!.name);
   assert.equal(findRule(hw, "nope/nope"), undefined);
+});
+
+test("a course not started yet shows its first lesson ahead, as it did beside Lesson 0; Lesson 0 itself is current", () => {
+  const notStarted = resolveCurrent(fixtureCourse, fixtureFreshStudent);
+  assert.equal(lessonStatus(fixtureCourse, notStarted, "001"), "ahead");
+  assert.equal(lessonStatus(fixtureCourse, notStarted, "002"), "ahead");
+  const zero = resolveCurrent(fixtureBuiltinCourse, fixtureFreshStudent);
+  assert.equal(lessonStatus(fixtureBuiltinCourse, zero, "000"), "current");
 });

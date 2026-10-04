@@ -3,7 +3,11 @@ import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
-import { resolveLayout } from "./layout.ts";
+import type { LayoutProbe } from "../types.ts";
+import { createDiskAccess } from "../../test/helpers/disk-access.ts";
+import { capstoneProgress, findRepoRoot, resolveLayout } from "./detect.ts";
+
+const diskProbe: LayoutProbe = createDiskAccess();
 
 /** A temp folder holding a capstone-project-starter clone: `.git`, `.agents/skills` and `tetris/`. */
 async function repo(t: TestContext): Promise<string> {
@@ -19,7 +23,7 @@ async function repo(t: TestContext): Promise<string> {
 test("a starter clone whose factory is still tetris/.factory", async (t) => {
   const root = await repo(t);
   await mkdir(join(root, "tetris/.factory"));
-  const layout = await resolveLayout(root);
+  const layout = await resolveLayout(root, diskProbe);
   assert.equal(layout.mode, "repo");
   assert.equal(layout.repoRoot, root);
   assert.equal(layout.factoryDir, join(root, "tetris/.factory"));
@@ -37,7 +41,7 @@ test("a starter clone whose factory is still tetris/.factory", async (t) => {
 test("from 004 the factory is factory/, beside tetris/, and the seeds stay in tetris/seeds", async (t) => {
   const root = await repo(t);
   await mkdir(join(root, "factory"));
-  const layout = await resolveLayout(root);
+  const layout = await resolveLayout(root, diskProbe);
   assert.equal(layout.mode, "repo");
   assert.equal(layout.factoryDir, join(root, "factory"));
   assert.equal(layout.factoryAt, "late");
@@ -52,7 +56,7 @@ test("with both, factory/ is used and the leftover tetris/.factory is a problem"
   const root = await repo(t);
   await mkdir(join(root, "factory"));
   await mkdir(join(root, "tetris/.factory"));
-  const layout = await resolveLayout(root);
+  const layout = await resolveLayout(root, diskProbe);
   assert.equal(layout.factoryDir, join(root, "factory"));
   assert.equal(layout.factoryAt, "late");
   assert.equal(layout.problems.length, 1);
@@ -62,7 +66,7 @@ test("with both, factory/ is used and the leftover tetris/.factory is a problem"
 
 test("with neither, the factory is where lesson 000 expects it, and nothing is written until it is there", async (t) => {
   const root = await repo(t);
-  const layout = await resolveLayout(root);
+  const layout = await resolveLayout(root, diskProbe);
   assert.equal(layout.mode, "repo");
   assert.equal(layout.factoryDir, join(root, "tetris/.factory"));
   assert.equal(layout.factoryAt, "early");
@@ -76,7 +80,7 @@ test("a factory that is a symbolic link or a file is refused", async (t) => {
     await mkdir(join(root, "tetris/.factory"));
     if (kind === "link") await symlink("tetris/.factory", join(root, "factory"));
     else await writeFile(join(root, "factory"), "not a folder\n");
-    const layout = await resolveLayout(root);
+    const layout = await resolveLayout(root, diskProbe);
     assert.equal(layout.mode, "repo", kind);
     assert.match(layout.problems.join(" "), kind === "link" ? /factory is a symbolic link/ : /factory is a file/, kind);
     assert.match(layout.blocked ?? "", /factory/, kind);
@@ -87,7 +91,7 @@ test("legacy: a project whose folder is the factory itself (v0.1.0's tetris/.fac
   const root = await repo(t);
   const factory = join(root, "tetris/.factory");
   await mkdir(factory);
-  const layout = await resolveLayout(factory);
+  const layout = await resolveLayout(factory, diskProbe);
   assert.equal(layout.mode, "legacy");
   assert.equal(layout.factoryDir, factory);
   assert.equal(layout.factoryAt, null);
@@ -106,10 +110,43 @@ test("legacy: a factory repo of its own (it holds .git and ITERATION) stays the 
   const root = join(top, "my-factory");
   await mkdir(join(root, ".git"), { recursive: true });
   await writeFile(join(root, "ITERATION"), "001 Done\n");
-  const layout = await resolveLayout(root);
+  const layout = await resolveLayout(root, diskProbe);
   assert.equal(layout.mode, "legacy");
   assert.equal(layout.factoryDir, root);
   assert.equal(layout.repoRoot, root);
   assert.equal(layout.codebaseDir, top);
   assert.equal(layout.blocked, null);
+});
+
+test("a starter clone's layout is decided from one question to the probe", async (t) => {
+  const root = await repo(t);
+  await mkdir(join(root, "tetris/.factory"));
+  const asked: string[][] = [];
+  const counting: LayoutProbe = {
+    kinds: (paths) => (asked.push([...paths]), diskProbe.kinds(paths)),
+    realPath: (path) => diskProbe.realPath(path),
+  };
+  const layout = await resolveLayout(root, counting);
+  assert.equal(layout.factoryAt, "early");
+  assert.equal(asked.length, 1);
+  assert.ok(asked[0]?.includes(join(root, ".git")));
+});
+
+test("findRepoRoot walks up to the nearest folder holding .git, through the probe", async (t) => {
+  const root = await repo(t);
+  await mkdir(join(root, "tetris/.factory"));
+  assert.equal(await findRepoRoot(join(root, "tetris/.factory"), diskProbe), root);
+  const none: LayoutProbe = { kinds: async (paths) => Object.fromEntries(paths.map((path) => [path, "none" as const])), realPath: async (path) => path };
+  assert.equal(await findRepoRoot(join(root, "tetris/.factory"), none), null);
+});
+
+test("a capstone factory keeps its progress in spec/PROGRESS.yaml and ITERATION, falling back to spec/ITERATION", async (t) => {
+  const root = await repo(t);
+  await mkdir(join(root, "factory"));
+  const layout = await resolveLayout(root, diskProbe);
+  assert.deepEqual(capstoneProgress(layout), {
+    dir: join(root, "factory"),
+    progressFile: "spec/PROGRESS.yaml",
+    iterationFiles: ["ITERATION", "spec/ITERATION"],
+  });
 });

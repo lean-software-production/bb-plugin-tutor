@@ -4,7 +4,7 @@
 // module with `import type` only.
 //
 // Handlers fail by throwing an Error whose message is shown to the student
-// as-is, so write it for them ("No factory project is set up yet.").
+// as-is, so write it for them ("No workspace is set up yet.").
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import {
@@ -35,6 +35,8 @@ import {
  */
 export const tutorThreadSchema = z.object({
   id: threadIdSchema,
+  /** The course of its lesson. A Lesson 0 thread is the built-in course's, whatever course an older Tutor recorded. */
+  courseId: z.string(),
   lessonId: lessonIdSchema,
   role: z.enum(["coach", "sideChat"]),
   ruleKey: ruleKeySchema.nullable(),
@@ -46,7 +48,7 @@ export const tutorThreadSchema = z.object({
 });
 export type TutorThread = z.infer<typeof tutorThreadSchema>;
 
-export const factoryProjectSchema = z.discriminatedUnion("status", [
+export const workspaceSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("unset") }),
   z.object({
     status: z.literal("found"),
@@ -55,10 +57,20 @@ export const factoryProjectSchema = z.discriminatedUnion("status", [
     /** Absolute path of the project's default local source. */
     root: z.string(),
   }),
-  /** The factoryProject setting names a project that is gone or has no local source. */
+  /** The workspaceProject setting names a project that is gone or has no local source. */
   z.object({ status: z.literal("missing"), projectId: z.string() }),
+  /** The project is there, but the machine holding its folder is not connected to BB (or a call to it found it offline). */
+  z.object({ status: z.literal("unreachable"), projectId: z.string(), projectName: z.string() }),
 ]);
-export type FactoryProject = z.infer<typeof factoryProjectSchema>;
+export type Workspace = z.infer<typeof workspaceSchema>;
+
+/** offerWorkspace's answer: the offer of the student's Codespace checkout as the workspace. */
+export const workspaceOfferSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("no-machine") }),
+  z.object({ status: z.literal("no-folder"), folder: z.string(), machineName: z.string() }),
+  z.object({ status: z.literal("offer"), hostId: z.string(), machineName: z.string(), folder: z.string() }),
+]);
+export type WorkspaceOffer = z.infer<typeof workspaceOfferSchema>;
 
 export const courseInfoSchema = z.object({
   id: z.string(),
@@ -101,8 +113,17 @@ export const lessonSummarySchema = z.object({
   counts: exampleCountsSchema,
   /** The lesson's coach thread, or null before it has one. */
   coachThreadId: threadIdSchema.nullable(),
+  /** Why the coach stopped on its last turn, in Tutor's words; null when it hasn't, or there is no coach thread. */
+  coachFailure: z.string().nullable(),
   /** Its features and Rules, for the course outline. */
   outline: z.array(featureOutlineSchema),
+  /** The course declares a layout that isn't ready in the workspace (or there is no workspace yet), so this lesson can't start. Never for Lesson 0. */
+  needsLayout: z.boolean(),
+  /**
+   * The course's next lesson to adopt (adoptionTargets), never Lesson 0: its start page offers Start
+   * (startNextLesson) though its status is "ahead", as a course just added has every lesson ahead.
+   */
+  canStart: z.boolean(),
 });
 export type LessonSummary = z.infer<typeof lessonSummarySchema>;
 
@@ -126,16 +147,54 @@ export const currentStateSchema = z.object({
 });
 export type CurrentState = z.infer<typeof currentStateSchema>;
 
+/** A course Tutor can fetch and add (server/content/catalog.ts): not fetched yet, or fetched but not finished. */
+export const availableCourseSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string(),
+  /**
+   * Fetched, but its starter is not all in the workspace yet (the seed was interrupted) or it no longer loads:
+   * offered as "Finish adding the course", with the same fetchCourse.
+   */
+  unfinished: z.boolean(),
+});
+export type AvailableCourse = z.infer<typeof availableCourseSchema>;
+
+/** One course in the overview, with the student's place in it. */
+export const courseOverviewSchema = z.object({
+  course: courseInfoSchema,
+  /** Tutor's built-in course (Lesson 0), listed first. */
+  builtin: z.boolean(),
+  /** The course's layout (layouts/state.ts) and whether the workspace has it. A course without one is ready. */
+  layout: z.object({ id: z.enum(["capstone-factory"]).nullable(), ready: z.boolean() }),
+  lessons: z.array(lessonSummarySchema),
+  /** Null while there is no workspace. */
+  current: currentStateSchema.nullable(),
+});
+export type CourseOverview = z.infer<typeof courseOverviewSchema>;
+
+/**
+ * The agent that would coach, and for each of COACH_AGENTS that isn't ready,
+ * how to sign in (server/coach/agent.ts).
+ */
+export const coachAgentStateSchema = z.object({
+  ready: z.string().nullable(),
+  signIn: z.array(z.object({ providerId: z.string(), name: z.string(), command: z.string().nullable() })),
+});
+export type CoachAgentState = z.infer<typeof coachAgentStateSchema>;
+
 /** Everything the outline, the home section and the first-run page need in one call. */
 export const overviewSchema = z.object({
-  course: courseInfoSchema.nullable(),
-  /** Why the course could not be loaded (course is then null). */
-  courseError: z.string().nullable(),
-  factoryProject: factoryProjectSchema,
-  lessons: z.array(lessonSummarySchema),
-  /** Null while the course is missing or there is no factory project. */
-  current: currentStateSchema.nullable(),
+  workspace: workspaceSchema,
+  /** Tutor's built-in course first, then the configured course. Before there is a workspace, they show what is ahead. */
+  courses: z.array(courseOverviewSchema),
+  /** Courses that can be added ("Add the course"), or finished ("Finish adding the course"). Empty when a configured course wins (Decision 12). */
+  available: z.array(availableCourseSchema),
+  /** Courses that could not be loaded, by path, with the reason. */
+  courseErrors: z.array(z.object({ source: z.string(), error: z.string() })),
   threads: z.array(tutorThreadSchema),
+  /** Which agent would coach, or how to sign in to one; null when a coachProvider setting names one, or there is no workspace. */
+  coachAgent: coachAgentStateSchema.nullable(),
 });
 export type Overview = z.infer<typeof overviewSchema>;
 
@@ -167,6 +226,8 @@ export const completionSchema = z.object({
   summary: z.string().nullable(),
   next: z
     .object({
+      /** After Lesson 0, the next lesson is the first of the course that follows it. */
+      courseId: z.string(),
       id: lessonIdSchema,
       /** "ahead" until the student starts it; then the page continues it instead. */
       status: lessonStatusSchema,
@@ -192,12 +253,14 @@ export const candidateProjectSchema = z.object({
   qualifies: z.boolean(),
   /** One line for the picker: "ITERATION · 001 WIP", "no ITERATION". */
   detail: z.string(),
+  /** Whether the machine holding its folder could be asked; false when that machine is asleep, stopped or gone. */
+  reachable: z.boolean(),
 });
 export type CandidateProject = z.infer<typeof candidateProjectSchema>;
 
 /** Payload of the REALTIME_CHANNELS.stateChanged signal. */
 export const stateChangedSignalSchema = z.object({
-  reason: z.enum(["progress", "iteration", "factoryProject", "threads", "course"]),
+  reason: z.enum(["progress", "iteration", "workspace", "threads", "course"]),
   lessonId: lessonIdSchema.nullable(),
 });
 export type StateChangedSignal = z.infer<typeof stateChangedSignalSchema>;
@@ -206,7 +269,9 @@ export type StateChangedSignal = z.infer<typeof stateChangedSignalSchema>;
 // Contract
 // ---------------------------------------------------------------------------
 
-const lessonInput = z.object({ lessonId: lessonIdSchema });
+/** A lesson, named by its course: lesson ids repeat across courses. */
+export const lessonRefSchema = z.object({ courseId: z.string().min(1).max(64), lessonId: lessonIdSchema });
+export type LessonRef = z.infer<typeof lessonRefSchema>;
 
 export const rpcContract = defineRpcContract({
   getOverview: {
@@ -214,12 +279,12 @@ export const rpcContract = defineRpcContract({
     output: overviewSchema,
   },
   getLessonDetail: {
-    input: lessonInput,
+    input: lessonRefSchema,
     output: lessonDetailSchema,
   },
   /** Between lessons (screen 7). Fails unless the lesson is done. */
   getCompletion: {
-    input: lessonInput,
+    input: lessonRefSchema,
     output: completionSchema,
   },
   /** For the rule tab: null unless the thread is Tutor's, or a side chat BB made of a coach thread. */
@@ -235,14 +300,27 @@ export const rpcContract = defineRpcContract({
     input: z.null(),
     output: z.object({ projects: z.array(candidateProjectSchema) }),
   },
-  /** Stores the factoryProject setting. Never creates a project. */
-  confirmFactory: {
+  /** Stores the workspaceProject setting. Never creates a project. */
+  confirmWorkspace: {
     input: z.object({ projectId: z.string().min(1).max(128) }),
-    output: factoryProjectSchema,
+    output: workspaceSchema,
+  },
+  /**
+   * Whether the student's machine (their Codespace) has a checkout to offer: on the first run, and when the
+   * workspace is unreachable and that machine is a different one (a rebuilt Codespace), to switch to it.
+   */
+  offerWorkspace: {
+    input: z.null(),
+    output: workspaceOfferSchema,
+  },
+  /** Creates the BB project for the offered folder on that machine (findOrCreateProject), then makes it the workspace. */
+  createWorkspace: {
+    input: z.object({ hostId: z.string().min(1).max(128), folder: z.string().startsWith("/").max(4096) }),
+    output: workspaceSchema,
   },
   /** Finds the lesson's coach thread, or spawns it. Current or done lessons only. */
   openCoach: {
-    input: lessonInput,
+    input: lessonRefSchema,
     output: z.object({ threadId: threadIdSchema, created: z.boolean() }),
   },
   /**
@@ -250,7 +328,7 @@ export const rpcContract = defineRpcContract({
    * adopts the spec (tutor_adopt_iteration). Fails for any other lesson.
    */
   startNextLesson: {
-    input: lessonInput,
+    input: lessonRefSchema,
     output: z.object({ threadId: threadIdSchema }),
   },
   /**
@@ -259,7 +337,7 @@ export const rpcContract = defineRpcContract({
    * panel. A plugin cannot select that tab, so the frontend points to it.
    */
   startSideChat: {
-    input: z.object({ lessonId: lessonIdSchema, ruleKey: ruleKeySchema.nullable() }),
+    input: lessonRefSchema.extend({ ruleKey: ruleKeySchema.nullable() }),
     output: z.object({ coachThreadId: threadIdSchema, sideChatId: threadIdSchema }),
   },
   /**
@@ -277,8 +355,25 @@ export const rpcContract = defineRpcContract({
    * moves the focus (tutor_focus_rule), not the UI.
    */
   redirectFocus: {
-    input: z.object({ lessonId: lessonIdSchema, ruleKey: ruleKeySchema }),
+    input: lessonRefSchema.extend({ ruleKey: ruleKeySchema }),
     output: z.object({ threadId: threadIdSchema }),
+  },
+  /**
+   * Adds a course from the catalog (Decision 11): fetches it into BB's data
+   * dir, seeds its starter into the workspace (writing only what is absent),
+   * and lists its lessons after Lesson 0. Calling it again finishes a seed
+   * that was interrupted ("Finish adding the course"). `courseId` in the
+   * output is the id the course now goes by, its catalog id: navigate with it.
+   * Refused when a configured course wins (Decision 12).
+   */
+  fetchCourse: {
+    input: z.object({ courseId: z.string().min(1).max(64) }),
+    output: z.object({
+      courseId: z.string(),
+      firstLessonId: lessonIdSchema,
+      /** written: the starter's files now in the workspace; kept: files already there with other content, left as they were. */
+      seeded: z.object({ written: z.number().int().nonnegative(), kept: z.array(z.string()) }),
+    }),
   },
   /**
    * The student is using BB (app/activity.ts). Stamps the tutor feature's

@@ -1,14 +1,18 @@
-// View model of the course outline in BB's sidebar: one tree. Each lesson
-// is a top-level row; under it sit its BB threads, the coach thread
-// and then its side chats; under the coach thread sit the lesson's Rules,
-// grouped by Feature, each leading to its section of the coach thread. Other
-// threads follow the tree. Pure, so every state is testable.
+// View model of the course outline in BB's sidebar: one group per course,
+// Tutor's built-in course first. In each, every lesson is a top-level row;
+// under it sit its BB threads, the coach thread and then its side chats;
+// under the coach thread sit the lesson's Rules, grouped by Feature, each
+// leading to its section of the coach thread. Other threads follow the tree.
+// Pure, so every state is testable.
+import { WORKSPACE_UNREACHABLE_TEXT } from "../../shared/constants.ts";
 import { withoutLeadingDirectives } from "../../shared/directives.ts";
 import { formatRoute } from "../../shared/routes.ts";
 import type { TutorRoute } from "../../shared/routes.ts";
 import type { LessonStatus, Change, RuleStatus } from "../../shared/model.ts";
-import type { FeatureOutline, LessonSummary, Overview, TutorThread } from "../../shared/rpc.ts";
+import type { CoachAgentState, FeatureOutline, LessonSummary, Overview, TutorThread } from "../../shared/rpc.ts";
+import { routeCourse } from "./course-route.ts";
 import { percent } from "./format.ts";
+import { activeCourse, addCourseAction, type AddCourseAction } from "./home.ts";
 import { indicatorView, isListed } from "./threads.ts";
 import type { IndicatorView, SidebarThreadLike } from "./threads.ts";
 
@@ -71,6 +75,8 @@ export interface SideRow {
 }
 
 export interface LessonNode {
+  /** Its course: lesson ids repeat across courses. */
+  courseId: string;
   id: string;
   title: string;
   status: LessonStatus;
@@ -81,6 +87,8 @@ export interface LessonNode {
   /** The lesson on screen: its start page, its coach thread or one of its side chats. */
   isViewed: boolean;
   coach: ThreadRow | null;
+  /** Why the coach stopped on its last turn, in Tutor's words; null when it hasn't. */
+  coachFailure: string | null;
   /** No coach thread yet, and this is the lesson the student is on. */
   canStartCoach: boolean;
   sideRows: SideRow[];
@@ -100,13 +108,40 @@ export type OutlineStatus =
   | { kind: "loading" }
   | { kind: "error"; message: string }
   | { kind: "unset"; missing: boolean }
+  /** The workspace's machine is not connected: the lessons are there to read, with why nothing else is. */
+  | { kind: "unreachable"; message: string }
   | { kind: "ready" };
+
+/** One course and its lessons. */
+export interface CourseGroup {
+  courseId: string;
+  title: string;
+  builtin: boolean;
+  lessons: LessonNode[];
+}
+
+/** A catalog course not fetched yet, or not finished (Overview.available), offered right after Lesson 0. */
+export interface AddCourseRow {
+  courseId: string;
+  title: string;
+  description: string;
+  action: AddCourseAction;
+}
 
 export interface OutlineView {
   brand: string;
   status: OutlineStatus;
-  lessons: LessonNode[];
+  /** Tutor's built-in course first, then each other course. */
+  groups: CourseGroup[];
+  /** Courses that could not be loaded, while others could: said under the tree. */
+  errors: string[];
   others: OtherThreadGroup[];
+  /** Catalog courses the student can add (Decision 16: shown whether or not Lesson 0 is done). Empty once a course has been fetched. */
+  addCourses: AddCourseRow[];
+  /** Says how to sign in to a coding agent when none is ready to coach; null when one is, or BB can't say. */
+  agentNotice: { text: string } | null;
+  /** Whether a coach thread can be spawned: false while no coding agent is ready and agentNotice says how to fix that. */
+  canStartCoach: boolean;
 }
 
 /** BB's own thread URL, for a coach thread the sidebar has not listed yet. */
@@ -119,11 +154,12 @@ function statusOf(input: OutlineInput): OutlineStatus {
   if (overview === null) {
     return input.overviewError === null ? { kind: "loading" } : { kind: "error", message: input.overviewError };
   }
-  if (overview.course === null) {
-    return { kind: "error", message: overview.courseError ?? "We couldn't load the course." };
+  if (overview.courses.length === 0) {
+    return { kind: "error", message: overview.courseErrors[0]?.error ?? "We couldn't load the course." };
   }
-  if (overview.factoryProject.status !== "found") {
-    return { kind: "unset", missing: overview.factoryProject.status === "missing" };
+  if (overview.workspace.status === "unreachable") return { kind: "unreachable", message: WORKSPACE_UNREACHABLE_TEXT };
+  if (overview.workspace.status !== "found") {
+    return { kind: "unset", missing: overview.workspace.status === "missing" };
   }
   return { kind: "ready" };
 }
@@ -189,28 +225,84 @@ function sideRowsOf(
     });
 }
 
-/** Which lesson is on screen: the start page's, or that of the open coach thread or side chat. */
+/** A lesson of a course. */
+export interface LessonKey {
+  courseId: string;
+  lessonId: string;
+}
+
+/**
+ * Which lesson is on screen: the start page's (its course resolved by
+ * routeCourse), or that of the open coach thread or side chat.
+ */
 export function viewedLesson(
   route: TutorRoute | null,
   activeThreadId: string | null,
-  lessons: readonly { id: string; coachThreadId: string | null }[],
+  lessons: readonly { courseId: string; id: string; coachThreadId: string | null }[],
   threads: readonly Pick<SidebarThreadLike, "id" | "parentThreadId" | "sourceThreadId">[],
-): string | null {
-  if (route !== null && (route.kind === "start" || route.kind === "complete")) return route.lessonId;
+  courses: Overview["courses"] = [],
+): LessonKey | null {
+  if (route !== null && (route.kind === "start" || route.kind === "complete")) {
+    const courseId = routeCourse(route.courseId, route.lessonId, courses);
+    return courseId === null ? null : { courseId, lessonId: route.lessonId };
+  }
   if (activeThreadId === null) return null;
   const active = threads.find((thread) => thread.id === activeThreadId);
   const coachId = active?.sourceThreadId ?? active?.parentThreadId ?? activeThreadId;
-  return lessons.find((lesson) => lesson.coachThreadId === coachId || lesson.coachThreadId === activeThreadId)?.id ?? null;
+  const lesson = lessons.find((candidate) => candidate.coachThreadId === coachId || candidate.coachThreadId === activeThreadId);
+  return lesson === undefined ? null : { courseId: lesson.courseId, lessonId: lesson.id };
+}
+
+function isLesson(key: LessonKey | null, courseId: string, lessonId: string): boolean {
+  return key !== null && key.courseId === courseId && key.lessonId === lessonId;
+}
+
+/** Overview.coachAgent's signIn entries, as one line for the student. */
+function agentNoticeText(signIn: readonly { name: string; command: string | null }[]): string {
+  const commands = signIn.filter((entry): entry is { name: string; command: string } => entry.command !== null);
+  if (commands.length === 0) return "Install and sign in to Claude Code, Codex or pi in your Codespace.";
+  const joined = commands.map((entry) => `${entry.name}: run \`${entry.command}\``).join("; ");
+  return `Sign in to a coding agent in your Codespace's terminal, then come back: ${joined}.`;
+}
+
+/**
+ * Whether a coach thread can be spawned: true when a coachProvider setting
+ * names an agent or there is no workspace (coachAgent null), or when one of
+ * COACH_AGENTS is ready; false when none is, so the student is told how to sign in.
+ */
+export function canStartCoachWith(agentState: CoachAgentState | null): boolean {
+  return agentState === null || agentState.ready !== null;
+}
+
+/** A coach-starting button's gate: whether it is enabled, and what to say beside it while it isn't. */
+export interface CoachGate {
+  canStart: boolean;
+  notice: string | null;
+}
+
+export function coachGate(agentState: CoachAgentState | null): CoachGate {
+  const canStart = canStartCoachWith(agentState);
+  return { canStart, notice: agentState === null || canStart ? null : agentNoticeText(agentState.signIn) };
+}
+
+/**
+ * Whether the page should keep asking for the overview: the student has a
+ * workspace but no coding agent is ready, and signing in to one happens in
+ * their Codespace's terminal, which sends Tutor no signal.
+ */
+export function awaitingAgentSignIn(agentState: CoachAgentState | null): boolean {
+  return agentState !== null && agentState.ready === null;
 }
 
 export function buildOutline(input: OutlineInput): OutlineView {
   const { overview, activeThreadId } = input;
   const status = statusOf(input);
-  const summaries = overview?.course === null ? [] : (overview?.lessons ?? []);
+  const courses = overview?.courses ?? [];
+  const summaries = courses.flatMap((entry) => entry.lessons.map((lesson) => ({ ...lesson, courseId: entry.course.id })));
   const tutorById = new Map((overview?.threads ?? []).map((thread) => [thread.id, thread]));
   const liveById = new Map(input.threads.map((thread) => [thread.id, thread]));
   const ready = status.kind === "ready";
-  const viewed = viewedLesson(input.route, activeThreadId, summaries, input.threads);
+  const viewed = viewedLesson(input.route, activeThreadId, summaries, input.threads, courses);
 
   const row = (live: SidebarThreadLike, kind: ThreadRowKind, nested: boolean): ThreadRow => ({
     id: live.id,
@@ -222,7 +314,9 @@ export function buildOutline(input: OutlineInput): OutlineView {
     indicator: indicatorView(live),
   });
 
-  const lessons = summaries.map((lesson): LessonNode => {
+  // The current lesson opens of the course the student is on (Lesson 0 until it is done), as home sends them there.
+  const active = overview === null ? null : activeCourse(overview)?.course.id;
+  const node = (courseId: string, lesson: LessonSummary): LessonNode => {
     const coachId = ready ? lesson.coachThreadId : null;
     const live = coachId === null ? undefined : liveById.get(coachId);
     const coach: ThreadRow | null =
@@ -239,21 +333,30 @@ export function buildOutline(input: OutlineInput): OutlineView {
               indicator: { tone: "none", label: null },
             }
           : row(live, "coach", false);
+    const isViewed = isLesson(viewed, courseId, lesson.id);
     return {
+      courseId,
       id: lesson.id,
       title: lesson.title,
       status: lesson.status,
       count: `${lesson.counts.passing}/${lesson.counts.total}`,
       percent: percent(lesson.counts.passing, lesson.counts.total),
-      expandedByDefault: ready && (lesson.status === "current" || lesson.id === viewed),
-      isViewed: lesson.id === viewed,
+      expandedByDefault: ready && ((lesson.status === "current" && courseId === active) || isViewed),
+      isViewed,
       coach,
+      coachFailure: ready ? lesson.coachFailure : null,
       canStartCoach: ready && coachId === null && lesson.status === "current",
       sideRows: coachId === null ? [] : sideRowsOf(coachId, lesson, overview?.threads ?? [], liveById, activeThreadId),
       features: coachId === null ? [] : features(lesson.outline),
-      startPath: formatRoute({ kind: "start", lessonId: lesson.id }),
+      startPath: formatRoute({ kind: "start", courseId, lessonId: lesson.id }),
     };
-  });
+  };
+  const groups = status.kind === "error" ? [] : courses.map((entry): CourseGroup => ({
+    courseId: entry.course.id,
+    title: entry.course.title,
+    builtin: entry.builtin,
+    lessons: entry.lessons.map((lesson) => node(entry.course.id, lesson)),
+  }));
 
   const others = otherGroups(
     input.threads.filter(isListed).filter((thread) => !tutorById.has(thread.id)),
@@ -261,7 +364,19 @@ export function buildOutline(input: OutlineInput): OutlineView {
     (live, nested) => row(live, "plain", nested),
   );
 
-  return { brand: overview?.course?.title ?? "Tutor", status, lessons, others };
+  const brand = courses.find((entry) => !entry.builtin)?.course.title ?? "Tutor";
+  const errors = status.kind === "error" ? [] : (overview?.courseErrors ?? []).map((entry) => entry.error);
+  const addCourses: AddCourseRow[] = (overview?.available ?? []).map((course) => ({
+    courseId: course.id,
+    title: course.title,
+    description: course.description,
+    action: addCourseAction(course),
+  }));
+  const agentState = overview?.coachAgent ?? null;
+  const gate = coachGate(agentState);
+  const canStartCoach = gate.canStart;
+  const agentNotice = gate.notice === null ? null : { text: gate.notice };
+  return { brand, status, groups, errors, others, addCourses, agentNotice, canStartCoach };
 }
 
 /** Non-course threads, grouped by project, children nested under their parent. */

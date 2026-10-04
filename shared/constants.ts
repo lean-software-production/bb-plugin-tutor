@@ -14,6 +14,7 @@ export const TOOL_NAMES = {
   adoptIteration: "tutor_adopt_iteration",
   completeIteration: "tutor_complete_iteration",
   sideChat: "tutor_side_chat",
+  fetchCourse: "tutor_fetch_course",
 } as const;
 export type ToolName = (typeof TOOL_NAMES)[keyof typeof TOOL_NAMES];
 export const ALL_TOOL_NAMES: readonly ToolName[] = Object.values(TOOL_NAMES);
@@ -65,38 +66,32 @@ export const NAV_PANEL_PATH = "course";
 export const SETTING_KEYS = {
   /** `type: "string"`; overrides every other course-path source. */
   coursePath: "coursePath",
-  /** `type: "project"`; the student's factory project. Written by `confirmFactory`. */
+  /** `type: "project"`; the student's workspace. Written by `confirmWorkspace`. */
+  workspaceProject: "workspaceProject",
+  /** Read only, for Tutor before 0.5: an older Tutor's workspace setting, still read as a fallback. */
   factoryProject: "factoryProject",
   /** `type: "boolean"`, default true; hides BB's Plugins and Skills navigation rows. */
   simpleNavigation: "simpleNavigation",
+  /** `type: "string"`; the agent provider coach threads use. Empty means BB's default. */
+  coachProvider: "coachProvider",
+  /** `type: "string"`; the model coach threads use, as provider/model. Empty means the coach agent's default. */
+  coachModel: "coachModel",
+  /** `type: "string"`; a JSON course catalog replacing the built-in one (server/content/catalog.ts). Empty means the built-in one. */
+  courseCatalog: "courseCatalog",
+  /** `type: "string"`; where the student's Codespace checks out the starter, offered on first run. */
+  workspaceFolder: "workspaceFolder",
 } as const;
 
+/** Where the student's Codespace checks out the starter: the workspace Tutor offers on first run. */
+export const DEFAULT_WORKSPACE_FOLDER = "/workspaces/capstone-project-starter";
+
 /**
- * How the `tutor` devcontainer feature tells the plugin where things are.
- * Course path precedence: `coursePath` setting > `TUTOR_COURSE_PATH` env >
- * `FEATURE_CONFIG_FILE.course` > `DEFAULT_COURSE_PATH`.
- * The repo and factory paths are only hints for detecting the student's
- * project, in this order: `TUTOR_REPO_PATH`, config `repo`, the git top folder
- * above `TUTOR_FACTORY_PATH` / config `factory`, then that factory path
- * itself. The project is always a BB project id (`factoryProject` setting).
+ * Course path precedence: `coursePath` setting (development) > `TUTOR_COURSE_PATH` env.
+ * The project is always a BB project id (`workspaceProject` setting).
  */
 export const ENV_VARS = {
   coursePath: "TUTOR_COURSE_PATH",
-  repoPath: "TUTOR_REPO_PATH",
-  factoryPath: "TUTOR_FACTORY_PATH",
 } as const;
-/**
- * JSON `{ "schemaVersion"?: 1, "course"?: string, "repo"?: string, "factory"?: string, "dataDir"?: string }`,
- * written by the feature's install.sh. Unknown keys are ignored.
- */
-export const FEATURE_CONFIG_FILE = "/usr/local/etc/tutor/config.json";
-/**
- * The config file layout this plugin understands. An absent `schemaVersion` is 1
- * (Features written before it existed); any other value stops Tutor, since the
- * Feature and the plugin are released separately.
- */
-export const FEATURE_CONFIG_SCHEMA_VERSION = 1;
-export const DEFAULT_COURSE_PATH = "/workspaces/tutorial";
 
 /**
  * The student-activity heartbeat, shared with the feature's keep-alive:
@@ -110,7 +105,7 @@ export const ACTIVITY_FILE = ".tutor-feature/activity";
  * Paths inside the student's factory, relative to its folder (tetris/.factory,
  * then factory/ from lesson 004, in capstone-project-starter). `seedsDir` sits
  * under the codebase folder: tetris/seeds in a starter clone, ../seeds for a
- * project whose folder is the factory itself (server/progress/layout.ts).
+ * project whose folder is the factory itself (layouts/capstone-factory/detect.ts).
  */
 export const FACTORY_FILES = {
   progress: "spec/PROGRESS.yaml",
@@ -132,8 +127,14 @@ export const COURSE_FILES = {
   standIns: "stand-ins",
 } as const;
 
-/** Lesson 0, "Using your tutor": shipped with the plugin, prepended to every course. */
+/** Lesson 0, "Using your tutor": shipped with the plugin as the one lesson of Tutor's built-in course. Other courses may not use its id. */
 export const BUILTIN_LESSON_ID = "000";
+
+/** Tutor's built-in course (server/course/builtin/), listed before every other course. */
+export const BUILTIN_COURSE_ID = "tutor";
+
+/** Where the built-in course keeps its progress in the workspace: .tutor/progress.yaml, with no ITERATION. */
+export const BUILTIN_PROGRESS = { dir: ".tutor", file: "progress.yaml" } as const;
 
 /** Title of a lesson's coach thread. Students read "lesson" for lesson (docs/tutor/GLOSSARY.md). */
 export function coachThreadTitle(lessonId: string): string {
@@ -147,7 +148,7 @@ export function coachThreadTitle(lessonId: string): string {
  * lesson `moveAtLesson` is adopted: the starter's fetch.sh does
  * `git mv tetris/.factory factory`, then points the factory's
  * `claudeSkillsLink` at `linkTarget` again. Tutor does the same
- * (server/progress/factory-move.ts). The rule belongs to the starter.
+ * (layouts/capstone-factory/factory-move.ts). The rule belongs to the starter.
  */
 export const STARTER_LAYOUT = {
   codebase: "tetris",
@@ -168,3 +169,10 @@ export const STARTER_LAYOUT = {
  * (server/coach/coach-file.ts).
  */
 export const STARTER_COACH_SKILL = `${STARTER_LAYOUT.skillsDir}/coach-me/SKILL.md`;
+
+/**
+ * What every surface says while the machine holding the workspace is not
+ * connected to BB (the workspace is "unreachable"): the server's RPC errors
+ * and tool refusals, and the app's pages.
+ */
+export const WORKSPACE_UNREACHABLE_TEXT = "Your Codespace is asleep or stopped. Open it and Tutor reconnects by itself.";

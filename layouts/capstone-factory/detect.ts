@@ -10,11 +10,13 @@
 // Legacy mode: the project's folder is the factory itself, as Tutor v0.1.0
 // set up tetris/.factory, or a factory repo of its own. The codebase is the
 // factory's parent and the seeds ../seeds, as before.
-import { lstat } from "node:fs/promises";
+//
+// Every question about the workspace goes to a LayoutProbe, so the server
+// (through the machine) and the machine itself detect the same layout.
 import { basename, dirname, join } from "node:path";
 import { FACTORY_FILES, STARTER_LAYOUT } from "../../shared/constants.ts";
-import { realPath } from "../paths.ts";
-import { ITERATION_FILES } from "./iteration.ts";
+import { ITERATION_FILES } from "../progress/iteration.ts";
+import type { LayoutProbe, PathKind, ProgressLocation } from "../types.ts";
 
 export type LayoutMode = "repo" | "legacy";
 
@@ -45,36 +47,16 @@ export interface Layout {
   blocked: string | null;
 }
 
-type Kind = "folder" | "link" | "file" | "none";
-
-async function kindOf(path: string): Promise<Kind> {
-  const stats = await lstat(path).catch(() => null);
-  if (stats === null) return "none";
-  if (stats.isSymbolicLink()) return "link";
-  return stats.isDirectory() ? "folder" : "file";
-}
-
-async function occupied(path: string): Promise<boolean> {
-  return (await kindOf(path)) !== "none";
-}
-
-/** Whether `folder` is a factory itself: it holds ITERATION (either place), spec/PROGRESS.yaml or AGENTS.md. */
-async function looksLikeFactory(folder: string): Promise<boolean> {
-  for (const file of [...ITERATION_FILES, FACTORY_FILES.progress, FACTORY_FILES.agents]) {
-    if (await occupied(join(folder, file))) return true;
-  }
-  return false;
-}
-
 /** The nearest folder at or above `from` that holds .git, or null. */
-export async function findRepoRoot(from: string): Promise<string | null> {
+export async function findRepoRoot(from: string, probe: LayoutProbe): Promise<string | null> {
   for (let dir = from; ; dir = dirname(dir)) {
-    if (await occupied(join(dir, ".git"))) return dir;
+    const git = join(dir, ".git");
+    if (((await probe.kinds([git]))[git] ?? "none") !== "none") return dir;
     if (dirname(dir) === dir) return null;
   }
 }
 
-function notAFolder(kind: Kind, name: string): string {
+function notAFolder(kind: PathKind, name: string): string {
   return kind === "link"
     ? `${name} is a symbolic link, so Tutor will not use it as the factory. Make it a real folder.`
     : `${name} is a file, not a folder, so Tutor will not use it as the factory. Move it aside.`;
@@ -100,13 +82,18 @@ function repoLayout(root: string, factoryAt: "early" | "late", problems: string[
   };
 }
 
-export async function resolveLayout(projectRoot: string): Promise<Layout> {
-  const late = await kindOf(join(projectRoot, STARTER_LAYOUT.lateFactory));
-  const early = await kindOf(join(projectRoot, STARTER_LAYOUT.earlyFactory));
-  const repoMode =
-    late !== "none" ||
-    early !== "none" ||
-    ((await occupied(join(projectRoot, ".git"))) && !(await looksLikeFactory(projectRoot)));
+export async function resolveLayout(projectRoot: string, probe: LayoutProbe): Promise<Layout> {
+  const latePath = join(projectRoot, STARTER_LAYOUT.lateFactory);
+  const earlyPath = join(projectRoot, STARTER_LAYOUT.earlyFactory);
+  const gitPath = join(projectRoot, ".git");
+  // A factory itself holds ITERATION (either place), spec/PROGRESS.yaml or AGENTS.md.
+  const factoryMarks = [...ITERATION_FILES, FACTORY_FILES.progress, FACTORY_FILES.agents].map((file) => join(projectRoot, file));
+  const kinds = await probe.kinds([latePath, earlyPath, gitPath, ...factoryMarks]);
+  const kindOf = (path: string): PathKind => kinds[path] ?? "none";
+  const late = kindOf(latePath);
+  const early = kindOf(earlyPath);
+  const looksLikeFactory = factoryMarks.some((path) => kindOf(path) !== "none");
+  const repoMode = late !== "none" || early !== "none" || (kindOf(gitPath) !== "none" && !looksLikeFactory);
   if (repoMode) {
     const lateName = `${STARTER_LAYOUT.lateFactory}/`;
     const earlyName = `${STARTER_LAYOUT.earlyFactory}/`;
@@ -131,9 +118,9 @@ export async function resolveLayout(projectRoot: string): Promise<Layout> {
       "Restore it from git, or pick the clone of capstone-project-starter you build your factory in.";
     return repoLayout(projectRoot, "early", [problem], problem);
   }
-  const real = await realPath(projectRoot);
+  const real = await probe.realPath(projectRoot);
   const codebaseDir = dirname(real);
-  const repoRoot = await findRepoRoot(real);
+  const repoRoot = await findRepoRoot(real, probe);
   return {
     mode: "legacy",
     projectRoot,
@@ -149,4 +136,9 @@ export async function resolveLayout(projectRoot: string): Promise<Layout> {
     problems: [],
     blocked: null,
   };
+}
+
+/** Where a capstone factory keeps the student's progress: spec/PROGRESS.yaml, and ITERATION (else an older factory's spec/ITERATION). */
+export function capstoneProgress(layout: Layout): ProgressLocation {
+  return { dir: layout.factoryDir, progressFile: FACTORY_FILES.progress, iterationFiles: [...ITERATION_FILES] };
 }

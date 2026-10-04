@@ -1,5 +1,5 @@
-# Tutor's built-in course. Its one lesson is prepended to every course as
-# Lesson 0; the id "000" is reserved for it.
+# Tutor's built-in course, listed before every other course. Its one lesson
+# is Lesson 0; no other course may use the id "000".
 id: tutor
 title: Using your tutor
 lessons:

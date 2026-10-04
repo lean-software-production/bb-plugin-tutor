@@ -1,16 +1,21 @@
-// First run: which BB projects look like the student's repo. Tutor suggests
-// and the student confirms; it never creates a project. A capstone-project-
-// starter clone qualifies by its layout (tetris/.factory, factory/, or the
-// coach-me skill); a folder that is a factory itself, as before, by its
-// ITERATION or an AGENTS.md naming the coach.
-import { lstat, readFile } from "node:fs/promises";
+// First run: which projects could be the student's workspace. Tutor suggests
+// and the student confirms; the hosted first run (hosted-workspace.ts) makes
+// the project for the student's Codespace checkout instead when none of these
+// is on a connected machine. When the loaded course uses the capstone-factory
+// layout, a capstone-project-starter clone qualifies by its layout
+// (tetris/.factory, factory/, or the coach-me skill), and a folder that is a
+// factory itself, as before, by its ITERATION or an AGENTS.md naming the
+// coach. Without that layout, every standard project qualifies as a workspace.
+// Each project's folder is probed through the WorkspaceAccess of the machine
+// holding it.
 import { basename, extname, join, resolve } from "node:path";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { COURSE_FILES, FACTORY_FILES, STARTER_COACH_SKILL, STARTER_LAYOUT } from "../../shared/constants.ts";
+import { ITERATION_FILES, parseIteration } from "../../layouts/progress/iteration.ts";
+import { BUILTIN_PROGRESS, COURSE_FILES, FACTORY_FILES, STARTER_COACH_SKILL, STARTER_LAYOUT } from "../../shared/constants.ts";
 import type { CandidateProject } from "../../shared/rpc.ts";
 import { overlaps } from "../paths.ts";
-import { ITERATION_FILES, parseIteration } from "../progress/iteration.ts";
-import { defaultSourcePath, pathExists, type ProjectWithSources } from "../coach/factory-project.ts";
+import { WorkspaceUnreachableError, type WorkspaceAccess } from "../workspace/access.ts";
+import { defaultSource, pathExists, type AccessFor, type ProjectWithSources } from "../workspace/workspace-project.ts";
 
 type Sdk = BbPluginApi["sdk"];
 
@@ -25,27 +30,37 @@ export interface ProjectProbe {
   agentsText: string | null;
   /**
    * Set when the folder is a starter clone: which factory folder it holds
-   * (factory/ wins, as in layout.ts), or null with only the coach-me skill.
+   * (factory/ wins, as in layouts/capstone-factory/detect.ts), or null with only the coach-me skill.
    * `iterationText` is then the factory's ITERATION.
    */
   starter?: { factory: string | null };
+  /** Whether the folder already holds `.tutor/`: a workspace Tutor has used before. */
+  hasTutorDir: boolean;
+  /** False when the machine holding the folder could not be asked (it is not connected); true unless given. */
+  reachable?: boolean;
 }
 
 interface CandidateContext {
-  coursePath: string;
+  /** The configured course's folder, which no workspace may share; null without one (Decision 12). */
+  coursePath: string | null;
   /**
    * The coach file's name without its extension, which a coach-me-made
    * AGENTS.md names: "coach-me" matches both coach-me.md and the starter's
    * **coach-me** skill.
    */
   coachName: string;
+  /** The non-built-in course's declared layout (Course.layout), or null for a layoutless setup. */
+  layoutId: "capstone-factory" | null;
 }
 
 export function describeCandidate(probe: ProjectProbe, context: CandidateContext): CandidateProject {
-  const base = { projectId: probe.projectId, name: probe.name, root: probe.root };
+  const base = { projectId: probe.projectId, name: probe.name, root: probe.root, reachable: probe.reachable ?? true };
   if (probe.root === null || !probe.rootExists) return { ...base, qualifies: false, detail: "no folder on this machine" };
-  if (resolve(probe.root) === resolve(context.coursePath)) return { ...base, qualifies: false, detail: "the course itself" };
-  if (overlaps(probe.root, context.coursePath)) return { ...base, qualifies: false, detail: "shares a folder with the course" };
+  if (context.coursePath !== null && resolve(probe.root) === resolve(context.coursePath)) return { ...base, qualifies: false, detail: "the course itself" };
+  if (context.coursePath !== null && overlaps(probe.root, context.coursePath)) return { ...base, qualifies: false, detail: "shares a folder with the course" };
+  if (context.layoutId !== "capstone-factory") {
+    return { ...base, qualifies: true, detail: probe.hasTutorDir ? ".tutor/ · already set up" : "a folder to work in" };
+  }
   if (probe.starter !== undefined) {
     const where = probe.starter.factory === null ? "no factory folder yet" : `factory in ${probe.starter.factory}`;
     const iteration = probe.iterationText === null ? "" : ` · ${iterationDetail(probe.iterationText)}`;
@@ -66,64 +81,112 @@ function iterationDetail(text: string): string {
   return `${FACTORY_FILES.iteration} · ${state}`;
 }
 
-/** The hinted folder first, then projects that look like a factory, then by name. */
-export function rankCandidates(candidates: readonly CandidateProject[], hint: string | null): CandidateProject[] {
+/**
+ * The hinted folder first, then qualifying projects, then by name. `preferred`
+ * (a layoutless setup's projects already holding `.tutor/`) comes right after
+ * the hint, ahead of other qualifying projects.
+ */
+export function rankCandidates(
+  candidates: readonly CandidateProject[],
+  hint: string | null,
+  preferred: ReadonlySet<string> = new Set(),
+): CandidateProject[] {
   const hinted = (candidate: CandidateProject) =>
     hint !== null && candidate.root !== null && resolve(candidate.root) === resolve(hint) ? 0 : 1;
+  const preference = (candidate: CandidateProject) => (preferred.has(candidate.projectId) ? 0 : 1);
   return [...candidates].sort(
-    (a, b) => hinted(a) - hinted(b) || Number(b.qualifies) - Number(a.qualifies) || a.name.localeCompare(b.name),
+    (a, b) =>
+      hinted(a) - hinted(b) || preference(a) - preference(b) || Number(b.qualifies) - Number(a.qualifies) || a.name.localeCompare(b.name),
   );
 }
 
-async function readOptional(path: string): Promise<string | null> {
-  return readFile(path, "utf8").catch(() => null);
+async function readOptional(access: WorkspaceAccess, path: string): Promise<string | null> {
+  return access.read(path).then(
+    (file) => file?.text ?? null,
+    () => null,
+  );
 }
 
-async function readIterationText(root: string): Promise<string | null> {
+async function readIterationText(access: WorkspaceAccess, root: string): Promise<string | null> {
   for (const file of ITERATION_FILES) {
-    const text = await readOptional(join(root, file));
+    const text = await readOptional(access, join(root, file));
     if (text !== null) return text;
   }
   return null;
 }
 
-async function isFolder(path: string): Promise<boolean> {
-  return (await lstat(path).catch(() => null))?.isDirectory() === true;
-}
-
 /** Whether `root` is a starter clone, and which factory folder it holds. */
-async function starterOf(root: string): Promise<{ factory: string | null } | undefined> {
-  for (const folder of [STARTER_LAYOUT.lateFactory, STARTER_LAYOUT.earlyFactory]) {
-    if (await isFolder(join(root, folder))) return { factory: folder === STARTER_LAYOUT.lateFactory ? `${folder}/` : folder };
+async function starterOf(access: WorkspaceAccess, root: string): Promise<{ factory: string | null } | undefined> {
+  const folders = [STARTER_LAYOUT.lateFactory, STARTER_LAYOUT.earlyFactory];
+  const skill = join(root, STARTER_COACH_SKILL);
+  const kinds = await access.kinds([...folders.map((folder) => join(root, folder)), skill]);
+  for (const folder of folders) {
+    if (kinds[join(root, folder)] === "folder") return { factory: folder === STARTER_LAYOUT.lateFactory ? `${folder}/` : folder };
   }
-  return (await pathExists(join(root, STARTER_COACH_SKILL))) ? { factory: null } : undefined;
+  const skillKind = kinds[skill] ?? "none";
+  const hasSkill = skillKind === "link" ? await pathExists(access, skill) : skillKind !== "none";
+  return hasSkill ? { factory: null } : undefined;
 }
 
-async function probe(project: ProjectWithSources): Promise<ProjectProbe> {
-  const root = defaultSourcePath(project);
-  const rootExists = root !== null && (await pathExists(root));
+async function probeHasTutorDir(access: WorkspaceAccess, root: string): Promise<boolean> {
+  const path = join(root, BUILTIN_PROGRESS.dir);
+  const kinds = await access.kinds([path]);
+  return (kinds[path] ?? "none") === "folder";
+}
+
+/** A project whose machine can't be reached has, for now, no folder Tutor can use. */
+async function probeReachable(project: ProjectWithSources, accessFor: AccessFor): Promise<ProjectProbe> {
+  try {
+    return await probe(project, accessFor);
+  } catch (cause) {
+    if (!(cause instanceof WorkspaceUnreachableError)) throw cause;
+    const root = defaultSource(project)?.path ?? null;
+    return { projectId: project.id, name: project.name, root, rootExists: false, iterationText: null, agentsText: null, hasTutorDir: false, reachable: false };
+  }
+}
+
+async function probe(project: ProjectWithSources, accessFor: AccessFor): Promise<ProjectProbe> {
+  const source = defaultSource(project);
+  const root = source?.path ?? null;
+  const access = source === undefined ? null : accessFor(source.hostId);
+  const rootExists = root !== null && access !== null && (await pathExists(access, root));
   const base = { projectId: project.id, name: project.name, root, rootExists };
-  if (root === null || !rootExists) return { ...base, iterationText: null, agentsText: null };
-  const starter = await starterOf(root);
+  if (root === null || access === null || !rootExists) return { ...base, iterationText: null, agentsText: null, hasTutorDir: false };
+  const hasTutorDir = await probeHasTutorDir(access, root);
+  const starter = await starterOf(access, root);
   if (starter !== undefined) {
     const factory = starter.factory === null ? null : join(root, starter.factory);
-    return { ...base, iterationText: factory === null ? null : await readIterationText(factory), agentsText: null, starter };
+    return {
+      ...base,
+      iterationText: factory === null ? null : await readIterationText(access, factory),
+      agentsText: null,
+      starter,
+      hasTutorDir,
+    };
   }
-  return { ...base, iterationText: await readIterationText(root), agentsText: await readOptional(join(root, FACTORY_FILES.agents)) };
+  return {
+    ...base,
+    iterationText: await readIterationText(access, root),
+    agentsText: await readOptional(access, join(root, FACTORY_FILES.agents)),
+    hasTutorDir,
+  };
 }
 
 export async function listCandidates(
   sdk: Sdk,
-  coursePath: string,
+  accessFor: AccessFor,
+  coursePath: string | null,
   coachPath: string | null,
-  projectHint: string | null,
+  layoutId: "capstone-factory" | null = null,
 ): Promise<CandidateProject[]> {
   const projects = await sdk.projects.list({ includePersonal: false });
   const coachFile = basename(coachPath ?? COURSE_FILES.defaultCoach);
-  const context: CandidateContext = { coursePath, coachName: basename(coachFile, extname(coachFile)) };
-  const probes = await Promise.all(projects.filter((project) => project.kind === "standard").map(probe));
+  const context: CandidateContext = { coursePath, coachName: basename(coachFile, extname(coachFile)), layoutId };
+  const probes = await Promise.all(projects.filter((project) => project.kind === "standard").map((project) => probeReachable(project, accessFor)));
+  const preferred = new Set(probes.filter((entry) => entry.hasTutorDir).map((entry) => entry.projectId));
   return rankCandidates(
     probes.map((entry) => describeCandidate(entry, context)),
-    projectHint,
+    null,
+    layoutId === "capstone-factory" ? undefined : preferred,
   );
 }

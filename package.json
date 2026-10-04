@@ -10,8 +10,8 @@
   },
   "type": "module",
   "engines": {
-    "bb": ">=0.43.4",
-    "bbPluginSdk": ">=0.5.9"
+    "bb": ">=0.45.0",
+    "bbPluginSdk": ">=0.6.15"
   },
   "bb": {
     "name": "Tutor",
@@ -21,6 +21,7 @@
     },
     "server": "./server.ts",
     "app": "./app.tsx",
+    "host": "./host.ts",
     "themes": [
       {
         "id": "sketchbook",
@@ -36,7 +37,7 @@
   },
   "scripts": {
     "typecheck": "tsc -p .",
-    "test": "node --experimental-strip-types --no-warnings=ExperimentalWarning --test \"shared/**/*.test.ts\" \"server/**/*.test.ts\" \"app/**/*.test.ts\" \"test/**/*.test.ts\" \"scripts/*.test.ts\"",
+    "test": "node --experimental-strip-types --no-warnings=ExperimentalWarning --test \"host/**/*.test.ts\" \"shared/**/*.test.ts\" \"server/**/*.test.ts\" \"app/**/*.test.ts\" \"test/**/*.test.ts\" \"layouts/**/*.test.ts\" \"scripts/*.test.ts\"",
     "build": "bb plugin build .",
     "sync-brand": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/sync-brand.ts",
     "build:assets": "node --experimental-strip-types --no-warnings=ExperimentalWarning app/fonts/embed.ts && node --experimental-strip-types --no-warnings=ExperimentalWarning app/theme/build.ts && node --experimental-strip-types --no-warnings=ExperimentalWarning app/sketch/build-kit.ts && node --experimental-strip-types --no-warnings=ExperimentalWarning app/sketch/build-assets.ts",
@@ -54,7 +55,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@get-bb/plugin-sdk": "0.5.9",
+    "@get-bb/plugin-sdk": "0.6.15",
     "@pierre/diffs": "^1.2.9",
     "@radix-ui/react-alert-dialog": "^1.1.19",
     "@radix-ui/react-context-menu": "^2.3.3",

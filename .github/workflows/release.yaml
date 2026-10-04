@@ -1,8 +1,11 @@
 name: Release
 
 # Push a tag v<version>, where <version> is package.json's version, to publish
-# bb-plugin-tutor-<version>.tgz and its .sha256 as a GitHub Release. The tutor
-# Feature downloads that tarball and pins its SHA-256. See README.md, Releasing.
+# bb-plugin-tutor-<version>.tgz and its .sha256, plus
+# bb-plugin-tutor-<version>-built.tgz (the archive with its dependencies
+# installed and built), as a GitHub Release. Student servers install the
+# -built.tgz, pinned by its SHA-256 (docs/tutor-students.md in the
+# infrastructure repo). See README.md, Release.
 on:
   push:
     tags: ["v*"]
@@ -11,7 +14,7 @@ permissions:
   contents: write
 
 env:
-  BB_APP_VERSION: 0.43.4
+  BB_APP_VERSION: 0.45.0
 
 jobs:
   release:
@@ -36,12 +39,14 @@ jobs:
         run: npm install --global --ignore-scripts "bb-app@${BB_APP_VERSION}"
       - name: Build the release assets from the tag
         run: scripts/release-archive.sh "$GITHUB_REF_NAME" "$RUNNER_TEMP/release"
-      - name: Extract, npm ci --omit=dev --ignore-scripts, bb plugin build
+      - name: Extract, npm ci --omit=dev --ignore-scripts, bb plugin build; write the -built.tgz
         run: scripts/check-release-archive.sh "$RUNNER_TEMP/release/bb-plugin-tutor-${GITHUB_REF_NAME#v}.tgz"
       - name: Create the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           asset="$RUNNER_TEMP/release/bb-plugin-tutor-${GITHUB_REF_NAME#v}.tgz"
-          gh release create "$GITHUB_REF_NAME" "$asset" "$asset.sha256" \
+          built="$RUNNER_TEMP/release/bb-plugin-tutor-${GITHUB_REF_NAME#v}-built.tgz"
+          gh release create "$GITHUB_REF_NAME" \
+            "$asset" "$asset.sha256" "$built" \
             --verify-tag --title "$GITHUB_REF_NAME" --generate-notes

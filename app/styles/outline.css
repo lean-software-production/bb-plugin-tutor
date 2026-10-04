@@ -164,6 +164,41 @@
   cursor: default;
 }
 
+/* ---- "Add the course": a catalog course not fetched yet, right after Lesson 0 ---- */
+.tutor-sk.tp-outline .tp-add-course {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 2px 0 6px 8px;
+  padding: 8px 8px 10px;
+  border-radius: 10px;
+  background: var(--tp-hover);
+}
+.tutor-sk .tp-add-course-text {
+  display: grid;
+  gap: 1px;
+}
+.tutor-sk .tp-add-course-title {
+  color: var(--tp-heading);
+  font-family: var(--tp-font-label);
+  font-size: 16px;
+}
+.tutor-sk .tp-add-course-desc {
+  overflow: hidden;
+  color: var(--tp-muted);
+  font-size: 14.5px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tutor-sk.tp-outline .tp-th--add {
+  align-self: flex-start;
+  padding: 3px 10px;
+  color: var(--tp-heading);
+  font-family: var(--tp-font-label);
+  box-shadow: inset 0 0 0 1px var(--tp-rule);
+}
+
 /* ---- separators and thread rows ---- */
 .tutor-sk .tp-sep {
   display: flex;

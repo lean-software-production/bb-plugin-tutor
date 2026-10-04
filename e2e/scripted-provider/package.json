@@ -1,0 +1,24 @@
+{
+  "name": "bb-plugin-scripted-provider",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Credential-free agent provider for Tutor tests: reports the tools and skills a thread was offered, makes scripted tool calls and echoes ::directive lines as assistant markdown.",
+  "engines": { "bb": ">=0.45.0", "bbPluginSdk": ">=0.6.15" },
+  "bb": {
+    "name": "Scripted provider (test fixture)",
+    "description": "Credential-free scripted agent provider for plugin testing.",
+    "branding": { "icon": "Zap" },
+    "server": "./server.ts",
+    "host": "./host.ts"
+  },
+  "dependencies": {
+    "@get-bb/plugin-sdk": "0.6.15",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  },
+  "scripts": { "typecheck": "tsc --noEmit" }
+}

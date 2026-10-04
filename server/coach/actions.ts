@@ -1,7 +1,8 @@
 // What each coach tool does, as pure functions over the re-derived world.
 // They return the text for the coach and the files to write; tools.ts checks
 // the caller and performs the writes.
-import { BUILTIN_LESSON_ID, STARTER_LAYOUT } from "../../shared/constants.ts";
+import { relative } from "node:path";
+import { STARTER_LAYOUT, WORKSPACE_UNREACHABLE_TEXT } from "../../shared/constants.ts";
 import {
   countExamples,
   findExample,
@@ -17,23 +18,24 @@ import { formatProgressCard, type ProgressCard } from "../../shared/directives.t
 import { ruleKeyOfExample } from "../../shared/keys.ts";
 import type { Course, ExampleProgress, Lesson, IterationState, ProgressFile, Rule, StudentState } from "../../shared/model.ts";
 import type { ToolParameters } from "../../shared/tools.ts";
-import { carryOver } from "../progress/carry-over.ts";
+import { carryOver } from "../../layouts/progress/carry-over.ts";
 import { progressFor } from "../progress/current.ts";
-import { needsFactoryMove } from "../progress/factory-move.ts";
-import type { Layout } from "../progress/layout.ts";
-import type { World } from "./world.ts";
+import { needsFactoryMove } from "../../layouts/capstone-factory/factory-move.ts";
+import { notReadyText, type CourseLayoutState } from "../../layouts/state.ts";
+import type { CoachMethod } from "./coach-file.ts";
+import { findCourse, methodCourse, type World } from "./world.ts";
 
 const LATE_FACTORY = STARTER_LAYOUT.lateFactory;
 
 export interface CoachState {
   course: Course;
-  /** The coaching method's file (coach-file.ts), or null. */
-  coachPath: string | null;
+  /** The coaching method (coach-file.ts). */
+  coach: CoachMethod;
   projectId: string;
   /** The BB project's folder, where coach threads work: the student's repo, or (legacy) the factory itself. */
   root: string;
-  /** Where the factory is in it: every file the tools write goes into layout.factoryDir. */
-  layout: Layout;
+  /** The course's layout in it: the tools write progress to layout.progress, and a capstone lesson's spec into its factory. */
+  layout: CourseLayoutState;
   hostId: string;
   lesson: Lesson;
   pointer: CurrentPointer;
@@ -53,31 +55,46 @@ export type Outcome =
       reached?: string;
     };
 
-export function coachStateOf(world: World): CoachState | { error: string } {
-  if (world.course === null || world.pointer === null) {
-    return { error: `The course could not be loaded: ${world.courseError ?? "unknown error"}` };
+/** The coach's view of one course: the caller's, from its coach thread's metadata (Lesson 0's is the built-in course). */
+export function coachStateOf(world: World, courseId: string): CoachState | { error: string } {
+  if (world.workspace.status === "unreachable") return { error: WORKSPACE_UNREACHABLE_TEXT };
+  if (world.workspace.status !== "found" || world.hostId === null) {
+    return { error: "No workspace is set up yet. The student confirms it on the Course page." };
   }
-  if (world.factoryProject.status !== "found" || world.factoryHostId === null || world.layout === null) {
-    return { error: "No factory project is set up yet. The student confirms it on the Course page." };
+  const loaded = findCourse(world, courseId);
+  if (loaded === undefined) {
+    const why = world.courseErrors.map((entry) => entry.error).join(" ");
+    return { error: `The course "${courseId}" isn't loaded${why === "" ? "" : `: ${why}`}` };
   }
-  const lesson = findLesson(world.course, world.pointer.lessonId);
-  if (lesson === undefined) return { error: `Lesson ${world.pointer.lessonId} is not in this course.` };
+  const { course, pointer, student } = loaded;
+  const lesson = findLesson(course, pointer.lessonId);
+  if (lesson === undefined) return { error: `Lesson ${pointer.lessonId} is not in this course.` };
   return {
-    course: world.course,
-    coachPath: world.coachPath,
-    projectId: world.factoryProject.projectId,
-    root: world.factoryProject.root,
-    layout: world.layout,
-    hostId: world.factoryHostId,
+    course,
+    coach: methodCourse(world.courses, loaded).coach,
+    projectId: world.workspace.projectId,
+    root: world.workspace.root,
+    layout: loaded.layout,
+    hostId: world.hostId,
     lesson,
-    pointer: world.pointer,
-    student: world.student,
-    progress: progressFor(world.student, lesson.id),
+    pointer,
+    student,
+    progress: progressFor(student, lesson.id),
   };
 }
 
 /**
- * No progress is recorded for the current lesson: spec/PROGRESS.yaml is
+ * Why the tools that change progress refuse the current lesson: it is one of
+ * the course's own and the course's layout isn't ready. Lesson 0 works in any
+ * workspace, and tutor_status always answers, problems and all. Null when
+ * nothing stands in the way.
+ */
+export function layoutError(state: CoachState): string | null {
+  return !state.lesson.builtin && !state.layout.ready ? notReadyText(state.layout) : null;
+}
+
+/**
+ * No progress is recorded for the current lesson: its progress file is
  * missing or about another lesson. A file that could not be read or parsed is
  * not "none": its marks are unknown, and adopting again would overwrite them.
  */
@@ -85,10 +102,21 @@ export function unrecorded(state: CoachState): boolean {
   return state.progress === null && state.student.progressUnreadable !== true;
 }
 
-/** Why nothing can change the lesson's progress while spec/PROGRESS.yaml is damaged. */
-export function unreadableProgressText(lessonId: string): string {
+/**
+ * The progress file's path, relative to the workspace, for this course's
+ * layout: `.tutor/progress.yaml` for Lesson 0, `.tutor/courses/<id>/progress.yaml`
+ * for a layoutless course, and `spec/PROGRESS.yaml`, unchanged, for the
+ * capstone-factory layout.
+ */
+export function progressFileText(state: Pick<CoachState, "root" | "layout">): string {
+  if (state.layout.id === "capstone-factory") return state.layout.progress.progressFile;
+  return `${relative(state.root, state.layout.progress.dir)}/${state.layout.progress.progressFile}`;
+}
+
+/** Why nothing can change the lesson's progress while its progress file is damaged. */
+export function unreadableProgressText(progressPath: string, lessonId: string): string {
   return (
-    `spec/PROGRESS.yaml could not be read, so Lesson ${lessonId}'s marks are unknown. ` +
+    `${progressPath} could not be read, so Lesson ${lessonId}'s marks are unknown. ` +
     "Help the student repair it (tutor_status names the problem; git may have a good copy). " +
     "Don't adopt the lesson again: that would replace the file and lose its marks."
   );
@@ -152,7 +180,7 @@ function echo(line: string): string {
 function sectionHeader(line: string): string {
   return [
     "When you turn to this Rule, start your next message with this line, exactly as written and on a line of its own.",
-    "BB draws it as the Rule card, where the Rule's section of this conversation starts; the course outline jumps there.",
+    "Tutor draws it as the Rule card, where the Rule's section of this conversation starts; the course outline jumps there.",
     line,
   ].join("\n");
 }
@@ -160,7 +188,7 @@ function sectionHeader(line: string): string {
 /** The progress to change, refusing when the lesson is not under way. */
 function underWay(state: CoachState): ProgressFile | { error: string } {
   const { lesson, pointer } = state;
-  if (state.progress === null && state.student.progressUnreadable === true) return { error: unreadableProgressText(lesson.id) };
+  if (state.progress === null && state.student.progressUnreadable === true) return { error: unreadableProgressText(progressFileText(state), lesson.id) };
   if (pointer.iterationStatus === "not-started" || state.progress === null) {
     return { error: `Lesson ${lesson.id} has not been adopted yet. Call tutor_adopt_iteration first.` };
   }
@@ -242,17 +270,16 @@ export function markAction(state: CoachState, input: ToolParameters<"tutor_mark_
 }
 
 /**
- * The lessons tutor_adopt_iteration accepts now. `unrecorded`: there is no
- * progress for the current lesson. A WIP lesson without any was set going
- * outside Tutor, as fetch-iteration does, and its own coach adopts it again;
- * otherwise nothing could start its spec/PROGRESS.yaml.
+ * The lessons of this course tutor_adopt_iteration accepts now: its first
+ * lesson while nothing is adopted (Lesson 0 in the built-in course), and the
+ * lesson after a Done one. `unrecorded`: there is no progress for the current
+ * lesson. A WIP lesson without any was set going outside Tutor, as
+ * fetch-iteration does, and its own coach adopts it again; otherwise nothing
+ * could start its spec/PROGRESS.yaml. Each course starts from its own
+ * progress: nothing carries over from another course.
  */
 export function adoptionTargets(course: Course, pointer: CurrentPointer, unrecorded = false): string[] {
-  const firstReal = course.lessons.find((lesson) => !lesson.builtin)?.id;
-  if (pointer.lessonId === BUILTIN_LESSON_ID) {
-    const targets = firstReal === undefined ? [] : [firstReal];
-    return pointer.iterationStatus === "not-started" ? [BUILTIN_LESSON_ID, ...targets] : targets;
-  }
+  if (pointer.iterationStatus === "not-started") return findLesson(course, pointer.lessonId) === undefined ? [] : [pointer.lessonId];
   if (pointer.iterationStatus !== "Done") return pointer.iterationStatus === "WIP" && unrecorded ? [pointer.lessonId] : [];
   const next = nextLesson(course, pointer.lessonId);
   return next === undefined ? [] : [next.id];
@@ -264,17 +291,26 @@ export function adoptAction(state: CoachState, input: ToolParameters<"tutor_adop
   if (lesson === undefined || !targets.includes(input.iteration)) {
     const current = `The student is on lesson ${state.pointer.lessonId} (${state.pointer.iterationStatus}).`;
     const allowed = targets.length === 0 ? "Nothing can be adopted now." : `You can adopt: ${targets.join(", ")}.`;
-    const damaged = state.student.progressUnreadable === true ? ` ${unreadableProgressText(state.pointer.lessonId)}` : "";
+    const damaged = state.student.progressUnreadable === true ? ` ${unreadableProgressText(progressFileText(state), state.pointer.lessonId)}` : "";
     return { error: `Lesson ${input.iteration} cannot be adopted now. ${current} ${allowed}${damaged}` };
   }
-  const { layout } = state;
-  if (layout.blocked !== null) return { error: `Lesson ${input.iteration} cannot be adopted: ${layout.blocked}` };
+  const { layout: course } = state;
+  if (!lesson.builtin && !course.ready) return { error: notReadyText(course) };
+  if (course.blocked !== null) return { error: `Lesson ${input.iteration} cannot be adopted: ${course.blocked}` };
   const progress = carryOver(state.student.progress, lesson, now);
   const carried = Object.keys(progress.examples).length;
   const total = lessonExamples(lesson).length;
   const summary = `Adopted lesson ${lesson.id} "${lesson.title}": ${total} examples, ${carried} carried over as passing.`;
-  if (lesson.builtin) return { text: `${summary}\nThis lesson lives in Tutor only: nothing was copied into spec/.`, progress };
-  const adopted = { progress, iteration: { iteration: lesson.id, status: "WIP" as const }, adopt: lesson };
+  if (lesson.builtin) {
+    const dir = `${relative(state.root, course.progress.dir)}/`;
+    return { text: `${summary}\nThis lesson lives in Tutor only: nothing was copied into ${dir}.`, progress };
+  }
+  const iteration = { iteration: lesson.id, status: "WIP" as const };
+  if (course.id === null) {
+    return { text: `${summary} Its spec is in the course; nothing was copied into your workspace.`, progress, iteration };
+  }
+  const { layout } = course;
+  const adopted = { progress, iteration, adopt: lesson };
   if (layout.mode === "legacy") {
     return {
       text: [
@@ -335,7 +371,7 @@ export function completeAction(state: CoachState, input: ToolParameters<"tutor_c
     lessonId: lesson.id,
   });
   const caveat = open > 0 ? `\nNote: ${open} examples are not marked passing or skipped.` : "";
-  const commit = lesson.builtin ? "" : `\nCommit the implementation, ITERATION and spec/PROGRESS.yaml with the message "Implement homework ${lesson.id}".`;
+  const commit = lesson.builtin ? "" : `\nCommit the implementation, ITERATION and ${progressFileText(state)} with the message "Implement homework ${lesson.id}".`;
   const outcome: Outcome = {
     text: `Lesson ${lesson.id} is complete.${caveat}${commit}\n${echo(line)}`,
     progress: { ...progress, summary: input.summary },

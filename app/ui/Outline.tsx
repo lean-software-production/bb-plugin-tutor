@@ -1,6 +1,7 @@
-// The course outline, BB's sidebar thread list replaced: one tree of lessons,
-// each with its coach thread, the coach thread's Rules and its side chats,
-// then the project's other threads. BB still draws New thread, Search, the
+// The course outline, BB's sidebar thread list replaced: a tree of lessons
+// per course (Tutor's built-in course first), each lesson with its coach
+// thread, the coach thread's Rules and its side chats, then the project's
+// other threads. BB still draws New thread, Search, the
 // plugin nav rows and the footer around it.
 import { useEffect, useState } from "react";
 import type { MouseEvent } from "react";
@@ -15,6 +16,7 @@ import type { TutorRoute } from "../../shared/routes.ts";
 import {
   refreshAll,
   useAction,
+  useAddCourse,
   useAskSideQuestion,
   useCourseNavigate,
   useLiveRefresh,
@@ -26,7 +28,7 @@ import {
 } from "../hooks.ts";
 import { lessonLabel } from "../model/format.ts";
 import { buildOutline } from "../model/outline.ts";
-import type { LessonNode, OutlineRule, OutlineView, SideRow, ThreadRow } from "../model/outline.ts";
+import type { AddCourseRow, LessonNode, OutlineRule, OutlineView, SideRow, ThreadRow } from "../model/outline.ts";
 import { outlineMountedStore, routeStore } from "../state/app-state.ts";
 import { ChangeBadge, ReloadButton, coursePageHref, isPlainClick } from "./common.tsx";
 import { Highlight, KitIcon, StepBadge, Tick } from "./sketch/index.ts";
@@ -61,7 +63,7 @@ export function CourseOutline({ activeThreadId, activeProjectId, onNavigate }: P
     goCourse(target);
     onNavigate();
   };
-  const factoryProjectId = overview.data?.factoryProject.status === "found" ? overview.data.factoryProject.projectId : null;
+  const workspaceProjectId = overview.data?.workspace.status === "found" ? overview.data.workspace.projectId : null;
 
   return (
     <nav className="tutor-sk tp-outline" aria-label="Course outline">
@@ -74,7 +76,7 @@ export function CourseOutline({ activeThreadId, activeProjectId, onNavigate }: P
         outline={outline}
         status={sidebar.status}
         onNavigate={onNavigate}
-        projectId={activeProjectId ?? factoryProjectId}
+        projectId={activeProjectId ?? workspaceProjectId}
       />
     </nav>
   );
@@ -96,43 +98,159 @@ function OutlineBody({ outline, go, onNavigate }: { outline: OutlineView; go: Go
     case "unset":
       return (
         <>
-          {outline.lessons.map((lesson, position) => (
+          <LessonsAhead outline={outline} go={go} />
+          <CourseErrors errors={outline.errors} />
+          <a className="tp-setup-card" href={coursePageHref("welcome")} onClick={(event) => go(event, { kind: "welcome" })}>
+            {outline.status.missing ? "Your workspace is gone. Pick it again →" : "Pick your workspace →"}
+          </a>
+        </>
+      );
+    case "unreachable":
+      return (
+        <>
+          <LessonsAhead outline={outline} go={go} />
+          <CourseErrors errors={outline.errors} />
+          <div className="tp-outline-note tp-outline-note--error" role="alert">
+            {outline.status.message}
+          </div>
+        </>
+      );
+    case "ready":
+      return (
+        <>
+          <AgentNotice notice={outline.agentNotice} />
+          {outline.groups.map((group, position) => (
+            <div key={group.courseId}>
+              <GroupLabel outline={outline} title={group.title} />
+              <ul className="tp-tree" aria-label={`Lessons of ${group.title}`}>
+                {group.lessons.map((lesson, lessonPosition) => (
+                  <LessonBranch
+                    key={lesson.id}
+                    lesson={lesson}
+                    position={lessonPosition}
+                    go={go}
+                    onNavigate={onNavigate}
+                    canStartCoach={outline.canStartCoach}
+                  />
+                ))}
+              </ul>
+              {position === 0 ? <AddCourseList addCourses={outline.addCourses} /> : null}
+            </div>
+          ))}
+          <CourseErrors errors={outline.errors} />
+        </>
+      );
+  }
+}
+
+/** How to sign in to a coding agent, when none is ready to coach. */
+function AgentNotice({ notice }: { notice: OutlineView["agentNotice"] }) {
+  if (notice === null) return null;
+  return (
+    <div className="tp-outline-note" role="status">
+      {notice.text}
+    </div>
+  );
+}
+
+/** Each course's lessons, to read ahead, before there is a workspace to coach in. */
+function LessonsAhead({ outline, go }: { outline: OutlineView; go: Go }) {
+  return (
+    <>
+      {outline.groups.map((group, position) => (
+        <div key={group.courseId} role="group" aria-label={group.title}>
+          <GroupLabel outline={outline} title={group.title} />
+          {group.lessons.map((lesson, lessonPosition) => (
             <a
               key={lesson.id}
               className="tp-lesson-row tp-lesson-row--ahead"
               href={coursePageHref(lesson.startPath)}
               aria-label={`${lessonLabel(lesson.id)}, ${lesson.title}`}
               data-lesson-id={lesson.id}
-              onClick={(event) => go(event, { kind: "start", lessonId: lesson.id })}
+              onClick={(event) => go(event, { kind: "start", courseId: lesson.courseId, lessonId: lesson.id })}
             >
-              <StepBadge position={position} label={Number(lesson.id)} className="tp-n" />
+              <StepBadge position={lessonPosition} label={Number(lesson.id)} className="tp-n" />
               <span className="tp-ltitle">{lesson.title}</span>
             </a>
           ))}
-          <a className="tp-setup-card" href={coursePageHref("welcome")} onClick={(event) => go(event, { kind: "welcome" })}>
-            {outline.status.missing ? "Your factory project is gone. Pick it again →" : "Set up your factory project →"}
-          </a>
-        </>
-      );
-    case "ready":
-      return (
-        <ul className="tp-tree" aria-label="Lessons">
-          {outline.lessons.map((lesson, position) => (
-            <LessonBranch key={lesson.id} lesson={lesson} position={position} go={go} onNavigate={onNavigate} />
-          ))}
-        </ul>
-      );
-  }
+          {position === 0 ? <AddCourseList addCourses={outline.addCourses} /> : null}
+        </div>
+      ))}
+    </>
+  );
 }
 
-function LessonBranch({ lesson, position, go, onNavigate }: { lesson: LessonNode; position: number; go: Go; onNavigate: () => void }) {
+/** A course's name above its lessons, once there is more than one course to tell apart. */
+function GroupLabel({ outline, title }: { outline: OutlineView; title: string }) {
+  return outline.groups.length > 1 ? <div className="tp-other-project">{title}</div> : null;
+}
+
+/** Catalog courses the student can add (Decision 16), right after the built-in course's group. */
+function AddCourseList({ addCourses }: { addCourses: readonly AddCourseRow[] }) {
+  return (
+    <>
+      {addCourses.map((course) => (
+        <AddCourseItem key={course.courseId} course={course} />
+      ))}
+    </>
+  );
+}
+
+function AddCourseItem({ course }: { course: AddCourseRow }) {
+  const add = useAddCourse(course.courseId);
+  return (
+    <div className="tp-add-course" data-course-id={course.courseId}>
+      <div className="tp-add-course-text">
+        <span className="tp-add-course-title">{course.title}</span>
+        <span className="tp-add-course-desc">{course.description}</span>
+      </div>
+      <button type="button" className="tp-th tp-th--add" disabled={add.pending} onClick={() => void add.run()}>
+        <span className="tp-t">{add.pending ? "Adding the course…" : course.action}</span>
+      </button>
+      {add.error === null ? null : (
+        <div className="tp-outline-note tp-outline-note--error" role="alert">
+          {add.error}
+          <ReloadButton message={add.error} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Courses that could not be loaded while others could. */
+function CourseErrors({ errors }: { errors: readonly string[] }) {
+  return (
+    <>
+      {errors.map((error) => (
+        <div key={error} className="tp-outline-note tp-outline-note--error" role="alert">
+          {error}
+          <ReloadButton message={error} />
+        </div>
+      ))}
+    </>
+  );
+}
+
+function LessonBranch({
+  lesson,
+  position,
+  go,
+  onNavigate,
+  canStartCoach,
+}: {
+  lesson: LessonNode;
+  position: number;
+  go: Go;
+  onNavigate: () => void;
+  canStartCoach: boolean;
+}) {
   const [open, setOpen] = useState(lesson.expandedByDefault);
   useEffect(() => {
     if (lesson.expandedByDefault) setOpen(true);
   }, [lesson.expandedByDefault]);
-  const childrenId = `tp-lesson-${lesson.id}`;
+  const childrenId = `tp-lesson-${lesson.courseId.replace(/[^\w-]/g, "_")}-${lesson.id}`;
   return (
-    <li className={`tp-lesson tp-lesson--${lesson.status}${lesson.isViewed ? " tp-lesson--viewed" : ""}`} data-lesson-id={lesson.id}>
+    <li className={`tp-lesson tp-lesson--${lesson.status}${lesson.isViewed ? " tp-lesson--viewed" : ""}`} data-lesson-id={lesson.id} data-course-id={lesson.courseId}>
       <button
         type="button"
         className="tp-lesson-head"
@@ -150,21 +268,31 @@ function LessonBranch({ lesson, position, go, onNavigate }: { lesson: LessonNode
       </button>
       {open ? (
         <div id={childrenId} className="tp-lesson-body">
-          <LessonThreads lesson={lesson} go={go} onNavigate={onNavigate} />
+          <LessonThreads lesson={lesson} go={go} onNavigate={onNavigate} canStartCoach={canStartCoach} />
         </div>
       ) : null}
     </li>
   );
 }
 
-function LessonThreads({ lesson, go, onNavigate }: { lesson: LessonNode; go: Go; onNavigate: () => void }) {
+function LessonThreads({
+  lesson,
+  go,
+  onNavigate,
+  canStartCoach,
+}: {
+  lesson: LessonNode;
+  go: Go;
+  onNavigate: () => void;
+  canStartCoach: boolean;
+}) {
   const rpc = useTutorRpc();
   const navigate = useBbNavigate();
   const openRule = useOpenRule();
   const openSideChat = useOpenSideChat();
   const askSide = useAskSideQuestion(onNavigate);
   const startCoach = useAction(async () => {
-    const { threadId } = await rpc.call("openCoach", { lessonId: lesson.id });
+    const { threadId } = await rpc.call("openCoach", { courseId: lesson.courseId, lessonId: lesson.id });
     refreshAll();
     navigate.toThread(threadId);
     onNavigate();
@@ -177,7 +305,12 @@ function LessonThreads({ lesson, go, onNavigate }: { lesson: LessonNode; go: Go;
     <>
       {coach === null ? (
         lesson.canStartCoach ? (
-          <button type="button" className="tp-th tp-th--coach tp-th--start" disabled={startCoach.pending} onClick={() => void startCoach.run()}>
+          <button
+            type="button"
+            className="tp-th tp-th--coach tp-th--start"
+            disabled={startCoach.pending || !canStartCoach}
+            onClick={() => void startCoach.run()}
+          >
             <KitIcon name="chat" className="tp-ic" />
             <span className="tp-t">{startCoach.pending ? "Starting your coach…" : "Start with your coach"}</span>
           </button>
@@ -185,7 +318,7 @@ function LessonThreads({ lesson, go, onNavigate }: { lesson: LessonNode; go: Go;
           <a
             className="tp-th tp-th--page"
             href={coursePageHref(lesson.startPath)}
-            onClick={(event) => go(event, { kind: "start", lessonId: lesson.id })}
+            onClick={(event) => go(event, { kind: "start", courseId: lesson.courseId, lessonId: lesson.id })}
           >
             <span className="tp-ic" aria-hidden>
               ¶
@@ -196,6 +329,11 @@ function LessonThreads({ lesson, go, onNavigate }: { lesson: LessonNode; go: Go;
       ) : (
         <>
           <ThreadLink row={{ ...coach, title: coachThreadTitle(lesson.id) }} onNavigate={onNavigate} />
+          {lesson.coachFailure === null ? null : (
+            <div className="tp-outline-note tp-outline-note--error" role="alert">
+              {lesson.coachFailure}
+            </div>
+          )}
           <div className="tp-rules" role="group" aria-label={`Rules of ${lessonLabel(lesson.id)}`}>
             {lesson.features.map((feature) => (
               <div key={feature.slug} className="tp-rule-group">
@@ -232,7 +370,7 @@ function LessonThreads({ lesson, go, onNavigate }: { lesson: LessonNode; go: Go;
             type="button"
             className="tp-th tp-th--ask"
             disabled={askSide.pending}
-            onClick={() => void askSide.run(lesson.id, lesson.status === "current" ? focus : null)}
+            onClick={() => void askSide.run(lesson.courseId, lesson.id, lesson.status === "current" ? focus : null)}
           >
             <span className="tp-ic" aria-hidden>
               +

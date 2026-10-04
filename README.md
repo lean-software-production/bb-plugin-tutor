@@ -1,44 +1,35 @@
 # bb-plugin-tutor
 
-Tutor is a BB plugin for a coached, Gherkin-driven course inside a course Codespace's BB. It is
-the plugin half of the `tutor` devcontainer Feature, which lives in
-[devcontainer-features](https://github.com/lean-software-production/devcontainer-features/tree/main/src/tutor)
-and installs a pinned release of this repo.
+Tutor is a BB plugin for a coached, Gherkin-driven course. Each student has a hosted BB server
+running Tutor, and their Codespace of
+[capstone-project-starter](https://github.com/lean-software-production/capstone-project-starter)
+is that server's machine.
 
 The design is [`docs/DESIGN.md`](docs/DESIGN.md), as amended by
 [`docs/CHANGELOG-from-design.md`](docs/CHANGELOG-from-design.md). The module map, ownership and
 contracts are in [`docs/IMPLEMENTATION.md`](docs/IMPLEMENTATION.md).
 
-Tutor targets bb-app **0.43.4** (`engines.bb` is `>=0.43.4`, and CI builds with exactly 0.43.4)
-with plugin SDK **0.5.9**, which is pinned exactly in `devDependencies`. The plugin id is `tutor`.
+Tutor targets bb-app **0.45.0** (`engines.bb` is `>=0.45.0`, and CI builds with exactly 0.45.0)
+with plugin SDK **0.6.15**, which is pinned exactly in `devDependencies`. The plugin id is `tutor`.
+
+## Hosted
+
+Tutor is hosted: one BB server per student, with the student's Codespace as its machine, rather
+than an all-on-the-laptop launcher. See [`docs/2026-10-04-hosted-tutor.md`](docs/2026-10-04-hosted-tutor.md)
+for the design, and docs/tutor-students.md in the infrastructure repo for running and operating
+student servers.
 
 ## Install
 
-### In a course Codespace (the supported way)
+### On a student's server (the supported way)
 
-Add the tutor Feature, together with the bb Feature in standalone mode, as devcontainer-features'
-[`.devcontainer/tutor`](https://github.com/lean-software-production/devcontainer-features/tree/main/.devcontainer/tutor)
-does. At image build, the Feature downloads this repo's release
-`bb-plugin-tutor-<version>.tgz`, checks it against a SHA-256 pinned in the Feature, and prebuilds
-it. It also writes `/usr/local/etc/tutor/config.json`. On start, it installs the plugin into the
-learner's BB and does the rest of the set-up:
-
-- clones the course (and the starter);
-- registers the course and the factory as BB projects;
-- selects the course outline as the sidebar and the Sketchbook theme (`plugin:tutor:sketchbook`);
-- switches off plugins a learner does not need;
-- runs the keep-alive that reads Tutor's activity heartbeat.
-
-To use a different plugin release, set the Feature's `pluginVersion` and `pluginSha256`.
-
-`config.json` carries `"schemaVersion": 1`. This plugin reads schema version 1, and treats a
-missing `schemaVersion` as 1. For any other version, Tutor refuses to run:
-
-- the course pages and the coach say which version they found and which one this plugin
-  supports;
-- every coach tool refuses and writes nothing.
-
-To fix it, update the plugin, or pin a tutor Feature version that matches it.
+An operator installs a release's `bb-plugin-tutor-<version>-built.tgz` (the archive with its
+dependencies installed and built) into each student's BB server, with the infrastructure repo's
+tools (docs/tutor-students.md in the infrastructure repo). The student's Codespace of
+capstone-project-starter joins that server as its only machine, through the `bb` devcontainer
+feature's `machine` mode; the student runs no Tutor command. On the first run, Tutor offers the
+Codespace's checkout (`/workspaces/capstone-project-starter`, the `workspaceFolder` setting) as
+the workspace and, once the student confirms, makes the BB project for it.
 
 ### Directly into a BB
 
@@ -47,20 +38,20 @@ bb plugin install git:https://github.com/lean-software-production/bb-plugin-tuto
 ```
 
 BB clones the tag, runs `npm install` with lifecycle scripts disabled, builds both bundles, and
-starts the plugin. It then runs with no Feature `config.json`, and none of the Feature's set-up
-above happens:
+starts the plugin. With no course configured, Tutor runs standalone: the first run offers its
+built-in course and a catalog of courses to add (`server/content/catalog.ts`), and offers the
+Codespace checkout as the workspace.
 
-- **Course.** Tutor looks for the course at the `coursePath` setting (Settings → Plugins →
-  Tutor), then `TUTOR_COURSE_PATH` in the BB server's environment, then `/workspaces/tutorial`.
-  If none of those holds a course, the home page and the Course page show "There is no course
-  folder at /workspaces/tutorial." along with how to fix it. Nothing else works until a course
-  is found.
-- **Factory.** With no factory hint from the Feature, the first-run page ranks your BB projects
-  as factory candidates and asks you to confirm one. Tutor never creates projects, so register your factory
-  as a BB project first.
+- **Course.** The `coursePath` setting (Settings → Plugins → Tutor) is a development-only
+  override: an absolute path on the server to a course checkout, in place of the hosted catalog.
+  `TUTOR_COURSE_PATH` in the BB server's environment works the same way. Leave both empty for the
+  normal, hosted first-run experience.
+- **Workspace.** The first-run page ranks your BB projects as workspace candidates and asks you
+  to confirm one. When none is on a connected machine, it offers the connected machine's
+  `workspaceFolder` checkout instead and makes the BB project for it once you confirm.
 - **Everything else is up to you.** That covers selecting the course outline as the sidebar
-  thread list, choosing the Sketchbook theme, and cloning the course. Nothing reads the
-  activity heartbeat, which lands in `<BB data dir>/.tutor-feature/activity`.
+  thread list and choosing the Sketchbook theme. Nothing reads the activity heartbeat, which
+  lands in `<BB data dir>/.tutor-feature/activity`.
 
 ## Develop
 
@@ -74,7 +65,7 @@ bb plugin build .      # dist/app.* and dist/server.*
 ```
 
 CI (`.github/workflows/ci.yaml`) runs typecheck, the tests and `bb plugin build .` on Node 24.
-It installs bb-app from npm with `npm install --global --ignore-scripts bb-app@0.43.4`, which
+It installs bb-app from npm with `npm install --global --ignore-scripts bb-app@0.45.0`, which
 skips BB's native add-ons, since building a plugin does not need them. CI also builds the release
 archive from `HEAD` and checks that it installs and builds on its own
 (`scripts/release-archive.sh`, `scripts/check-release-archive.sh`).
@@ -89,9 +80,11 @@ scripts/tutor-dev/up.sh
 scripts/tutor-dev/install-plugin.sh .      # path-installs this checkout; re-run to rebuild and reload
 ```
 
-The end-to-end walk in [`scripts/tutor-dev/e2e/`](scripts/tutor-dev/e2e/README.md) tests the
-tutor Feature and this plugin together. It uses a devcontainer-features checkout's
-`.devcontainer/tutor`, with this checkout swapped in for the pinned release.
+The hosted end to end is [`e2e/hosted.sh`](e2e/hosted.sh): a student's bb-server as its own
+Linux user, this user's host daemon as the "Codespace" machine, then the first run and the
+lessons (`SERVER_USER=$(id -un) e2e/hosted.sh all` runs it as yourself). CI runs it too. The
+older walk in [`scripts/tutor-dev/e2e/`](scripts/tutor-dev/e2e/README.md) tested the retired
+tutor Feature.
 
 ## Release
 
@@ -112,21 +105,40 @@ A release is a tag `v<version>` whose version equals `version` in `package.json`
    `bb-plugin-tutor-<x.y.z>.tgz` with `git archive`. That archive has one top-level directory,
    `bb-plugin-tutor-<x.y.z>/`, and no `docs/`, `scripts/`, `.github/`, `dist/` or
    `node_modules`. The workflow checks that the archive installs
-   (`npm ci --omit=dev --ignore-scripts`) and builds (`bb plugin build .`). It then creates
-   the GitHub Release with that archive and its `.sha256`, plus generated notes.
-4. To adopt the release in the tutor Feature, follow the steps in devcontainer-features'
-   [`src/tutor/plugin-pin.sh`](https://github.com/lean-software-production/devcontainer-features/blob/main/src/tutor/plugin-pin.sh).
-   Compute the SHA-256 yourself rather than copying the release's `.sha256`.
+   (`npm ci --omit=dev --ignore-scripts`) and builds (`bb plugin build .`), and packs that
+   installed and built tree, under the same top-level directory, as
+   `bb-plugin-tutor-<x.y.z>-built.tgz`. It then creates the GitHub Release with the archive,
+   its `.sha256` and the `-built.tgz`, plus generated notes.
+4. To roll the release out to student servers, follow docs/tutor-students.md in the
+   infrastructure repo. Compute the SHA-256 yourself rather than copying the release's `.sha256`.
 
 To build the same archive locally, run `scripts/release-archive.sh v<x.y.z> <out-dir>`, then
-`scripts/check-release-archive.sh <out-dir>/bb-plugin-tutor-<x.y.z>.tgz`.
+`scripts/check-release-archive.sh <out-dir>/bb-plugin-tutor-<x.y.z>.tgz` (which also writes the
+`-built.tgz`).
 
 ## Settings and coach tools
 
-- `coursePath` (string): the course checkout. Empty falls back to `TUTOR_COURSE_PATH`, then the
-  Feature's `/usr/local/etc/tutor/config.json`, then `/workspaces/tutorial`.
-- `factoryProject` (project): the student's factory, written by the first-run page. Tutor never
-  creates projects.
+- `coursePath` (string): development only. An absolute path to a course checkout on the server,
+  in place of the hosted catalog; empty falls back to `TUTOR_COURSE_PATH` in the server's
+  environment. A configured course wins: fetched courses are ignored and nothing is offered to
+  add.
+- `workspaceProject` (project): the student's workspace, the BB project holding their repo,
+  where coach threads run. Written by the first-run page, which makes the project for the
+  Codespace's checkout when there is none. When the workspace's machine is gone (a rebuilt or
+  new Codespace enrols as a new machine), the course page offers the student's current machine's
+  checkout and switches this setting to it.
+- `factoryProject` (project, read only): an older Tutor's workspace setting. It is still read
+  when `workspaceProject` is unset, so existing Codespaces carry on, but Tutor never writes it.
+- `coachProvider` (string): the agent provider coach threads are pinned to, such as `claude-code`,
+  `codex` or `pi`. Empty uses the first of Claude Code, Codex and pi that BB reports signed in
+  ("ready") on the workspace's machine, on that agent's default model. With none ready, the
+  coach buttons wait and say how to sign in. Leave it empty for students.
+- `coachModel` (string): the model coach threads use, as `provider/model`. It applies only with
+  `coachProvider` set.
+- `courseCatalog` (string): the courses that can be added, as JSON: a list of
+  `{ id, title, description, repo, ref }`, each `repo` an `https://` (or the operator's own
+  `file://`) URL and each `ref` a tag or a full SHA. Empty uses Tutor's own catalog
+  (`server/content/catalog.ts`). A fetched course goes by its entry's `id`.
 - `simpleNavigation` (boolean, default true): Tutor's sidebar navigation
   (`experimental_sidebarNavigation` `simple-nav`) shows BB's own rows minus Plugins and Skills.
   Off, or while settings load, it renders BB's navigation unchanged. BB uses it while
@@ -171,11 +183,15 @@ To build the same archive locally, run `scripts/release-archive.sh v<x.y.z> <out
   Codespace …" with a Reload button instead of `rpc "…" failed (HTTP 401)`
   (`app/model/rpc-errors.ts`). Tutor's and BB's own errors are unchanged.
 
-Coach threads are spawned by Tutor directly in the factory folder, and only they are offered the
-`tutor` skill and the six `tutor_*` tools (`status`, `focus_rule`, `mark_example`,
-`adopt_iteration`, `complete_iteration`, `side_chat`). Each tool also refuses, inside
-`execute()`, any thread Tutor did not spawn in the chosen factory project, and a coach
-thread (or side chat) changes only its own lesson's progress.
+Coach threads are spawned by Tutor directly in the workspace, and only they are offered the
+`tutor` skill and the seven `tutor_*` tools (`status`, `focus_rule`, `mark_example`,
+`adopt_iteration`, `complete_iteration`, `side_chat`, `fetch_course`). Each tool also refuses,
+inside `execute()`, any thread Tutor did not spawn in the chosen workspace project, and a coach
+thread (or side chat) changes only its own lesson's progress. `tutor_fetch_course {course}`
+adds a course from the catalog when the student asks for it, as the outline's "Add the course"
+does: it fetches the course into BB's data dir, seeds its starter into the workspace (writing
+only files that aren't there yet) and lists its lessons after Lesson 0. Called again, it
+finishes a seed that was interrupted.
 
 ## Layout
 

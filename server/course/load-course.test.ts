@@ -42,10 +42,11 @@ async function rejectsWith(promise: Promise<unknown>, pattern: RegExp): Promise<
   });
 }
 
-test("a course.yaml course loads with Lesson 0 in front", async () => {
+test("a course.yaml course loads its own lessons only: Lesson 0 is a course of its own", async () => {
   const course = await load(fixture("synthetic"));
   courseSchema.parse(course);
   assert.equal(course.source, "course.yaml");
+  assert.equal(course.layout, null, "a course.yaml without layout has none");
   assert.equal(course.id, "widget-works");
   assert.equal(course.title, "Build a widget works");
   assert.equal(course.description, "Two lessons, one widget works.");
@@ -54,7 +55,6 @@ test("a course.yaml course loads with Lesson 0 in front", async () => {
   assert.deepEqual(
     course.lessons.map((hw) => [hw.id, hw.title, hw.set, hw.builtin]),
     [
-      ["000", "Using your tutor", "Start here", true],
       ["010", "First widgets", "Day 1", false],
       ["020", "More widgets", "Day 2", false],
     ],
@@ -123,7 +123,6 @@ test("change compares each lesson with the one before it", async () => {
 
 test("the FACTORY.md diff is against the previous lesson, and null for the first", async () => {
   const course = await load(fixture("synthetic"));
-  assert.equal(lesson(course, "000").factoryDiff, null);
   assert.equal(lesson(course, "010").factoryDiff, null);
   assert.deepEqual(lesson(course, "020").factoryDiff, [
     { kind: "ctx", text: "# The works" },
@@ -138,6 +137,7 @@ test("without a course.yaml the ledger table is the course", async () => {
   const course = await load(root);
   courseSchema.parse(course);
   assert.equal(course.source, "ledger");
+  assert.equal(course.layout, "capstone-factory", "only the capstone uses the ledger format");
   assert.equal(course.id, "ledger");
   assert.equal(course.title, "Steps course");
   assert.equal(course.description, null);
@@ -146,7 +146,6 @@ test("without a course.yaml the ledger table is the course", async () => {
   assert.deepEqual(
     course.lessons.map((hw) => [hw.id, hw.title, hw.set, hw.dir]),
     [
-      ["000", "Using your tutor", "Start here", lesson(course, "000").dir],
       ["001", "First steps", "Day 1", join(root, "docs/iterations/001-first-steps")],
       ["002", "Second steps", null, join(root, "docs/iterations/002-second-steps")],
     ],
@@ -157,8 +156,15 @@ test("without a course.yaml the ledger table is the course", async () => {
   });
 });
 
-test("Lesson 0 ships with the plugin and teaches the interface", async () => {
-  const zero = lesson(await load(fixture("ledger")), "000");
+test("Lesson 0 ships with the plugin as Tutor's built-in course, and teaches the interface", async () => {
+  const builtin = await createCourseSource().loadBuiltin();
+  courseSchema.parse(builtin);
+  assert.equal(builtin.id, "tutor");
+  assert.equal(builtin.layout, null);
+  assert.deepEqual(builtin.lexicon, []);
+  assert.deepEqual(builtin.lessons.map((hw) => hw.id), ["000"]);
+  assert.equal(findLesson(await load(fixture("ledger")), "000"), undefined, "a course no longer carries Lesson 0");
+  const zero = lesson(builtin, "000");
   assert.equal(zero.builtin, true);
   assert.match(zero.dir, /server\/course\/builtin\/lesson-0$/);
   assert.equal(zero.factoryDiff, null);

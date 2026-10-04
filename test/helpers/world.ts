@@ -1,12 +1,15 @@
 import { basename, dirname, join } from "node:path";
 import { resolveCurrent } from "../../shared/derive.ts";
-import { fixtureFactoryProject, fixtureCourse, fixtureStudent } from "../../shared/fixtures.ts";
+import { fixtureBuiltinCourse, fixtureCourse, fixtureLesson0Student, fixtureStudent, fixtureWorkspace } from "../../shared/fixtures.ts";
+import { DEFAULT_WORKSPACE_FOLDER } from "../../shared/constants.ts";
 import type { Course, StudentState } from "../../shared/model.ts";
-import type { FactoryProject } from "../../shared/rpc.ts";
-import type { World } from "../../server/coach/world.ts";
-import type { Layout } from "../../server/progress/layout.ts";
+import type { Workspace } from "../../shared/rpc.ts";
+import type { CoachMethod } from "../../server/coach/coach-file.ts";
+import { builtinLayout, type LoadedCourse, type World } from "../../server/coach/world.ts";
+import { capstoneProgress, type Layout } from "../../layouts/capstone-factory/detect.ts";
+import type { CourseLayoutState } from "../../layouts/state.ts";
 
-/** What layout.ts makes of a project whose folder is the factory itself (tetris/.factory, as v0.1.0 set it up). */
+/** What resolveLayout makes of a project whose folder is the factory itself (tetris/.factory, as v0.1.0 set it up). */
 export function legacyLayout(root: string): Layout {
   const codebaseDir = dirname(root);
   return {
@@ -26,7 +29,7 @@ export function legacyLayout(root: string): Layout {
   };
 }
 
-/** What layout.ts makes of a starter clone that is the project, its factory at `factoryAt`. */
+/** What resolveLayout makes of a starter clone that is the project, its factory at `factoryAt`. */
 export function repoLayout(root: string, factoryAt: "early" | "late" = "early"): Layout {
   const factoryShown = factoryAt === "late" ? "factory" : "tetris/.factory";
   return {
@@ -46,22 +49,51 @@ export function repoLayout(root: string, factoryAt: "early" | "late" = "early"):
   };
 }
 
+/** What resolveCourseLayout makes of `course` in a workspace at `root`: a legacy capstone factory, or a layoutless course's folder. */
+export function courseLayout(course: Course, root: string, layout: Layout = legacyLayout(root)): CourseLayoutState {
+  if (course.layout === null) {
+    return { id: null, ready: true, progress: { dir: join(root, ".tutor/courses", course.id), progressFile: "progress.yaml", iterationFiles: ["ITERATION"] }, problems: [], blocked: null };
+  }
+  return { id: course.layout, ready: layout.blocked === null, layout, progress: capstoneProgress(layout), problems: layout.problems, blocked: layout.blocked };
+}
+
+/**
+ * A world with the built-in course (Lesson 0, its student `lesson0`) and
+ * `course` (its student `student`), in `workspace`. Without a workspace no
+ * course is loaded into it, as world.ts does: only `available`.
+ */
 export function makeWorld(
   student: StudentState = fixtureStudent,
-  factoryProject: FactoryProject = fixtureFactoryProject,
+  workspace: Workspace = fixtureWorkspace,
   course: Course = fixtureCourse,
+  lesson0: StudentState = fixtureLesson0Student,
 ): World {
-  const effective = factoryProject.status === "found" ? student : { iteration: null, progress: null, problems: [] };
+  const found = workspace.status === "found";
+  // A fixture stands in for the course's own coach file being read and inlined (world.ts does this for real).
+  const coachOf = (c: Course): CoachMethod => (c.coachPath === null ? null : { kind: "course", text: `Coaching method text for ${c.id}.` });
+  const courses: LoadedCourse[] = found
+    ? [
+        { course: fixtureBuiltinCourse, layout: builtinLayout(workspace.root), student: lesson0, pointer: resolveCurrent(fixtureBuiltinCourse, lesson0), coach: null },
+        { course, layout: courseLayout(course, workspace.root), student, pointer: resolveCurrent(course, student), coach: coachOf(course) },
+      ]
+    : [];
   return {
     coursePath: course.root,
-    course,
-    courseError: null,
-    coachPath: course.coachPath,
-    factoryProject,
-    factoryHostId: factoryProject.status === "found" ? "host_1" : null,
-    layout: factoryProject.status === "found" ? legacyLayout(factoryProject.root) : null,
-    student: effective,
-    pointer: resolveCurrent(course, effective),
-    projectHint: null,
+    workspace,
+    hostId: found ? "host_1" : null,
+    allCourses: [fixtureBuiltinCourse, course],
+    catalog: [],
+    fetchable: [],
+    dataDir: null,
+    coachProvider: "",
+    coachModel: "",
+    courses,
+    courseErrors: [],
+    workspaceFolder: DEFAULT_WORKSPACE_FOLDER,
   };
+}
+
+/** `world` with one loaded course changed. */
+export function withCourse(world: World, courseId: string, change: Partial<LoadedCourse>): World {
+  return { ...world, courses: world.courses.map((entry) => (entry.course.id === courseId ? { ...entry, ...change } : entry)) };
 }

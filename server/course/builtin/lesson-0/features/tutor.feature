@@ -4,7 +4,7 @@ Feature: Your tutor
   outline in the sidebar shows every lesson and where you are, and the coach
   works through each lesson with you in its own thread, one Rule at a time.
 
-  These examples are about the tutor itself, not your factory. You check
+  These examples are about the tutor itself, not your own work. You check
   them off the way you will check off every lesson after this one: by
   doing what they say and telling your coach what you saw.
 
@@ -36,7 +36,7 @@ Feature: Your tutor
 
     Example: Coming back later
       Given you have left your coach thread
-      When you choose "Continue with your coach" on BB's home page
+      When you choose "Continue with your coach" on the home page
       Then you are back in the thread with your coach, where you left off
 
   Rule: You can ask your coach anything

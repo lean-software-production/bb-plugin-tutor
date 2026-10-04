@@ -5,8 +5,8 @@
 // the student's place (and the coach thread) from getOverview instead.
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import type { PluginHomepageSectionProps } from "@get-bb/plugin-sdk/app";
-import { refreshAll, useAction, useCourseNavigate, useLiveRefresh, useOverview, useTutorRpc } from "../hooks.ts";
-import { continueView } from "../model/home.ts";
+import { refreshAll, useAction, useAddCourse, useCoachGate, useCourseNavigate, useLiveRefresh, useOverview, useTutorRpc } from "../hooks.ts";
+import { activeCourse, continueView } from "../model/home.ts";
 import { ErrorNotice, InlineText } from "./common.tsx";
 import { Button, Character, Highlight, Meter, Panel } from "./sketch/index.ts";
 
@@ -16,19 +16,21 @@ export function ContinueSection(_props: PluginHomepageSectionProps) {
   const navigate = useBbNavigate();
   const goCourse = useCourseNavigate();
   const overview = useOverview();
+  const gate = useCoachGate();
   const view = overview.data === null ? null : continueView(overview.data);
-  const lessonId = view?.kind === "continue" ? view.lessonId : null;
+  const lesson = view?.kind === "continue" ? { courseId: view.courseId, lessonId: view.lessonId } : null;
   const coachThreadId = view?.kind === "continue" ? view.coachThreadId : null;
   const toCoach = useAction(async () => {
     if (coachThreadId !== null) {
       navigate.toThread(coachThreadId);
       return;
     }
-    if (lessonId === null) return;
-    const { threadId } = await rpc.call("openCoach", { lessonId });
+    if (lesson === null) return;
+    const { threadId } = await rpc.call("openCoach", lesson);
     refreshAll();
     navigate.toThread(threadId);
   });
+  const addCourse = useAddCourse(view?.kind === "add-course" ? view.courseId : null);
 
   if (view === null) {
     return overview.status === "error" ? (
@@ -44,6 +46,25 @@ export function ContinueSection(_props: PluginHomepageSectionProps) {
       </div>
     );
   }
+  if (view.kind === "add-course") {
+    return (
+      <div className="tutor-sk tp-hs-wrap">
+        <Panel tone="teal" className="tp-hs tp-hs--setup">
+          <div className="tp-hs-l">
+            <p className="tp-eyebrow">Your next course</p>
+            <h2 className="sk-title tp-hs-title">
+              <Highlight>{view.title}</Highlight>
+            </h2>
+            <p>{view.description}</p>
+            <Button disabled={addCourse.pending} onClick={() => void addCourse.run()}>
+              {addCourse.pending ? "Adding the course…" : view.action}
+            </Button>
+            {addCourse.error === null ? null : <ErrorNotice message={addCourse.error} />}
+          </div>
+        </Panel>
+      </div>
+    );
+  }
   if (view.kind === "setup") {
     return (
       <div className="tutor-sk tp-hs-wrap">
@@ -55,8 +76,8 @@ export function ContinueSection(_props: PluginHomepageSectionProps) {
             </h2>
             <p>
               {view.missing
-                ? "The factory project you chose has gone. Pick it again to carry on."
-                : "Pick the project your factory lives in. Then your coach can start."}
+                ? "The workspace you chose has gone. Pick it again to carry on."
+                : "Pick the project you work in, your workspace. Then your coach can start."}
             </p>
             <Button onClick={() => goCourse({ kind: "welcome" })}>Set up the course →</Button>
           </div>
@@ -92,18 +113,24 @@ export function ContinueSection(_props: PluginHomepageSectionProps) {
           </p>
           <div className="tp-hs-acts">
             {view.complete ? (
-              <Button onClick={() => goCourse({ kind: "complete", lessonId: view.lessonId })}>See what's next →</Button>
+              <Button onClick={() => goCourse({ kind: "complete", courseId: view.courseId, lessonId: view.lessonId })}>See what's next →</Button>
             ) : (
-              <Button disabled={toCoach.pending} onClick={() => void toCoach.run()}>
+              // With no coach thread yet, this starts one: it waits for a signed-in agent, as the start page does.
+              <Button disabled={toCoach.pending || (view.coachThreadId === null && !gate.canStart)} onClick={() => void toCoach.run()}>
                 Continue with your coach →
               </Button>
             )}
             {view.coachThreadId === null ? (
-              <Button secondary onClick={() => goCourse({ kind: "start", lessonId: view.lessonId })}>
+              <Button secondary onClick={() => goCourse({ kind: "start", courseId: view.courseId, lessonId: view.lessonId })}>
                 Open the start page
               </Button>
             ) : null}
           </div>
+          {view.complete || view.coachThreadId !== null || gate.notice === null ? null : (
+            <p className="tp-agent-notice" role="status">
+              {gate.notice}
+            </p>
+          )}
           {toCoach.error === null ? null : <ErrorNotice message={toCoach.error} />}
         </div>
         <div className="tp-hs-r">
@@ -132,7 +159,7 @@ export function ContinueSection(_props: PluginHomepageSectionProps) {
 export function CourseAccessory() {
   useLiveRefresh();
   const overview = useOverview();
-  const current = overview.data?.current ?? null;
+  const current = overview.data === null ? null : (activeCourse(overview.data)?.current ?? null);
   if (current === null) return null;
   return (
     <span className="tutor-sk tp-accessory">

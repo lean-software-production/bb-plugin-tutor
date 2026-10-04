@@ -1,20 +1,23 @@
 // Wires Tutor's backend into BB: settings, coach tools, configure scoping,
 // the dispatch guard, thread events and the RPC handlers.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import { coachThreadMetadataSchema } from "../../shared/model.ts";
 import { createActivityRecorder, resolveDataDir } from "../activity/heartbeat.ts";
 import { registerRpc } from "../rpc/handlers.ts";
+import { createHostClient } from "../workspace/host-client.ts";
+import { isTutorCoachThread } from "./auth.ts";
 import { createCoachRegistry } from "./coach-registry.ts";
 import { coachConfiguration } from "./configure.ts";
 import { factoryWhere } from "./prompts.ts";
-import { readFeatureConfig } from "./course-path.ts";
 import { decideDispatch } from "./dispatch-guard.ts";
 import { createKeyedLock } from "./keyed-lock.ts";
 import type { TutorRuntime } from "./runtime.ts";
 import { defineTutorSettings } from "./settings.ts";
 import { createStateSignals } from "./signals.ts";
-import { listTutorThreads } from "./threads.ts";
+import { listTutorThreads, threadCourse } from "./threads.ts";
 import { registerCoachTools } from "./tools.ts";
-import { createWorldSource, type WorldDeps } from "./world.ts";
+import { createTurnFailures } from "./turn-failures.ts";
+import { createWorldSource, methodCourse, type WorldDeps } from "./world.ts";
 
 export async function registerTutor(bb: BbPluginApi, deps: WorldDeps): Promise<TutorRuntime> {
   const settings = defineTutorSettings(bb);
@@ -23,15 +26,18 @@ export async function registerTutor(bb: BbPluginApi, deps: WorldDeps): Promise<T
     settings,
     world: createWorldSource(bb, settings, deps),
     store: deps.store,
+    access: deps.access,
+    host: createHostClient(bb),
     signals: createStateSignals(bb),
     locks: createKeyedLock(),
     coaches: createCoachRegistry(),
+    turnFailures: createTurnFailures(),
     activity: createActivityRecorder({
       dataDir: async () =>
         resolveDataDir({
           fromBb: () => bb.server.experimental_dataDir,
           env: deps.env,
-          configDataDir: (await readFeatureConfig(deps.featureConfigFile)).dataDir,
+          configDataDir: undefined,
         }),
       now: deps.now,
     }),
@@ -39,13 +45,24 @@ export async function registerTutor(bb: BbPluginApi, deps: WorldDeps): Promise<T
   };
 
   registerCoachTools(rt);
-  bb.agents.configure((context) =>
-    coachConfiguration(context, bb.pluginId, {
-      coachPath: rt.world.lastCoachPath(),
-      factory: factoryWhere(rt.world.lastLayout()),
+  bb.agents.configure((context) => {
+    // The thread's course: its own Tutor metadata, else (a side chat BB made) its coach thread's.
+    const metadata = coachThreadMetadataSchema.safeParse(context.pluginMetadata);
+    const forkOf = context.origin.kind === "fork" ? context.thread.sourceThreadId : null;
+    const courseId = metadata.success
+      ? threadCourse(metadata.data.course, metadata.data.lesson)
+      : forkOf === null
+        ? undefined
+        : rt.coaches.courseOf(forkOf);
+    const courses = rt.world.lastCourses();
+    const loaded = courses.find((entry) => entry.course.id === courseId);
+    const method = loaded === undefined ? null : methodCourse(courses, loaded);
+    return coachConfiguration(context, bb.pluginId, {
+      coach: method?.coach ?? null,
+      factory: factoryWhere(method?.layout ?? null),
       coachLesson: (threadId) => rt.coaches.lessonOf(threadId),
-    }),
-  );
+    });
+  });
   bb.experimental_hooks.on("message.dispatch", async (context) => {
     const decision = await decideDispatch(bb.sdk, bb.pluginId, context, deps.now().getTime());
     if (decision.action === "wait") bb.log.info(`[tutor] holding ${context.thread.id}: ${decision.reason}`);
@@ -57,11 +74,16 @@ export async function registerTutor(bb: BbPluginApi, deps: WorldDeps): Promise<T
   const mayHoldATurn = (thread: { originPluginId: string | null; originKind: string | null }) =>
     thread.originPluginId === bb.pluginId || thread.originKind === "fork";
   bb.events.on("thread.idle", async ({ thread }) => {
+    if (isTutorCoachThread(thread, bb.pluginId)) rt.turnFailures.clear(thread.id);
     if (!mayHoldATurn(thread)) return;
     recheck();
     if (thread.originPluginId === bb.pluginId) rt.signals.observe(await rt.world.load(), { publishIfUnseen: true });
   });
-  bb.events.on("thread.failed", ({ thread }) => {
+  bb.events.on("thread.failed", ({ thread, error }) => {
+    if (isTutorCoachThread(thread, bb.pluginId)) {
+      rt.turnFailures.record(thread.id, error);
+      rt.signals.publish("threads", null);
+    }
     if (mayHoldATurn(thread)) recheck();
   });
   for (const event of ["thread.archived", "thread.unarchived", "thread.deleted"] as const) {
@@ -79,7 +101,7 @@ export async function registerTutor(bb: BbPluginApi, deps: WorldDeps): Promise<T
   });
 
   registerRpc(rt);
-  settings.onChange(() => rt.signals.publish("factoryProject", null));
+  settings.onChange(() => rt.signals.publish("workspace", null));
   void warmCoachRegistry(rt);
   return rt;
 }
@@ -88,8 +110,8 @@ export async function registerTutor(bb: BbPluginApi, deps: WorldDeps): Promise<T
 async function warmCoachRegistry(rt: TutorRuntime): Promise<void> {
   try {
     const world = await rt.world.load();
-    if (world.factoryProject.status !== "found") return;
-    rt.coaches.remember(await listTutorThreads(rt.bb.sdk, rt.bb.pluginId, world.factoryProject.projectId));
+    if (world.workspace.status !== "found") return;
+    rt.coaches.remember(await listTutorThreads(rt.bb.sdk, rt.bb.pluginId, world.workspace.projectId));
   } catch (cause) {
     rt.bb.log.warn(`[tutor] could not list coach threads at start: ${cause instanceof Error ? cause.message : String(cause)}`);
   }

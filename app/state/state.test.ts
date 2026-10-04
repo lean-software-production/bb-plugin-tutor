@@ -133,7 +133,7 @@ test("an error is never cached: the next mount retries at once", async () => {
 });
 
 test("error messages are always readable", () => {
-  assert.equal(errorMessage(new Error("No factory project is set up yet.")), "No factory project is set up yet.");
+  assert.equal(errorMessage(new Error("No workspace is set up yet.")), "No workspace is set up yet.");
   assert.equal(errorMessage("plain"), "plain");
   assert.equal(errorMessage({}), "Something went wrong.");
   assert.equal(errorMessage(new Error("  ")), "Something went wrong.");
@@ -142,7 +142,7 @@ test("error messages are always readable", () => {
 test("a change signal refreshes everything but the lexicon, unless the course changed", () => {
   const progress = staleKeys({ reason: "progress", lessonId: "002" });
   assert.equal(progress(QUERY_KEYS.overview), true);
-  assert.equal(progress(QUERY_KEYS.lessonDetail("002")), true);
+  assert.equal(progress(QUERY_KEYS.lessonDetail("software-factory", "002")), true);
   assert.equal(progress(QUERY_KEYS.lexicon), false);
   assert.equal(staleKeys({ reason: "course", lessonId: null })(QUERY_KEYS.lexicon), true);
   assert.equal(staleKeys("garbage")(QUERY_KEYS.lexicon), true);

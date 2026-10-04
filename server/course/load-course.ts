@@ -1,8 +1,9 @@
 // Reads a course from disk into the shared Course model: the manifest (from
-// course.yaml or the ledger), Lesson 0 in front, every lesson's content,
-// then new/reworded changes, suggested Rule order and FACTORY.md diffs between lessons.
+// course.yaml or the ledger), every lesson's content, then new/reworded
+// changes, suggested Rule order and FACTORY.md diffs between lessons. Lesson 0
+// is a course of its own, Tutor's built-in one (loadBuiltinCourse).
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
-import { BUILTIN_LESSON_ID, COURSE_FILES } from "../../shared/constants.ts";
+import { BUILTIN_COURSE_ID, BUILTIN_LESSON_ID, COURSE_FILES } from "../../shared/constants.ts";
 import { slugify } from "../../shared/keys.ts";
 import type { Course, Lesson, LexiconEntry } from "../../shared/model.ts";
 import { CourseLoadError } from "../../shared/ports.ts";
@@ -36,7 +37,6 @@ export async function loadCourse(coursePath: string): Promise<Course> {
   checkLessonIds(manifest, displayPath);
   await checkManifestPaths(manifest, displayPath, guard);
 
-  const builtin = await readBuiltinLessons();
   const contents = await Promise.all(
     manifest.lessons.map((entry) => readLesson(entry, false, display, guard)),
   );
@@ -46,9 +46,11 @@ export async function loadCourse(coursePath: string): Promise<Course> {
     description: manifest.description,
     root,
     coachPath: await requireIfNamed(manifest.coachPath, "coach", display),
-    lessons: [...deriveInOrder(builtin), ...deriveInOrder(contents)],
+    lessons: deriveInOrder(contents),
     lexicon: await readLexicon(manifest.lexiconPath, display),
     source,
+    layout: manifest.layout,
+    starter: manifest.starter,
   };
 }
 
@@ -85,6 +87,9 @@ async function readManifest(root: string, display: DisplayPath, guard: PathGuard
       id,
       title: (readme === null ? null : firstHeading(readme)) ?? id,
       description: null,
+      // Only the capstone uses the ledger format, so a ledger course is laid out as its factory.
+      layout: "capstone-factory",
+      starter: null,
       coachPath: await ifPresent(join(root, COURSE_FILES.defaultCoach)),
       lexiconPath: await ifPresent(join(root, COURSE_FILES.defaultLexicon)),
       lessons: parseLedger(ledger, dirname(ledgerPath), display(ledgerPath), root),
@@ -111,14 +116,31 @@ function checkLessonIds(manifest: CourseManifest, where: string): void {
   }
 }
 
-async function readBuiltinLessons(): Promise<LessonContent[]> {
+/**
+ * Tutor's own course, shipped with the plugin: Lesson 0, "Using your tutor".
+ * It needs nothing in the workspace (no layout) and keeps its progress in
+ * .tutor/progress.yaml (server/coach/world.ts).
+ */
+export async function loadBuiltinCourse(): Promise<Course> {
   const display = (path: string): string => `Lesson 0 (built in): ${displayWithin(BUILTIN_COURSE_ROOT)(path)}`;
   const yamlPath = join(BUILTIN_COURSE_ROOT, COURSE_FILES.manifest);
   const yaml = await readTextIfPresent(yamlPath, display(yamlPath));
   if (yaml === null) throw new CourseLoadError(`Tutor's built-in Lesson 0 is missing from ${BUILTIN_COURSE_ROOT}.`);
   const manifest = parseCourseYaml(yaml, BUILTIN_COURSE_ROOT, display(yamlPath));
   const guard = guardWithin(BUILTIN_COURSE_ROOT, display);
-  return Promise.all(manifest.lessons.map((entry) => readLesson(entry, true, display, guard)));
+  const contents = await Promise.all(manifest.lessons.map((entry) => readLesson(entry, true, display, guard)));
+  return {
+    id: BUILTIN_COURSE_ID,
+    title: manifest.title,
+    description: manifest.description,
+    root: BUILTIN_COURSE_ROOT,
+    coachPath: null,
+    lessons: deriveInOrder(contents),
+    lexicon: [],
+    source: "course.yaml",
+    layout: null,
+    starter: null,
+  };
 }
 
 /**

@@ -10,7 +10,7 @@ permissions:
 
 env:
   # The BB the plugin targets (package.json engines.bb). Its CLI builds the plugin.
-  BB_APP_VERSION: 0.43.4
+  BB_APP_VERSION: 0.45.0
 
 jobs:
   test:
@@ -41,6 +41,25 @@ jobs:
           for artifact in app.js app.css app.meta.json server.js; do
             test -s "dist/$artifact" || { echo "::error::bb plugin build did not produce dist/$artifact"; exit 1; }
           done
+
+  e2e:
+    name: End-to-end (hosted shape)
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: e2e/hosted.sh all
+        env:
+          SERVER_USER: tutor-e2e-server
+      - if: failure()
+        # Each log on its own: one that was never written must not hide the other.
+        run: |
+          tail -n 100 ~/tutor-e2e-hosted/machine.log || true
+          sudo tail -n 100 ~tutor-e2e-server/server.log || true
 
   release-archive:
     name: Release archive installs and builds

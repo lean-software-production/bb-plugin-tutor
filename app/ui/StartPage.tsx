@@ -1,15 +1,17 @@
-// The route `start/<id>[/<rule>]`. The coach lives in BB's own thread view,
+// The route `start/<course>/<id>[/<rule>]`. The coach lives in BB's own thread view,
 // with the lesson carried into it by the lesson card and Rule cards, so a
 // lesson that has a coach thread opens it (at the Rule's section when the
 // route names one). A lesson without one shows its start page: the lesson
 // (Sketchbook mockup "outline") and "Start with your coach".
 import { useCallback, useEffect, useState } from "react";
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
+import { WORKSPACE_UNREACHABLE_TEXT } from "../../shared/constants.ts";
 import { formatRoute } from "../../shared/routes.ts";
-import { refreshAll, useAction, useCourseNavigate, useOpenRule, useOverview, useQuery, useTutorRpc } from "../hooks.ts";
+import { refreshAll, useAction, useCoachGate, useCourseNavigate, useOpenRule, useOverview, useQuery, useTutorRpc } from "../hooks.ts";
 import { lessonLabel } from "../model/format.ts";
 import { buildLesson, coachStart, foldsHiding } from "../model/lesson.ts";
 import type { CoachStart, LessonView } from "../model/lesson.ts";
+import type { CoachGate } from "../model/outline.ts";
 import { QUERY_KEYS } from "../state/app-state.ts";
 import { ErrorNotice, Loading, coursePageHref, isPlainClick } from "./common.tsx";
 import { Lesson } from "./Lesson.tsx";
@@ -36,10 +38,11 @@ function markRedirected(): void {
 }
 
 /** `ruleKey` is the Rule named in the URL. */
-export function StartPage({ lessonId, ruleKey }: { lessonId: string; ruleKey: string | null }) {
+export function StartPage({ courseId, lessonId, ruleKey }: { courseId: string; lessonId: string; ruleKey: string | null }) {
   const rpc = useTutorRpc();
   const overview = useOverview();
-  const detail = useQuery(QUERY_KEYS.lessonDetail(lessonId), () => rpc.call("getLessonDetail", { lessonId }));
+  const gate = useCoachGate();
+  const detail = useQuery(QUERY_KEYS.lessonDetail(courseId, lessonId), () => rpc.call("getLessonDetail", { courseId, lessonId }));
   if (detail.data === null) {
     return (
       <div className="tutor-sk tp-lt">
@@ -52,10 +55,20 @@ export function StartPage({ lessonId, ruleKey }: { lessonId: string; ruleKey: st
   if (detail.data.coachThreadId !== null) {
     return <ToCoach lessonId={lessonId} coachThreadId={detail.data.coachThreadId} ruleKey={ruleKey} reached={detail.data.reachedRules} />;
   }
-  const view = buildLesson(detail.data, overview.data?.lessons ?? [], Date.now());
-  const start = coachStart(view.status, overview.data?.factoryProject.status ?? null);
+  const lessons = overview.data?.courses.find((entry) => entry.course.id === courseId)?.lessons ?? [];
+  const view = buildLesson(detail.data, lessons, Date.now());
+  const canStart = lessons.find((lesson) => lesson.id === lessonId)?.canStart ?? false;
+  const start = coachStart(view.status, overview.data?.workspace.status ?? null, canStart);
   return (
-    <StartPageBody key={lessonId} view={view} start={start} urlRuleKey={ruleKey} staleError={detail.status === "error" ? detail.error : null} />
+    <StartPageBody
+      key={lessonId}
+      courseId={courseId}
+      view={view}
+      start={start}
+      urlRuleKey={ruleKey}
+      staleError={detail.status === "error" ? detail.error : null}
+      gate={gate}
+    />
   );
 }
 
@@ -95,15 +108,19 @@ function ToCoach({
 }
 
 function StartPageBody({
+  courseId,
   view,
   start,
   urlRuleKey,
   staleError,
+  gate,
 }: {
+  courseId: string;
   view: LessonView;
   start: CoachStart;
   urlRuleKey: string | null;
   staleError: string | null;
+  gate: CoachGate;
 }) {
   const rpc = useTutorRpc();
   const navigate = useBbNavigate();
@@ -124,12 +141,14 @@ function StartPageBody({
   }, [urlRuleKey]);
 
   const openCoach = useAction(async () => {
-    const { threadId } = await rpc.call("openCoach", { lessonId });
+    // A lesson ahead that is its course's next (start-next) is adopted, as the completion page's Start does.
+    const { threadId } =
+      start === "start-next" ? await rpc.call("startNextLesson", { courseId, lessonId }) : await rpc.call("openCoach", { courseId, lessonId });
     refreshAll();
     navigate.toThread(threadId);
   });
 
-  const completeHref = coursePageHref(formatRoute({ kind: "complete", lessonId }));
+  const completeHref = coursePageHref(formatRoute({ kind: "complete", courseId, lessonId }));
   return (
     <div className="tutor-sk tp-lt">
       <header className="tutor-sk tp-lthd">
@@ -162,7 +181,7 @@ function StartPageBody({
                     onClick={(event) => {
                       if (!isPlainClick(event)) return;
                       event.preventDefault();
-                      goCourse({ kind: "complete", lessonId });
+                      goCourse({ kind: "complete", courseId, lessonId });
                     }}
                   >
                     <Tick /> You finished {lessonLabel(lessonId).toLowerCase()}. See what's next →
@@ -177,6 +196,7 @@ function StartPageBody({
             error={openCoach.error}
             onStart={() => void openCoach.run()}
             onSetUp={() => goCourse({ kind: "welcome" })}
+            gate={gate}
           />
         </div>
       </div>
@@ -190,12 +210,14 @@ function StartCoach({
   error,
   onStart,
   onSetUp,
+  gate,
 }: {
   start: CoachStart;
   pending: boolean;
   error: string | null;
   onStart: () => void;
   onSetUp: () => void;
+  gate: CoachGate;
 }) {
   switch (start) {
     case "loading":
@@ -213,23 +235,35 @@ function StartCoach({
       return (
         <div className="tp-start">
           <p className="tp-prose">
-            Your coach works in your factory project. Pick that project first, then come back to start with your coach.
+            Your coach works in your workspace. Pick that project first, then come back to start with your coach.
           </p>
-          <Button onClick={onSetUp}>Set up your factory project →</Button>
+          <Button onClick={onSetUp}>Pick your workspace →</Button>
+        </div>
+      );
+    case "unreachable":
+      return (
+        <div className="tp-start">
+          <ErrorNotice message={WORKSPACE_UNREACHABLE_TEXT} />
         </div>
       );
     case "start":
+    case "start-next":
     case "revisit":
       return (
         <div className="tp-start">
           <p className="tp-prose">
-            {start === "start"
-              ? "Your coach works through this lesson with you, one Rule at a time, in your factory repo. The conversation opens in its own thread, with this lesson at the top."
-              : "You finished this lesson. Open a coach thread to look back at how it went."}
+            {start === "revisit"
+              ? "You finished this lesson. Open a coach thread to look back at how it went."
+              : "Your coach works through this lesson with you, one Rule at a time, in your workspace. The conversation opens in its own thread, with this lesson at the top."}
           </p>
-          <Button disabled={pending} onClick={onStart}>
-            {pending ? "Starting…" : start === "start" ? "Start with your coach →" : "Open a coach thread →"}
+          <Button disabled={pending || (start !== "revisit" && !gate.canStart)} onClick={onStart}>
+            {pending ? "Starting…" : start === "revisit" ? "Open a coach thread →" : "Start with your coach →"}
           </Button>
+          {start === "revisit" || gate.notice === null ? null : (
+            <p className="tp-prose tp-agent-notice" role="status">
+              {gate.notice}
+            </p>
+          )}
           {error === null ? null : <ErrorNotice message={error} />}
         </div>
       );

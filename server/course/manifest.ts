@@ -3,9 +3,12 @@
 import { resolve } from "node:path";
 import { z } from "zod";
 import { lessonIdSchema } from "../../shared/model.ts";
+import type { LayoutId } from "../../layouts/state.ts";
 import { CourseLoadError } from "../../shared/ports.ts";
 import { isInside } from "../paths.ts";
 import { readYaml } from "./yaml-file.ts";
+import { FETCHABLE_URL, FETCHABLE_URL_MESSAGE, PINNED_REF, PINNED_REF_MESSAGE } from "../content/catalog.ts";
+import type { CourseStarter } from "../../shared/model.ts";
 
 export interface LessonEntry {
   id: string;
@@ -19,10 +22,14 @@ export interface CourseManifest {
   id: string;
   title: string;
   description: string | null;
+  /** What the course expects in the workspace; null for none. A ledger course is "capstone-factory". */
+  layout: LayoutId | null;
   /** Absolute; the file named by `coach`, or null when there is none. */
   coachPath: string | null;
   /** Absolute; the file named by `lexicon`, or null when there is none. */
   lexiconPath: string | null;
+  /** The repo whose files Tutor seeds into the workspace when the course is added (Task 13); null for none. */
+  starter: CourseStarter | null;
   lessons: LessonEntry[];
 }
 
@@ -35,8 +42,18 @@ const courseYamlSchema = z.object({
   id: text,
   title: text,
   description: z.string().optional(),
+  layout: z.enum(["capstone-factory"], { error: "should be capstone-factory, or left out" }).optional(),
   coach: text.optional(),
   lexicon: text.optional(),
+  starter: z
+    .object({
+      // A file:// starter is allowed only for a course itself fetched from a file:// catalog entry (content/store.ts).
+      repo: z.string().regex(FETCHABLE_URL, FETCHABLE_URL_MESSAGE),
+      ref: z.string().regex(PINNED_REF, PINNED_REF_MESSAGE),
+      /** Top-level entries of the starter left out of the seed, besides .git, .devcontainer and .github. */
+      exclude: z.array(text).optional(),
+    })
+    .optional(),
   lessons: z
     .array(z.object({ id: lessonIdSchema, title: text, set: z.string().optional(), dir: text }))
     .min(1, "should list at least one lesson"),
@@ -72,8 +89,10 @@ export function parseCourseYaml(source: string, root: string, displayPath: strin
     id: course.id,
     title: course.title,
     description: course.description?.trim() || null,
+    layout: course.layout ?? null,
     coachPath: course.coach === undefined ? null : inside(course.coach, ["coach"]),
     lexiconPath: course.lexicon === undefined ? null : inside(course.lexicon, ["lexicon"]),
+    starter: course.starter === undefined ? null : { repo: course.starter.repo, ref: course.starter.ref, exclude: course.starter.exclude ?? [] },
     lessons: course.lessons.map((lesson, index) => ({
       id: lesson.id,
       title: lesson.title,

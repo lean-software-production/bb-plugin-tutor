@@ -7,19 +7,18 @@
 //   git add factory/.claude/skills
 //
 // from the repo's top folder, so the factory gets a codebase of its own
-// beside tetris/. Tutor does the same, under the factory lock, with every
-// check first: the lesson's spec-copy checks, factory/ absent, and a dry run
-// of the git mv. Then the move, then the usual adoption into factory/. A copy
-// that fails after the move leaves factory/ as it was at 003 (ITERATION
-// "003 Done"), and a retry adopts there without moving again.
+// beside tetris/. Tutor does the same on the student's machine (adopt.ts),
+// under the host lock, with every check first: the lesson's spec-copy checks,
+// factory/ absent, and a dry run of the git mv. Then the move, then the usual
+// adoption into factory/. A copy that fails after the move leaves factory/ as
+// it was at 003 (ITERATION "003 Done"), and a retry adopts there without
+// moving again.
 import { execFile } from "node:child_process";
 import { lstat, symlink, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { STARTER_LAYOUT } from "../../shared/constants.ts";
-import type { Lesson } from "../../shared/model.ts";
-import { resolveLayout, type Layout } from "./layout.ts";
-import { checkLessonSpec, copyLessonSpec, type SpecCopyHooks, type SpecCopyOptions, type SpecCopyResult } from "./spec-copy.ts";
+import type { Layout } from "./detect.ts";
 
 const run = promisify(execFile);
 
@@ -27,8 +26,8 @@ const EARLY = STARTER_LAYOUT.earlyFactory;
 const LATE = STARTER_LAYOUT.lateFactory;
 
 /** Whether adopting `lesson` moves the factory: a starter clone, the factory still at tetris/.factory, lesson 004 or later. */
-export function needsFactoryMove(layout: Layout, lesson: Lesson): boolean {
-  if (lesson.builtin || layout.mode !== "repo" || layout.factoryAt !== "early") return false;
+export function needsFactoryMove(layout: Layout, lesson: { id: string; builtin?: boolean }): boolean {
+  if (lesson.builtin === true || layout.mode !== "repo" || layout.factoryAt !== "early") return false;
   const number = Number.parseInt(lesson.id, 10);
   return Number.isInteger(number) && number >= STARTER_LAYOUT.moveAtLesson;
 }
@@ -93,41 +92,4 @@ export async function moveFactory(layout: Layout, move: FactoryMove): Promise<vo
   });
   await symlink(STARTER_LAYOUT.linkTarget, link);
   await git(repo, "add", `${LATE}/${STARTER_LAYOUT.claudeSkillsLink}`);
-}
-
-export interface Adoption {
-  /** The layout after the adoption: factory/ once moved. */
-  layout: Layout;
-  result: SpecCopyResult;
-  moved: boolean;
-  note: string | null;
-}
-
-function copyOptions(layout: Layout, courseRoot: string, hooks: SpecCopyHooks | undefined): SpecCopyOptions {
-  const repoRelative = layout.mode === "repo" ? { factoryShown: layout.factoryShown } : {};
-  return {
-    courseRoot,
-    seeds: { dir: layout.seedsDir, codebase: layout.codebase, shown: layout.seedsShown },
-    ...repoRelative,
-    ...(hooks === undefined ? {} : { hooks }),
-  };
-}
-
-/**
- * Adopts `lesson`'s spec, seed and stand-ins into the factory, moving it to
- * factory/ first when the lesson calls for it. ITERATION and PROGRESS.yaml are
- * the caller's to write, into the returned layout's factory.
- */
-export async function adoptLesson(layout: Layout, lesson: Lesson, options: { courseRoot: string; hooks?: SpecCopyHooks }): Promise<Adoption> {
-  if (layout.blocked !== null) throw new Error(layout.blocked);
-  if (!needsFactoryMove(layout, lesson)) {
-    return { layout, result: await copyLessonSpec(layout.factoryDir, lesson, copyOptions(layout, options.courseRoot, options.hooks)), moved: false, note: null };
-  }
-  // Every check before any write: the spec can be adopted where the factory is, and the move can be made.
-  await checkLessonSpec(layout.factoryDir, lesson, copyOptions(layout, options.courseRoot, undefined));
-  const move = await checkFactoryMove(layout);
-  await moveFactory(layout, move);
-  const moved = await resolveLayout(layout.projectRoot);
-  const result = await copyLessonSpec(moved.factoryDir, lesson, copyOptions(moved, options.courseRoot, options.hooks));
-  return { layout: moved, result, moved: true, note: move.note };
 }

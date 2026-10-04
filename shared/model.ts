@@ -147,6 +147,16 @@ export const lexiconEntrySchema = z.object({
 });
 export type LexiconEntry = z.infer<typeof lexiconEntrySchema>;
 
+/** course.yaml's `starter`: the repo whose files Tutor seeds into the workspace when the course is added. */
+export const courseStarterSchema = z.object({
+  repo: z.string(),
+  /** A tag or a full SHA (Decision 15). */
+  ref: z.string(),
+  /** Top-level entries left out of the seed, besides .git, .devcontainer and .github. */
+  exclude: z.array(z.string()),
+});
+export type CourseStarter = z.infer<typeof courseStarterSchema>;
+
 export const courseSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -159,6 +169,10 @@ export const courseSchema = z.object({
   lessons: z.array(lessonSchema),
   lexicon: z.array(lexiconEntrySchema),
   source: z.enum(["course.yaml", "ledger"]),
+  /** What the course expects in the workspace (layouts/state.ts): course.yaml's `layout`; a ledger course is the capstone's. */
+  layout: z.enum(["capstone-factory"]).nullable(),
+  /** course.yaml's `starter`, or null: a ledger course and the built-in one have none. */
+  starter: courseStarterSchema.nullable(),
 });
 export type Course = z.infer<typeof courseSchema>;
 
@@ -220,6 +234,11 @@ export interface StudentState {
    * is unknown rather than absent. Unset otherwise.
    */
   progressUnreadable?: true;
+  /**
+   * The sha256 of the progress file as it was read; unset when there was none.
+   * A write of this progress expects the file to still be this (compare-and-swap).
+   */
+  progressSha256?: string;
   /** Human-readable problems found while reading (malformed YAML, unknown id, …). */
   problems: string[];
 }

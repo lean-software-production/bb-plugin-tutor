@@ -4,14 +4,14 @@
 // never from plugin metadata. Which lesson it coaches does come from metadata,
 // but only the verified coach thread's, never the caller's own.
 //
-// How far that metadata can be trusted (SDK 0.5.9, bb-app 0.43.4):
+// How far that metadata can be trusted (SDK 0.5.29, bb-app 0.44.0):
 // `threads.getPluginMetadata` returns the namespace Tutor seeded at spawn
 // (`{ course, lesson, role: "coach" }`, threads.ts) plus `reachedRules`. The
 // SDK documents it as writable by "any API client, another plugin, or the
 // thread's own agent" (`updatePluginMetadata` takes an explicit `pluginId`),
 // so it is not a security boundary. It doesn't need to be one here: every
-// Tutor thread works directly in the factory with a shell and could edit
-// spec/ itself. What it guards against is a coach acting on the wrong lesson
+// Tutor thread works directly in the workspace with a shell and could edit
+// its files itself. What it guards against is a coach acting on the wrong lesson
 // by mistake, such as an old coach thread still open after the student moved
 // on. For that, the lesson Tutor wrote at spawn is the right record: it is the
 // same record that makes the thread its lesson's coach in the outline and in
@@ -19,8 +19,10 @@
 // coach-record.ts, is checked against it too). If a hard boundary were ever
 // needed, Tutor would keep the thread-to-lesson map in `bb.storage.kv` instead.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import { WORKSPACE_UNREACHABLE_TEXT } from "../../shared/constants.ts";
 import { coachThreadMetadataSchema } from "../../shared/model.ts";
-import type { FactoryProject } from "../../shared/rpc.ts";
+import type { Workspace } from "../../shared/rpc.ts";
+import { threadCourse } from "./threads.ts";
 
 type Sdk = BbPluginApi["sdk"];
 type Thread = Awaited<ReturnType<Sdk["threads"]["get"]>>;
@@ -31,7 +33,7 @@ export interface Caller {
   isCoachThread: boolean;
   /** The coach thread a side chat or side thread belongs to; the caller itself when it is the coach thread. */
   coachThreadId: string;
-  /** The course and lesson the coach thread coaches, from its Tutor metadata. Side chats inherit them. */
+  /** The course and lesson the coach thread coaches, from its Tutor metadata (Lesson 0: the built-in course). Side chats inherit them. */
   courseId: string;
   lessonId: string;
 }
@@ -78,16 +80,17 @@ export async function authorizeCaller(
   sdk: Sdk,
   pluginId: string,
   threadId: string,
-  factoryProject: FactoryProject,
+  workspace: Workspace,
 ): Promise<Caller | { error: string }> {
   const thread = await getThread(sdk, threadId);
   const coachThread = thread === null ? null : await coachThreadOf(sdk, pluginId, thread);
   if (thread === null || coachThread === null) return { error: NOT_A_TUTOR_THREAD };
-  if (factoryProject.status !== "found") {
-    return { error: "No factory project is set up yet. The student confirms it on the Course page." };
+  if (workspace.status === "unreachable") return { error: WORKSPACE_UNREACHABLE_TEXT };
+  if (workspace.status !== "found") {
+    return { error: "No workspace is set up yet. The student confirms it on the Course page." };
   }
-  if (thread.projectId !== factoryProject.projectId) {
-    return { error: "This thread is not in the student's factory project, so Tutor's tools are off here." };
+  if (thread.projectId !== workspace.projectId) {
+    return { error: "This thread is not in the student's workspace, so Tutor's tools are off here." };
   }
   // The coach thread's metadata, not the caller's: a fork's metadata was written by whoever forked it.
   const metadata = coachThreadMetadataSchema.safeParse(await sdk.threads.getPluginMetadata({ pluginId, threadId: coachThread.id }).catch(() => null));
@@ -98,7 +101,7 @@ export async function authorizeCaller(
     threadId: thread.id,
     isCoachThread: coachThread.id === thread.id,
     coachThreadId: coachThread.id,
-    courseId: metadata.data.course,
+    courseId: threadCourse(metadata.data.course, metadata.data.lesson),
     lessonId: metadata.data.lesson,
   };
 }
