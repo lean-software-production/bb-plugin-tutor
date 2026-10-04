@@ -9,7 +9,7 @@
 // (server/content/store.ts), in the order they were fetched.
 import { join } from "node:path";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { BUILTIN_COURSE_ID, BUILTIN_LESSON_ID, BUILTIN_PROGRESS, SETTING_KEYS } from "../../shared/constants.ts";
+import { BUILTIN_COURSE_ID, BUILTIN_LESSON_ID, BUILTIN_PROGRESS, DEFAULT_WORKSPACE_FOLDER, SETTING_KEYS } from "../../shared/constants.ts";
 import { resolveCurrent, type CurrentPointer } from "../../shared/derive.ts";
 import { slugify } from "../../shared/keys.ts";
 import type { Course, ProgressFile, StudentState } from "../../shared/model.ts";
@@ -83,6 +83,8 @@ export interface World {
   courseErrors: { source: string; error: string }[];
   /** Pre-selects a candidate project on first run (resolveProjectHint). */
   projectHint: string | null;
+  /** Where the student's Codespace checks out the starter: the workspaceFolder setting, else DEFAULT_WORKSPACE_FOLDER. */
+  workspaceFolder: string;
 }
 
 export interface WorldDeps {
@@ -351,6 +353,7 @@ export function createWorldSource(bb: BbPluginApi, settings: TutorSettings, deps
         courses,
         courseErrors,
         projectHint: await projectHint(config, hostId),
+        workspaceFolder: values.workspaceFolder || DEFAULT_WORKSPACE_FOLDER,
       };
     },
     lastCourses: () => last,

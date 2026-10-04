@@ -78,7 +78,12 @@ export const SETTING_KEYS = {
   coachModel: "coachModel",
   /** `type: "string"`; a JSON course catalog replacing the built-in one (server/content/catalog.ts). Empty means the built-in one. */
   courseCatalog: "courseCatalog",
+  /** `type: "string"`; where the student's Codespace checks out the starter, offered on first run. */
+  workspaceFolder: "workspaceFolder",
 } as const;
+
+/** Where the student's Codespace checks out the starter: the workspace Tutor offers on first run. */
+export const DEFAULT_WORKSPACE_FOLDER = "/workspaces/capstone-project-starter";
 
 /**
  * How the `tutor` devcontainer feature tells the plugin where things are.

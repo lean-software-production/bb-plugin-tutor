@@ -64,6 +64,14 @@ export const workspaceSchema = z.discriminatedUnion("status", [
 ]);
 export type Workspace = z.infer<typeof workspaceSchema>;
 
+/** offerWorkspace's answer: the hosted first run's offer of the student's Codespace checkout. */
+export const workspaceOfferSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("no-machine") }),
+  z.object({ status: z.literal("no-folder"), folder: z.string(), machineName: z.string() }),
+  z.object({ status: z.literal("offer"), hostId: z.string(), machineName: z.string(), folder: z.string() }),
+]);
+export type WorkspaceOffer = z.infer<typeof workspaceOfferSchema>;
+
 export const courseInfoSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -279,6 +287,16 @@ export const rpcContract = defineRpcContract({
   /** Stores the workspaceProject setting. Never creates a project. */
   confirmWorkspace: {
     input: z.object({ projectId: z.string().min(1).max(128) }),
+    output: workspaceSchema,
+  },
+  /** The hosted first run: whether the student's Codespace (BB's own host's machine) has a checkout to offer. */
+  offerWorkspace: {
+    input: z.null(),
+    output: workspaceOfferSchema,
+  },
+  /** Creates the BB project for the offered folder on that machine (findOrCreateProject), then makes it the workspace. */
+  createWorkspace: {
+    input: z.object({ hostId: z.string().min(1).max(128), folder: z.string().startsWith("/").max(4096) }),
     output: workspaceSchema,
   },
   /** Finds the lesson's coach thread, or spawns it. Current or done lessons only. */

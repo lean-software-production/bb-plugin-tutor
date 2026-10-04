@@ -10,7 +10,7 @@ import hostEntry from "../../host.ts";
 import { SKILL_ID } from "../../shared/constants.ts";
 import { lessonExamples } from "../../shared/derive.ts";
 import type { Course, ExampleProgress, Lesson } from "../../shared/model.ts";
-import type { PluginAgentToolResult } from "@get-bb/plugin-sdk";
+import type { BbPluginApi, PluginAgentToolResult } from "@get-bb/plugin-sdk";
 import { loadBuiltinCourse, loadCourse } from "../../server/course/load-course.ts";
 import { registerTutor } from "../../server/coach/register.ts";
 import { createProgressStore } from "../../server/progress/store.ts";
@@ -22,6 +22,17 @@ import type { TutorRuntime } from "../../server/coach/runtime.ts";
 
 export const PROJECT_ID = "prj_factory";
 export const NOW = new Date("2026-09-25T11:00:00Z");
+
+/** One host as a test wants `sdk.hosts.list`/`get` to answer it: the real shape has far more fields. */
+export interface FakeHost {
+  id: string;
+  name?: string;
+  status: "connected" | "disconnected";
+  machineProviderId: string | null;
+}
+
+type Sdk = BbPluginApi["sdk"];
+type ProjectResponse = Awaited<ReturnType<Sdk["projects"]["get"]>>;
 
 export interface FakeThread {
   id: string;
@@ -168,6 +179,10 @@ export async function makeTutorHost(
     onHostCall?: (method: string, input: unknown) => unknown;
     /** What sdk.system.providerStates says of each agent on a machine; without it, the call fails (as on an older BB). */
     providerStates?: { providerId: string; status: "ready" | "unauthenticated" | "expired" | "not_installed" | "unknown" | "unsupported_version" }[];
+    /** Hosts sdk.hosts.list returns; the server's own host unless given. */
+    hosts?: FakeHost[];
+    /** When true, sdk.projects.list starts empty and sdk.projects.create adds to it. */
+    noProjectYet?: boolean;
   } = {},
 ): Promise<TutorHost> {
   const threads: FakeThread[] = [];
@@ -206,7 +221,7 @@ export async function makeTutorHost(
     if (thread === undefined) throw new Error(`HTTP 404: thread ${threadId} not found`);
     return thread;
   };
-  const project = {
+  const project: ProjectResponse = {
     id: PROJECT_ID,
     name: options.projectName ?? "tetris/.factory",
     kind: "standard",
@@ -217,6 +232,7 @@ export async function makeTutorHost(
       { id: "src_1", projectId: PROJECT_ID, hostId: "host_1", type: "local_path", path: workspaceRoot, isDefault: true, createdAt: 1, updatedAt: 1 },
     ],
   };
+  const projects: ProjectResponse[] = options.noProjectYet === true ? [] : [project];
 
   // The real host entry, run in-process as BB's host daemon would run it.
   const hostHarness = experimental_createHostEntryHarness(hostEntry);
@@ -231,9 +247,20 @@ export async function makeTutorHost(
     ...(options.dataDir === undefined ? {} : { dataDir: options.dataDir }),
     sdk: {
       hosts: {
-        get: async ({ hostId }) => ({ ...makeHostResponse({ id: hostId, status: options.hostStatus ?? "connected" }), connectMachineId: null }),
+        get: async ({ hostId }) => {
+          const found = options.hosts?.find((h) => h.id === hostId);
+          if (found !== undefined) {
+            return { ...makeHostResponse({ id: found.id, name: found.name ?? found.id, status: found.status, machineProviderId: found.machineProviderId }), connectMachineId: null };
+          }
+          return { ...makeHostResponse({ id: hostId, status: options.hostStatus ?? "connected" }), connectMachineId: null };
+        },
         // The server's own host has no machine provider; a machine enrolled by hand has "manual".
-        list: async () => (options.serverHost === false ? [] : [makeHostResponse({ id: "host_1", machineProviderId: null })]),
+        list: async () =>
+          options.hosts !== undefined
+            ? options.hosts.map((h) => makeHostResponse({ id: h.id, name: h.name ?? h.id, status: h.status, machineProviderId: h.machineProviderId }))
+            : options.serverHost === false
+              ? []
+              : [makeHostResponse({ id: "host_1", machineProviderId: null })],
       },
       files: diskFiles,
       ...(options.providerStates === undefined
@@ -258,10 +285,26 @@ export async function makeTutorHost(
           }),
       projects: {
         get: async ({ projectId }) => {
-          if (projectId !== PROJECT_ID) throw new Error(`HTTP 404: project ${projectId} not found`);
-          return project;
+          const found = projects.find((p) => p.id === projectId);
+          if (found === undefined) throw new Error(`HTTP 404: project ${projectId} not found`);
+          return found;
         },
-        list: async () => [project],
+        list: async () => projects,
+        create: async ({ name, source }) => {
+          const created: ProjectResponse = {
+            id: `proj_${projects.length + 1}`,
+            name,
+            kind: "standard",
+            sources: [
+              { id: "src_x", projectId: `proj_${projects.length + 1}`, hostId: source.hostId, type: "local_path", path: source.path, isDefault: true, createdAt: 1, updatedAt: 1 },
+            ],
+            gitRemoteUrl: null,
+            createdAt: 1,
+            updatedAt: 1,
+          };
+          projects.push(created);
+          return created;
+        },
       },
       threads: {
         spawn: async (args) => {

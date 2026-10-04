@@ -1,6 +1,7 @@
 import { basename, dirname, join } from "node:path";
 import { resolveCurrent } from "../../shared/derive.ts";
 import { fixtureBuiltinCourse, fixtureCourse, fixtureLesson0Student, fixtureStudent, fixtureWorkspace } from "../../shared/fixtures.ts";
+import { DEFAULT_WORKSPACE_FOLDER } from "../../shared/constants.ts";
 import type { Course, StudentState } from "../../shared/model.ts";
 import type { Workspace } from "../../shared/rpc.ts";
 import type { CoachMethod } from "../../server/coach/coach-file.ts";
@@ -89,6 +90,7 @@ export function makeWorld(
     courses,
     courseErrors: [],
     projectHint: null,
+    workspaceFolder: DEFAULT_WORKSPACE_FOLDER,
   };
 }
 

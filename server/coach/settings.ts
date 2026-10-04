@@ -42,6 +42,11 @@ const descriptors = {
     description:
       "The courses you can add, as JSON: a list of { id, title, description, repo, ref }, each ref a tag or a full SHA. Leave empty for Tutor's own list.",
   },
+  [SETTING_KEYS.workspaceFolder]: {
+    type: "string",
+    label: "Workspace folder",
+    description: "The folder on your Codespace that Tutor offers as your workspace the first time. Leave empty for /workspaces/capstone-project-starter.",
+  },
 } as const;
 
 export type TutorSettings = PluginSettingsHandle<typeof descriptors>;

@@ -22,7 +22,7 @@ import { WorkspaceUnreachableError, WriteConflictError, type WorkspaceAccess } f
 import { formatProgress, parseProgress } from "../layouts/progress/progress-yaml.ts";
 import { createDiskAccess } from "./helpers/disk-access.ts";
 import { emptyGitWorkspace, git, makeFixtureCourseRepo, makeSandbox, makeRepoSandbox, type FixtureCourseRepoOptions, type Sandbox } from "./helpers/disk.ts";
-import { allPassing, callTool, makeTutorHost, PROJECT_ID, type TutorHost } from "./helpers/fake-bb.ts";
+import { allPassing, callTool, makeTutorHost, PROJECT_ID, type FakeHost, type TutorHost } from "./helpers/fake-bb.ts";
 import { createCourseSource } from "../server/course/index.ts";
 import { THREAD_PAGE_SIZE } from "../server/coach/threads.ts";
 
@@ -1008,6 +1008,64 @@ test("first run: a folder qualifies on ITERATION, an older spec/ITERATION, or th
   assert.deepEqual(await candidate(), [true, "ITERATION · 001 Done"]);
   await writeFile(join(root, "ITERATION"), "002 WIP\n");
   assert.deepEqual(await candidate(), [true, "ITERATION · 002 WIP"]);
+});
+
+// The hosted first run: the student's Codespace is their server's machine, and
+// Tutor offers its checkout and creates the project.
+
+async function hostedSetup(t: TestContext, hosts: FakeHost[], folderExists = true) {
+  const ws = await emptyGitWorkspace();
+  const folder = folderExists ? ws : join(ws, "not-there");
+  const host = await makeTutorHost(null, ws, { workspaceFolder: folder }, { hosts, noProjectYet: true });
+  t.after(async () => {
+    await host.harness.lifecycle.dispose();
+    await rm(ws, { recursive: true, force: true });
+  });
+  return { host, folder };
+}
+
+test("with no connected machine yet, the first run says to open the Codespace", async (t) => {
+  const { host } = await hostedSetup(t, [{ id: "host_server", status: "connected", machineProviderId: null }]);
+  assert.deepEqual(await host.harness.behavior.callRpc("offerWorkspace", null), { status: "no-machine" });
+});
+
+test("a disconnected machine is never offered", async (t) => {
+  const { host } = await hostedSetup(t, [{ id: "host_old", name: "old-codespace", status: "disconnected", machineProviderId: "manual" }]);
+  assert.deepEqual(await host.harness.behavior.callRpc("offerWorkspace", null), { status: "no-machine" });
+});
+
+test("the connected machine's checkout is offered, by name", async (t) => {
+  const { host, folder } = await hostedSetup(t, [
+    { id: "host_old", name: "old-codespace", status: "disconnected", machineProviderId: "manual" },
+    { id: "host_cs", name: "my-codespace", status: "connected", machineProviderId: "manual" },
+  ]);
+  assert.deepEqual(await host.harness.behavior.callRpc("offerWorkspace", null), { status: "offer", hostId: "host_cs", machineName: "my-codespace", folder });
+});
+
+test("a missing folder is named, not guessed", async (t) => {
+  const { host, folder } = await hostedSetup(t, [{ id: "host_cs", name: "my-codespace", status: "connected", machineProviderId: "manual" }], false);
+  assert.deepEqual(await host.harness.behavior.callRpc("offerWorkspace", null), { status: "no-folder", folder, machineName: "my-codespace" });
+});
+
+test("createWorkspace creates the project on that machine and makes it the workspace", async (t) => {
+  const { host, folder } = await hostedSetup(t, [{ id: "host_cs", status: "connected", machineProviderId: "manual" }]);
+  const workspace = (await host.harness.behavior.callRpc("createWorkspace", { hostId: "host_cs", folder })) as { status: string; root: string };
+  assert.equal(workspace.status, "found");
+  assert.equal(workspace.root, folder);
+  const [args] = host.harness.inspection.sdk.callsTo("projects.create")[0] as [Record<string, unknown>];
+  assert.deepEqual(args.source, { hostId: "host_cs", path: folder, type: "local_path" });
+});
+
+test("confirming twice makes one project", async (t) => {
+  const { host, folder } = await hostedSetup(t, [{ id: "host_cs", status: "connected", machineProviderId: "manual" }]);
+  await host.harness.behavior.callRpc("createWorkspace", { hostId: "host_cs", folder });
+  await host.harness.behavior.callRpc("createWorkspace", { hostId: "host_cs", folder });
+  assert.equal(host.harness.inspection.sdk.callsTo("projects.create").length, 1);
+});
+
+test("createWorkspace refuses a machine that isn't connected", async (t) => {
+  const { host, folder } = await hostedSetup(t, [{ id: "host_old", status: "disconnected", machineProviderId: "manual" }]);
+  await assert.rejects(host.harness.behavior.callRpc("createWorkspace", { hostId: "host_old", folder }), /Codespace is asleep or stopped/);
 });
 
 test("concurrent tool calls never lose each other's progress", async (t) => {

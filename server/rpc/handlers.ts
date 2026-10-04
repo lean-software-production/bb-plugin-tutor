@@ -13,6 +13,7 @@ import { recordCoachThread, recordedCoachThread } from "../coach/coach-record.ts
 import { resolveWorkspace } from "../workspace/workspace-project.ts";
 import { coachThreadLockKey, workspaceLockKey } from "../coach/lock-keys.ts";
 import { addCourse, CONFIGURED_COURSE_TEXT } from "../coach/add-course.ts";
+import { findOrCreateProject, offerHostedWorkspace } from "./hosted-workspace.ts";
 import {
   coachThreadPrompt,
   factoryWhere,
@@ -210,6 +211,24 @@ export function registerRpc(rt: TutorRuntime): void {
     return coachThreadPrompt(loaded.course, method.coach, lesson, start, focus, factoryWhere(method.layout));
   }
 
+  /** confirmWorkspace's and createWorkspace's body: stores the workspaceProject setting for `projectId`. Never creates a project. */
+  async function confirmProject(projectId: string): Promise<Workspace> {
+    const { workspace, hostId } = await resolveWorkspace(bb.sdk, projectId, rt.access);
+    if (workspace.status === "unreachable") throw new Error(WORKSPACE_UNREACHABLE_TEXT);
+    if (workspace.status !== "found" || hostId === null) {
+      throw new Error("That project has no folder on this machine, so Tutor cannot coach in it.");
+    }
+    // The coach writes spec/, stand-ins/ and ../seeds/ beside the factory, so it must never be the course checkout.
+    const { coursePath } = await rt.world.load();
+    // The workspace's real folder is the machine's to say; the course checkout is the server's.
+    if (coursePath !== null && overlaps(await rt.access(hostId).realPath(workspace.root), await realPath(coursePath))) {
+      throw new Error("That project's folder is, or shares a folder with, the course. Pick the repo you build your factory in.");
+    }
+    // settings.onChange publishes the workspace signal.
+    await rt.settings.experimental_set({ workspaceProject: projectId });
+    return workspace;
+  }
+
   bb.rpc.register(rpcContract, {
     getOverview: async () => {
       const world = await loadWorld();
@@ -279,21 +298,18 @@ export function registerRpc(rt: TutorRuntime): void {
       };
     },
 
-    confirmWorkspace: async ({ projectId }) => {
-      const { workspace, hostId } = await resolveWorkspace(bb.sdk, projectId, rt.access);
-      if (workspace.status === "unreachable") throw new Error(WORKSPACE_UNREACHABLE_TEXT);
-      if (workspace.status !== "found" || hostId === null) {
-        throw new Error("That project has no folder on this machine, so Tutor cannot coach in it.");
-      }
-      // The coach writes spec/, stand-ins/ and ../seeds/ beside the factory, so it must never be the course checkout.
-      const { coursePath } = await rt.world.load();
-      // The workspace's real folder is the machine's to say; the course checkout is the server's.
-      if (coursePath !== null && overlaps(await rt.access(hostId).realPath(workspace.root), await realPath(coursePath))) {
-        throw new Error("That project's folder is, or shares a folder with, the course. Pick the repo you build your factory in.");
-      }
-      // settings.onChange publishes the workspace signal.
-      await rt.settings.experimental_set({ workspaceProject: projectId });
-      return workspace;
+    confirmWorkspace: async ({ projectId }) => confirmProject(projectId),
+
+    offerWorkspace: async () => {
+      const world = await rt.world.load();
+      return offerHostedWorkspace(bb.sdk, rt.access, world.workspaceFolder);
+    },
+
+    createWorkspace: async ({ hostId, folder }) => {
+      const host = await bb.sdk.hosts.get({ hostId });
+      if (host.status !== "connected") throw new Error(WORKSPACE_UNREACHABLE_TEXT);
+      const projectId = await rt.locks.run(`create-workspace:${hostId}:${folder}`, () => findOrCreateProject(bb.sdk, hostId, folder));
+      return confirmProject(projectId);
     },
 
     openCoach: async ({ courseId, lessonId }) => {
