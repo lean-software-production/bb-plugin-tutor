@@ -188,41 +188,17 @@ stage_server() { # the student server, as its own Linux user (as on ew-lsp-001),
     "${SRV[@]}" env BB_SERVER_URL="$SERVER_URL" "$H/npm/node_modules/.bin/bb" plugin install "$H/bb-plugin-tutor-$VERSION" --yes
 }
 
-stage_machine() { # the "Codespace": enrolled with the built-in "manual" machine
-  # provider, over loopback (no Access in CI). offerHostedWorkspace only
-  # offers a machine whose machineProviderId is non-null — a bare
-  # `bb-app host-daemon join` self-enrolls with machineProviderId null (it's
-  # the server granting a key to itself, not the manual provider), so Tutor's
-  # first run would never see it. Point server-to-machine access at this
-  # loopback URL directly (else the manual provider's enrollment command
-  # waits on bb connect, which needs a signed-in bb account) and go through
-  # `bb machine create --provider manual`, as the real "connect your machine"
-  # flow does.
-  rm -rf "$E2E_DIR/machine"; mkdir -p "$E2E_DIR/machine"; mkdir -p "$WS"; git -C "$WS" init -q
-  check "machine enrollment is pointed at this server" quiet bbx settings general machineServerUrl "$SERVER_URL"
-  check "direct access needs no bb account sign-in" quiet bbx settings general defaultMachineAccess direct
-  local out="$E2E_DIR/machine-create.out"; : >"$out"
-  bbx machine create --provider manual --key "hosted-e2e-$PORT-$$" >"$out" 2>&1 &
-  local create_pid=$!
-  local header=""
-  for _ in $(seq 1 30); do
-    header=$(grep -m1 'X-BB-Enrollment' "$out" 2>/dev/null) || header=""
-    [ -n "$header" ] && break
-    kill -0 "$create_pid" 2>/dev/null || break
-    sleep 1
-  done
-  check "bb machine create prints an enrollment command" test -n "$header"
-  local token; token=$(printf '%s\n' "$header" | grep -o 'X-BB-Enrollment: [^'"'"']*' | cut -d' ' -f2)
-  curl -fsS -H "X-BB-Enrollment: $token" "$SERVER_URL/install.sh" -o "$E2E_DIR/machine-install.sh"
-  # install.sh's own first line: `export BB_ENROLLMENT='{"hostId":...,"serverUrl":...,"credential":...,"expiresAt":...}'`
-  local enrollment; enrollment=$(sed -n "1p" "$E2E_DIR/machine-install.sh" | sed "s/^export BB_ENROLLMENT='//; s/'\$//")
-  check "the enrollment command carries this host's bootstrap" contains "$enrollment" '"serverUrl"'
-  check "this user enrolls as the manual-provider machine" \
-    env BB_ENROLLMENT="$enrollment" BB_DATA_DIR="$E2E_DIR/machine" "$BBCLI/bb" machine enroll --bootstrap-env BB_ENROLLMENT
+stage_machine() { # the "Codespace": a host daemon as this user, joined over loopback (no Access in CI)
+  # A real Codespace enrols exactly this way — `host-daemon join` requests its
+  # own enroll key (the server grants it to loopback callers) and leaves
+  # machineProviderId null, since no installed machine provider is involved.
+  # That's expected: a student server is a bare bb-server with no machine of
+  # its own, so studentMachine() offers the newest connected host regardless
+  # of machineProviderId (server/rpc/hosted-workspace.ts).
+  rm -rf "$E2E_DIR/machine"; mkdir -p "$E2E_DIR/machine" "$WS"; git -C "$WS" init -q
   BB_DATA_DIR="$E2E_DIR/machine" nohup "$BBCLI/bb-app" host-daemon join --server-url "$SERVER_URL" --host-daemon-port "$DAEMON_PORT" >"$E2E_DIR/machine.log" 2>&1 &
   for _ in $(seq 1 60); do machine_connected && break; sleep 1; done
   check "the machine is connected" machine_connected
-  kill "$create_pid" 2>/dev/null || true
 }
 
 stage_first_run() {

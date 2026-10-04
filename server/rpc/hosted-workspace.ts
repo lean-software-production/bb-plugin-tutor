@@ -5,12 +5,19 @@ import type { Sdk } from "../coach/threads.ts";
 import type { WorkspaceAccess } from "../workspace/access.ts";
 import type { WorkspaceOffer } from "../../shared/rpc.ts";
 
-/** The student's machine: a connected, enrolled machine (never the server's own host). The newest wins. */
+/**
+ * The student's machine: the newest connected host. A student server is a
+ * bare bb-server with no machine of its own (never a co-located daemon), so
+ * every connected host is the student's Codespace — enrolled the same way a
+ * real Codespace is, over `bb-app host-daemon join`, which leaves
+ * machineProviderId null (there is no installed machine provider involved).
+ * Do not filter on machineProviderId.
+ */
 export async function studentMachine(sdk: Sdk): Promise<{ id: string; name: string } | null> {
   const hosts = await sdk.hosts.list();
-  const enrolled = hosts.filter((h) => h.machineProviderId !== null && h.status === "connected");
-  enrolled.sort((a, b) => b.createdAt - a.createdAt);
-  const host = enrolled[0];
+  const connected = hosts.filter((h) => h.status === "connected");
+  connected.sort((a, b) => b.createdAt - a.createdAt);
+  const host = connected[0];
   return host === undefined ? null : { id: host.id, name: host.name };
 }
 

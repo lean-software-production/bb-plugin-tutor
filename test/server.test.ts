@@ -1070,13 +1070,18 @@ async function hostedSetup(t: TestContext, hosts: FakeHost[], folderExists = tru
 }
 
 test("with no connected machine yet, the first run says to open the Codespace", async (t) => {
-  const { host } = await hostedSetup(t, [{ id: "host_server", status: "connected", machineProviderId: null }]);
+  const { host } = await hostedSetup(t, []);
   assert.deepEqual(await host.harness.behavior.callRpc("offerWorkspace", null), { status: "no-machine" });
 });
 
 test("a disconnected machine is never offered", async (t) => {
   const { host } = await hostedSetup(t, [{ id: "host_old", name: "old-codespace", status: "disconnected", machineProviderId: "manual" }]);
   assert.deepEqual(await host.harness.behavior.callRpc("offerWorkspace", null), { status: "no-machine" });
+});
+
+test("a machine enrolled without a provider (as the Codespace's is) is offered", async (t) => {
+  const { host, folder } = await hostedSetup(t, [{ id: "host_cs", name: "my-codespace", status: "connected", machineProviderId: null }]);
+  assert.deepEqual(await host.harness.behavior.callRpc("offerWorkspace", null), { status: "offer", hostId: "host_cs", machineName: "my-codespace", folder });
 });
 
 test("the connected machine's checkout is offered, by name", async (t) => {
