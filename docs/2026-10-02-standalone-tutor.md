@@ -1,6 +1,6 @@
 # Standalone Tutor: a tutor server and a machine, both on the student's computer
 
-Status: **proposed** 2026-10-02, revised after review the same day (see [Review](#review)). Today
+Status: **superseded for delivery** by [the hosted design](2026-10-04-hosted-tutor.md) (2026-10-04); its course half (workspaces, layouts, Lesson 0, fetched courses, the plugin split) stands. Proposed 2026-10-02, revised after review the same day (see [Review](#review)). Today
 Tutor runs only inside the `bb-tutor` Codespace, and only for the capstone course, whose factory
 it assumes everywhere. This design does two things that touch the same code, so they go together:
 
