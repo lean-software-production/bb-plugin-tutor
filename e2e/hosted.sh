@@ -30,10 +30,14 @@
 #   e2e/hosted.sh lessons     fetch the fixture course, install the scripted
 #                             provider, then adopt/pass/complete lessons 001-004
 #                             (the factory's tests run on the machine; the move at 004)
-#   e2e/hosted.sh all         every stage above, in order
+#   e2e/hosted.sh stop        stop exactly the student server and machine this
+#                             run started (by PID, recorded when they started)
+#   e2e/hosted.sh all         every stage above, then stop (also on failure)
 #
 # Each stage prints ok / not ok lines (also appended to $E2E_DIR/results.txt)
-# and stops at the first failure.
+# and stops at the first failure. When SERVER_USER is the invoking user, the
+# student server's home ($H) is $E2E_DIR/server-home — never the operator's
+# real $HOME — so nothing is left outside $E2E_DIR and a rerun starts clean.
 set -uo pipefail
 
 REPO=$(cd "$(dirname "$0")/.." && pwd)
@@ -78,6 +82,12 @@ rpc() { # rpc <method> <json input> → stdout JSON
 }
 json() { node -e 'let r="";process.stdin.on("data",c=>r+=c).on("end",()=>{const v=JSON.parse(r);const f=new Function("v","return ("+process.argv[1]+")");const o=f(v);process.stdout.write(typeof o==="string"?o:JSON.stringify(o))})' "$1"; }
 contains() { printf '%s' "$1" | grep -q -- "$2"; }          # contains <text> <pattern>
+port_free() { ! ss -ltnH "sport = :$1" 2>/dev/null | grep -q .; }   # port_free <port>
+pid_tree() { # pid_tree <pid>: that pid and every descendant, one per line (read-only; /proc is visible cross-user)
+  local pid=$1 child
+  printf '%s\n' "$pid"
+  for child in $(pgrep -P "$pid" 2>/dev/null); do pid_tree "$child"; done
+}
 machine_connected() { bbx machine list --json | grep -q '"connected"'; }
 machine_id() { bbx machine list --json | json 'v.find(x=>x.status==="connected")?.id ?? ""'; }
 # course_order <overview json> <ids>: the outline's courses, in order; on a
@@ -97,12 +107,19 @@ else
 fi
 as_server() { "${SRV[@]}" "$@"; }
 # ensure_server_user: idempotent; also sets $H (the server user's home), once.
+# When SERVER_USER is us, $H is a dedicated home under $E2E_DIR — never the
+# operator's real $HOME — so nothing this run writes escapes $E2E_DIR and a
+# rerun starts from nothing. In the separate-user (CI) case $H stays that
+# user's own home, made once with useradd.
 ensure_server_user() {
   [ -n "${H:-}" ] && return 0
-  if [ "$SERVER_USER" != "$(id -un)" ]; then
+  if [ "$SERVER_USER" = "$(id -un)" ]; then
+    H="$E2E_DIR/server-home"
+  else
     id "$SERVER_USER" >/dev/null 2>&1 || sudo useradd --create-home --shell /bin/bash "$SERVER_USER"
+    H=$(getent passwd "$SERVER_USER" | cut -d: -f6)
   fi
-  H=$(getent passwd "$SERVER_USER" | cut -d: -f6)
+  mkdir -p "$H"
 }
 no_workspace_copy() { # no_workspace_copy <filename>: true if none found outside content/ in the server's data dir
   [ -z "$(as_server find "$H/server" -path "$H/server/content" -prune -o -name "$1" -print)" ]
@@ -177,9 +194,14 @@ stage_build() { # the plugin's built archive, with the CLI the build is stamped 
 
 stage_server() { # the student server, as its own Linux user (as on ew-lsp-001), loopback only
   ensure_server_user
+  check "port $PORT is free before starting the student server" port_free "$PORT"
+  # A fresh run starts clean: no data dir or unpacked plugin left from a
+  # previous run (in either mode — $H is always this run's own, never a
+  # shared real home when SERVER_USER is us).
+  "${SRV[@]}" rm -rf "$H/server" "$H/bb-plugin-tutor-$VERSION"
   "${SRV[@]}" npm install --prefix "$H/npm" --no-audit --no-fund --silent "bb-app@0.45.0"
   check "bb-server installs for $SERVER_USER" test -x "$H/npm/node_modules/.bin/bb-server"
-  "${SRV[@]}" bash -c "cd '$H' && nohup '$H/npm/node_modules/.bin/bb-server' --data-dir '$H/server' --server-bind-host 127.0.0.1 --server-port $PORT >'$H/server.log' 2>&1 & disown"
+  "${SRV[@]}" bash -c "cd '$H' && '$H/npm/node_modules/.bin/bb-server' --data-dir '$H/server' --server-bind-host 127.0.0.1 --server-port $PORT >'$H/server.log' 2>&1 & echo \$! >'$H/server.pid'"
   for _ in $(seq 1 60); do curl -fsS "$SERVER_URL/health" -o /dev/null 2>/dev/null && break; sleep 1; done
   check "the student server is healthy" curl -fsS "$SERVER_URL/health" -o /dev/null
   "${SRVSUDO[@]}" install -m 644 "$E2E_DIR/release/bb-plugin-tutor-$VERSION-built.tgz" "$H/plugin.tgz"
@@ -195,10 +217,46 @@ stage_machine() { # the "Codespace": a host daemon as this user, joined over loo
   # That's expected: a student server is a bare bb-server with no machine of
   # its own, so studentMachine() offers the newest connected host regardless
   # of machineProviderId (server/rpc/hosted-workspace.ts).
-  rm -rf "$E2E_DIR/machine"; mkdir -p "$E2E_DIR/machine" "$WS"; git -C "$WS" init -q
-  BB_DATA_DIR="$E2E_DIR/machine" nohup "$BBCLI/bb-app" host-daemon join --server-url "$SERVER_URL" --host-daemon-port "$DAEMON_PORT" >"$E2E_DIR/machine.log" 2>&1 &
+  check "port $DAEMON_PORT is free before starting the machine" port_free "$DAEMON_PORT"
+  # Fresh every run: a previous run's checkout (e.g. lesson 004's move of
+  # tetris/.factory/ to factory/) would otherwise make a rerun's fetch/lesson
+  # checks fail against stale content.
+  rm -rf "$E2E_DIR/machine" "$WS"; mkdir -p "$E2E_DIR/machine" "$WS"; git -C "$WS" init -q
+  BB_DATA_DIR="$E2E_DIR/machine" "$BBCLI/bb-app" host-daemon join --server-url "$SERVER_URL" --host-daemon-port "$DAEMON_PORT" >"$E2E_DIR/machine.log" 2>&1 &
+  echo $! >"$E2E_DIR/machine.pid"
   for _ in $(seq 1 60); do machine_connected && break; sleep 1; done
   check "the machine is connected" machine_connected
+}
+
+stage_stop() { # stop exactly what this run started, by PID — never pkill by
+  # pattern: a pattern naming this run's own folder can match the calling
+  # shell's command line too.
+  trap - EXIT
+  if [ -f "$E2E_DIR/machine.pid" ]; then
+    local mpid; mpid=$(cat "$E2E_DIR/machine.pid" 2>/dev/null) || mpid=""
+    if [ -n "$mpid" ]; then
+      # shellcheck disable=SC2046 # word splitting is the point: one pid per line, from pid_tree
+      kill -TERM $(pid_tree "$mpid") 2>/dev/null || true
+      info "stopped the machine (pid $mpid and its children)"
+    fi
+    rm -f "$E2E_DIR/machine.pid"
+  fi
+  local h=""
+  if [ "$SERVER_USER" = "$(id -un)" ]; then
+    h="$E2E_DIR/server-home"
+  else
+    h=$(getent passwd "$SERVER_USER" 2>/dev/null | cut -d: -f6) || h=""
+  fi
+  if [ -n "$h" ] && as_server test -f "$h/server.pid" 2>/dev/null; then
+    local spid; spid=$(as_server cat "$h/server.pid" 2>/dev/null) || spid=""
+    if [ -n "$spid" ]; then
+      # shellcheck disable=SC2046 # word splitting is the point: one pid per line, from pid_tree
+      "${SRV[@]}" kill -TERM $(pid_tree "$spid") 2>/dev/null || true
+      info "stopped the student server (pid $spid and its children)"
+    fi
+    "${SRV[@]}" rm -f "$h/server.pid"
+  fi
+  for _ in $(seq 1 20); do port_free "$PORT" && port_free "$DAEMON_PORT" && break; sleep 1; done
 }
 
 stage_first_run() {
@@ -284,6 +342,10 @@ case "${1:-}" in
   machine) stage_machine ;;
   first-run) stage_first_run ;;
   lessons) stage_lessons_all ;;
-  all) stage_build; stage_server; stage_machine; stage_first_run; stage_lessons_all ;;
-  *) sed -n '2,33p' "$0"; exit 2 ;;
+  stop) stage_stop ;;
+  all)
+    trap stage_stop EXIT
+    stage_build; stage_server; stage_machine; stage_first_run; stage_lessons_all
+    ;;
+  *) sed -n '2,40p' "$0"; exit 2 ;;
 esac
