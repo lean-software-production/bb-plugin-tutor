@@ -9,7 +9,7 @@ import { withoutLeadingDirectives } from "../../shared/directives.ts";
 import { formatRoute } from "../../shared/routes.ts";
 import type { TutorRoute } from "../../shared/routes.ts";
 import type { LessonStatus, Change, RuleStatus } from "../../shared/model.ts";
-import type { FeatureOutline, LessonSummary, Overview, TutorThread } from "../../shared/rpc.ts";
+import type { CoachAgentState, FeatureOutline, LessonSummary, Overview, TutorThread } from "../../shared/rpc.ts";
 import { routeCourse } from "./course-route.ts";
 import { percent } from "./format.ts";
 import { activeCourse, addCourseAction, type AddCourseAction } from "./home.ts";
@@ -136,6 +136,10 @@ export interface OutlineView {
   others: OtherThreadGroup[];
   /** Catalog courses the student can add (Decision 16: shown whether or not Lesson 0 is done). Empty once a course has been fetched. */
   addCourses: AddCourseRow[];
+  /** Says how to sign in to a coding agent when none is ready to coach; null when one is, or BB can't say. */
+  agentNotice: { text: string } | null;
+  /** Whether a coach thread can be spawned: false while no coding agent is ready and agentNotice says how to fix that. */
+  canStartCoach: boolean;
 }
 
 /** BB's own thread URL, for a coach thread the sidebar has not listed yet. */
@@ -251,6 +255,23 @@ function isLesson(key: LessonKey | null, courseId: string, lessonId: string): bo
   return key !== null && key.courseId === courseId && key.lessonId === lessonId;
 }
 
+/** Overview.coachAgent's signIn entries, as one line for the student. */
+function agentNoticeText(signIn: readonly { name: string; command: string | null }[]): string {
+  const commands = signIn.filter((entry): entry is { name: string; command: string } => entry.command !== null);
+  if (commands.length === 0) return "Install and sign in to Claude Code, Codex or pi in your Codespace.";
+  const joined = commands.map((entry) => `${entry.name}: run \`${entry.command}\``).join("; ");
+  return `Sign in to a coding agent in your Codespace's terminal, then come back: ${joined}.`;
+}
+
+/**
+ * Whether a coach thread can be spawned: true when a coachProvider setting
+ * names an agent or there is no workspace (coachAgent null), or when one of
+ * COACH_AGENTS is ready; false when none is, so the student is told how to sign in.
+ */
+export function canStartCoachWith(agentState: CoachAgentState | null): boolean {
+  return agentState === null || agentState.ready !== null;
+}
+
 export function buildOutline(input: OutlineInput): OutlineView {
   const { overview, activeThreadId } = input;
   const status = statusOf(input);
@@ -328,7 +349,10 @@ export function buildOutline(input: OutlineInput): OutlineView {
     description: course.description,
     action: addCourseAction(course),
   }));
-  return { brand, status, groups, errors, others, addCourses };
+  const agentState = overview?.coachAgent ?? null;
+  const canStartCoach = canStartCoachWith(agentState);
+  const agentNotice = agentState === null || canStartCoach ? null : { text: agentNoticeText(agentState.signIn) };
+  return { brand, status, groups, errors, others, addCourses, agentNotice, canStartCoach };
 }
 
 /** Non-course threads, grouped by project, children nested under their parent. */

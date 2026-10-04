@@ -16,7 +16,7 @@ import {
 } from "../../shared/derive.ts";
 import { BUILTIN_COURSE_ID } from "../../shared/constants.ts";
 import type { Course, Lesson, StudentState } from "../../shared/model.ts";
-import type { Completion, CourseOverview, CurrentState, FeatureOutline, LessonDetail, Overview, TutorThread } from "../../shared/rpc.ts";
+import type { CoachAgentState, Completion, CourseOverview, CurrentState, FeatureOutline, LessonDetail, Overview, TutorThread } from "../../shared/rpc.ts";
 import { progressFor, recordedProgress } from "../progress/current.ts";
 import { adoptionTargets } from "../coach/actions.ts";
 import { findCoachThread, type TutorThreadRecord } from "../coach/threads.ts";
@@ -182,7 +182,7 @@ function courseOverview(view: CourseView, workspaceFound: boolean, threads: read
   };
 }
 
-export function buildOverview(world: World, threads: readonly TutorThreadRecord[]): Overview {
+export function buildOverview(world: World, threads: readonly TutorThreadRecord[], coachAgent: CoachAgentState | null = null): Overview {
   const found = world.workspace.status === "found";
   const views = courseViews(world);
   const ids = new Set(views.map((view) => view.course.id));
@@ -194,6 +194,7 @@ export function buildOverview(world: World, threads: readonly TutorThreadRecord[
     available: world.fetchable,
     courseErrors: world.courseErrors,
     threads: shown.map(publicThread),
+    coachAgent,
   };
 }
 

@@ -11,6 +11,7 @@ import { refreshAll, useAction, useCourseNavigate, useOpenRule, useOverview, use
 import { lessonLabel } from "../model/format.ts";
 import { buildLesson, coachStart, foldsHiding } from "../model/lesson.ts";
 import type { CoachStart, LessonView } from "../model/lesson.ts";
+import { canStartCoachWith } from "../model/outline.ts";
 import { QUERY_KEYS } from "../state/app-state.ts";
 import { ErrorNotice, Loading, coursePageHref, isPlainClick } from "./common.tsx";
 import { Lesson } from "./Lesson.tsx";
@@ -57,6 +58,7 @@ export function StartPage({ courseId, lessonId, ruleKey }: { courseId: string; l
   const view = buildLesson(detail.data, lessons, Date.now());
   const canStart = lessons.find((lesson) => lesson.id === lessonId)?.canStart ?? false;
   const start = coachStart(view.status, overview.data?.workspace.status ?? null, canStart);
+  const canStartCoach = canStartCoachWith(overview.data?.coachAgent ?? null);
   return (
     <StartPageBody
       key={lessonId}
@@ -65,6 +67,7 @@ export function StartPage({ courseId, lessonId, ruleKey }: { courseId: string; l
       start={start}
       urlRuleKey={ruleKey}
       staleError={detail.status === "error" ? detail.error : null}
+      canStartCoach={canStartCoach}
     />
   );
 }
@@ -110,12 +113,14 @@ function StartPageBody({
   start,
   urlRuleKey,
   staleError,
+  canStartCoach,
 }: {
   courseId: string;
   view: LessonView;
   start: CoachStart;
   urlRuleKey: string | null;
   staleError: string | null;
+  canStartCoach: boolean;
 }) {
   const rpc = useTutorRpc();
   const navigate = useBbNavigate();
@@ -191,6 +196,7 @@ function StartPageBody({
             error={openCoach.error}
             onStart={() => void openCoach.run()}
             onSetUp={() => goCourse({ kind: "welcome" })}
+            canStartCoach={canStartCoach}
           />
         </div>
       </div>
@@ -204,12 +210,14 @@ function StartCoach({
   error,
   onStart,
   onSetUp,
+  canStartCoach,
 }: {
   start: CoachStart;
   pending: boolean;
   error: string | null;
   onStart: () => void;
   onSetUp: () => void;
+  canStartCoach: boolean;
 }) {
   switch (start) {
     case "loading":
@@ -248,7 +256,7 @@ function StartCoach({
               ? "You finished this lesson. Open a coach thread to look back at how it went."
               : "Your coach works through this lesson with you, one Rule at a time, in your workspace. The conversation opens in its own thread, with this lesson at the top."}
           </p>
-          <Button disabled={pending} onClick={onStart}>
+          <Button disabled={pending || (start !== "revisit" && !canStartCoach)} onClick={onStart}>
             {pending ? "Starting…" : start === "revisit" ? "Open a coach thread →" : "Start with your coach →"}
           </Button>
           {error === null ? null : <ErrorNotice message={error} />}

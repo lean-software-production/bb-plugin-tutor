@@ -24,7 +24,7 @@ import {
   type CoachThreadStart,
 } from "../coach/prompts.ts";
 import type { TutorRuntime } from "../coach/runtime.ts";
-import { readyCoachAgent } from "../coach/agent.ts";
+import { coachAgentState, readyCoachAgent } from "../coach/agent.ts";
 import { BB_REPLY_PREFIX, ensureSideChatTab, listSideChats, openSideChat } from "../coach/side-chats.ts";
 import {
   findCoachThread,
@@ -233,7 +233,11 @@ export function registerRpc(rt: TutorRuntime): void {
     getOverview: async () => {
       const world = await loadWorld();
       const threads = await threadsOf(world);
-      return buildOverview(world, [...threads, ...(await bbSideChatsOf(threads))]);
+      const agent =
+        world.workspace.status === "found" && world.coachProvider === "" && world.hostId !== null
+          ? await coachAgentState(bb.sdk, world.hostId, (message) => bb.log.warn(message))
+          : null;
+      return buildOverview(world, [...threads, ...(await bbSideChatsOf(threads))], agent);
     },
 
     getLessonDetail: async ({ courseId, lessonId }) => {

@@ -612,6 +612,7 @@ export const fixtureOverview: Overview = {
   available: [],
   courseErrors: [],
   threads: fixtureThreads,
+  coachAgent: null,
 };
 
 /** A course before there is a workspace: nothing recorded, so Lesson 0 is current and every other lesson is ahead. */
@@ -642,6 +643,7 @@ export const fixtureOverviewNoFactory: Overview = {
   available: [],
   courseErrors: [],
   threads: [],
+  coachAgent: null,
 };
 
 export const fixtureLessonDetail: LessonDetail = {

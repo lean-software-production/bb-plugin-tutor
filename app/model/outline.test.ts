@@ -199,6 +199,16 @@ test("no coach thread yet: the current lesson offers to start one, others link t
   assert.equal(outline.others.flatMap((group) => group.rows).length, 6, "former Tutor threads fall back to Other threads");
 });
 
+test("with no agent signed in, the outline says how to sign in, and the coach button waits", () => {
+  const overview: Overview = {
+    ...fixtureOverview,
+    coachAgent: { ready: null, signIn: [{ providerId: "claude-code", name: "Claude Code", command: "claude" }] },
+  };
+  const outline = buildOutline(input({ overview }));
+  assert.deepEqual(outline.agentNotice, { text: "Sign in to a coding agent in your Codespace's terminal, then come back: Claude Code: run `claude`." });
+  assert.equal(outline.canStartCoach, false);
+});
+
 test("a coach thread the sidebar has not listed yet still gets a row", () => {
   const outline = buildOutline(input({ threads: [] }));
   const coach = lessonsOf(outline).find((lesson) => lesson.id === "002")?.coach;

@@ -118,12 +118,20 @@ function OutlineBody({ outline, go, onNavigate }: { outline: OutlineView; go: Go
     case "ready":
       return (
         <>
+          <AgentNotice notice={outline.agentNotice} />
           {outline.groups.map((group, position) => (
             <div key={group.courseId}>
               <GroupLabel outline={outline} title={group.title} />
               <ul className="tp-tree" aria-label={`Lessons of ${group.title}`}>
                 {group.lessons.map((lesson, lessonPosition) => (
-                  <LessonBranch key={lesson.id} lesson={lesson} position={lessonPosition} go={go} onNavigate={onNavigate} />
+                  <LessonBranch
+                    key={lesson.id}
+                    lesson={lesson}
+                    position={lessonPosition}
+                    go={go}
+                    onNavigate={onNavigate}
+                    canStartCoach={outline.canStartCoach}
+                  />
                 ))}
               </ul>
               {position === 0 ? <AddCourseList addCourses={outline.addCourses} /> : null}
@@ -133,6 +141,16 @@ function OutlineBody({ outline, go, onNavigate }: { outline: OutlineView; go: Go
         </>
       );
   }
+}
+
+/** How to sign in to a coding agent, when none is ready to coach. */
+function AgentNotice({ notice }: { notice: OutlineView["agentNotice"] }) {
+  if (notice === null) return null;
+  return (
+    <div className="tp-outline-note" role="status">
+      {notice.text}
+    </div>
+  );
 }
 
 /** Each course's lessons, to read ahead, before there is a workspace to coach in. */
@@ -213,7 +231,19 @@ function CourseErrors({ errors }: { errors: readonly string[] }) {
   );
 }
 
-function LessonBranch({ lesson, position, go, onNavigate }: { lesson: LessonNode; position: number; go: Go; onNavigate: () => void }) {
+function LessonBranch({
+  lesson,
+  position,
+  go,
+  onNavigate,
+  canStartCoach,
+}: {
+  lesson: LessonNode;
+  position: number;
+  go: Go;
+  onNavigate: () => void;
+  canStartCoach: boolean;
+}) {
   const [open, setOpen] = useState(lesson.expandedByDefault);
   useEffect(() => {
     if (lesson.expandedByDefault) setOpen(true);
@@ -238,14 +268,24 @@ function LessonBranch({ lesson, position, go, onNavigate }: { lesson: LessonNode
       </button>
       {open ? (
         <div id={childrenId} className="tp-lesson-body">
-          <LessonThreads lesson={lesson} go={go} onNavigate={onNavigate} />
+          <LessonThreads lesson={lesson} go={go} onNavigate={onNavigate} canStartCoach={canStartCoach} />
         </div>
       ) : null}
     </li>
   );
 }
 
-function LessonThreads({ lesson, go, onNavigate }: { lesson: LessonNode; go: Go; onNavigate: () => void }) {
+function LessonThreads({
+  lesson,
+  go,
+  onNavigate,
+  canStartCoach,
+}: {
+  lesson: LessonNode;
+  go: Go;
+  onNavigate: () => void;
+  canStartCoach: boolean;
+}) {
   const rpc = useTutorRpc();
   const navigate = useBbNavigate();
   const openRule = useOpenRule();
@@ -265,7 +305,12 @@ function LessonThreads({ lesson, go, onNavigate }: { lesson: LessonNode; go: Go;
     <>
       {coach === null ? (
         lesson.canStartCoach ? (
-          <button type="button" className="tp-th tp-th--coach tp-th--start" disabled={startCoach.pending} onClick={() => void startCoach.run()}>
+          <button
+            type="button"
+            className="tp-th tp-th--coach tp-th--start"
+            disabled={startCoach.pending || !canStartCoach}
+            onClick={() => void startCoach.run()}
+          >
             <KitIcon name="chat" className="tp-ic" />
             <span className="tp-t">{startCoach.pending ? "Starting your coach…" : "Start with your coach"}</span>
           </button>

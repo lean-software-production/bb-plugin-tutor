@@ -171,6 +171,16 @@ export const courseOverviewSchema = z.object({
 });
 export type CourseOverview = z.infer<typeof courseOverviewSchema>;
 
+/**
+ * The agent that would coach, and for each of COACH_AGENTS that isn't ready,
+ * how to sign in (server/coach/agent.ts).
+ */
+export const coachAgentStateSchema = z.object({
+  ready: z.string().nullable(),
+  signIn: z.array(z.object({ providerId: z.string(), name: z.string(), command: z.string().nullable() })),
+});
+export type CoachAgentState = z.infer<typeof coachAgentStateSchema>;
+
 /** Everything the outline, the home section and the first-run page need in one call. */
 export const overviewSchema = z.object({
   workspace: workspaceSchema,
@@ -181,6 +191,8 @@ export const overviewSchema = z.object({
   /** Courses that could not be loaded, by path, with the reason. */
   courseErrors: z.array(z.object({ source: z.string(), error: z.string() })),
   threads: z.array(tutorThreadSchema),
+  /** Which agent would coach, or how to sign in to one; null when a coachProvider setting names one, or there is no workspace. */
+  coachAgent: coachAgentStateSchema.nullable(),
 });
 export type Overview = z.infer<typeof overviewSchema>;
 

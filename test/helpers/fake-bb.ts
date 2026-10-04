@@ -178,7 +178,11 @@ export async function makeTutorHost(
     /** Runs before each call to the host entry is dispatched: to watch the calls, or to fail one by throwing. */
     onHostCall?: (method: string, input: unknown) => unknown;
     /** What sdk.system.providerStates says of each agent on a machine; without it, the call fails (as on an older BB). */
-    providerStates?: { providerId: string; status: "ready" | "unauthenticated" | "expired" | "not_installed" | "unknown" | "unsupported_version" }[];
+    providerStates?: {
+      providerId: string;
+      status: "ready" | "unauthenticated" | "expired" | "not_installed" | "unknown" | "unsupported_version";
+      loginCommand?: string | null;
+    }[];
     /** Hosts sdk.hosts.list returns; the server's own host unless given. */
     hosts?: FakeHost[];
     /** When true, sdk.projects.list starts empty and sdk.projects.create adds to it. */

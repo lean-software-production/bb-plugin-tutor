@@ -248,6 +248,33 @@ test("a coachProvider setting pins coach threads to that provider explicitly", a
   assert.deepEqual(spawn.executionInputSources, { providerId: "explicit" });
 });
 
+test("the overview says which agent coaches, or how to sign in to one", async (t) => {
+  const ready = await agentSetup(t, [{ providerId: "codex", status: "ready" }]);
+  const overview = (await ready.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.equal(overview.coachAgent?.ready, "codex");
+
+  const none = await agentSetup(t, [
+    { providerId: "claude-code", status: "unauthenticated", loginCommand: "claude" },
+    { providerId: "codex", status: "not_installed", loginCommand: null },
+    { providerId: "pi", status: "expired", loginCommand: "pi" },
+  ]);
+  const view = (await none.harness.behavior.callRpc("getOverview", null)) as Overview;
+  assert.equal(view.coachAgent?.ready, null);
+  assert.deepEqual(
+    view.coachAgent?.signIn.map((s) => [s.providerId, s.command]),
+    [
+      ["claude-code", "claude"],
+      ["codex", null],
+      ["pi", "pi"],
+    ],
+  );
+});
+
+test("with a coachProvider setting the overview carries no agent advice", async (t) => {
+  const host = await agentSetup(t, [{ providerId: "claude-code", status: "ready" }], { factoryProject: PROJECT_ID, coachProvider: "pi" });
+  assert.equal(((await host.harness.behavior.callRpc("getOverview", null)) as Overview).coachAgent, null);
+});
+
 test("a coachModel setting pins coach threads to that model explicitly", async (t) => {
   const { host } = await setup(t, { factoryProject: PROJECT_ID, coachProvider: "pi", coachModel: "openrouter/moonshotai/kimi-k2.6" });
   await openCoach(host, "000");
