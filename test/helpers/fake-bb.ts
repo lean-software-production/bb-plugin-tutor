@@ -291,12 +291,13 @@ export async function makeTutorHost(
         },
         list: async () => projects,
         create: async ({ name, source }) => {
+          const id = `proj_${projects.length + 1}`;
           const created: ProjectResponse = {
-            id: `proj_${projects.length + 1}`,
+            id,
             name,
             kind: "standard",
             sources: [
-              { id: "src_x", projectId: `proj_${projects.length + 1}`, hostId: source.hostId, type: "local_path", path: source.path, isDefault: true, createdAt: 1, updatedAt: 1 },
+              { id: "src_x", projectId: id, hostId: source.hostId, type: "local_path", path: source.path, isDefault: true, createdAt: 1, updatedAt: 1 },
             ],
             gitRemoteUrl: null,
             createdAt: 1,

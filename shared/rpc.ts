@@ -289,7 +289,7 @@ export const rpcContract = defineRpcContract({
     input: z.object({ projectId: z.string().min(1).max(128) }),
     output: workspaceSchema,
   },
-  /** The hosted first run: whether the student's Codespace (BB's own host's machine) has a checkout to offer. */
+  /** The hosted first run: whether the student's enrolled machine (their Codespace) has a checkout to offer. */
   offerWorkspace: {
     input: z.null(),
     output: workspaceOfferSchema,
