@@ -7,15 +7,15 @@
 # only with the go-ahead. Back out with teardown.sh.
 #
 # The plugin comes from the end-to-end build ($PLUGIN_TGZ, default
-# ~/tutor-e2e/release/bb-plugin-tutor-<version>-built.tgz): run
-# standalone/e2e/e2e.sh build first.
+# ~/tutor-e2e-hosted/release/bb-plugin-tutor-<version>-built.tgz): run
+# e2e/hosted.sh build first.
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 . "$here/lib.sh"
 
 version=$(node -p 'require(process.argv[1]).version' "$here/../../package.json")
-PLUGIN_TGZ=${PLUGIN_TGZ:-$HOME/tutor-e2e/release/bb-plugin-tutor-$version-built.tgz}
-[ -f "$PLUGIN_TGZ" ] || die "no built plugin at $PLUGIN_TGZ: run standalone/e2e/e2e.sh build"
+PLUGIN_TGZ=${PLUGIN_TGZ:-$HOME/tutor-e2e-hosted/release/bb-plugin-tutor-$version-built.tgz}
+[ -f "$PLUGIN_TGZ" ] || die "no built plugin at $PLUGIN_TGZ: run e2e/hosted.sh build"
 
 remote_tgz=/tmp/tutor-spike2-plugin.tgz
 scp -q -o BatchMode=yes "$PLUGIN_TGZ" "$BOX:$remote_tgz"

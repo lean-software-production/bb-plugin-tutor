@@ -23,7 +23,7 @@ Spike 2 tries this layout with one hand-made student (`student-001`) on `ew-lsp-
 
 ## Before you start
 
-- **The plugin build:** `standalone/e2e/e2e.sh build` writes `~/tutor-e2e/release/bb-plugin-tutor-<version>-built.tgz`.
+- **The plugin build:** `e2e/hosted.sh build` writes `~/tutor-e2e-hosted/release/bb-plugin-tutor-<version>-built.tgz`.
 - **Port 38888 must be free on the box.** `box-setup.sh` refuses if anything else is listening on it.
 - **Cloudflare (step 2):** an API token with Access:Edit, and DNS for `leansoftware.ai` in the LSP account, or the Zero Trust dashboard. Both are in 1Password `Shared` under the tag `ew-fleet`.
 

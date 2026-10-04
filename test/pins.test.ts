@@ -18,18 +18,3 @@ test("package.json, the lockfile and CI pin the same BB and SDK", async () => {
   const release = await readFile(".github/workflows/release.yaml", "utf8");
   assert.match(release, new RegExp(`BB_APP_VERSION: ${BB.replace(/\./g, "\\.")}\\b`));
 });
-
-test("the launcher installs the BB the plugin is pinned to", async () => {
-  const launcher = await readFile("standalone/tutor", "utf8");
-  assert.match(launcher, new RegExp(`^BB_VERSION=${BB.replace(/\./g, "\\.")}$`, "m"));
-});
-
-test("release.yaml attaches install.sh, tutor, the plugin archive and its ready-to-install build", async () => {
-  const release = await readFile(".github/workflows/release.yaml", "utf8");
-  for (const asset of ["install.sh", "tutor", "bb-plugin-tutor-", "-built.tgz", "SHA256SUMS"]) assert.ok(release.includes(asset), asset);
-});
-
-test("install.sh downloads the plugin's ready-to-install build, not the source archive", async () => {
-  const install = await readFile("standalone/install.sh", "utf8");
-  assert.match(install, /^ARCHIVE_NAME="bb-plugin-tutor-\$TUTOR_VERSION-built\.tgz"$/m);
-});

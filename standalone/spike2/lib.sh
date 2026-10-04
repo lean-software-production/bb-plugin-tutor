@@ -23,8 +23,8 @@ LAPTOP_BB="$SPIKE2_HOME/npm/node_modules/.bin/bb"
 # BB's installer names the machine's folder after the server it joined.
 MACHINE_DIR="$HOME/.bb-machines/$TAILNET_IP-$PORT"
 
-# The plugins a student doesn't need: the launcher's TUTOR_QUIET_PLUGINS.
-QUIET_PLUGINS=$(sed -n 's/^TUTOR_QUIET_PLUGINS="\(.*\)"$/\1/p' "$(dirname "${BASH_SOURCE[0]}")/../tutor")
+# The plugins a student doesn't need (the retired launcher's TUTOR_QUIET_PLUGINS).
+QUIET_PLUGINS="account-pool agent-annotations ask-user-question automations bb-guide connect custom-instructions drafts keep-awake monaco-editor navigation plugin-api-docs plugin-api-tester provider-acp push-notifications scheduled-send workflows"
 
 say() { printf '%s\n' "$*"; }
 die() { printf 'spike2: %s\n' "$*" >&2; exit 1; }

@@ -1,5 +1,0 @@
-#!/bin/sh
-# Reports $STUB_UNAME (default Linux) for `uname -s` (and bare `uname`).
-. "$(cd "$(dirname "$0")" && pwd)/lib.sh"
-stub_init uname "$@"
-echo "${STUB_UNAME:-Linux}"

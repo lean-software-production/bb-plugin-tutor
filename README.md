@@ -12,6 +12,13 @@ contracts are in [`docs/IMPLEMENTATION.md`](docs/IMPLEMENTATION.md).
 Tutor targets bb-app **0.45.0** (`engines.bb` is `>=0.45.0`, and CI builds with exactly 0.45.0)
 with plugin SDK **0.6.15**, which is pinned exactly in `devDependencies`. The plugin id is `tutor`.
 
+## Hosted
+
+Tutor is hosted: one BB server per student, with the student's Codespace as its machine, rather
+than an all-on-the-laptop launcher. See [`docs/2026-10-04-hosted-tutor.md`](docs/2026-10-04-hosted-tutor.md)
+for the design, and [`docs/tutor-students.md`](../infrastructure/docs/tutor-students.md) (in the
+infrastructure repo) for running and operating student servers.
+
 ## Install
 
 ### In a course Codespace (the supported way)
@@ -104,17 +111,15 @@ A release is a tag `v<version>` whose version equals `version` in `package.json`
    `node_modules`. The workflow checks that the archive installs
    (`npm ci --omit=dev --ignore-scripts`) and builds (`bb plugin build .`), and packs that
    installed and built tree, under the same top-level directory, as
-   `bb-plugin-tutor-<x.y.z>-built.tgz`. It then creates the GitHub Release with the archive and
-   its `.sha256`, the `-built.tgz` (what the standalone launcher's `install.sh` downloads, so
-   `tutor up` fetches nothing), `tutor`, `install.sh` and a `SHA256SUMS` covering all four,
-   plus generated notes.
+   `bb-plugin-tutor-<x.y.z>-built.tgz`. It then creates the GitHub Release with the archive,
+   its `.sha256` and the `-built.tgz`, plus generated notes.
 4. To adopt the release in the tutor Feature, follow the steps in devcontainer-features'
    [`src/tutor/plugin-pin.sh`](https://github.com/lean-software-production/devcontainer-features/blob/main/src/tutor/plugin-pin.sh).
    Compute the SHA-256 yourself rather than copying the release's `.sha256`.
 
 To build the same archive locally, run `scripts/release-archive.sh v<x.y.z> <out-dir>`, then
 `scripts/check-release-archive.sh <out-dir>/bb-plugin-tutor-<x.y.z>.tgz` (which also writes the
-`-built.tgz`) and `scripts/release-standalone.sh <x.y.z> <out-dir>`.
+`-built.tgz`).
 
 ## Settings and coach tools
 
